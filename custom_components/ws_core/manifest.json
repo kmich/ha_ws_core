@@ -1,12 +1,12 @@
 {
   "domain": "ws_core",
   "name": "Weather Station Core",
-  "codeowners": ["@kmich"],
+  "version": "0.1.0",
+  "documentation": "https://github.com/kmich/ha-ws-core",
+  "issue_tracker": "https://github.com/kmich/ha-ws-core/issues",
+  "codeowners": [
+    "@kmich"
+  ],
   "config_flow": true,
-  "dependencies": [],
-  "documentation": "https://github.com/kmich/ha_ws_core",
-  "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/kmich/ha_ws_core/issues",
-  "requirements": [],
-  "version": "1.0.0"
+  "iot_class": "calculated"
 }

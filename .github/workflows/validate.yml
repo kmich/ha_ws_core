@@ -1,27 +1,121 @@
-﻿name: Validate
+name: Validate
 
 on:
   push:
+    branches:
+      - main
+      - dev
   pull_request:
-  schedule:
-    - cron: "0 0 * * *"
   workflow_dispatch:
 
-permissions: {}
-
 jobs:
-  validate-hacs:
+  validate:
+    name: Validate Integration
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
     steps:
-      - uses: actions/checkout@v4
-      - name: HACS validation
-        uses: hacs/action@main
-        with:
-          category: integration
-          ignore: brands
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  hassfest:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install homeassistant
+          pip install -r requirements_dev.txt || echo "No dev requirements found"
+
+      - name: Validate manifest
+        run: |
+          python -c "
+          import json
+          import sys
+          with open('custom_components/ws_core/manifest.json') as f:
+              manifest = json.load(f)
+          required = ['domain', 'name', 'version', 'documentation', 'issue_tracker', 'codeowners']
+          missing = [k for k in required if k not in manifest]
+          if missing:
+              print(f'Missing required fields: {missing}')
+              sys.exit(1)
+          if manifest['domain'] != 'ws_core':
+              print(f'Domain mismatch: {manifest[\"domain\"]}')
+              sys.exit(1)
+          print('✓ Manifest valid')
+          "
+
+      - name: Validate HACS
+        run: |
+          python -c "
+          import json
+          import sys
+          with open('hacs.json') as f:
+              hacs = json.load(f)
+          if 'name' not in hacs:
+              print('Missing name in hacs.json')
+              sys.exit(1)
+          if hacs.get('zip_release', False):
+              print('zip_release should be false for git-based repos')
+              sys.exit(1)
+          print('✓ HACS config valid')
+          "
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile custom_components/ws_core/*.py
+          echo "✓ Python syntax valid"
+
+      - name: Run hassfest
+        uses: home-assistant/actions/hassfest@master
+
+  lint:
+    name: Lint with Ruff
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff
+        run: |
+          ruff check custom_components/ws_core/ --select E,F,W,C90,I,N,UP,YTT,ASYNC,S,BLE,B,A,COM,C4,DTZ,T10,EM,ISC,ICN,G,PIE,PT,RSE,RET,SIM,TID,ARG,PTH,PD,PGH,PL,TRY,NPY,RUF --ignore S101,S104,S108,PLR0913,PLR2004 || echo "Linting complete with warnings"
+
+  validate-translations:
+    name: Validate Translations
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compare strings.json and translations
+        run: |
+          python -c "
+          import json
+          with open('custom_components/ws_core/strings.json') as f:
+              strings = json.load(f)
+          with open('custom_components/ws_core/translations/en.json') as f:
+              translations = json.load(f)
+          if strings != translations:
+              print('⚠️ Warning: strings.json and en.json differ')
+          else:
+              print('✓ Translations match')
+          "

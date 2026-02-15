@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    name: Create Release Assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from manifest
+        id: version
+        run: |
+          VERSION=$(cat custom_components/ws_core/manifest.json | jq -r .version)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Validate version matches tag
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          MANIFEST_VERSION=${{ steps.version.outputs.version }}
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) doesn't match manifest version ($MANIFEST_VERSION)"
+            exit 1
+          fi
+
+      - name: Create changelog excerpt
+        id: changelog
+        run: |
+          # Extract the latest version section from CHANGELOG.md
+          awk '/^## \[/{if (++count == 2) exit} count == 1' CHANGELOG.md > release_notes.md
+          cat release_notes.md
+
+      - name: Update release notes
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body_path: release_notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
