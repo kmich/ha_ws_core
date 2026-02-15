@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Weather Station Core",
+        "description": "Create a derived weather station from your existing sensors.",
+        "data": {
+          "name": "Station name",
+          "prefix": "Entity prefix (e.g., ws)"
+        }
+      },
+      "required_sources": {
+        "title": "Required source sensors",
+        "description": "Pick the sensors that represent the real measurements from your weather station. These are required.",
+        "data": {
+          "temperature": "Temperature sensor",
+          "humidity": "Humidity sensor",
+          "pressure": "Pressure sensor",
+          "wind_speed": "Wind speed sensor",
+          "wind_gust": "Wind gust sensor",
+          "wind_direction": "Wind direction sensor",
+          "rain_total": "Cumulative precipitation sensor"
+        }
+      },
+      "optional_sources": {
+        "title": "Optional source sensors",
+        "description": "Optional sensors improve derived metrics, but are not required.",
+        "data": {
+          "illuminance": "Illuminance sensor (optional)",
+          "uv_index": "UV index sensor (optional)",
+          "dew_point": "Dew point sensor (optional)",
+          "battery": "Battery sensor (optional)"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Forecast uses Open-Meteo (no API key).",
+        "data": {
+          "units_mode": "Units mode",
+          "elevation_m": "Elevation above sea level",
+          "staleness_s": "Staleness threshold",
+          "forecast_enabled": "Enable forecast",
+          "forecast_interval_min": "Forecast refresh interval",
+          "forecast_lat": "Forecast latitude",
+          "forecast_lon": "Forecast longitude"
+        }
+      },
+      "alerts": {
+        "title": "Alerts & heuristics",
+        "description": "Customize local alert thresholds and heuristic helpers.",
+        "data": {
+          "thresh_wind_gust_ms": "Wind gust alert threshold",
+          "thresh_rain_rate_mmph": "Rain rate alert threshold",
+          "thresh_freeze_c": "Freeze alert threshold",
+          "rain_filter_alpha": "Rain-rate filter smoothing (alpha)",
+          "pressure_trend_window_h": "Pressure-trend window",
+          "enable_activity_scores": "Enable activity proxy scores (laundry / stargazing / fire)",
+          "rain_penalty_light_mmph": "Rain penalty start (light rain)",
+          "rain_penalty_heavy_mmph": "Rain penalty full (heavy rain)"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "Entity not found.",
+      "not_numeric": "Entity state is not a numeric value.",
+      "required": "This field is required."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "WS Station options",
+        "description": "Reconfigure settings, forecasts, thresholds, and heuristics."
+      }
+    }
+  }
+}

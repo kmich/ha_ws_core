@@ -1,0 +1,10 @@
+WS Station Light:
+  primary-color: "#1565c0"
+  accent-color: "#ff6f00"
+  primary-background-color: "#f6f7fb"
+  secondary-background-color: "#ffffff"
+  card-background-color: "#ffffff"
+  primary-text-color: "#1d1f23"
+  secondary-text-color: "#5b616b"
+  divider-color: "rgba(0, 0, 0, 0.12)"
+  ha-card-border-radius: "16px"

@@ -1,0 +1,8 @@
+{
+  "name": "Weather Station Core",
+  "content_in_root": false,
+  "render_readme": true,
+  "zip_release": true,
+  "filename": "ws_core.zip",
+  "homeassistant": "2024.6.0"
+}
