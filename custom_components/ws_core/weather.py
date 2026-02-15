@@ -13,9 +13,9 @@ except Exception:  # pragma: no cover
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
-    PRESSURE_HPA,
-    SPEED_METERS_PER_SECOND,
-    TEMP_CELSIUS,
+    UnitOfPressure,
+    UnitOfSpeed,
+    UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -72,9 +72,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class WSStationWeather(CoordinatorEntity, WeatherEntity):
     """Weather entity derived from the coordinator."""
 
-    _attr_native_temperature_unit = TEMP_CELSIUS
-    _attr_native_pressure_unit = PRESSURE_HPA
-    _attr_native_wind_speed_unit = SPEED_METERS_PER_SECOND
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_pressure_unit = UnitOfPressure.HPA
+    _attr_native_wind_speed_unit = UnitOfSpeed.METERS_PER_SECOND
 
     def __init__(self, coordinator, entry: ConfigEntry, prefix: str) -> None:
         super().__init__(coordinator)
