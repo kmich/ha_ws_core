@@ -243,6 +243,10 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data.update(user_input)
             return await self.async_step_alerts()
 
+        # Get safe defaults
+        default_lat = self.hass.config.latitude if self.hass.config.latitude is not None else 0.0
+        default_lon = self.hass.config.longitude if self.hass.config.longitude is not None else 0.0
+
         schema = vol.Schema(
             {
                 vol.Optional(CONF_UNITS_MODE, default=DEFAULT_UNITS_MODE): selector.SelectSelector(
@@ -261,10 +265,10 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=DEFAULT_FORECAST_INTERVAL_MIN): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
                 ),
-                vol.Optional(CONF_FORECAST_LAT, default=self.hass.config.latitude or 0.0): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LAT, default=default_lat): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
-                vol.Optional(CONF_FORECAST_LON, default=self.hass.config.longitude or 0.0): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LON, default=default_lon): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
             }
@@ -363,6 +367,12 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         cur_light = float(self.config_entry.options.get(CONF_RAIN_PENALTY_LIGHT_MMPH, self.config_entry.data.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)))
         cur_heavy = float(self.config_entry.options.get(CONF_RAIN_PENALTY_HEAVY_MMPH, self.config_entry.data.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)))
 
+        # Safe lat/lon defaults
+        default_lat = self.hass.config.latitude if self.hass.config.latitude is not None else 0.0
+        default_lon = self.hass.config.longitude if self.hass.config.longitude is not None else 0.0
+        cur_lat = self.config_entry.options.get(CONF_FORECAST_LAT, self.config_entry.data.get(CONF_FORECAST_LAT, default_lat))
+        cur_lon = self.config_entry.options.get(CONF_FORECAST_LON, self.config_entry.data.get(CONF_FORECAST_LON, default_lon))
+
         schema = vol.Schema(
             {
                 vol.Optional(CONF_PREFIX, default=self.config_entry.options.get(CONF_PREFIX, self.config_entry.data.get(CONF_PREFIX, DEFAULT_PREFIX))): str,
@@ -379,10 +389,10 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=self.config_entry.options.get(CONF_FORECAST_INTERVAL_MIN, self.config_entry.data.get(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN))): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
                 ),
-                vol.Optional(CONF_FORECAST_LAT, default=self.config_entry.options.get(CONF_FORECAST_LAT, self.config_entry.data.get(CONF_FORECAST_LAT, self.hass.config.latitude or 0.0))): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LAT, default=cur_lat): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
-                vol.Optional(CONF_FORECAST_LON, default=self.config_entry.options.get(CONF_FORECAST_LON, self.config_entry.data.get(CONF_FORECAST_LON, self.hass.config.longitude or 0.0))): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LON, default=cur_lon): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
                 # Alerts & heuristics
