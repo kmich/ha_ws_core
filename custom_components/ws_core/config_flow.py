@@ -261,10 +261,10 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=DEFAULT_FORECAST_INTERVAL_MIN): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
                 ),
-                vol.Optional(CONF_FORECAST_LAT, default=self.hass.config.latitude): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LAT, default=self.hass.config.latitude or 0.0): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
-                vol.Optional(CONF_FORECAST_LON, default=self.hass.config.longitude): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LON, default=self.hass.config.longitude or 0.0): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
             }
@@ -359,7 +359,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         cur_freeze_c = float(self.config_entry.options.get(CONF_THRESH_FREEZE_C, self.config_entry.data.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C)))
         cur_alpha = float(self.config_entry.options.get(CONF_RAIN_FILTER_ALPHA, self.config_entry.data.get(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA)))
         cur_window_h = int(self.config_entry.options.get(CONF_PRESSURE_TREND_WINDOW_H, self.config_entry.data.get(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H)))
-        cur_enable_scores = bool(self.config_entry.options.get(CONF_ENABLE_ACTIVITY_SCORES, self.config_entry.data.get(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_ACTIVITY_SCORES)))
+        cur_enable_scores = bool(self.config_entry.options.get(CONF_ENABLE_ACTIVITY_SCORES, self.config_entry.data.get(CONF_ENABLE_ACTIVITY_SCORES, False)))
         cur_light = float(self.config_entry.options.get(CONF_RAIN_PENALTY_LIGHT_MMPH, self.config_entry.data.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)))
         cur_heavy = float(self.config_entry.options.get(CONF_RAIN_PENALTY_HEAVY_MMPH, self.config_entry.data.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)))
 
@@ -379,10 +379,10 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=self.config_entry.options.get(CONF_FORECAST_INTERVAL_MIN, self.config_entry.data.get(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN))): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
                 ),
-                vol.Optional(CONF_FORECAST_LAT, default=self.config_entry.options.get(CONF_FORECAST_LAT, self.config_entry.data.get(CONF_FORECAST_LAT, self.hass.config.latitude))): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LAT, default=self.config_entry.options.get(CONF_FORECAST_LAT, self.config_entry.data.get(CONF_FORECAST_LAT, self.hass.config.latitude or 0.0))): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
-                vol.Optional(CONF_FORECAST_LON, default=self.config_entry.options.get(CONF_FORECAST_LON, self.config_entry.data.get(CONF_FORECAST_LON, self.hass.config.longitude))): selector.NumberSelector(
+                vol.Optional(CONF_FORECAST_LON, default=self.config_entry.options.get(CONF_FORECAST_LON, self.config_entry.data.get(CONF_FORECAST_LON, self.hass.config.longitude or 0.0))): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
                 # Alerts & heuristics
