@@ -1,5 +1,4 @@
 """Weather Station Core integration."""
-
 from __future__ import annotations
 
 import logging
@@ -16,18 +15,27 @@ from .coordinator import WSStationCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# This integration is config-entry-only (no YAML config)
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 SERVICE_RESET_RAIN = "reset_rain_baseline"
 ATTR_ENTRY_ID = "entry_id"
 
-SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+SERVICE_RESET_RAIN_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY_ID): cv.string,
+    }
+)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the integration domain."""
     hass.data.setdefault(DOMAIN, {})
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up WS Core from a config entry."""
     coordinator = WSStationCoordinator(hass, entry.data, entry.options)
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
@@ -39,7 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
-        manufacturer="WS Station",
+        manufacturer="Weather Station Core",
         model="Derived Weather Package",
     )
 
@@ -47,11 +55,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def _reset_rain(call: ServiceCall) -> None:
         entry_id = call.data.get(ATTR_ENTRY_ID)
-        targets = []
         if entry_id:
             coord = hass.data[DOMAIN].get(entry_id)
-            if coord:
-                targets = [coord]
+            targets = [coord] if coord else []
         else:
             targets = list(hass.data[DOMAIN].values())
 
@@ -63,7 +69,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Register services once per integration domain (idempotent)
     if not hass.services.has_service(DOMAIN, SERVICE_RESET_RAIN):
-        hass.services.async_register(DOMAIN, SERVICE_RESET_RAIN, _reset_rain, schema=SERVICE_RESET_RAIN_SCHEMA)
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_RESET_RAIN,
+            _reset_rain,
+            schema=SERVICE_RESET_RAIN_SCHEMA,
+        )
 
     return True
 
@@ -74,8 +85,11 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
     coordinator: WSStationCoordinator | None = hass.data[DOMAIN].pop(entry.entry_id, None)
     if coordinator is not None:
         await coordinator.async_stop()
+
     return unload_ok
