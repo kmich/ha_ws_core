@@ -239,26 +239,36 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="optional_sources", data_schema=vol.Schema(fields), errors=errors)
 
     async def async_step_settings(self, user_input: dict[str, Any] | None = None):
-        import logging
-        _LOGGER = logging.getLogger(__name__)
-        _LOGGER.error(f"=== SETTINGS ENTERED: user_input={user_input}")
-        
         if user_input is not None:
-            _LOGGER.error("SETTINGS: Processing user input")
             self._data.update(user_input)
             return await self.async_step_alerts()
 
-        _LOGGER.error("SETTINGS: Building minimal schema")
-        try:
-            schema = vol.Schema({
-                vol.Optional(CONF_ELEVATION_M, default=0.0): int
-            })
-            _LOGGER.error("SETTINGS: Minimal schema built successfully")
-        except Exception as e:
-            _LOGGER.error(f"SETTINGS: Exception building schema: {e}", exc_info=True)
-            raise
-            
-        _LOGGER.error("SETTINGS: About to show form")
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_UNITS_MODE, default=DEFAULT_UNITS_MODE): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=["auto", "metric", "imperial"],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(CONF_ELEVATION_M, default=DEFAULT_ELEVATION_M): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-500, max=5000, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="m")
+                ),
+                vol.Optional(CONF_STALENESS_S, default=DEFAULT_STALENESS_S): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=60, max=86400, step=60, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s")
+                ),
+                vol.Optional(CONF_FORECAST_ENABLED, default=DEFAULT_FORECAST_ENABLED): selector.BooleanSelector(),
+                vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=DEFAULT_FORECAST_INTERVAL_MIN): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
+                ),
+                vol.Optional(CONF_FORECAST_LAT, default=self.hass.config.latitude): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_FORECAST_LON, default=self.hass.config.longitude): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode=selector.NumberSelectorMode.BOX)
+                ),
+            }
+        )
         return self.async_show_form(step_id="settings", data_schema=schema)
 
     async def async_step_alerts(self, user_input: dict[str, Any] | None = None):
@@ -288,26 +298,26 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Optional(CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(DEFAULT_THRESH_WIND_GUST_MS, imperial), 1)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=60, step=0.1, mode="box", unit_of_measurement=gust_u)
+                    selector.NumberSelectorConfig(min=0, max=60, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=gust_u)
                 ),
                 vol.Optional(CONF_THRESH_RAIN_RATE_MMPH, default=round(_convert_rain_to_display(DEFAULT_THRESH_RAIN_RATE_MMPH, imperial), 2)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=200, step=0.1, mode="box", unit_of_measurement=rain_u)
+                    selector.NumberSelectorConfig(min=0, max=200, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=rain_u)
                 ),
                 vol.Optional(CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(DEFAULT_THRESH_FREEZE_C, imperial), 1)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-50, max=50, step=0.1, mode="box", unit_of_measurement=temp_u)
+                    selector.NumberSelectorConfig(min=-50, max=50, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=temp_u)
                 ),
                 vol.Optional(CONF_RAIN_FILTER_ALPHA, default=DEFAULT_RAIN_FILTER_ALPHA): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="box")
+                    selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode=selector.NumberSelectorMode.BOX)
                 ),
                 vol.Optional(CONF_PRESSURE_TREND_WINDOW_H, default=DEFAULT_PRESSURE_TREND_WINDOW_H): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
+                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="h")
                 ),
                 vol.Optional(CONF_ENABLE_ACTIVITY_SCORES, default=False): selector.BooleanSelector(),
                 vol.Optional(CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_LIGHT_MMPH, imperial), 2)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=10, step=0.1, mode="box", unit_of_measurement=rain_u)
+                    selector.NumberSelectorConfig(min=0, max=10, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=rain_u)
                 ),
                 vol.Optional(CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_HEAVY_MMPH, imperial), 2)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.1, mode="box", unit_of_measurement=rain_u)
+                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=rain_u)
                 ),
             }
         )
@@ -353,56 +363,50 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         cur_light = float(self.config_entry.options.get(CONF_RAIN_PENALTY_LIGHT_MMPH, self.config_entry.data.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)))
         cur_heavy = float(self.config_entry.options.get(CONF_RAIN_PENALTY_HEAVY_MMPH, self.config_entry.data.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)))
 
-        # Safe lat/lon defaults
-        default_lat = self.hass.config.latitude if self.hass.config.latitude is not None else 0.0
-        default_lon = self.hass.config.longitude if self.hass.config.longitude is not None else 0.0
-        cur_lat = self.config_entry.options.get(CONF_FORECAST_LAT, self.config_entry.data.get(CONF_FORECAST_LAT, default_lat))
-        cur_lon = self.config_entry.options.get(CONF_FORECAST_LON, self.config_entry.data.get(CONF_FORECAST_LON, default_lon))
-
         schema = vol.Schema(
             {
                 vol.Optional(CONF_PREFIX, default=self.config_entry.options.get(CONF_PREFIX, self.config_entry.data.get(CONF_PREFIX, DEFAULT_PREFIX))): str,
                 vol.Optional(CONF_UNITS_MODE, default=units_mode): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=["auto", "metric", "imperial"], mode="dropdown")
+                    selector.SelectSelectorConfig(options=["auto", "metric", "imperial"], mode=selector.SelectSelectorMode.DROPDOWN)
                 ),
                 vol.Optional(CONF_ELEVATION_M, default=self.config_entry.options.get(CONF_ELEVATION_M, self.config_entry.data.get(CONF_ELEVATION_M, DEFAULT_ELEVATION_M))): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-500, max=5000, step=1, mode="box", unit_of_measurement="m")
+                    selector.NumberSelectorConfig(min=-500, max=5000, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="m")
                 ),
                 vol.Optional(CONF_STALENESS_S, default=self.config_entry.options.get(CONF_STALENESS_S, self.config_entry.data.get(CONF_STALENESS_S, DEFAULT_STALENESS_S))): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=60, max=86400, step=60, mode="box", unit_of_measurement="s")
+                    selector.NumberSelectorConfig(min=60, max=86400, step=60, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s")
                 ),
                 vol.Optional(CONF_FORECAST_ENABLED, default=self.config_entry.options.get(CONF_FORECAST_ENABLED, self.config_entry.data.get(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED))): selector.BooleanSelector(),
                 vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=self.config_entry.options.get(CONF_FORECAST_INTERVAL_MIN, self.config_entry.data.get(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN))): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="min")
                 ),
-                vol.Optional(CONF_FORECAST_LAT, default=cur_lat): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode="box")
+                vol.Optional(CONF_FORECAST_LAT, default=self.config_entry.options.get(CONF_FORECAST_LAT, self.config_entry.data.get(CONF_FORECAST_LAT, self.hass.config.latitude))): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
-                vol.Optional(CONF_FORECAST_LON, default=cur_lon): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode="box")
+                vol.Optional(CONF_FORECAST_LON, default=self.config_entry.options.get(CONF_FORECAST_LON, self.config_entry.data.get(CONF_FORECAST_LON, self.hass.config.longitude))): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode=selector.NumberSelectorMode.BOX)
                 ),
                 # Alerts & heuristics
                 vol.Optional(CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, imperial), 1)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=60, step=0.1, mode="box", unit_of_measurement=gust_u)
+                    selector.NumberSelectorConfig(min=0, max=60, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=gust_u)
                 ),
                 vol.Optional(CONF_THRESH_RAIN_RATE_MMPH, default=round(_convert_rain_to_display(cur_rain_mmph, imperial), 2)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=200, step=0.1, mode="box", unit_of_measurement=rain_u)
+                    selector.NumberSelectorConfig(min=0, max=200, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=rain_u)
                 ),
                 vol.Optional(CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, imperial), 1)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-50, max=50, step=0.1, mode="box", unit_of_measurement=temp_u)
+                    selector.NumberSelectorConfig(min=-50, max=50, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=temp_u)
                 ),
                 vol.Optional(CONF_RAIN_FILTER_ALPHA, default=cur_alpha): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="box")
+                    selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode=selector.NumberSelectorMode.BOX)
                 ),
                 vol.Optional(CONF_PRESSURE_TREND_WINDOW_H, default=cur_window_h): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
+                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="h")
                 ),
                 vol.Optional(CONF_ENABLE_ACTIVITY_SCORES, default=cur_enable_scores): selector.BooleanSelector(),
                 vol.Optional(CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(cur_light, imperial), 2)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=10, step=0.1, mode="box", unit_of_measurement=rain_u)
+                    selector.NumberSelectorConfig(min=0, max=10, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=rain_u)
                 ),
                 vol.Optional(CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(cur_heavy, imperial), 2)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.1, mode="box", unit_of_measurement=rain_u)
+                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=rain_u)
                 ),
             }
         )

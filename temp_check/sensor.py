@@ -47,35 +47,15 @@ from .const import (
 )
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class WSSensorDescription:
-    """Describes Weather Station sensor entities."""
-    # Required
     key: str
-    
-    # From EntityDescription
-    device_class: SensorDeviceClass | None = None
-    entity_category: EntityCategory | None = None
-    entity_registry_enabled_default: bool = True
-    entity_registry_visible_default: bool = True
-    force_update: bool = False
+    name: str
     icon: str | None = None
-    has_entity_name: bool = True
-    name: str | None = None
-    translation_key: str | None = None
-    translation_placeholders: dict[str, str] | None = None
-    
-    # From SensorEntityDescription
-    last_reset: Any | None = None  # datetime
-    native_unit_of_measurement: str | None = None
-    options: list[str] | None = None
+    device_class: SensorDeviceClass | None = None
+    native_unit: str | None = None
     state_class: SensorStateClass | None = None
-    suggested_display_precision: int | None = None
-    suggested_unit_of_measurement: str | None = None
-    unit_of_measurement: None = None  # Type override - must be None
-    
-    # Custom attributes for this integration
-    native_unit: str | None = None  # For backward compatibility
+    entity_category: EntityCategory | None = None
     value_fn: Callable[[dict[str, Any]], Any] | None = None
     attrs_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 

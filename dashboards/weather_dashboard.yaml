@@ -1,79 +1,108 @@
-# Weather Station Core Dashboard (vanilla Lovelace)
-# Paste into a YAML dashboard.
+# Weather Station Core Dashboard
+# Simple dashboard using core HA cards - works with HA 2026.2+
 
 title: Weather Station
 views:
-  - title: Overview
-    path: ws
-    icon: mdi:weather-partly-cloudy
+  - title: Weather
     cards:
-      - type: markdown
-        content: |
-          ## Weather Station Core
-          **Data quality:** {{ states('sensor.ws_core_data_quality_banner') }}
-          **Alert:** {{ states('sensor.ws_core_alert_message') }}
-
+      # Weather forecast card
       - type: weather-forecast
-        name: Forecast
-        entity: weather.ws_core
+        entity: weather.ws
+        show_forecast: true
 
+      # Main sensors grid
+      - type: grid
+        columns: 2
+        cards:
+          - type: sensor
+            entity: sensor.ws_temperature
+            graph: line
+            name: Temperature
+          - type: sensor
+            entity: sensor.ws_humidity
+            graph: line
+            name: Humidity
+          - type: sensor
+            entity: sensor.ws_station_pressure
+            graph: line
+            name: Station Pressure
+          - type: sensor
+            entity: sensor.ws_sea_level_pressure
+            graph: line
+            name: Sea Level Pressure
+
+      # Pressure trends
+      - type: entities
+        title: Pressure Trends
+        entities:
+          - entity: sensor.ws_pressure_trend_avg
+            name: Pressure Trend
+          - entity: sensor.ws_pressure_change_window
+            name: Pressure Change
+          - entity: sensor.ws_dew_point
+            name: Dew Point
+          - entity: sensor.ws_battery
+            name: Battery
+
+      # Wind information
       - type: grid
         columns: 3
-        square: false
         cards:
-          - type: gauge
-            name: Temperature
-            entity: sensor.ws_core_norm_temperature
-            min: -10
-            max: 45
-          - type: gauge
-            name: Humidity
-            entity: sensor.ws_core_norm_humidity
-            min: 0
-            max: 100
-          - type: gauge
-            name: Pressure (SLP)
-            entity: sensor.ws_core_sea_level_pressure
-            min: 950
-            max: 1050
-          - type: gauge
-            name: Pressure (Station)
-            entity: sensor.ws_core_norm_pressure
-            min: 900
-            max: 1050
-
-          - type: gauge
+          - type: sensor
+            entity: sensor.ws_wind_speed
+            graph: line
             name: Wind Speed
-            entity: sensor.ws_core_norm_wind_speed
-            min: 0
-            max: 30
-          - type: gauge
+          - type: sensor
+            entity: sensor.ws_wind_gust
+            graph: line
             name: Wind Gust
-            entity: sensor.ws_core_norm_wind_gust
-            min: 0
-            max: 40
           - type: gauge
-            name: Rain rate
-            entity: sensor.ws_core_rain_rate_filtered
+            entity: sensor.ws_wind_direction
+            name: Wind Direction
             min: 0
-            max: 80
+            max: 360
+            needle: true
 
+      # Rain information
+      - type: grid
+        columns: 3
+        cards:
+          - type: sensor
+            entity: sensor.ws_rain_total
+            name: Rain Total
+          - type: sensor
+            entity: sensor.ws_rain_rate_raw
+            graph: line
+            name: Rain Rate (raw)
+          - type: sensor
+            entity: sensor.ws_rain_rate_filtered
+            graph: line
+            name: Rain Rate (filtered)
+
+      # Environmental
+      - type: grid
+        columns: 2
+        cards:
+          - type: sensor
+            entity: sensor.ws_illuminance
+            graph: line
+            name: Illuminance
+          - type: sensor
+            entity: sensor.ws_uv_index
+            graph: line
+            name: UV Index
+
+      # System status
       - type: entities
-        title: Details
-        show_header_toggle: false
+        title: System Status
         entities:
-          - entity: sensor.ws_core_norm_wind_dir
-          - entity: sensor.ws_core_dew_point
-          - entity: sensor.ws_core_norm_rain_total
-          - entity: sensor.ws_core_rain_rate_raw
-          - entity: sensor.ws_core_rain_rate_filtered
-          - entity: sensor.ws_core_illuminance
-          - entity: sensor.ws_core_uv_index
-          - entity: sensor.ws_core_battery
-          - entity: sensor.ws_core_pressure_trend
-          - entity: sensor.ws_core_laundry_drying_score
-          - entity: sensor.ws_core_stargazing_quality
-          - entity: sensor.ws_core_fire_weather_score
+          - entity: sensor.ws_data_quality_banner
+            name: Data Quality
+          - entity: sensor.ws_package_status
+            name: Package Status
           - entity: binary_sensor.ws_package_ok
-          - entity: sensor.ws_core_package_status
-          - entity: sensor.ws_core_forecast_daily
+            name: Package OK
+          - entity: sensor.ws_alert_state
+            name: Alert State
+          - entity: sensor.ws_alert_message
+            name: Alert Message
