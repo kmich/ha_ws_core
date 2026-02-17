@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
@@ -19,10 +20,12 @@ from .const import (
     DOMAIN,
     PLATFORMS,
 )
-from .coordinator import WSStationCoordinator
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _LOGGER = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from .coordinator import WSStationCoordinator
 
 SERVICE_RESET_RAIN = "reset_rain_baseline"
 ATTR_ENTRY_ID = "entry_id"
@@ -33,7 +36,7 @@ SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
     """Handle config entry schema version migrations.
 
-    v1 β†’ v2: Added hemisphere and climate_region fields.
+    v1 ΞΒ²Ξ²β‚¬Β Ξ²β‚¬β„Ά v2: Added hemisphere and climate_region fields.
     """
     _LOGGER.info("Migrating WS Station config entry from version %s", entry.version)
 
@@ -56,7 +59,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
         )
         return True
 
-    _LOGGER.error("Unknown config entry version %s β€” cannot migrate", entry.version)
+    _LOGGER.error("Unknown config entry version %s ΞΒ²Ξ²β€Β¬Ξ²β‚¬Β cannot migrate", entry.version)
     return False
 
 
@@ -66,6 +69,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    from .coordinator import WSStationCoordinator
+
     coordinator = WSStationCoordinator(hass, entry.data, entry.options)
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
