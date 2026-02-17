@@ -221,7 +221,7 @@ def _is_imperial(units_mode: str, hass: HomeAssistant) -> bool:
     if m == "metric":
         return False
     try:
-        return not bool(hass.config.units.is_metric)
+        return hass.config.units.temperature_unit != "°C"
     except Exception:
         return False
 
@@ -258,8 +258,9 @@ def _convert_temp_to_c(val: float, imperial: bool) -> float:
 class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = CONFIG_VERSION
 
-    def async_get_options_flow(self, config_entry: config_entries.ConfigEntry):
-        return WSStationOptionsFlowHandler(config_entry)
+    @staticmethod
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry):
+        return WSStationOptionsFlowHandler()
 
     def __init__(self):
         self._data: dict[str, Any] = {}
@@ -417,8 +418,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Guess sensible defaults from HA unit system
         try:
-            default_units = "metric" if self.hass.config.units.is_metric else "imperial"
-            default_temp = "C" if self.hass.config.units.is_metric else "F"
+            is_metric = self.hass.config.units.temperature_unit == "°C"
+            default_units = "metric" if is_metric else "imperial"
+            default_temp = "C" if is_metric else "F"
         except Exception:
             default_units = DEFAULT_UNITS_MODE
             default_temp = DEFAULT_TEMP_UNIT
@@ -588,8 +590,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, config_entry: config_entries.ConfigEntry):
-        self.config_entry = config_entry
+    """Options flow handler. self.config_entry is provided by parent class."""
 
     def _get(self, key: str, default: Any) -> Any:
         return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
