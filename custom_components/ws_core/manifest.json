@@ -1,7 +1,7 @@
 {
   "domain": "ws_core",
   "name": "Weather Station Core",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "documentation": "https://github.com/kmich/ha_ws_core",
   "issue_tracker": "https://github.com/kmich/ha_ws_core/issues",
   "requirements": [],
