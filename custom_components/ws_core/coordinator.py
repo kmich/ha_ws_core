@@ -1,4 +1,4 @@
-﻿"""Coordinator for Weather Station Core β€” v0.3.1.
+"""Coordinator for Weather Station Core β€” v0.3.1.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors
@@ -977,4 +977,3 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.runtime.last_forecast_fetch = dt_util.utcnow()
         self.async_set_updated_data(self._compute())
         rt.forecast_inflight = False
-

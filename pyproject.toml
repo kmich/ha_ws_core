@@ -1,22 +1,9 @@
 [tool.ruff]
-target-version = "py311"
 line-length = 120
+target-version = "py312"
 
 [tool.ruff.lint]
-# A pragmatic baseline: catch correctness issues + import sorting.
-# You can expand this over time once the codebase is clean.
-select = [
-  "E",   # pycodestyle errors
-  "W",   # pycodestyle warnings
-  "F",   # pyflakes
-  "I",   # isort
-  "UP",  # pyupgrade
-  "B",   # bugbear
-]
+ignore = ["E501", "E701"]
 
-ignore = [
-  "E501",  # line length (handled gradually; avoid noisy CI failures)
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E501"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]

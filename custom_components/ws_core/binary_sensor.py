@@ -7,7 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEFAULT_PREFIX, CONF_PREFIX, DOMAIN, KEY_PACKAGE_OK
+from .const import CONF_PREFIX, DEFAULT_PREFIX, DOMAIN, KEY_PACKAGE_OK
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:

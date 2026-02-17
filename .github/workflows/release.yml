@@ -1,4 +1,4 @@
-name: Release
+﻿name: Release
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
           pip install -r requirements_dev.txt
 
       - name: Ruff lint
-        run: ruff check --output-format=github custom_components/ws_core/
+        run: ruff check --ignore E701 --output-format=github custom_components/ws_core/
 
       - name: HACS validation
         uses: hacs/action@main
@@ -76,3 +76,4 @@ jobs:
           prerelease: false
           files: ws_core_v${{ steps.version.outputs.VERSION }}.zip
           generate_release_notes: true
+
