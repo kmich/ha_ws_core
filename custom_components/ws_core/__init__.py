@@ -1,4 +1,4 @@
-"""Weather Station Core integration."""
+﻿"""Weather Station Core integration."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 from homeassistant.helpers import device_registry as dr
 
 from .const import (
@@ -32,7 +34,7 @@ SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
     """Handle config entry schema version migrations.
 
-    v1 → v2: Added hemisphere and climate_region fields.
+    v1 β†’ v2: Added hemisphere and climate_region fields.
     """
     _LOGGER.info("Migrating WS Station config entry from version %s", entry.version)
 
@@ -55,7 +57,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
         )
         return True
 
-    _LOGGER.error("Unknown config entry version %s — cannot migrate", entry.version)
+    _LOGGER.error("Unknown config entry version %s β€” cannot migrate", entry.version)
     return False
 
 
@@ -119,3 +121,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator is not None:
         await coordinator.async_stop()
     return unload_ok
+

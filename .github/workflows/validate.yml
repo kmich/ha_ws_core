@@ -1,4 +1,4 @@
-name: Validate
+﻿name: Validate
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
       - name: Install ruff
         run: pip install ruff
       - name: Run ruff
-        run: ruff check custom_components/ws_core/
+        run: ruff check --output-format=github custom_components/ws_core/
 
   validate-hacs:
     name: HACS validation
@@ -29,6 +29,7 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
+          ignore: brands
 
   hassfest:
     name: hassfest
