@@ -51,7 +51,7 @@ UNIT_WIND_MS = "m/s"
 UNIT_PRESSURE_HPA = "hPa"
 UNIT_RAIN_MM = "mm"
 
-# Keys used in coordinator.data
+# Keys used in coordinator.data - BASIC SENSORS
 KEY_NORM_TEMP_C = "norm_temperature_c"
 KEY_NORM_HUMIDITY = "norm_humidity"
 KEY_NORM_PRESSURE_HPA = "norm_pressure_hpa"
@@ -74,6 +74,39 @@ KEY_PACKAGE_STATUS = "package_status"
 KEY_PACKAGE_OK = "package_ok"
 KEY_FORECAST = "forecast"
 
+# Keys for ADVANCED METEOROLOGICAL SENSORS (v0.2.0+)
+KEY_FEELS_LIKE_C = "feels_like_c"
+KEY_ZAMBRETTI_FORECAST = "zambretti_forecast"
+KEY_WIND_BEAUFORT = "wind_beaufort"
+KEY_WIND_BEAUFORT_DESC = "wind_beaufort_desc"
+KEY_WIND_QUADRANT = "wind_quadrant"
+KEY_WIND_DIR_SMOOTH_DEG = "wind_dir_smooth_deg"
+KEY_CURRENT_CONDITION = "current_condition"
+KEY_RAIN_PROBABILITY = "rain_probability"
+KEY_RAIN_PROBABILITY_COMBINED = "rain_probability_combined"
+KEY_RAIN_DISPLAY = "rain_display"
+KEY_PRESSURE_TREND_DISPLAY = "pressure_trend_display"
+KEY_HEALTH_DISPLAY = "health_display"
+KEY_FORECAST_TILES = "forecast_tiles"
+
+# Keys for 24H STATISTICS
+KEY_TEMP_HIGH_24H = "temp_high_24h"
+KEY_TEMP_LOW_24H = "temp_low_24h"
+KEY_TEMP_AVG_24H = "temp_avg_24h"
+KEY_WIND_GUST_MAX_24H = "wind_gust_max_24h"
+
+# Keys for DISPLAY/FORMAT SENSORS
+KEY_UV_LEVEL_DISPLAY = "uv_level_display"
+KEY_HUMIDITY_LEVEL_DISPLAY = "humidity_level_display"
+KEY_TEMP_DISPLAY = "temp_display"
+KEY_BATTERY_DISPLAY = "battery_display"
+
+# Activity / derived heuristics (optional)
+KEY_LAUNDRY_SCORE = "laundry_drying_score"
+KEY_STARGAZE_SCORE = "stargazing_quality"
+KEY_FIRE_SCORE = "fire_weather_score"
+KEY_PRESSURE_TREND_HPAH = "pressure_trend_hpah"
+
 # Source mapping keys
 SRC_TEMP = "temperature"
 SRC_HUM = "humidity"
@@ -89,9 +122,3 @@ SRC_BATTERY = "battery"
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
 OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY]
-
-# Activity / derived heuristics (optional but included)
-KEY_LAUNDRY_SCORE = "laundry_drying_score"
-KEY_STARGAZE_SCORE = "stargazing_quality"
-KEY_FIRE_SCORE = "fire_weather_score"
-KEY_PRESSURE_TREND_HPAH = "pressure_trend_hpah"
