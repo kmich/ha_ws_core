@@ -1,4 +1,4 @@
-"""Coordinator for Weather Station Core — v0.3.1.
+﻿"""Coordinator for Weather Station Core β€” v0.3.1.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors
@@ -10,16 +10,16 @@ The _compute() method is broken into focused sub-methods:
   _compute_rain_probability()      Local + API probability
   _compute_activity_scores()       Laundry, fire, running, stargazing
   _compute_health()                Staleness, package status, alerts
-  _compute()                       Orchestrator — calls all sub-methods
+  _compute()                       Orchestrator β€” calls all sub-methods
 """
 
 from __future__ import annotations
 
+import logging
+import math
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import timedelta
-import math
-import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -28,15 +28,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .algorithms import (
-    KalmanFilter,
     CONDITION_COLORS,
     CONDITION_DESCRIPTIONS,
     CONDITION_ICONS,
     MOON_ILLUMINATION,
-    MOON_ICONS,
+    KalmanFilter,
     beaufort_description,
     calculate_apparent_temperature,
-    calculate_dew_point,
     calculate_moon_phase,
     calculate_rain_probability,
     calculate_sea_level_pressure,
@@ -53,7 +51,6 @@ from .algorithms import (
     laundry_recommendation,
     least_squares_pressure_trend,
     moon_stargazing_impact,
-    pressure_trend_arrow,
     pressure_trend_display,
     running_level,
     running_recommendation,
@@ -83,8 +80,8 @@ from .const import (
     DEFAULT_STALENESS_S,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
-    KEY_BATTERY_PCT,
     KEY_BATTERY_DISPLAY,
+    KEY_BATTERY_PCT,
     KEY_CURRENT_CONDITION,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
@@ -133,13 +130,8 @@ from .const import (
     MAGNUS_B,
     PRESSURE_HISTORY_INTERVAL_MIN,
     PRESSURE_HISTORY_SAMPLES,
-    PRESSURE_TREND_FALLING,
-    PRESSURE_TREND_FALLING_RAPID,
-    PRESSURE_TREND_RISING,
-    PRESSURE_TREND_RISING_RAPID,
     RAIN_RATE_PHYSICAL_CAP_MMPH,
     REQUIRED_SOURCES,
-    SLP_GAS_CONSTANT_RATIO,
     SRC_BATTERY,
     SRC_DEW_POINT,
     SRC_GUST,
@@ -167,6 +159,7 @@ _LOGGER = logging.getLogger(__name__)
 # Runtime state
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class WSStationRuntime:
     """Mutable runtime state that persists across compute cycles."""
@@ -177,9 +170,7 @@ class WSStationRuntime:
     last_rain_rate_filt: float = 0.0
 
     # Pressure tracking
-    pressure_history: deque = field(
-        default_factory=lambda: deque(maxlen=PRESSURE_HISTORY_SAMPLES)
-    )
+    pressure_history: deque = field(default_factory=lambda: deque(maxlen=PRESSURE_HISTORY_SAMPLES))
     pressure_history_ts: Any | None = None
 
     # Wind direction smoothing
@@ -205,6 +196,7 @@ class WSStationRuntime:
 # ---------------------------------------------------------------------------
 # Coordinator
 # ---------------------------------------------------------------------------
+
 
 class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Keeps all derived values up to date."""
@@ -250,12 +242,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_start(self) -> None:
         entity_ids = [eid for eid in self.sources.values() if eid]
         if entity_ids:
-            self._unsubs.append(
-                async_track_state_change_event(self.hass, entity_ids, self._handle_source_change)
-            )
-        self._unsubs.append(
-            async_track_time_interval(self.hass, self._handle_tick, timedelta(seconds=60))
-        )
+            self._unsubs.append(async_track_state_change_event(self.hass, entity_ids, self._handle_source_change))
+        self._unsubs.append(async_track_time_interval(self.hass, self._handle_tick, timedelta(seconds=60)))
         await self.async_refresh()
 
     async def async_stop(self) -> None:
@@ -300,14 +288,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Compute 24h rain accumulation from a cumulative rain-total history."""
         vals = [v for _, v in history]
         total = 0.0
-        for prev, cur in zip(vals, vals[1:]):
+        for prev, cur in zip(vals, vals[1:], strict=False):
             dv = cur - prev
             if dv < -0.1:  # counter reset protection
                 dv = 0.0
             if dv > 0:
                 total += dv
         return total
-
 
     # ------------------------------------------------------------------
 
@@ -336,7 +323,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @staticmethod
     def _to_celsius(v: float, unit: str) -> float:
         u = unit.lower().replace(" ", "")
-        if u in ("f", "°f") or ("f" in u and "°" in u):
+        if u in ("f", "Β°f") or ("f" in u and "Β°" in u):
             return (v - 32.0) * 5.0 / 9.0
         if u in ("k", "kelvin"):
             return v - 273.15
@@ -387,7 +374,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return list of quality warning strings for suspect readings."""
         flags: list[str] = []
         if tc is not None and not (VALID_TEMP_MIN_C <= tc <= VALID_TEMP_MAX_C):
-            flags.append(f"temperature {tc:.1f}°C outside physical range")
+            flags.append(f"temperature {tc:.1f}Β°C outside physical range")
         if rh is not None and not (VALID_HUMIDITY_MIN <= rh <= VALID_HUMIDITY_MAX):
             flags.append(f"humidity {rh:.0f}% outside valid range")
         if pressure_hpa is not None and not (VALID_PRESSURE_MIN_HPA <= pressure_hpa <= VALID_PRESSURE_MAX_HPA):
@@ -403,9 +390,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # Sub-methods
     # ------------------------------------------------------------------
 
-    def _compute_raw_readings(
-        self, data: dict, now: Any
-    ) -> tuple[float | None, ...]:
+    def _compute_raw_readings(self, data: dict, now: Any) -> tuple[float | None, ...]:
         """Read and unit-convert all source sensors. Returns (tc, rh, pressure_hpa, wind_ms, gust_ms, wind_dir, rain_total_mm, lux, uv, bat)."""
         hass = self.hass
 
@@ -489,9 +474,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Apparent temperature (Australian BOM)
         if tc is not None and rh is not None and wind_ms is not None:
-            data[KEY_FEELS_LIKE_C] = calculate_apparent_temperature(
-                float(tc), float(rh), float(wind_ms)
-            )
+            data[KEY_FEELS_LIKE_C] = calculate_apparent_temperature(float(tc), float(rh), float(wind_ms))
 
         # 24h rolling stats
         if tc is not None:
@@ -504,7 +487,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Display strings
         if tc is not None:
-            data[KEY_TEMP_DISPLAY] = f"{float(tc):.1f}°C"
+            data[KEY_TEMP_DISPLAY] = f"{float(tc):.1f}Β°C"
         if rh is not None:
             data[KEY_HUMIDITY_LEVEL_DISPLAY] = humidity_level(float(rh))
         if uv := data.get(KEY_UV):
@@ -513,8 +496,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return dew_c
 
     def _compute_derived_pressure(
-        self, data: dict, now: Any, tc: float | None, pressure_hpa: float | None,
-        rh: float | None
+        self, data: dict, now: Any, tc: float | None, pressure_hpa: float | None, rh: float | None
     ) -> tuple[float, float]:
         """MSLP, pressure history, trend, Zambretti. Returns (trend_3h, mslp_or_0)."""
         rt = self.runtime
@@ -539,9 +521,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if len(rt.pressure_history) >= 2:
                 trend_3h = least_squares_pressure_trend(list(rt.pressure_history))
                 data[KEY_PRESSURE_TREND_HPAH] = trend_3h
-                data[KEY_PRESSURE_CHANGE_WINDOW_HPA] = round(
-                    rt.pressure_history[-1] - rt.pressure_history[0], 2
-                )
+                data[KEY_PRESSURE_CHANGE_WINDOW_HPA] = round(rt.pressure_history[-1] - rt.pressure_history[0], 2)
             else:
                 data[KEY_PRESSURE_TREND_HPAH] = 0.0
                 data[KEY_PRESSURE_CHANGE_WINDOW_HPA] = 0.0
@@ -600,9 +580,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if gust_vals:
                 data[KEY_WIND_GUST_MAX_24H] = round(max(gust_vals), 1)
 
-    def _compute_derived_precipitation(
-        self, data: dict, now: Any, rain_total_mm: float | None
-    ) -> float:
+    def _compute_derived_precipitation(self, data: dict, now: Any, rain_total_mm: float | None) -> float:
         """Rain rate (Kalman-filtered), rain display. Returns rain_rate (filtered)."""
         rt = self.runtime
 
@@ -631,9 +609,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return rain_rate
 
     def _compute_condition(
-        self, data: dict, tc: float | None, rh: float | None,
-        wind_ms: float | None, gust_ms: float | None, rain_rate: float,
-        dew_c: float | None, lux: float | None, uv: float | None,
+        self,
+        data: dict,
+        tc: float | None,
+        rh: float | None,
+        wind_ms: float | None,
+        gust_ms: float | None,
+        rain_rate: float,
+        dew_c: float | None,
+        lux: float | None,
+        uv: float | None,
     ) -> str:
         """Determine current weather condition (36-condition classifier)."""
         sun_state = self.hass.states.get("sun.sun")
@@ -670,9 +655,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_condition_severity"] = get_condition_severity(condition)
         return condition
 
-    def _compute_rain_probability(
-        self, data: dict, mslp: float, trend_3h: float, rh: float | None
-    ) -> None:
+    def _compute_rain_probability(self, data: dict, mslp: float, trend_3h: float, rh: float | None) -> None:
         """Local + API-blended rain probability."""
         wind_quad = data.get(KEY_WIND_QUADRANT, "N")
         if mslp and rh is not None:
@@ -696,8 +679,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_RAIN_PROBABILITY_COMBINED] = combined
 
     def _compute_activity_scores(
-        self, data: dict, tc: float | None, rh: float | None,
-        wind_ms: float | None, rain_rate: float, uv: float | None
+        self, data: dict, tc: float | None, rh: float | None, wind_ms: float | None, rain_rate: float, uv: float | None
     ) -> None:
         """Laundry, stargazing, fire weather, running activity scores."""
         feels_like = data.get(KEY_FEELS_LIKE_C)
@@ -706,8 +688,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if tc is not None and rh is not None and wind_ms is not None:
             rain_prob = data.get(KEY_RAIN_PROBABILITY_COMBINED)
             l_score = laundry_drying_score(
-                temp_c=float(tc), humidity=float(rh), wind_speed_ms=float(wind_ms),
-                uv_index=float(uv or 0), rain_rate_mmph=float(rain_rate),
+                temp_c=float(tc),
+                humidity=float(rh),
+                wind_speed_ms=float(wind_ms),
+                uv_index=float(uv or 0),
+                rain_rate_mmph=float(rain_rate),
                 rain_probability=float(rain_prob) if rain_prob is not None else None,
             )
             data[KEY_LAUNDRY_SCORE] = l_score
@@ -720,14 +705,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if rh is not None:
             moon_phase = self._get_moon_phase()
             sg_quality = stargazing_quality(
-                cloud_cover_pct=None, humidity=float(rh),
-                rain_rate_mmph=float(rain_rate), moon_phase=moon_phase,
+                cloud_cover_pct=None,
+                humidity=float(rh),
+                rain_rate_mmph=float(rain_rate),
+                moon_phase=moon_phase,
             )
             data[KEY_STARGAZE_SCORE] = sg_quality
             data["_moon_phase"] = moon_phase
             data["_moon_stargazing_impact"] = moon_stargazing_impact(moon_phase)
 
-        # Fire Weather Index — uses real 24h rain accumulation
+        # Fire Weather Index β€” uses real 24h rain accumulation
         if tc is not None and rh is not None and wind_ms is not None:
             rt = self.runtime
             rain_24h = self._rain_accum_24h_from_totals(rt.rain_total_history_24h)
@@ -749,9 +736,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_uv_recommendation"] = uv_recommendation(float(uv))
             data["_uv_burn_fair_skin"] = f"{uv_burn_time_minutes(float(uv), 2)} minutes"
 
-    def _compute_health(
-        self, data: dict, now: Any, missing: list, missing_entities: list
-    ) -> None:
+    def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list) -> None:
         """Staleness, package status, data quality, configurable alerts."""
         # Staleness check
         stale = []
@@ -768,16 +753,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         n_healthy = len(self.sources) - n_unavailable - len(stale)
 
         station_health = (
-            "Offline"  if n_unavailable >= 3 else
-            "Online"   if n_healthy >= len(REQUIRED_SOURCES) else
-            "Degraded" if n_healthy >= 1 else
-            "Stale"
+            "Offline"
+            if n_unavailable >= 3
+            else "Online"
+            if n_healthy >= len(REQUIRED_SOURCES)
+            else "Degraded"
+            if n_healthy >= 1
+            else "Stale"
         )
         health_color = {
-            "Online":   "rgba(74,222,128,0.8)",
+            "Online": "rgba(74,222,128,0.8)",
             "Degraded": "rgba(251,191,36,0.9)",
-            "Stale":    "rgba(249,115,22,0.9)",
-            "Offline":  "rgba(239,68,68,0.9)",
+            "Stale": "rgba(249,115,22,0.9)",
+            "Offline": "rgba(239,68,68,0.9)",
         }.get(station_health, "rgba(239,68,68,0.9)")
 
         data[KEY_HEALTH_DISPLAY] = station_health
@@ -804,13 +792,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_DATA_QUALITY] = dq
 
         # Configurable alerts
-        gust_thr  = float(self.entry_options.get("thresh_wind_gust_ms",  17.0))
-        rain_thr  = float(self.entry_options.get("thresh_rain_rate_mmph", 20.0))
-        freeze_thr = float(self.entry_options.get("thresh_freeze_c",       0.0))
+        gust_thr = float(self.entry_options.get("thresh_wind_gust_ms", 17.0))
+        rain_thr = float(self.entry_options.get("thresh_rain_rate_mmph", 20.0))
+        freeze_thr = float(self.entry_options.get("thresh_freeze_c", 0.0))
 
-        gust_ms  = data.get(KEY_NORM_WIND_GUST_MS)
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
         rain_rate = data.get(KEY_RAIN_RATE_FILT, 0.0)
-        tc        = data.get(KEY_NORM_TEMP_C)
+        tc = data.get(KEY_NORM_TEMP_C)
 
         alert_state = "clear"
         alert_msg = "All clear"
@@ -822,7 +810,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             alert_msg = f"Heavy rain: {rain_rate:.1f} mm/h"
         if tc is not None and float(tc) <= freeze_thr:
             alert_state = "advisory" if alert_state == "clear" else alert_state
-            alert_msg = f"Freeze risk: {tc:.1f}°C"
+            alert_msg = f"Freeze risk: {tc:.1f}Β°C"
 
         data[KEY_ALERT_STATE] = alert_state
         data[KEY_ALERT_MESSAGE] = alert_msg
@@ -838,14 +826,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Validation
         missing = [k for k in REQUIRED_SOURCES if not self.sources.get(k)]
         missing_entities = [
-            k for k in REQUIRED_SOURCES
-            if self.sources.get(k) and self.hass.states.get(self.sources[k]) is None
+            k for k in REQUIRED_SOURCES if self.sources.get(k) and self.hass.states.get(self.sources[k]) is None
         ]
 
         # 1. Raw readings
-        tc, rh, pressure_hpa, wind_ms, gust_ms, wind_dir, rain_total_mm, lux, uv = (
-            self._compute_raw_readings(data, now)
-        )
+        tc, rh, pressure_hpa, wind_ms, gust_ms, wind_dir, rain_total_mm, lux, uv = self._compute_raw_readings(data, now)
 
         # 2. Wind (quadrant needed before Zambretti)
         self._compute_derived_wind(data, now, wind_ms, gust_ms, wind_dir)
@@ -905,7 +890,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         labels = ["Today", "Tomorrow", "Day 3", "Day 4", "Day 5"]
         return [
             {
-                "label": labels[i] if i < len(labels) else f"Day {i+1}",
+                "label": labels[i] if i < len(labels) else f"Day {i + 1}",
                 "date": day.get("date", ""),
                 "tmax": day.get("tmax_c"),
                 "tmin": day.get("tmin_c"),
@@ -954,6 +939,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "&timezone=auto"
         )
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
         session = async_get_clientsession(self.hass)
         try:
             async with session.get(url, timeout=20) as resp:
@@ -967,22 +953,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         daily = js.get("daily") or {}
         times = daily.get("time") or []
-        tmax  = daily.get("temperature_2m_max") or []
-        tmin  = daily.get("temperature_2m_min") or []
-        pr    = daily.get("precipitation_sum") or []
-        ws    = daily.get("windspeed_10m_max") or []
-        wc    = daily.get("weathercode") or []
-        pp    = daily.get("precipitation_probability_max") or []
+        tmax = daily.get("temperature_2m_max") or []
+        tmin = daily.get("temperature_2m_min") or []
+        pr = daily.get("precipitation_sum") or []
+        ws = daily.get("windspeed_10m_max") or []
+        wc = daily.get("weathercode") or []
+        pp = daily.get("precipitation_probability_max") or []
 
         out = [
             {
-                "date":       times[i],
-                "tmax_c":     tmax[i] if i < len(tmax) else None,
-                "tmin_c":     tmin[i] if i < len(tmin) else None,
-                "precip_mm":  pr[i]   if i < len(pr)   else None,
-                "wind_kmh":   ws[i]   if i < len(ws)   else None,
-                "weathercode": wc[i]  if i < len(wc)   else None,
-                "precip_prob": pp[i]  if i < len(pp)   else None,
+                "date": times[i],
+                "tmax_c": tmax[i] if i < len(tmax) else None,
+                "tmin_c": tmin[i] if i < len(tmin) else None,
+                "precip_mm": pr[i] if i < len(pr) else None,
+                "wind_kmh": ws[i] if i < len(ws) else None,
+                "weathercode": wc[i] if i < len(wc) else None,
+                "precip_prob": pp[i] if i < len(pp) else None,
             }
             for i in range(min(len(times), 7))
         ]
@@ -991,3 +977,4 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.runtime.last_forecast_fetch = dt_util.utcnow()
         self.async_set_updated_data(self._compute())
         rt.forecast_inflight = False
+
