@@ -4,18 +4,24 @@ DOMAIN = "ws_core"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather"]
 
+# ---------------------------------------------------------------------------
+# Configuration keys
+# ---------------------------------------------------------------------------
 CONF_NAME = "name"
 CONF_PREFIX = "prefix"
 CONF_SOURCES = "sources"
-CONF_UNITS_MODE = "units_mode"  # auto|metric|imperial
+CONF_UNITS_MODE = "units_mode"  # auto | metric | imperial
+CONF_TEMP_UNIT = "temp_unit"  # auto | C | F
 CONF_ELEVATION_M = "elevation_m"
+CONF_HEMISPHERE = "hemisphere"  # Northern | Southern
+CONF_CLIMATE_REGION = "climate_region"  # for Zambretti wind pattern
 CONF_STALENESS_S = "staleness_s"
 CONF_FORECAST_ENABLED = "forecast_enabled"
 CONF_FORECAST_LAT = "forecast_lat"
 CONF_FORECAST_LON = "forecast_lon"
 CONF_FORECAST_INTERVAL_MIN = "forecast_interval_min"
 
-# Alert & heuristic options (stored in canonical metric units)
+# Alert & heuristic options (stored in canonical metric units internally)
 CONF_THRESH_WIND_GUST_MS = "thresh_wind_gust_ms"
 CONF_THRESH_RAIN_RATE_MMPH = "thresh_rain_rate_mmph"
 CONF_THRESH_FREEZE_C = "thresh_freeze_c"
@@ -25,16 +31,20 @@ CONF_ENABLE_ACTIVITY_SCORES = "enable_activity_scores"
 CONF_RAIN_PENALTY_LIGHT_MMPH = "rain_penalty_light_mmph"
 CONF_RAIN_PENALTY_HEAVY_MMPH = "rain_penalty_heavy_mmph"
 
-
+# ---------------------------------------------------------------------------
+# Defaults
+# ---------------------------------------------------------------------------
 DEFAULT_NAME = "Weather Station"
 DEFAULT_PREFIX = "ws"
 DEFAULT_UNITS_MODE = "auto"
+DEFAULT_TEMP_UNIT = "auto"
 DEFAULT_ELEVATION_M = 0.0
+DEFAULT_HEMISPHERE = "Northern"
+DEFAULT_CLIMATE_REGION = "Atlantic Europe"
 DEFAULT_STALENESS_S = 900
 DEFAULT_FORECAST_ENABLED = True
 DEFAULT_FORECAST_INTERVAL_MIN = 30
 
-# Defaults for alert/heuristic options
 DEFAULT_THRESH_WIND_GUST_MS = 17.0
 DEFAULT_THRESH_RAIN_RATE_MMPH = 20.0
 DEFAULT_THRESH_FREEZE_C = 0.0
@@ -44,14 +54,58 @@ DEFAULT_ENABLE_ACTIVITY_SCORES = False
 DEFAULT_RAIN_PENALTY_LIGHT_MMPH = 0.2
 DEFAULT_RAIN_PENALTY_HEAVY_MMPH = 5.0
 
+# ---------------------------------------------------------------------------
+# Selectable option lists
+# ---------------------------------------------------------------------------
+HEMISPHERE_OPTIONS = ["Northern", "Southern"]
 
+CLIMATE_REGION_OPTIONS = [
+    "Atlantic Europe",
+    "Mediterranean",
+    "Continental Europe",
+    "Scandinavia",
+    "North America East",
+    "North America West",
+    "Australia",
+    "Custom",
+]
+
+UNITS_MODE_OPTIONS = ["auto", "metric", "imperial"]
+TEMP_UNIT_OPTIONS = ["auto", "C", "F"]
+
+# ---------------------------------------------------------------------------
+# Physical validation limits (WMO / ICAO records)
+# ---------------------------------------------------------------------------
+VALID_TEMP_MIN_C = -60.0  # below lowest recorded (-89.2°C Antarctica)
+VALID_TEMP_MAX_C = 60.0  # above highest recorded (54.4°C Death Valley)
+VALID_TEMP_WARN_MIN_C = -40.0
+VALID_TEMP_WARN_MAX_C = 50.0
+
+VALID_PRESSURE_MIN_HPA = 870.0  # typhoon record low
+VALID_PRESSURE_MAX_HPA = 1085.0  # Siberia record high
+VALID_PRESSURE_WARN_MIN_HPA = 940.0
+VALID_PRESSURE_WARN_MAX_HPA = 1060.0
+
+VALID_ELEVATION_MIN_M = -500.0  # Dead Sea ~-430m
+VALID_ELEVATION_MAX_M = 9000.0  # above Everest summit
+
+VALID_HUMIDITY_MIN = 0.0
+VALID_HUMIDITY_MAX = 100.0
+
+VALID_WIND_GUST_MAX_MS = 113.0  # highest recorded gust (Barrow Island)
+VALID_RAIN_RATE_MAX_MMPH = 500.0  # highest reliable tipping-bucket reading
+
+# ---------------------------------------------------------------------------
 # Canonical internal units
+# ---------------------------------------------------------------------------
 UNIT_TEMP_C = "°C"
 UNIT_WIND_MS = "m/s"
 UNIT_PRESSURE_HPA = "hPa"
 UNIT_RAIN_MM = "mm"
 
-# Keys used in coordinator.data - BASIC SENSORS
+# ---------------------------------------------------------------------------
+# Coordinator data keys - BASIC SENSORS
+# ---------------------------------------------------------------------------
 KEY_NORM_TEMP_C = "norm_temperature_c"
 KEY_NORM_HUMIDITY = "norm_humidity"
 KEY_NORM_PRESSURE_HPA = "norm_pressure_hpa"
@@ -101,13 +155,19 @@ KEY_HUMIDITY_LEVEL_DISPLAY = "humidity_level_display"
 KEY_TEMP_DISPLAY = "temp_display"
 KEY_BATTERY_DISPLAY = "battery_display"
 
-# Activity / derived heuristics (optional)
+# Activity / derived heuristics (optional, disabled by default)
 KEY_LAUNDRY_SCORE = "laundry_drying_score"
 KEY_STARGAZE_SCORE = "stargazing_quality"
 KEY_FIRE_SCORE = "fire_weather_score"
+KEY_RUNNING_SCORE = "running_score"
 KEY_PRESSURE_TREND_HPAH = "pressure_trend_hpah"
 
+# Sensor quality / validation flags
+KEY_SENSOR_QUALITY_FLAGS = "sensor_quality_flags"
+
+# ---------------------------------------------------------------------------
 # Source mapping keys
+# ---------------------------------------------------------------------------
 SRC_TEMP = "temperature"
 SRC_HUM = "humidity"
 SRC_PRESS = "pressure"
@@ -122,3 +182,36 @@ SRC_BATTERY = "battery"
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
 OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY]
+
+# ---------------------------------------------------------------------------
+# Named physical / algorithm constants (no magic numbers in code)
+# ---------------------------------------------------------------------------
+# Sea-level pressure reduction (WMO hypsometric formula)
+# R_dry / g = 287.05 J/(kg·K) / 9.80665 m/s² ≈ 29.263 m·K/Pa
+SLP_GAS_CONSTANT_RATIO: float = 29.263
+
+# August-Roche-Magnus dew point constants (Alduchov & Eskridge 1996)
+MAGNUS_A: float = 17.62
+MAGNUS_B: float = 243.12  # °C
+
+# Beaufort scale boundary speeds in m/s (WMO No. 8)
+BEAUFORT_BOUNDARIES = [0.3, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7]
+
+# Pressure trend window (samples × interval = total history)
+PRESSURE_HISTORY_SAMPLES = 12
+PRESSURE_HISTORY_INTERVAL_MIN = 15  # minutes between samples → 3h window
+
+# WMO pressure tendency thresholds (WMO No. 306, Table 4680) in hPa/3h
+PRESSURE_TREND_RISING_RAPID: float = 1.6
+PRESSURE_TREND_RISING: float = 0.8
+PRESSURE_TREND_FALLING: float = -0.8
+PRESSURE_TREND_FALLING_RAPID: float = -1.6
+
+# Rain rate cap for Kalman filter (physical plausibility cap)
+RAIN_RATE_PHYSICAL_CAP_MMPH: float = 500.0
+
+# Wind smoothing exponential factor
+WIND_SMOOTH_ALPHA: float = 0.3
+
+# Config entry schema version (bump on breaking changes, implement migration)
+CONFIG_VERSION = 2

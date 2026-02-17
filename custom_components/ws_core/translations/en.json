@@ -2,75 +2,114 @@
   "config": {
     "step": {
       "user": {
-        "title": "Weather Station Core",
-        "description": "Create a derived weather station from your existing sensors.",
+        "title": "Weather Station Core — Create Station",
+        "description": "Give your weather station a name. The prefix will be used for all entity IDs (e.g. prefix 'ws' → sensor.ws_temperature).",
         "data": {
           "name": "Station name",
-          "prefix": "Entity prefix (e.g., ws)"
+          "prefix": "Entity prefix (e.g. ws, garden, roof)"
         }
       },
       "required_sources": {
-        "title": "Required source sensors",
-        "description": "Pick the sensors that represent the real measurements from your weather station. These are required.",
+        "title": "Required sensors",
+        "description": "Map each required measurement to an existing sensor entity. These 7 sensors are mandatory.",
         "data": {
           "temperature": "Temperature sensor",
-          "humidity": "Humidity sensor",
-          "pressure": "Pressure sensor",
+          "humidity": "Relative humidity sensor",
+          "pressure": "Atmospheric pressure sensor",
           "wind_speed": "Wind speed sensor",
           "wind_gust": "Wind gust sensor",
-          "wind_direction": "Wind direction sensor",
+          "wind_direction": "Wind direction sensor (degrees)",
           "rain_total": "Cumulative precipitation sensor"
         }
       },
       "optional_sources": {
-        "title": "Optional source sensors",
-        "description": "Optional sensors improve derived metrics, but are not required.",
+        "title": "Optional sensors",
+        "description": "These sensors improve derived metrics but are not required. Leave blank to skip.",
         "data": {
-          "illuminance": "Illuminance sensor (optional)",
-          "uv_index": "UV index sensor (optional)",
-          "dew_point": "Dew point sensor (optional)",
-          "battery": "Battery sensor (optional)"
+          "illuminance": "Illuminance / solar radiation (lux)",
+          "uv_index": "UV index",
+          "dew_point": "Dew point (if your station provides it; otherwise it is calculated)",
+          "battery": "Station battery level (%)"
         }
       },
-      "settings": {
-        "title": "Settings",
-        "description": "Forecast uses Open-Meteo (no API key).",
+      "location": {
+        "title": "Location & climate",
+        "description": "These settings affect pressure reduction, Zambretti forecast wind patterns, and seasonal logic. Elevation has been pre-filled from your Home Assistant location — adjust if your weather station is at a different altitude.",
         "data": {
-          "units_mode": "Units mode",
-          "elevation_m": "Elevation above sea level",
-          "staleness_s": "Staleness threshold",
-          "forecast_enabled": "Enable forecast",
+          "hemisphere": "Hemisphere",
+          "climate_region": "Climate region (for Zambretti wind pattern weighting)",
+          "elevation_m": "Station elevation above sea level"
+        }
+      },
+      "display": {
+        "title": "Display units",
+        "description": "Choose how values are displayed. 'Auto' follows your Home Assistant unit system setting.",
+        "data": {
+          "units_mode": "Wind / rain / pressure units",
+          "temp_unit": "Temperature unit"
+        }
+      },
+      "forecast": {
+        "title": "7-day forecast",
+        "description": "Weather Station Core can fetch a 7-day forecast from Open-Meteo (free, no API key required). Coordinates default to your Home Assistant location.",
+        "data": {
+          "forecast_enabled": "Enable forecast (Open-Meteo)",
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
           "forecast_lon": "Forecast longitude"
         }
       },
       "alerts": {
-        "title": "Alerts & heuristics",
-        "description": "Customize local alert thresholds and heuristic helpers.",
+        "title": "Alerts & advanced options",
+        "description": "Configure alert thresholds and fine-tune algorithm parameters. Defaults work well for most stations.",
         "data": {
           "thresh_wind_gust_ms": "Wind gust alert threshold",
           "thresh_rain_rate_mmph": "Rain rate alert threshold",
-          "thresh_freeze_c": "Freeze alert threshold",
-          "rain_filter_alpha": "Rain-rate filter smoothing (alpha)",
-          "pressure_trend_window_h": "Pressure-trend window",
-          "enable_activity_scores": "Enable activity proxy scores (laundry / stargazing / fire)",
-          "rain_penalty_light_mmph": "Rain penalty start (light rain)",
-          "rain_penalty_heavy_mmph": "Rain penalty full (heavy rain)"
+          "thresh_freeze_c": "Freeze warning threshold",
+          "staleness_s": "Sensor staleness timeout",
+          "rain_filter_alpha": "Rain-rate Kalman filter smoothing",
+          "pressure_trend_window_h": "Pressure trend window",
+          "enable_activity_scores": "Enable activity scores (laundry / stargazing / fire / running)",
+          "rain_penalty_light_mmph": "Rain penalty start threshold",
+          "rain_penalty_heavy_mmph": "Rain penalty maximum threshold"
         }
       }
     },
     "error": {
-      "entity_not_found": "Entity not found.",
-      "not_numeric": "Entity state is not a numeric value.",
-      "required": "This field is required."
+      "entity_not_found": "Entity not found in Home Assistant.",
+      "not_numeric":      "Entity state is not a numeric value.",
+      "required":         "This field is required.",
+      "elevation_out_of_range": "Elevation must be between -500 m and 9000 m.",
+      "wind_gust_too_high": "Wind gust threshold exceeds the physical world record — please check the value.",
+      "temp_out_of_range":  "Temperature is outside the physically possible range (-60°C to +60°C)."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "WS Station options",
-        "description": "Reconfigure settings, forecasts, thresholds, and heuristics."
+        "title": "Weather Station Core — Options",
+        "description": "Update settings, units, location, forecast, and alert thresholds.",
+        "data": {
+          "prefix": "Entity prefix",
+          "hemisphere": "Hemisphere",
+          "climate_region": "Climate region",
+          "elevation_m": "Station elevation",
+          "units_mode": "Wind / rain / pressure units",
+          "temp_unit": "Temperature unit",
+          "forecast_enabled": "Enable forecast",
+          "forecast_interval_min": "Forecast refresh interval",
+          "forecast_lat": "Forecast latitude",
+          "forecast_lon": "Forecast longitude",
+          "thresh_wind_gust_ms": "Wind gust alert threshold",
+          "thresh_rain_rate_mmph": "Rain rate alert threshold",
+          "thresh_freeze_c": "Freeze warning threshold",
+          "staleness_s": "Sensor staleness timeout",
+          "rain_filter_alpha": "Rain-rate filter smoothing",
+          "pressure_trend_window_h": "Pressure trend window",
+          "enable_activity_scores": "Enable activity scores",
+          "rain_penalty_light_mmph": "Rain penalty start",
+          "rain_penalty_heavy_mmph": "Rain penalty maximum"
+        }
       }
     }
   }

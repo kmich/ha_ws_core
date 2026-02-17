@@ -1,9 +1,10 @@
-"""Sensors for Weather Station Core - v0.2.0."""
+"""Sensors for Weather Station Core - v0.3.1."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
@@ -13,13 +14,13 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DEFAULT_PREFIX,
     CONF_PREFIX,
+    DEFAULT_PREFIX,
     DOMAIN,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
-    KEY_BATTERY_PCT,
     KEY_BATTERY_DISPLAY,
+    KEY_BATTERY_PCT,
     KEY_CURRENT_CONDITION,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
@@ -47,7 +48,9 @@ from .const import (
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
     KEY_RAIN_RATE_RAW,
+    KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
+    KEY_SENSOR_QUALITY_FLAGS,
     KEY_STARGAZE_SCORE,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
@@ -71,6 +74,7 @@ from .const import (
 @dataclass(frozen=True, kw_only=True)
 class WSSensorDescription:
     """Describes Weather Station sensor entities."""
+
     key: str
     device_class: SensorDeviceClass | None = None
     entity_category: EntityCategory | None = None
@@ -88,116 +92,177 @@ SENSORS: list[WSSensorDescription] = [
     # CORE MEASUREMENTS (21 sensors from v0.1.x, unchanged)
     # =========================================================================
     WSSensorDescription(
-        key=KEY_NORM_TEMP_C, name="WS Temperature", icon="mdi:thermometer",
-        device_class=SensorDeviceClass.TEMPERATURE, native_unit=UNIT_TEMP_C,
+        key=KEY_NORM_TEMP_C,
+        name="WS Temperature",
+        icon="mdi:thermometer",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    WSSensorDescription(
+        key=KEY_DEW_POINT_C,
+        name="WS Dew Point",
+        icon="mdi:weather-fog",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_DEW_POINT_C, name="WS Dew Point", icon="mdi:weather-fog",
-        device_class=SensorDeviceClass.TEMPERATURE, native_unit=UNIT_TEMP_C,
+        key=KEY_NORM_HUMIDITY,
+        name="WS Humidity",
+        icon="mdi:water-percent",
+        device_class=SensorDeviceClass.HUMIDITY,
+        native_unit="%",
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_NORM_HUMIDITY, name="WS Humidity", icon="mdi:water-percent",
-        device_class=SensorDeviceClass.HUMIDITY, native_unit="%",
+        key=KEY_NORM_PRESSURE_HPA,
+        name="WS Station Pressure",
+        icon="mdi:gauge",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit=UNIT_PRESSURE_HPA,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_NORM_PRESSURE_HPA, name="WS Station Pressure", icon="mdi:gauge",
-        device_class=SensorDeviceClass.PRESSURE, native_unit=UNIT_PRESSURE_HPA,
+        key=KEY_SEA_LEVEL_PRESSURE_HPA,
+        name="WS Sea-Level Pressure",
+        icon="mdi:gauge-full",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit=UNIT_PRESSURE_HPA,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_SEA_LEVEL_PRESSURE_HPA, name="WS Sea-Level Pressure", icon="mdi:gauge-full",
-        device_class=SensorDeviceClass.PRESSURE, native_unit=UNIT_PRESSURE_HPA,
+        key=KEY_NORM_WIND_SPEED_MS,
+        name="WS Wind Speed",
+        icon="mdi:weather-windy",
+        device_class=SensorDeviceClass.WIND_SPEED,
+        native_unit=UNIT_WIND_MS,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_NORM_WIND_SPEED_MS, name="WS Wind Speed", icon="mdi:weather-windy",
-        device_class=SensorDeviceClass.WIND_SPEED, native_unit=UNIT_WIND_MS,
+        key=KEY_NORM_WIND_GUST_MS,
+        name="WS Wind Gust",
+        icon="mdi:weather-windy-variant",
+        device_class=SensorDeviceClass.WIND_SPEED,
+        native_unit=UNIT_WIND_MS,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_NORM_WIND_GUST_MS, name="WS Wind Gust", icon="mdi:weather-windy-variant",
-        device_class=SensorDeviceClass.WIND_SPEED, native_unit=UNIT_WIND_MS,
+        key=KEY_NORM_WIND_DIR_DEG,
+        name="WS Wind Direction",
+        icon="mdi:compass",
+        device_class=SensorDeviceClass.WIND_DIRECTION,
+        native_unit="°",
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_NORM_WIND_DIR_DEG, name="WS Wind Direction", icon="mdi:compass",
-        device_class=SensorDeviceClass.WIND_DIRECTION, native_unit="°",
+        key=KEY_NORM_RAIN_TOTAL_MM,
+        name="WS Rain Total",
+        icon="mdi:water",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit=UNIT_RAIN_MM,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_NORM_RAIN_TOTAL_MM, name="WS Rain Total", icon="mdi:water",
-        device_class=SensorDeviceClass.PRECIPITATION, native_unit=UNIT_RAIN_MM,
+        key=KEY_RAIN_RATE_RAW,
+        name="WS Rain Rate Raw",
+        icon="mdi:weather-pouring",
+        native_unit="mm/h",
         state_class=SensorStateClass.MEASUREMENT,
-    ),
-    WSSensorDescription(
-        key=KEY_RAIN_RATE_RAW, name="WS Rain Rate Raw", icon="mdi:weather-pouring",
-        native_unit="mm/h", state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
-        key=KEY_RAIN_RATE_FILT, name="WS Rain Rate Filtered", icon="mdi:weather-pouring",
-        native_unit="mm/h", state_class=SensorStateClass.MEASUREMENT,
-    ),
-    WSSensorDescription(
-        key=KEY_LUX, name="WS Illuminance", icon="mdi:white-balance-sunny",
-        device_class=SensorDeviceClass.ILLUMINANCE, native_unit="lx",
+        key=KEY_RAIN_RATE_FILT,
+        name="WS Rain Rate Filtered",
+        icon="mdi:weather-pouring",
+        native_unit="mm/h",
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_UV, name="WS UV Index", icon="mdi:weather-sunny-alert",
+        key=KEY_LUX,
+        name="WS Illuminance",
+        icon="mdi:white-balance-sunny",
+        device_class=SensorDeviceClass.ILLUMINANCE,
+        native_unit="lx",
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_BATTERY_PCT, name="WS Battery", icon="mdi:battery",
-        device_class=SensorDeviceClass.BATTERY, native_unit="%",
+        key=KEY_UV,
+        name="WS UV Index",
+        icon="mdi:weather-sunny-alert",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_BATTERY_PCT,
+        name="WS Battery",
+        icon="mdi:battery",
+        device_class=SensorDeviceClass.BATTERY,
+        native_unit="%",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
-        key=KEY_PRESSURE_TREND_HPAH, name="WS Pressure Trend Raw", icon="mdi:trending-up",
-        native_unit="hPa/h", state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    WSSensorDescription(
-        key=KEY_PRESSURE_CHANGE_WINDOW_HPA, name="WS Pressure Change (window)",
-        icon="mdi:swap-vertical", native_unit="hPa",
+        key=KEY_PRESSURE_TREND_HPAH,
+        name="WS Pressure Trend Raw",
+        icon="mdi:trending-up",
+        native_unit="hPa/h",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
-        key=KEY_DATA_QUALITY, name="WS Data Quality Banner",
+        key=KEY_PRESSURE_CHANGE_WINDOW_HPA,
+        name="WS Pressure Change (window)",
+        icon="mdi:swap-vertical",
+        native_unit="hPa",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_DATA_QUALITY,
+        name="WS Data Quality Banner",
         icon="mdi:clipboard-check-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
-        key=KEY_PACKAGE_STATUS, name="WS Package Status",
+        key=KEY_PACKAGE_STATUS,
+        name="WS Package Status",
         icon="mdi:package-variant-closed",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
-        key=KEY_ALERT_STATE, name="WS Alert State",
+        key=KEY_SENSOR_QUALITY_FLAGS,
+        name="WS Sensor Quality Flags",
+        icon="mdi:shield-alert-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get(KEY_SENSOR_QUALITY_FLAGS) or []),
+        attrs_fn=lambda d: {
+            "flags": d.get(KEY_SENSOR_QUALITY_FLAGS) or [],
+            "all_clear": len(d.get(KEY_SENSOR_QUALITY_FLAGS) or []) == 0,
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_ALERT_STATE,
+        name="WS Alert State",
         icon="mdi:alert-circle-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
-        key=KEY_ALERT_MESSAGE, name="WS Alert Message",
+        key=KEY_ALERT_MESSAGE,
+        name="WS Alert Message",
         icon="mdi:message-alert-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
-        key=KEY_FORECAST, name="WS Forecast Daily", icon="mdi:calendar-weather",
+        key=KEY_FORECAST,
+        name="WS Forecast Daily",
+        icon="mdi:calendar-weather",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get(KEY_FORECAST) or {}).get("provider") if d.get(KEY_FORECAST) else None,
-        attrs_fn=lambda d: (d.get(KEY_FORECAST) or {}),
+        attrs_fn=lambda d: d.get(KEY_FORECAST) or {},
     ),
-
     # =========================================================================
     # NEW v0.2.0: ADVANCED METEOROLOGICAL SENSORS
     # =========================================================================
-
     # Apparent temperature - Australian BOM standard
     WSSensorDescription(
         key=KEY_FEELS_LIKE_C,
@@ -208,12 +273,13 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "method": "Australian Apparent Temperature (BOM standard)",
-            "wind_contribution_ms": round(-0.70 * float(d[KEY_NORM_WIND_SPEED_MS]), 1) if d.get(KEY_NORM_WIND_SPEED_MS) is not None else None,
+            "wind_contribution_ms": round(-0.70 * float(d[KEY_NORM_WIND_SPEED_MS]), 1)
+            if d.get(KEY_NORM_WIND_SPEED_MS) is not None
+            else None,
             "humidity": d.get(KEY_NORM_HUMIDITY),
             "actual_temp_c": d.get(KEY_NORM_TEMP_C),
         },
     ),
-
     # Zambretti 6-12h barometric forecast
     WSSensorDescription(
         key=KEY_ZAMBRETTI_FORECAST,
@@ -226,7 +292,6 @@ SENSORS: list[WSSensorDescription] = [
             "pressure_trend_display": d.get(KEY_PRESSURE_TREND_DISPLAY),
         },
     ),
-
     # Beaufort wind scale
     WSSensorDescription(
         key=KEY_WIND_BEAUFORT,
@@ -236,12 +301,15 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "description": d.get(KEY_WIND_BEAUFORT_DESC),
             "speed_ms": d.get(KEY_NORM_WIND_SPEED_MS),
-            "speed_kmh": round(float(d[KEY_NORM_WIND_SPEED_MS]) * 3.6, 1) if d.get(KEY_NORM_WIND_SPEED_MS) is not None else None,
+            "speed_kmh": round(float(d[KEY_NORM_WIND_SPEED_MS]) * 3.6, 1)
+            if d.get(KEY_NORM_WIND_SPEED_MS) is not None
+            else None,
             "gust_ms": d.get(KEY_NORM_WIND_GUST_MS),
-            "gust_kmh": round(float(d[KEY_NORM_WIND_GUST_MS]) * 3.6, 1) if d.get(KEY_NORM_WIND_GUST_MS) is not None else None,
+            "gust_kmh": round(float(d[KEY_NORM_WIND_GUST_MS]) * 3.6, 1)
+            if d.get(KEY_NORM_WIND_GUST_MS) is not None
+            else None,
         },
     ),
-
     # Wind quadrant (N/E/S/W)
     WSSensorDescription(
         key=KEY_WIND_QUADRANT,
@@ -252,7 +320,6 @@ SENSORS: list[WSSensorDescription] = [
             "using_smoothed": d.get(KEY_WIND_DIR_SMOOTH_DEG) is not None,
         },
     ),
-
     # Smoothed wind direction (circular averaging, alpha=0.3)
     WSSensorDescription(
         key=KEY_WIND_DIR_SMOOTH_DEG,
@@ -266,7 +333,6 @@ SENSORS: list[WSSensorDescription] = [
             "method": "Circular exponential smoothing (alpha=0.3)",
         },
     ),
-
     # Current weather condition (36 conditions, matches original)
     WSSensorDescription(
         key=KEY_CURRENT_CONDITION,
@@ -282,7 +348,6 @@ SENSORS: list[WSSensorDescription] = [
             "temperature": d.get(KEY_NORM_TEMP_C),
         },
     ),
-
     # Rain probability (local, pressure+humidity+wind)
     WSSensorDescription(
         key=KEY_RAIN_PROBABILITY,
@@ -295,10 +360,14 @@ SENSORS: list[WSSensorDescription] = [
             "pressure_trend_3h": d.get(KEY_PRESSURE_TREND_HPAH),
             "humidity_pct": d.get(KEY_NORM_HUMIDITY),
             "wind_quadrant": d.get(KEY_WIND_QUADRANT),
-            "method": "Local sensor calculation (Zambretti-inspired)",
+            "method": "Heuristic estimate: pressure + trend + humidity + wind direction",
+            "disclaimer": (
+                "Heuristic estimate based on local sensor data. "
+                "Accuracy depends on sensor quality and local climate patterns. "
+                "Not suitable as a sole forecast source."
+            ),
         },
     ),
-
     # Combined rain probability (local + forecast API weighted)
     WSSensorDescription(
         key=KEY_RAIN_PROBABILITY_COMBINED,
@@ -311,7 +380,6 @@ SENSORS: list[WSSensorDescription] = [
             "method": "Time-weighted merge: local sensors + Open-Meteo",
         },
     ),
-
     # Rain display (formatted text)
     WSSensorDescription(
         key=KEY_RAIN_DISPLAY,
@@ -323,7 +391,6 @@ SENSORS: list[WSSensorDescription] = [
             "is_raining": (d.get(KEY_RAIN_RATE_FILT) or 0) > 0,
         },
     ),
-
     # Pressure trend (formatted display)
     WSSensorDescription(
         key=KEY_PRESSURE_TREND_DISPLAY,
@@ -335,7 +402,6 @@ SENSORS: list[WSSensorDescription] = [
             "mslp_hpa": d.get(KEY_SEA_LEVEL_PRESSURE_HPA),
         },
     ),
-
     # Station health display
     WSSensorDescription(
         key=KEY_HEALTH_DISPLAY,
@@ -348,7 +414,6 @@ SENSORS: list[WSSensorDescription] = [
             "data_quality": d.get(KEY_DATA_QUALITY),
         },
     ),
-
     # Forecast tiles (5-day)
     WSSensorDescription(
         key=KEY_FORECAST_TILES,
@@ -360,7 +425,6 @@ SENSORS: list[WSSensorDescription] = [
             "count": len(d.get(KEY_FORECAST_TILES) or []),
         },
     ),
-
     # =========================================================================
     # 24h ROLLING STATISTICS
     # =========================================================================
@@ -397,7 +461,6 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=UNIT_WIND_MS,
         state_class=SensorStateClass.MEASUREMENT,
     ),
-
     # =========================================================================
     # DISPLAY / LEVEL SENSORS
     # =========================================================================
@@ -425,7 +488,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:thermometer",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-
     # =========================================================================
     # ACTIVITY OPTIMIZATION SENSORS
     # =========================================================================
@@ -466,6 +528,24 @@ SENSORS: list[WSSensorDescription] = [
             "temperature_c": d.get(KEY_NORM_TEMP_C),
             "humidity_pct": d.get(KEY_NORM_HUMIDITY),
             "wind_ms": d.get(KEY_NORM_WIND_SPEED_MS),
+            "rain_24h_mm": d.get("_fire_rain_24h_mm"),
+            "disclaimer": (
+                "Simplified heuristic — NOT suitable for operational fire weather decisions. "
+                "Consult official fire services and meteorological agencies for fire danger ratings."
+            ),
+            "reference": "Simplified FWI based on Van Wagner 1987 structure. Full Canadian FWI requires daily moisture codes.",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_RUNNING_SCORE,
+        name="WS Running Score",
+        icon="mdi:run",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "level": d.get("_running_level"),
+            "recommendation": d.get("_running_recommendation"),
+            "feels_like_c": d.get(KEY_FEELS_LIKE_C),
+            "uv_index": d.get(KEY_UV),
         },
     ),
 ]
@@ -473,9 +553,7 @@ SENSORS: list[WSSensorDescription] = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    prefix = (
-        entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX
-    ).strip().lower()
+    prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
 
     entities: list[WSSensor] = [WSSensor(coordinator, entry, desc, prefix) for desc in SENSORS]
     async_add_entities(entities)
@@ -489,10 +567,12 @@ class WSSensor(CoordinatorEntity, SensorEntity):
         KEY_LAUNDRY_SCORE,
         KEY_STARGAZE_SCORE,
         KEY_FIRE_SCORE,
+        KEY_RUNNING_SCORE,
         KEY_TEMP_AVG_24H,
         KEY_TEMP_DISPLAY,
         KEY_WIND_DIR_SMOOTH_DEG,
         KEY_BATTERY_DISPLAY,
+        KEY_SENSOR_QUALITY_FLAGS,
     }
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
@@ -570,6 +650,8 @@ class WSSensor(CoordinatorEntity, SensorEntity):
             KEY_LAUNDRY_SCORE: "laundry_drying_score",
             KEY_STARGAZE_SCORE: "stargazing_quality",
             KEY_FIRE_SCORE: "fire_weather_index",
+            KEY_SENSOR_QUALITY_FLAGS: "sensor_quality_flags",
+            KEY_RUNNING_SCORE: "running_score",
         }
         if key in overrides:
             return overrides[key]
