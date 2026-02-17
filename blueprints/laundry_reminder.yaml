@@ -1,0 +1,55 @@
+blueprint:
+  name: "WS Core: Laundry Drying Reminder"
+  description: >-
+    Send a morning notification when outdoor laundry drying conditions
+    are excellent. Requires the activity scores feature to be enabled
+    in the integration options.
+  domain: automation
+  input:
+    laundry_entity:
+      name: Laundry drying score sensor
+      default: sensor.ws_laundry_drying_score
+      selector:
+        entity:
+          domain: sensor
+    score_threshold:
+      name: Minimum score to notify
+      description: Only notify when drying score is at least this value (0-100)
+      default: 70
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 5
+    notify_time:
+      name: Notification time
+      description: Time of day to check and notify
+      default: "08:00:00"
+      selector:
+        time:
+    notify_target:
+      name: Notification service
+      default: notify.persistent_notification
+      selector:
+        text:
+
+trigger:
+  - platform: time
+    at: !input notify_time
+
+variables:
+  laundry_sensor: !input laundry_entity
+
+condition:
+  - condition: numeric_state
+    entity_id: !input laundry_entity
+    above: !input score_threshold
+
+action:
+  - service: !input notify_target
+    data:
+      title: "☀️ Great Drying Weather!"
+      message: >-
+        Laundry drying score: {{ states(laundry_sensor) }}/100.
+        {{ state_attr(laundry_sensor, 'recommendation') or 'Good conditions for outdoor drying.' }}
+        Estimated dry time: {{ state_attr(laundry_sensor, 'estimated_dry_time') or 'unknown' }}.

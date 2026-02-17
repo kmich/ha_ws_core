@@ -1,0 +1,28 @@
+name: Feature Request
+description: Suggest an improvement or new feature
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: Describe the use case or frustration
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      placeholder: How should it work?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Other approaches you've thought about
+  - type: input
+    id: station
+    attributes:
+      label: Weather station hardware (if relevant)
+      placeholder: "e.g. Davis Vantage Pro 2"

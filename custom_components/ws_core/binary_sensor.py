@@ -21,10 +21,15 @@ class WSPackageOK(CoordinatorEntity, BinarySensorEntity):
 
     def __init__(self, coordinator, entry: ConfigEntry, prefix: str):
         super().__init__(coordinator)
+        self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_package_ok"
         self._attr_suggested_object_id = f"{prefix}_package_ok"
         self._attr_name = "WS Package OK"
         self._attr_icon = "mdi:check-decagram"
+
+    @property
+    def device_info(self):
+        return {"identifiers": {(DOMAIN, self._entry.entry_id)}}
 
     @property
     def is_on(self) -> bool | None:

@@ -36,13 +36,12 @@ SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
     """Handle config entry schema version migrations.
 
-    v1 ΞΒ²Ξ²β‚¬Β Ξ²β‚¬β„Ά v2: Added hemisphere and climate_region fields.
+    v1 -> v2: Added hemisphere and climate_region fields.
     """
     _LOGGER.info("Migrating WS Station config entry from version %s", entry.version)
 
     if entry.version == 1:
         new_data = dict(entry.data)
-        # Add new fields with sensible defaults
         if CONF_HEMISPHERE not in new_data:
             try:
                 lat = float(hass.config.latitude)
@@ -59,7 +58,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
         )
         return True
 
-    _LOGGER.error("Unknown config entry version %s ΞΒ²Ξ²β€Β¬Ξ²β‚¬Β cannot migrate", entry.version)
+    _LOGGER.error("Unknown config entry version %s -- cannot migrate", entry.version)
     return False
 
 
@@ -82,8 +81,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
-        manufacturer="WS Station",
+        manufacturer="Weather Station Core",
         model="Derived Weather Package",
+        sw_version="0.4.0",
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -125,4 +125,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator is not None:
         await coordinator.async_stop()
     return unload_ok
-

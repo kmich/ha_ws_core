@@ -1,0 +1,250 @@
+# =============================================================================
+# WEATHER STATION VANILLA DASHBOARD v1.0.0
+# =============================================================================
+# Uses ONLY native Home Assistant cards. No HACS frontend dependencies.
+# No input_boolean, input_text, or input_select helpers required.
+#
+# Usage: Dashboard → Edit → Raw Configuration Editor → paste → save
+#
+# Assumes default prefix "ws". If you used a different prefix,
+# find-and-replace "sensor.ws_" with "sensor.YOURPREFIX_"
+# and "weather.ws" with "weather.YOURPREFIX".
+# =============================================================================
+
+views:
+  # =============================================
+  # PAGE 1: MAIN WEATHER
+  # =============================================
+  - title: Weather
+    path: weather
+    icon: mdi:weather-partly-cloudy
+    cards:
+      # --- Weather entity card (built-in) ---
+      - type: weather-forecast
+        entity: weather.ws
+        show_forecast: true
+        forecast_type: daily
+
+      # --- Current conditions grid ---
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: entity
+            entity: sensor.ws_temperature
+            name: Temperature
+            icon: mdi:thermometer
+          - type: entity
+            entity: sensor.ws_feels_like
+            name: Feels Like
+            icon: mdi:thermometer-lines
+          - type: entity
+            entity: sensor.ws_humidity
+            name: Humidity
+            icon: mdi:water-percent
+          - type: entity
+            entity: sensor.ws_dew_point
+            name: Dew Point
+            icon: mdi:weather-fog
+          - type: entity
+            entity: sensor.ws_wet_bulb
+            name: Wet Bulb
+            icon: mdi:thermometer-water
+          - type: entity
+            entity: sensor.ws_frost_point
+            name: Frost Point
+            icon: mdi:snowflake-thermometer
+
+      # --- Wind ---
+      - type: entities
+        title: Wind
+        icon: mdi:weather-windy
+        entities:
+          - entity: sensor.ws_wind_speed
+            name: Speed
+          - entity: sensor.ws_wind_gust
+            name: Gust
+          - entity: sensor.ws_wind_direction
+            name: Direction
+          - entity: sensor.ws_wind_beaufort
+            name: Beaufort Scale
+          - entity: sensor.ws_wind_quadrant
+            name: Quadrant
+          - entity: sensor.ws_wind_gust_max_24h
+            name: Max Gust (24h)
+
+      # --- Pressure ---
+      - type: entities
+        title: Pressure
+        icon: mdi:gauge
+        entities:
+          - entity: sensor.ws_station_pressure
+            name: Station
+          - entity: sensor.ws_sea_level_pressure
+            name: Sea Level (MSLP)
+          - entity: sensor.ws_pressure_trend
+            name: Trend
+
+      # --- Precipitation ---
+      - type: entities
+        title: Precipitation
+        icon: mdi:weather-rainy
+        entities:
+          - entity: sensor.ws_rain_total
+            name: Rain Total
+          - entity: sensor.ws_rain_rate
+            name: Rain Rate (filtered)
+          - entity: sensor.ws_rain_display
+            name: Intensity
+          - entity: sensor.ws_rain_probability
+            name: Rain Probability (local)
+          - entity: sensor.ws_rain_probability_combined
+            name: Rain Probability (combined)
+
+      # --- Forecast ---
+      - type: entities
+        title: Zambretti Forecast
+        icon: mdi:crystal-ball
+        entities:
+          - entity: sensor.ws_zambretti_forecast
+            name: Forecast
+          - entity: sensor.ws_current_condition
+            name: Current Condition
+
+      # --- Temperature history graph ---
+      - type: history-graph
+        title: Temperature (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.ws_temperature
+            name: Actual
+          - entity: sensor.ws_feels_like
+            name: Feels Like
+          - entity: sensor.ws_dew_point
+            name: Dew Point
+
+      # --- Pressure history graph ---
+      - type: history-graph
+        title: Pressure (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.ws_sea_level_pressure
+            name: MSLP
+
+      # --- Wind history graph ---
+      - type: history-graph
+        title: Wind (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.ws_wind_speed
+            name: Speed
+          - entity: sensor.ws_wind_gust
+            name: Gust
+
+  # =============================================
+  # PAGE 2: STATION HEALTH & ADVANCED
+  # =============================================
+  - title: Station
+    path: station
+    icon: mdi:heart-pulse
+    cards:
+      # --- Station health ---
+      - type: entities
+        title: Station Health
+        icon: mdi:heart-pulse
+        entities:
+          - entity: sensor.ws_station_health
+            name: Status
+          - entity: binary_sensor.ws_package_ok
+            name: Package OK
+          - entity: sensor.ws_data_quality_banner
+            name: Data Quality
+          - entity: sensor.ws_alert_state
+            name: Alert State
+          - entity: sensor.ws_alert_message
+            name: Alert Message
+
+      # --- UV & Solar ---
+      - type: entities
+        title: UV & Solar
+        icon: mdi:weather-sunny-alert
+        entities:
+          - entity: sensor.ws_uv_index
+            name: UV Index
+          - entity: sensor.ws_uv_level
+            name: UV Level
+          - entity: sensor.ws_illuminance
+            name: Illuminance
+
+      # --- 24h Statistics ---
+      - type: grid
+        columns: 3
+        square: false
+        cards:
+          - type: entity
+            entity: sensor.ws_temperature_high_24h
+            name: High (24h)
+            icon: mdi:thermometer-high
+          - type: entity
+            entity: sensor.ws_temperature_low_24h
+            name: Low (24h)
+            icon: mdi:thermometer-low
+          - type: entity
+            entity: sensor.ws_wind_gust_max_24h
+            name: Max Gust (24h)
+            icon: mdi:weather-windy-variant
+
+      # --- Battery ---
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_battery
+            state_not: unavailable
+        card:
+          type: entity
+          entity: sensor.ws_battery
+          name: Station Battery
+
+      # --- Rain history graph ---
+      - type: history-graph
+        title: Rain Rate (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.ws_rain_rate
+            name: Filtered
+          - entity: sensor.ws_rain_rate_raw
+            name: Raw
+
+  # =============================================
+  # PAGE 3: ACTIVITY SCORES
+  # =============================================
+  - title: Activities
+    path: activities
+    icon: mdi:run
+    cards:
+      - type: markdown
+        content: >-
+          Activity scores are **disabled by default**. Enable them in
+          Settings → Devices & Services → Weather Station Core → Configure
+          → "Enable activity scores".
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          - type: entity
+            entity: sensor.ws_laundry_drying_score
+            name: Laundry Drying
+            icon: mdi:hanger
+          - type: entity
+            entity: sensor.ws_running_score
+            name: Running
+            icon: mdi:run
+          - type: entity
+            entity: sensor.ws_stargazing_quality
+            name: Stargazing
+            icon: mdi:telescope
+          - type: entity
+            entity: sensor.ws_fire_risk_score
+            name: Fire Risk
+            icon: mdi:fire

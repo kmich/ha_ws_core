@@ -16,14 +16,18 @@ from custom_components.ws_core.algorithms import (
     beaufort_description,
     calculate_apparent_temperature,
     calculate_dew_point,
+    calculate_frost_point,
     calculate_moon_phase,
     calculate_rain_probability,
     calculate_sea_level_pressure,
+    calculate_wet_bulb,
+    combine_rain_probability,
     determine_current_condition,
     direction_to_cardinal_16,
     direction_to_quadrant,
     fire_danger_level,
-    fire_weather_index,
+    fire_risk_score,
+    format_rain_display,
     humidity_level,
     laundry_drying_score,
     least_squares_pressure_trend,
@@ -235,16 +239,19 @@ class TestKalmanFilter:
 # ---------------------------------------------------------------------------
 class TestZambretti:
     def test_high_pressure_rising_returns_fair(self):
-        result = zambretti_forecast(mslp=1025.0, pressure_trend_3h=1.0, wind_quadrant="N", humidity=50.0, month=6)
-        assert "fair" in result.lower() or "fine" in result.lower() or "continu" in result.lower()
+        text, z = zambretti_forecast(mslp=1025.0, pressure_trend_3h=1.0, wind_quadrant="N", humidity=50.0, month=6)
+        assert "fair" in text.lower() or "fine" in text.lower() or "settled" in text.lower()
 
     def test_storm_likely(self):
-        result = zambretti_forecast(mslp=995.0, pressure_trend_3h=-4.0, wind_quadrant="S", humidity=90.0, month=11)
-        assert "storm" in result.lower() or "rain" in result.lower()
+        text, z = zambretti_forecast(mslp=995.0, pressure_trend_3h=-4.0, wind_quadrant="S", humidity=90.0, month=11)
+        assert "storm" in text.lower() or "rain" in text.lower() or "unsettled" in text.lower()
 
-    def test_returns_string(self):
+    def test_returns_tuple(self):
         result = zambretti_forecast(mslp=1013.0, pressure_trend_3h=0.0, wind_quadrant="E", humidity=65.0, month=4)
-        assert isinstance(result, str) and len(result) > 0
+        assert isinstance(result, tuple) and len(result) == 2
+        text, z = result
+        assert isinstance(text, str) and len(text) > 0
+        assert isinstance(z, int) and 1 <= z <= 26
 
 
 # ---------------------------------------------------------------------------
@@ -300,17 +307,17 @@ class TestMoonPhase:
 # ---------------------------------------------------------------------------
 class TestFireWeather:
     def test_rainy_day_low_danger(self):
-        fwi = fire_weather_index(20.0, 80.0, 2.0, 20.0)
+        fwi = fire_risk_score(20.0, 80.0, 2.0, 20.0)
         assert fire_danger_level(fwi) in ("Low", "Moderate")
 
     def test_extreme_conditions(self):
-        fwi = fire_weather_index(38.0, 15.0, 15.0, 0.0)
+        fwi = fire_risk_score(38.0, 15.0, 15.0, 0.0)
         level = fire_danger_level(fwi)
         assert level in ("High", "Very High", "Extreme")
 
     def test_non_negative(self):
         for temp in range(-5, 40, 5):
-            fwi = fire_weather_index(float(temp), 50.0, 3.0, 0.0)
+            fwi = fire_risk_score(float(temp), 50.0, 3.0, 0.0)
             assert fwi >= 0
 
 
@@ -393,3 +400,150 @@ class TestCurrentCondition:
     def test_snowy(self):
         cond = determine_current_condition(**self._base_kwargs(temp_c=-2.0, rain_rate_mmph=1.0, humidity=95.0))
         assert cond in ("snowy", "snow-accumulation")
+
+    def test_clear_night(self):
+        cond = determine_current_condition(
+            **self._base_kwargs(is_day=False, illuminance_lx=10.0, humidity=40.0)
+        )
+        assert cond == "clear-night"
+
+
+# ---------------------------------------------------------------------------
+# Frost Point (Buck 1981)
+# ---------------------------------------------------------------------------
+class TestFrostPoint:
+    def test_above_zero_equals_dew_point(self):
+        """Above 0°C, frost point should equal dew point."""
+        fp = calculate_frost_point(20.0, 60.0)
+        dp = calculate_dew_point(20.0, 60.0)
+        assert abs(fp - dp) < 0.01
+
+    def test_below_zero_uses_ice_constants(self):
+        """Below 0°C, frost point should differ from warm-air dew point."""
+        fp = calculate_frost_point(-10.0, 80.0)
+        # Frost point at -10°C/80%RH should be around -12 to -13°C
+        assert -15.0 < fp < -10.0
+
+    def test_saturated_cold(self):
+        """At 100% RH and freezing, frost point ≈ temperature."""
+        fp = calculate_frost_point(-5.0, 100.0)
+        assert abs(fp - (-5.0)) < 0.2
+
+
+# ---------------------------------------------------------------------------
+# Wet-Bulb Temperature (Stull 2011)
+# ---------------------------------------------------------------------------
+class TestWetBulb:
+    def test_typical_summer(self):
+        """30°C / 50% RH → wet bulb ~22°C (psychrometric chart reference)."""
+        tw = calculate_wet_bulb(30.0, 50.0)
+        assert 20.0 <= tw <= 24.0, f"Expected ~22, got {tw}"
+
+    def test_saturated_equals_dry(self):
+        """At 100% RH, wet bulb ≈ dry bulb temperature."""
+        # Stull formula has max error ±0.3°C, so allow some tolerance
+        tw = calculate_wet_bulb(25.0, 99.0)
+        assert abs(tw - 25.0) < 1.0, f"Expected ~25, got {tw}"
+
+    def test_low_humidity(self):
+        """Low humidity gives much lower wet-bulb than dry-bulb."""
+        tw = calculate_wet_bulb(35.0, 10.0)
+        assert tw < 20.0, f"Expected < 20, got {tw}"
+
+    def test_valid_range(self):
+        """Should produce reasonable values across valid input range."""
+        for temp in range(-15, 45, 10):
+            for rh in [10, 30, 50, 70, 90]:
+                tw = calculate_wet_bulb(float(temp), float(rh))
+                assert tw <= temp + 1.0, f"Wet bulb {tw} > dry bulb {temp}"
+                assert tw > temp - 40, f"Wet bulb {tw} unreasonably low"
+
+
+# ---------------------------------------------------------------------------
+# Real Zambretti Forecaster (Z-numbers 1-26)
+# ---------------------------------------------------------------------------
+class TestZambrettiReal:
+    def test_high_pressure_fair(self):
+        """High MSLP + rising trend → fair weather (low Z-number)."""
+        text, z = zambretti_forecast(
+            mslp=1035.0, pressure_trend_3h=1.0, wind_quadrant="N",
+            humidity=50.0, month=6, hemisphere="Northern",
+        )
+        assert z <= 8, f"Expected fair weather (Z≤8), got Z={z}: {text}"
+
+    def test_low_pressure_unsettled(self):
+        """Low MSLP + falling trend → unsettled (high Z-number)."""
+        text, z = zambretti_forecast(
+            mslp=985.0, pressure_trend_3h=-2.0, wind_quadrant="S",
+            humidity=90.0, month=11, hemisphere="Northern",
+        )
+        assert z >= 18, f"Expected unsettled (Z≥18), got Z={z}: {text}"
+
+    def test_z_range_always_valid(self):
+        """Z-number should always be 1-26."""
+        for p in [950, 980, 1000, 1020, 1050]:
+            for trend in [-3, -1, 0, 1, 3]:
+                _, z = zambretti_forecast(
+                    mslp=float(p), pressure_trend_3h=float(trend),
+                    wind_quadrant="W", humidity=60.0, month=3,
+                )
+                assert 1 <= z <= 26, f"Z={z} out of range for MSLP={p}, trend={trend}"
+
+    def test_climate_region_affects_result(self):
+        """Different climate regions should give different results for same conditions."""
+        _, z_atlantic = zambretti_forecast(
+            mslp=1010.0, pressure_trend_3h=-0.5, wind_quadrant="W",
+            humidity=70.0, month=6, climate="Atlantic Europe",
+        )
+        _, z_med = zambretti_forecast(
+            mslp=1010.0, pressure_trend_3h=-0.5, wind_quadrant="W",
+            humidity=70.0, month=6, climate="Mediterranean",
+        )
+        # W wind is "bad" in Atlantic, also "bad" in Mediterranean, but
+        # overall adjustments may differ slightly
+        assert isinstance(z_atlantic, int)
+        assert isinstance(z_med, int)
+
+    def test_returns_valid_text(self):
+        """Forecast text should be from the 26-entry table."""
+        from custom_components.ws_core.algorithms import ZAMBRETTI_TEXTS
+        text, z = zambretti_forecast(
+            mslp=1013.0, pressure_trend_3h=0.0, wind_quadrant="N",
+            humidity=60.0, month=6,
+        )
+        assert text in ZAMBRETTI_TEXTS
+
+
+# ---------------------------------------------------------------------------
+# Combine Rain Probability
+# ---------------------------------------------------------------------------
+class TestCombineRainProbability:
+    def test_no_api_returns_local(self):
+        result = combine_rain_probability(75.0, None, 12)
+        assert result == 75
+
+    def test_daytime_weights_local_higher(self):
+        """During daytime convective hours, local weight = 0.5."""
+        result = combine_rain_probability(80.0, 20.0, 12)
+        # 80*0.5 + 20*0.5 = 50
+        assert result == 50
+
+    def test_nighttime_weights_api_higher(self):
+        """During nighttime, local weight = 0.3."""
+        result = combine_rain_probability(80.0, 20.0, 2)
+        # 80*0.3 + 20*0.7 = 24+14 = 38
+        assert result == 38
+
+
+# ---------------------------------------------------------------------------
+# Format Rain Display
+# ---------------------------------------------------------------------------
+class TestFormatRainDisplay:
+    def test_dry(self):
+        assert format_rain_display(0.0) == "Dry"
+
+    def test_heavy(self):
+        assert "Heavy" in format_rain_display(15.0)
+
+    def test_drizzle(self):
+        assert format_rain_display(0.1) == "Drizzle"

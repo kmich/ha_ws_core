@@ -1,0 +1,58 @@
+blueprint:
+  name: "WS Core: Storm Warning"
+  description: >-
+    Send a notification when the pressure trend indicates a rapid drop
+    combined with increasing wind, suggesting an approaching storm front.
+  domain: automation
+  input:
+    pressure_trend_entity:
+      name: Pressure trend sensor
+      default: sensor.ws_pressure_trend
+      selector:
+        entity:
+          domain: sensor
+    wind_gust_entity:
+      name: Wind gust sensor
+      default: sensor.ws_wind_gust
+      selector:
+        entity:
+          domain: sensor
+    wind_gust_threshold:
+      name: Wind gust threshold (m/s)
+      description: Minimum gust speed to consider storm-worthy
+      default: 15.0
+      selector:
+        number:
+          min: 8
+          max: 30
+          step: 1
+          unit_of_measurement: "m/s"
+    notify_target:
+      name: Notification service
+      default: notify.persistent_notification
+      selector:
+        text:
+
+variables:
+  gust_sensor: !input wind_gust_entity
+  trend_sensor: !input pressure_trend_entity
+
+trigger:
+  - platform: state
+    entity_id: !input pressure_trend_entity
+    to:
+      - "Falling Rapidly"
+
+condition:
+  - condition: numeric_state
+    entity_id: !input wind_gust_entity
+    above: !input wind_gust_threshold
+
+action:
+  - service: !input notify_target
+    data:
+      title: "⛈️ Storm Warning"
+      message: >-
+        Barometric pressure is falling rapidly with wind gusts
+        of {{ states(gust_sensor) }} m/s.
+        Secure outdoor furniture and close windows.

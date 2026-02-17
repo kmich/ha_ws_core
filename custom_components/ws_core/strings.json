@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Weather Station Core — Create Station",
-        "description": "Give your weather station a name. The prefix will be used for all entity IDs (e.g. prefix 'ws' → sensor.ws_temperature).",
+        "title": "Weather Station Core -- Create Station",
+        "description": "Give your weather station a name. The prefix will be used for all entity IDs (e.g. prefix 'ws' creates sensor.ws_temperature).",
         "data": {
           "name": "Station name",
           "prefix": "Entity prefix (e.g. ws, garden, roof)"
@@ -34,7 +34,7 @@
       },
       "location": {
         "title": "Location & climate",
-        "description": "These settings affect pressure reduction, Zambretti forecast wind patterns, and seasonal logic. Elevation has been pre-filled from your Home Assistant location — adjust if your weather station is at a different altitude.",
+        "description": "These settings affect pressure reduction, Zambretti forecast wind patterns, and seasonal logic. Elevation has been pre-filled from your Home Assistant location.",
         "data": {
           "hemisphere": "Hemisphere",
           "climate_region": "Climate region (for Zambretti wind pattern weighting)",
@@ -77,17 +77,17 @@
     },
     "error": {
       "entity_not_found": "Entity not found in Home Assistant.",
-      "not_numeric":      "Entity state is not a numeric value.",
-      "required":         "This field is required.",
+      "not_numeric": "Entity state is not a numeric value.",
+      "required": "This field is required.",
       "elevation_out_of_range": "Elevation must be between -500 m and 9000 m.",
-      "wind_gust_too_high": "Wind gust threshold exceeds the physical world record — please check the value.",
-      "temp_out_of_range":  "Temperature is outside the physically possible range (-60°C to +60°C)."
+      "wind_gust_too_high": "Wind gust threshold exceeds the physical world record.",
+      "temp_out_of_range": "Temperature is outside the physically possible range."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Weather Station Core — Options",
+        "title": "Weather Station Core -- Options",
         "description": "Update settings, units, location, forecast, and alert thresholds.",
         "data": {
           "prefix": "Entity prefix",
@@ -111,6 +111,20 @@
           "rain_penalty_heavy_mmph": "Rain penalty maximum"
         }
       }
+    }
+  },
+  "issues": {
+    "missing_source_entities": {
+      "title": "Weather station source entities not found",
+      "description": "The following source sensor entities could not be found in Home Assistant: {entities}. Check that the sensor entities exist and are not disabled."
+    },
+    "stale_sensors": {
+      "title": "Weather station sensors are stale",
+      "description": "The following sensors have not updated within the staleness timeout: {sensors}. Check that your weather station hardware is online and connected."
+    },
+    "forecast_api_failures": {
+      "title": "Open-Meteo forecast API failures",
+      "description": "The Open-Meteo forecast API has failed {failures} consecutive times. Forecast data may be stale. Check your internet connection. The integration will retry automatically with exponential backoff."
     }
   }
 }

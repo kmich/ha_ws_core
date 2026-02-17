@@ -76,29 +76,29 @@ TEMP_UNIT_OPTIONS = ["auto", "C", "F"]
 # ---------------------------------------------------------------------------
 # Physical validation limits (WMO / ICAO records)
 # ---------------------------------------------------------------------------
-VALID_TEMP_MIN_C = -60.0  # below lowest recorded (-89.2°C Antarctica)
-VALID_TEMP_MAX_C = 60.0  # above highest recorded (54.4°C Death Valley)
+VALID_TEMP_MIN_C = -60.0
+VALID_TEMP_MAX_C = 60.0
 VALID_TEMP_WARN_MIN_C = -40.0
 VALID_TEMP_WARN_MAX_C = 50.0
 
-VALID_PRESSURE_MIN_HPA = 870.0  # typhoon record low
-VALID_PRESSURE_MAX_HPA = 1085.0  # Siberia record high
+VALID_PRESSURE_MIN_HPA = 870.0
+VALID_PRESSURE_MAX_HPA = 1085.0
 VALID_PRESSURE_WARN_MIN_HPA = 940.0
 VALID_PRESSURE_WARN_MAX_HPA = 1060.0
 
-VALID_ELEVATION_MIN_M = -500.0  # Dead Sea ~-430m
-VALID_ELEVATION_MAX_M = 9000.0  # above Everest summit
+VALID_ELEVATION_MIN_M = -500.0
+VALID_ELEVATION_MAX_M = 9000.0
 
 VALID_HUMIDITY_MIN = 0.0
 VALID_HUMIDITY_MAX = 100.0
 
-VALID_WIND_GUST_MAX_MS = 113.0  # highest recorded gust (Barrow Island)
-VALID_RAIN_RATE_MAX_MMPH = 500.0  # highest reliable tipping-bucket reading
+VALID_WIND_GUST_MAX_MS = 113.0
+VALID_RAIN_RATE_MAX_MMPH = 500.0
 
 # ---------------------------------------------------------------------------
 # Canonical internal units
 # ---------------------------------------------------------------------------
-UNIT_TEMP_C = "°C"
+UNIT_TEMP_C = "\u00b0C"
 UNIT_WIND_MS = "m/s"
 UNIT_PRESSURE_HPA = "hPa"
 UNIT_RAIN_MM = "mm"
@@ -128,9 +128,12 @@ KEY_PACKAGE_STATUS = "package_status"
 KEY_PACKAGE_OK = "package_ok"
 KEY_FORECAST = "forecast"
 
-# Keys for ADVANCED METEOROLOGICAL SENSORS (v0.2.0+)
+# Keys for ADVANCED METEOROLOGICAL SENSORS
 KEY_FEELS_LIKE_C = "feels_like_c"
+KEY_WET_BULB_C = "wet_bulb_c"
+KEY_FROST_POINT_C = "frost_point_c"
 KEY_ZAMBRETTI_FORECAST = "zambretti_forecast"
+KEY_ZAMBRETTI_NUMBER = "zambretti_number"
 KEY_WIND_BEAUFORT = "wind_beaufort"
 KEY_WIND_BEAUFORT_DESC = "wind_beaufort_desc"
 KEY_WIND_QUADRANT = "wind_quadrant"
@@ -158,7 +161,7 @@ KEY_BATTERY_DISPLAY = "battery_display"
 # Activity / derived heuristics (optional, disabled by default)
 KEY_LAUNDRY_SCORE = "laundry_drying_score"
 KEY_STARGAZE_SCORE = "stargazing_quality"
-KEY_FIRE_SCORE = "fire_weather_score"
+KEY_FIRE_RISK_SCORE = "fire_risk_score"
 KEY_RUNNING_SCORE = "running_score"
 KEY_PRESSURE_TREND_HPAH = "pressure_trend_hpah"
 
@@ -184,34 +187,33 @@ REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_D
 OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY]
 
 # ---------------------------------------------------------------------------
-# Named physical / algorithm constants (no magic numbers in code)
+# Named physical / algorithm constants
 # ---------------------------------------------------------------------------
-# Sea-level pressure reduction (WMO hypsometric formula)
-# R_dry / g = 287.05 J/(kg·K) / 9.80665 m/s² ≈ 29.263 m·K/Pa
 SLP_GAS_CONSTANT_RATIO: float = 29.263
 
-# August-Roche-Magnus dew point constants (Alduchov & Eskridge 1996)
-MAGNUS_A: float = 17.62
-MAGNUS_B: float = 243.12  # °C
+MAGNUS_A: float = 17.625
+MAGNUS_B: float = 243.04
 
-# Beaufort scale boundary speeds in m/s (WMO No. 8)
+MAGNUS_A_ICE: float = 22.587
+MAGNUS_B_ICE: float = 273.86
+
 BEAUFORT_BOUNDARIES = [0.3, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7]
 
-# Pressure trend window (samples × interval = total history)
 PRESSURE_HISTORY_SAMPLES = 12
-PRESSURE_HISTORY_INTERVAL_MIN = 15  # minutes between samples → 3h window
+PRESSURE_HISTORY_INTERVAL_MIN = 15
 
-# WMO pressure tendency thresholds (WMO No. 306, Table 4680) in hPa/3h
 PRESSURE_TREND_RISING_RAPID: float = 1.6
 PRESSURE_TREND_RISING: float = 0.8
 PRESSURE_TREND_FALLING: float = -0.8
 PRESSURE_TREND_FALLING_RAPID: float = -1.6
 
-# Rain rate cap for Kalman filter (physical plausibility cap)
 RAIN_RATE_PHYSICAL_CAP_MMPH: float = 500.0
-
-# Wind smoothing exponential factor
 WIND_SMOOTH_ALPHA: float = 0.3
 
-# Config entry schema version (bump on breaking changes, implement migration)
+ZAMBRETTI_UPPER_PRESSURE: float = 1050.0
+ZAMBRETTI_LOWER_PRESSURE: float = 950.0
+
+FORECAST_MIN_RETRY_S: int = 300
+FORECAST_MAX_RETRY_S: int = 3600
+
 CONFIG_VERSION = 2

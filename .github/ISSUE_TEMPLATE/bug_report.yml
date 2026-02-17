@@ -1,0 +1,47 @@
+name: Bug Report
+description: Report an issue with Weather Station Core
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please include your diagnostics export if possible
+        (Settings → Devices & Services → Weather Station Core → ⋮ → Download Diagnostics).
+  - type: input
+    id: version
+    attributes:
+      label: Integration version
+      placeholder: "e.g. 0.4.0"
+    validations:
+      required: true
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "e.g. 2026.2.1"
+    validations:
+      required: true
+  - type: input
+    id: station
+    attributes:
+      label: Weather station hardware
+      placeholder: "e.g. Ecowitt GW2000 + WS90"
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      placeholder: What happened? What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste any relevant logs from Settings → System → Logs (filter by "ws_core")
+      render: shell
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics JSON (optional)
+      description: Paste the contents of the diagnostics export
+      render: json

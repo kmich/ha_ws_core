@@ -1,47 +1,51 @@
-# Weather Station Core (ws_core)
+# Weather Station Core (`ws_core`)
 
-A Home Assistant custom integration that turns your raw Personal Weather Station (PWS) sensors into a complete, normalised weather data layer — with derived meteorological values, a native `weather.*` entity, configurable alerts, and optional activity scores.
+[![HACS][hacs-badge]][hacs-url]
+[![GitHub Release][release-badge]][release-url]
+[![License][license-badge]][license-url]
+[![Validate][validate-badge]][validate-url]
 
-Supports any PWS brand (Ecowitt, Fine Offset, Davis, BTHome, DIY) that already has sensors in HA.
+**Turn any personal weather station into a comprehensive, scientifically-documented weather intelligence hub for Home Assistant.**
 
----
+Weather Station Core reads raw sensor data from your existing weather station — Ecowitt, Davis, WeatherFlow, Shelly, or any HA-integrated PWS — and produces 40+ derived meteorological values through a guided 7-step config flow. No YAML required.
 
-## What it does
-
-Instead of writing dozens of template sensors yourself, this integration reads your existing raw sensors, converts units automatically, and produces a clean set of derived outputs — all from one config-flow setup screen.
-
-**Core derived values (always created):**
-- Dew point (August-Roche-Magnus formula, accurate to ±0.1°C over –40°C–60°C)
-- Mean sea-level pressure (WMO hypsometric reduction from station pressure + elevation + temperature)
-- Pressure trend (3-hour least-squares regression, WMO classification thresholds)
-- Rain rate raw and Kalman-filtered (suppresses tipping-bucket phantom spikes)
-- Apparent/feels-like temperature (Australian BOM standard)
-- Beaufort wind scale + description
-- Smoothed wind direction (circular exponential smoothing, no 360°/0° discontinuity)
-- Current weather condition (36-condition classifier using local sensors)
-- Zambretti 6–12h barometric forecast (8 regional climate presets)
-- Local rain probability (pressure + trend + humidity + wind direction)
-- Combined rain probability (local + Open-Meteo time-weighted)
-- 24-hour rolling stats: temp high/low/avg, max gust
-- Station health monitor (Online / Degraded / Stale / Offline)
-
-**Weather entity:** `weather.{prefix}` — standard HA entity with 7-day Open-Meteo forecast. Condition falls back to local classifier if forecast is unavailable.
-
-**Optional activity scores** (disabled by default, enable in entity registry):
-- Laundry drying score (0–100) with estimated dry time
-- Stargazing quality with moon phase impact
-- Fire Weather Index (Canadian FWI-based)
-- Running conditions score
+<p align="center">
+  <em>Screenshots: Config flow, Main dashboard, Advanced page</em><br>
+  <sub>(Add your own screenshots to <code>docs/img/</code> after installation)</sub>
+</p>
 
 ---
 
-## Compatibility
+## Features
 
-| Component | Version |
+- **Real Zambretti barometric forecaster** — Negretti & Zambra lookup table (Z-numbers 1–26), climate-region-aware wind corrections, seasonal adjustment
+- **Wet-bulb temperature** (Stull 2011, ±0.3 °C) and **frost point** (Buck 1981 ice constants)
+- **Climate-region-aware rain probability** with Open-Meteo NWP blending
+- **Kalman-filtered rain rate** for de-noised precipitation readings
+- **36-condition weather classifier** with severity levels and MDI icons
+- **Activity scores**: laundry drying, stargazing quality, running conditions, fire risk
+- **7-day daily forecast** via Open-Meteo (free, no API key required)
+- **Proper HA integration**: 7-step config flow, options flow, diagnostics, device registry, HA Repairs
+
+---
+
+## Requirements
+
+A personal weather station integrated into Home Assistant providing **at minimum**:
+
+| Measurement | Example entities |
 |---|---|
-| Home Assistant | 2026.2+ |
-| Python | 3.12+ |
-| HACS | Any current |
+| Temperature | `sensor.gw2000a_outdoor_temperature` |
+| Relative humidity | `sensor.gw2000a_outdoor_humidity` |
+| Atmospheric pressure | `sensor.gw2000a_absolute_pressure` |
+| Wind speed | `sensor.gw2000a_wind_speed` |
+| Wind gust | `sensor.gw2000a_wind_gust` |
+| Wind direction (°) | `sensor.gw2000a_wind_direction` |
+| Cumulative rainfall | `sensor.gw2000a_rain_total` |
+
+**Optional** (improves derived metrics): illuminance (lux), UV index, dew point, battery level.
+
+**Home Assistant**: 2026.2+ · **Python**: 3.12+
 
 ---
 
@@ -49,171 +53,264 @@ Instead of writing dozens of template sensors yourself, this integration reads y
 
 ### Via HACS (recommended)
 
-1. In HACS → Integrations → Custom Repositories
-2. Add: `https://github.com/kmich/ha_ws_core` (category: Integration)
-3. Install **Weather Station Core** and restart Home Assistant
+1. Open HACS → Integrations → ⋮ → Custom repositories
+2. Add `https://github.com/kmich/ha_ws_core` (category: Integration)
+3. Search for "Weather Station Core" and install
+4. Restart Home Assistant
 
 ### Manual
 
-1. Copy `custom_components/ws_core` to your HA `custom_components` directory
+1. Copy `custom_components/ws_core` to your HA `custom_components/` directory
 2. Restart Home Assistant
 
 ---
 
 ## Configuration
 
-1. **Settings → Devices & Services → Add Integration**
-2. Search **Weather Station Core**
-3. Name your station and set an entity prefix (default: `ws`)
-4. Map required sensors: temperature, humidity, pressure, wind speed, wind gust, wind direction, rain total
-5. Optionally map: illuminance, UV index, dew point, battery
-6. Set elevation, units (auto/metric/imperial), staleness threshold, and forecast options
-7. Set alert thresholds (wind gust, rain rate, freeze point)
+Settings → Devices & Services → Add Integration → "Weather Station Core"
 
-Options can be changed at any time via **Settings → Devices & Services → Weather Station Core → Configure**.
+The 7-step wizard walks you through:
+
+| Step | What it does |
+|---|---|
+| 1. Name & prefix | Station name and entity ID prefix (e.g. `ws` → `sensor.ws_temperature`) |
+| 2. Required sensors | Map your 7 mandatory sensor entities |
+| 3. Optional sensors | Map illuminance, UV, dew point, battery (leave blank to skip) |
+| 4. Location & climate | Hemisphere, climate region, elevation (auto-detected from HA) |
+| 5. Display units | Temperature, wind, rain, pressure unit preferences |
+| 6. Forecast | Enable/disable Open-Meteo 7-day forecast |
+| 7. Alerts & advanced | Wind/rain/freeze thresholds, Kalman filter, activity scores toggle |
+
+All settings can be changed later via the **Configure** button.
 
 ---
 
-## Sensors created
+## Sensors Created
 
-### Core measurements (always enabled)
+### Core Measurements (always enabled)
 
-| Entity | Description | Unit |
+| Entity | Unit | Device Class | Description |
+|---|---|---|---|
+| `sensor.ws_temperature` | °C | temperature | Normalized temperature |
+| `sensor.ws_humidity` | % | humidity | Normalized relative humidity |
+| `sensor.ws_station_pressure` | hPa | pressure | Station-level pressure |
+| `sensor.ws_sea_level_pressure` | hPa | pressure | Mean sea-level pressure (MSLP) |
+| `sensor.ws_wind_speed` | m/s | wind_speed | Sustained wind speed |
+| `sensor.ws_wind_gust` | m/s | wind_speed | Wind gust speed |
+| `sensor.ws_wind_direction` | ° | wind_direction | Wind direction |
+| `sensor.ws_rain_total` | mm | precipitation | Cumulative rainfall (TOTAL_INCREASING) |
+| `sensor.ws_rain_rate` | mm/h | — | Kalman-filtered rain rate |
+| `sensor.ws_dew_point` | °C | temperature | Dew point (Magnus formula) |
+| `sensor.ws_illuminance` | lx | illuminance | Solar illuminance |
+| `sensor.ws_uv_index` | — | — | UV index |
+
+### Advanced Meteorological (always enabled)
+
+| Entity | Unit | Description |
 |---|---|---|
-| `sensor.{prefix}_temperature` | Station temperature | °C / °F |
-| `sensor.{prefix}_humidity` | Station humidity | % |
-| `sensor.{prefix}_dew_point` | Dew point (August-Roche-Magnus) | °C / °F |
-| `sensor.{prefix}_station_pressure` | Raw station pressure | hPa |
-| `sensor.{prefix}_sea_level_pressure` | MSLP (WMO hypsometric) | hPa |
-| `sensor.{prefix}_wind_speed` | Wind speed | m/s |
-| `sensor.{prefix}_wind_gust` | Wind gust | m/s |
-| `sensor.{prefix}_wind_direction` | Wind direction | ° |
-| `sensor.{prefix}_wind_direction_smooth` | Smoothed wind direction (EMA) *(disabled by default)* | ° |
-| `sensor.{prefix}_rain_total` | Cumulative precipitation | mm |
-| `sensor.{prefix}_rain_rate` | Rain rate (Kalman-filtered) | mm/h |
-| `sensor.{prefix}_illuminance` | Solar illuminance | lx |
-| `sensor.{prefix}_uv_index` | UV index | — |
-| `sensor.{prefix}_battery` | Station battery | % |
-| `sensor.{prefix}_feels_like` | Apparent temperature (BOM) | °C / °F |
-| `sensor.{prefix}_wind_beaufort` | Beaufort scale 0–12 | — |
-| `sensor.{prefix}_wind_quadrant` | Cardinal quadrant (N/E/S/W) | — |
-| `sensor.{prefix}_current_condition` | 36-condition classifier | — |
-| `sensor.{prefix}_zambretti_forecast` | Barometric 6–12h forecast | — |
-| `sensor.{prefix}_rain_probability` | Local rain probability | % |
-| `sensor.{prefix}_rain_probability_combined` | Local + API blended probability | % |
-| `sensor.{prefix}_rain_display` | Formatted rain text | — |
-| `sensor.{prefix}_pressure_trend` | Trend text (Rising/Steady/Falling) | — |
-| `sensor.{prefix}_station_health` | Health status | — |
-| `sensor.{prefix}_temperature_high_24h` | 24h temperature maximum | °C / °F |
-| `sensor.{prefix}_temperature_low_24h` | 24h temperature minimum | °C / °F |
-| `sensor.{prefix}_temperature_avg_24h` | 24h temperature average *(disabled by default)* | °C / °F |
-| `sensor.{prefix}_wind_gust_max_24h` | 24h maximum wind gust | m/s |
-| `sensor.{prefix}_humidity_level` | Humidity text level | — |
-| `sensor.{prefix}_uv_level` | UV text level | — |
-| `sensor.{prefix}_forecast_tiles` | 5-day forecast tile data | — |
+| `sensor.ws_feels_like` | °C | Apparent temperature (BOM formula) |
+| `sensor.ws_wet_bulb` | °C | Wet-bulb temperature (Stull 2011) |
+| `sensor.ws_frost_point` | °C | Frost point (ice constants below 0 °C) |
+| `sensor.ws_zambretti_forecast` | — | Zambretti barometric forecast text |
+| `sensor.ws_zambretti_number` | — | Z-number (1–26) for automations |
+| `sensor.ws_wind_beaufort` | — | Beaufort scale number |
+| `sensor.ws_wind_quadrant` | — | 4-point wind quadrant (N/E/S/W) |
+| `sensor.ws_current_condition` | — | 36-condition classifier |
+| `sensor.ws_rain_probability` | % | Local sensor-based rain index |
+| `sensor.ws_rain_probability_combined` | % | Blended local + Open-Meteo |
+| `sensor.ws_pressure_trend` | — | Rising/Falling/Steady (WMO No. 306) |
 
-### Diagnostic (enabled, shown in Diagnostics section)
+### 24h Rolling Statistics
 
 | Entity | Description |
 |---|---|
-| `sensor.{prefix}_rain_rate_raw` | Unfiltered rain rate |
-| `sensor.{prefix}_pressure_trend_raw` | Pressure trend hPa/h |
-| `sensor.{prefix}_data_quality_banner` | OK / WARN / ERROR |
-| `sensor.{prefix}_sensor_quality_flags` | Bitmask / reasons behind data-quality state *(disabled by default)* |
-| `sensor.{prefix}_package_status` | Detailed status string |
-| `sensor.{prefix}_alert_state` | clear / advisory / warning |
-| `sensor.{prefix}_alert_message` | Alert detail text |
-| `sensor.{prefix}_forecast_daily` | Raw forecast provider info |
-| `binary_sensor.{prefix}_package_ok` | True when all sources healthy |
+| `sensor.ws_temperature_high_24h` | 24-hour high temperature |
+| `sensor.ws_temperature_low_24h` | 24-hour low temperature |
+| `sensor.ws_wind_gust_max_24h` | 24-hour maximum gust |
 
-### Activity scores (disabled by default)
+### Activity Scores (disabled by default, enable in options)
 
-Enable individually in **Settings → Entities** or the Entity Registry.
-
-| Entity | Description |
-|---|---|
-| `sensor.{prefix}_laundry_drying_score` | 0–100 with recommendation |
-| `sensor.{prefix}_stargazing_quality` | Quality rating + moon phase |
-| `sensor.{prefix}_fire_weather_index` | FWI with danger level |
-| `sensor.{prefix}_running_score` | Running conditions 0–100 |
-
----
-
-## Weather entity
-
-`weather.{prefix}` is a standard HA weather entity populated from your local station.
-
-- **Current conditions:** derived from local sensors (36-condition classifier)
-- **7-day forecast:** Open-Meteo free API (no account or API key required)
-- **Forecast fallback:** if Open-Meteo is unreachable, entity remains available with local data only
-- **Attribution:** "Forecast by Open-Meteo" displayed when forecast data is present
-
----
-
-## Meteorological methods
-
-| Calculation | Method | Reference |
+| Entity | Scale | Description |
 |---|---|---|
-| Dew point | August-Roche-Magnus (a=17.62, b=243.12) | Alduchov & Eskridge 1996 |
-| Sea-level pressure | Hypsometric reduction | WMO No. 8, §3.1.3 |
-| Apparent temperature | Australian BOM (AT = Ta + 0.33·e − 0.70·ws − 4.0) | Steadman 1994 |
-| Pressure trend | 3-hour least-squares regression | — |
-| Trend thresholds | ±0.8 / ±1.6 hPa per 3h | WMO No. 306, Table 4680 |
-| Zambretti forecast | 8-region climate preset lookup | Zambretti 1928 adapted |
-| Rain rate filter | 1D Kalman filter (Q=0.01, R=0.5) | — |
-| Wind smoothing | Circular exponential smoothing (α=0.3) | — |
-| Moon phase | Julian Day algorithm | Conway 1999 |
+| `sensor.ws_laundry_drying_score` | 0–100 | Outdoor drying conditions |
+| `sensor.ws_stargazing_quality` | text | Stargazing quality (Excellent/Good/Fair/Poor) |
+| `sensor.ws_fire_risk_score` | 0–50 | Simplified fire risk heuristic |
+| `sensor.ws_running_score` | 0–100 | Running conditions score |
+
+### Other Entities
+
+| Entity | Type | Description |
+|---|---|---|
+| `weather.ws` | weather | Standard HA weather entity with daily forecast |
+| `binary_sensor.ws_package_ok` | binary_sensor | True when all required sources are mapped and available |
 
 ---
 
-## Dashboard
+## Dashboards
 
-A sample dashboard is included in `dashboards/weather_dashboard.yaml`.
+Two dashboards are provided in `dashboards/`:
 
-**To install:**
-1. Copy the contents of `weather_dashboard.yaml`
-2. In HA: **Settings → Dashboards → Add Dashboard → From YAML → Raw config editor**
-3. Paste and save
+### Vanilla Dashboard (`weather_dashboard_vanilla.yaml`)
 
-*Dashboard is **vanilla** (core cards only) — no Lovelace custom cards required.*
+Uses **only native HA cards** — no HACS frontend dependencies. Works immediately after installation.
+
+To install: copy the YAML contents → Dashboard → Edit → Raw Configuration Editor → paste → save.
+
+### Enhanced Dashboard (`weather_dashboard.yaml`)
+
+Rich visual dashboard requiring these HACS frontend cards:
+- `custom:button-card`
+- `custom:mini-graph-card`
+- `custom:stack-in-card`
+- `custom:config-template-card`
+- `card-mod`
+- `kiosk-mode`
+
+---
+
+## Formula Documentation
+
+Every derived metric is documented with its source reference, valid input range, and known limitations.
+
+### Dew Point — Magnus Formula (Alduchov & Eskridge 1996)
+
+```
+γ = (a·T)/(b+T) + ln(RH/100)
+Td = (b·γ)/(a-γ)
+
+Over water (T ≥ 0°C): a=17.625, b=243.04
+Over ice  (T < 0°C):  a=22.587, b=273.86 (Buck 1981)
+```
+
+Valid range: -45 °C to +60 °C, 1–100% RH. Max error: < 0.1 °C.
+
+### Frost Point — Magnus Formula with Ice Constants (Buck 1981)
+
+Same formula as dew point but always uses ice constants (a=22.587, b=273.86). Only physically meaningful below 0 °C; above 0 °C returns the standard dew point.
+
+### Wet-Bulb Temperature (Stull 2011)
+
+```
+Tw = T·atan(0.151977·(RH+8.313659)^0.5) + atan(T+RH)
+     - atan(RH-1.676331) + 0.00391838·RH^1.5·atan(0.023101·RH)
+     - 4.686035
+```
+
+Source: Stull, R. (2011). *J. Appl. Meteor. Climatol.*, 50, 2267–2269.
+Valid range: RH 5–99%, T −20 to +50 °C. Max error: ±0.3 °C.
+
+### Sea-Level Pressure — Hypsometric Reduction (WMO No. 8)
+
+```
+MSLP = P_stn × exp(elevation / (T_K × 29.263))
+```
+
+Accuracy: ±0.3 hPa below 500 m, ±1 hPa at 2000 m.
+**Limitation**: Uses current temperature only; WMO recommends 12h mean temperature for better accuracy at high elevations.
+
+### Apparent Temperature — Australian BOM (Steadman 1994)
+
+```
+AT = Ta + 0.33·e - 0.70·ws - 4.0
+where e = (RH/100) × 6.105 × exp((17.27·T)/(237.7+T))
+```
+
+Valid for any temperature range (unlike NWS wind chill / heat index which have validity bounds).
+
+### Zambretti Barometric Forecaster (Negretti & Zambra, 1915)
+
+Maps MSLP (950–1050 hPa) to Z-numbers 1–26 on a linear scale, then applies corrections for pressure trend (±4 Z-numbers for rapid change), wind direction (climate-region-aware), season, and humidity.
+
+Accuracy: 65–75% for 6–12h forecasts in maritime/Mediterranean climates. Less reliable in continental interiors and tropics.
+
+### Pressure Trend — Least-Squares Linear Regression (WMO No. 306)
+
+Fits a linear trend to the pressure history buffer (sampled every 15 minutes, 12 samples = 3h window) and extrapolates the slope to a 3-hour rate. Classifications follow WMO Table 4680 thresholds: Rising Rapidly (>1.6 hPa/3h), Rising (>0.8), Steady, Falling (<−0.8), Falling Rapidly (<−1.6).
+
+### Rain Probability — Heuristic Index
+
+**This is NOT a calibrated probability.** It is a composite index (0–100) combining MSLP, pressure trend, humidity, and wind direction using climate-region-specific thresholds. The combined probability blends this local index with Open-Meteo NWP output, weighting local sensors higher during daytime convective hours (6–18h) when surface observations better capture buildup.
+
+### Fire Risk Score — Simplified Heuristic
+
+**NOT the Canadian FWI.** A simplified 0–50 scale inspired by the FWI structure (Van Wagner 1987) but lacking the daily-accumulated moisture codes (FFMC, DMC, DC) required for the real system. Not suitable for operational fire weather decisions. Consult official fire services.
+
+### Kalman Filter — Rain Rate Smoothing
+
+1D Kalman filter applied to raw rain rate (computed from successive total rainfall readings). Process noise: 0.01, measurement noise: 0.5. Eliminates the spike-and-drop pattern common in tipping-bucket rain gauges.
+
+---
+
+## Example Automations
+
+Example Blueprint automations are provided in `blueprints/`:
+
+- **Frost Alert**: Notify when temperature drops below threshold
+- **Rain Notification**: Alert when rain starts or rain probability exceeds threshold
+- **Laundry Reminder**: Morning notification when drying conditions are excellent
+- **Storm Warning**: Alert on rapid pressure drop with high wind
+
+See `blueprints/README.md` for installation instructions.
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| All sensors show "unavailable" | Source entities not found | Check source sensor entity IDs in Configure |
+| Temperature statistics look wrong | Old `TOTAL_INCREASING` state class | Delete the temperature entity from HA, restart |
+| Rain rate stuck at 0 | Rain total sensor reset | Call `ws_core.reset_rain_baseline` service |
+| Forecast shows "unavailable" | Open-Meteo API timeout | Check internet; forecast retries automatically |
+| "Stale" warning | Source sensor stopped updating | Check your weather station hardware |
+
+### Diagnostics
+
+Download diagnostics via Settings → Devices & Services → Weather Station Core → ⋮ → Download Diagnostics. The export includes sensor availability, compute timing, and quality flags (location data is redacted).
 
 ---
 
 ## Services
 
-### `ws_core.reset_rain_baseline`
-
-Resets the internal rain total baseline used to compute rain rate. Use this if your station resets its cumulative counter (e.g., after a reboot).
-
-```yaml
-service: ws_core.reset_rain_baseline
-data:
-  entry_id: "optional_specific_entry_id"  # omit to reset all stations
-```
+| Service | Description |
+|---|---|
+| `ws_core.reset_rain_baseline` | Reset the internal rain total baseline. Useful after station rain counter resets. |
 
 ---
 
-## Alerts
+## Known Limitations
 
-Three threshold-based alerts are computed every minute:
-
-| Alert | Condition | Default threshold |
-|---|---|---|
-| High wind | `wind_gust >= threshold` | 17.0 m/s (≈ Beaufort 8) |
-| Heavy rain | `rain_rate_filtered >= threshold` | 20 mm/h |
-| Freeze risk | `temperature <= threshold` | 0.0 °C |
-
-All thresholds are configurable and unit-aware (displays in mph/in·h⁻¹/°F for imperial users).
+1. **Illuminance-based cloud detection** uses raw lux without solar-angle normalization. Accuracy degrades at low sun elevation angles.
+2. **Sea-level pressure** uses current temperature only, not the WMO-recommended 12h mean. Error increases above 500 m during rapid temperature swings.
+3. **Rain probability** is a heuristic index, not a statistically calibrated probability. Treat it as relative likelihood.
+4. **Fire Risk Score** is a simplified heuristic that does NOT implement the full Canadian FWI moisture tracking system.
+5. **24h statistics** are computed from in-memory rolling windows and reset on HA restart.
 
 ---
 
-## Support
+## Contributing
 
-- **Bugs & features:** [GitHub Issues](https://github.com/kmich/ha_ws_core/issues)
-- **Tested hardware:** Ecowitt WS90, Fine Offset WH2350, BTHome sensors, DIY ESPHome stations
+Contributions are welcome! Please open an issue first to discuss what you'd like to change.
+
+- **Translations**: The integration currently supports English. Community translations are welcome — see `custom_components/ws_core/translations/en.json` for the key structure.
+- **Bug reports**: Use the GitHub issue template and include your diagnostics export.
+- **Weather stations**: If your station brand needs special handling, open an issue with your entity details.
 
 ---
 
 ## License
 
-MIT
+[MIT](LICENSE)
+
+---
+
+[hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg
+[hacs-url]: https://github.com/hacs/integration
+[release-badge]: https://img.shields.io/github/v/release/kmich/ha_ws_core
+[release-url]: https://github.com/kmich/ha_ws_core/releases
+[license-badge]: https://img.shields.io/github/license/kmich/ha_ws_core
+[license-url]: https://github.com/kmich/ha_ws_core/blob/main/LICENSE
+[validate-badge]: https://img.shields.io/github/actions/workflow/status/kmich/ha_ws_core/validate.yml?label=validate
+[validate-url]: https://github.com/kmich/ha_ws_core/actions/workflows/validate.yml
