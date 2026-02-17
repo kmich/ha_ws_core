@@ -475,10 +475,10 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
                     ),
                     vol.Optional(CONF_FORECAST_LAT, default=round(default_lat, 4)): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode="box")
+                        selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")
                     ),
                     vol.Optional(CONF_FORECAST_LON, default=round(default_lon, 4)): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode="box")
+                        selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")
                     ),
                 }
             ),
@@ -694,10 +694,10 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_FORECAST_LAT, default=g(CONF_FORECAST_LAT, round(default_lat, 4))
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode="box")),
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")),
                 vol.Optional(
                     CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode="box")),
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
                 # Alerts
                 vol.Optional(
                     CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, imperial), 1)
