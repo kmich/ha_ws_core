@@ -1,4 +1,4 @@
-﻿"""Weather Station Core integration."""
+"""Weather Station Core integration."""
 
 from __future__ import annotations
 
