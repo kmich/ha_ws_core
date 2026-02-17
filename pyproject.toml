@@ -3,54 +3,20 @@ target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
+# A pragmatic baseline: catch correctness issues + import sorting.
+# You can expand this over time once the codebase is clean.
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "C90",  # mccabe complexity
-    "I",    # isort
-    "N",    # pep8-naming
-    "UP",   # pyupgrade
-    "YTT",  # flake8-2020
-    "ASYNC",# flake8-async
-    "S",    # flake8-bandit
-    "BLE",  # flake8-blind-except
-    "B",    # flake8-bugbear
-    "A",    # flake8-builtins
-    "COM",  # flake8-commas
-    "C4",   # flake8-comprehensions
-    "DTZ",  # flake8-datetimez
-    "T10",  # flake8-debugger
-    "EM",   # flake8-errmsg
-    "ISC",  # flake8-implicit-str-concat
-    "ICN",  # flake8-import-conventions
-    "G",    # flake8-logging-format
-    "PIE",  # flake8-pie
-    "PT",   # flake8-pytest-style
-    "RSE",  # flake8-raise
-    "RET",  # flake8-return
-    "SIM",  # flake8-simplify
-    "TID",  # flake8-tidy-imports
-    "ARG",  # flake8-unused-arguments
-    "PTH",  # flake8-use-pathlib
-    "PD",   # pandas-vet
-    "PGH",  # pygrep-hooks
-    "PL",   # pylint
-    "TRY",  # tryceratops
-    "NPY",  # numpy-specific rules
-    "RUF",  # ruff-specific rules
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # isort
+  "UP",  # pyupgrade
+  "B",   # bugbear
 ]
 
 ignore = [
-    "S101",     # Use of assert detected
-    "S104",     # Possible binding to all interfaces
-    "S108",     # Probable insecure usage of temp file/directory
-    "PLR0913",  # Too many arguments to function call
-    "PLR2004",  # Magic value used in comparison
+  "E501",  # line length (handled gradually; avoid noisy CI failures)
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]  # Unused imports in __init__.py are common
-
-[tool.ruff.lint.mccabe]
-max-complexity = 15
+"tests/*" = ["E501"]

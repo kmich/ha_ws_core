@@ -15,9 +15,11 @@ The Options flow (Configure button) exposes all settings for post-install change
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 import voluptuous as vol
+
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
@@ -94,7 +96,6 @@ _LOGGER = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
-
 def _sanitize_prefix(prefix: str) -> str:
     p = (prefix or "").strip().lower()
     p = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in p)
@@ -119,17 +120,17 @@ def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
         return None
 
     mapping = {
-        SRC_TEMP: ["ws_01_temperature", "ws90_temperature", "temperature"],
-        SRC_HUM: ["ws_01_humidity", "ws90_humidity", "humidity"],
-        SRC_PRESS: ["ws_01_pressure", "ws90_pressure", "pressure"],
-        SRC_WIND: ["ws_01_speed_1", "wind_speed", "speed_1"],
-        SRC_GUST: ["ws_01_speed_2", "wind_gust", "speed_2", "gust"],
-        SRC_WIND_DIR: ["ws_01_direction", "wind_direction", "direction"],
-        SRC_RAIN_TOTAL: ["ws_01_precipitation", "rain_total", "precipitation", "rainfall"],
-        SRC_LUX: ["ws_01_illuminance", "illuminance", "lux"],
-        SRC_UV: ["ws_01_uv_index", "uv_index", "uv"],
-        SRC_DEW_POINT: ["ws_01_dew_point", "dew_point"],
-        SRC_BATTERY: ["ws_01_battery", "battery"],
+        SRC_TEMP:       ["ws_01_temperature", "ws90_temperature", "temperature"],
+        SRC_HUM:        ["ws_01_humidity",    "ws90_humidity",    "humidity"],
+        SRC_PRESS:      ["ws_01_pressure",    "ws90_pressure",    "pressure"],
+        SRC_WIND:       ["ws_01_speed_1",     "wind_speed",       "speed_1"],
+        SRC_GUST:       ["ws_01_speed_2",     "wind_gust",        "speed_2", "gust"],
+        SRC_WIND_DIR:   ["ws_01_direction",   "wind_direction",   "direction"],
+        SRC_RAIN_TOTAL: ["ws_01_precipitation","rain_total",      "precipitation", "rainfall"],
+        SRC_LUX:        ["ws_01_illuminance", "illuminance",      "lux"],
+        SRC_UV:         ["ws_01_uv_index",    "uv_index",         "uv"],
+        SRC_DEW_POINT:  ["ws_01_dew_point",   "dew_point"],
+        SRC_BATTERY:    ["ws_01_battery",     "battery"],
     }
 
     for k, subs in mapping.items():
@@ -167,9 +168,7 @@ def _auto_detect_elevation(hass: HomeAssistant) -> float:
                     if VALID_ELEVATION_MIN_M <= elev <= VALID_ELEVATION_MAX_M:
                         _LOGGER.debug(
                             "Elevation auto-detected from entity %s attr '%s': %.1f m",
-                            state.entity_id,
-                            attr_key,
-                            elev,
+                            state.entity_id, attr_key, elev,
                         )
                         return round(elev, 1)
                 except (TypeError, ValueError):
@@ -229,22 +228,17 @@ def _is_imperial(units_mode: str, hass: HomeAssistant) -> bool:
 def _convert_gust_to_display(ms: float, imperial: bool) -> float:
     return ms / 0.44704 if imperial else ms
 
-
 def _convert_gust_to_ms(val: float, imperial: bool) -> float:
     return val * 0.44704 if imperial else val
-
 
 def _convert_rain_to_display(mmph: float, imperial: bool) -> float:
     return mmph / 25.4 if imperial else mmph
 
-
 def _convert_rain_to_mmph(val: float, imperial: bool) -> float:
     return val * 25.4 if imperial else val
 
-
 def _convert_temp_to_display(c: float, imperial: bool) -> float:
     return (c * 9.0 / 5.0) + 32.0 if imperial else c
-
 
 def _convert_temp_to_c(val: float, imperial: bool) -> float:
     return (val - 32.0) * 5.0 / 9.0 if imperial else val
@@ -253,7 +247,6 @@ def _convert_temp_to_c(val: float, imperial: bool) -> float:
 # ---------------------------------------------------------------------------
 # Config Flow
 # ---------------------------------------------------------------------------
-
 
 class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = CONFIG_VERSION
@@ -285,12 +278,10 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
-                    vol.Required(CONF_PREFIX, default=DEFAULT_PREFIX): str,
-                },
-            ),
+            data_schema=vol.Schema({
+                vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
+                vol.Required(CONF_PREFIX, default=DEFAULT_PREFIX): str,
+            }),
         )
 
     # ------------------------------------------------------------------
@@ -316,11 +307,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         fields = {
             vol.Required(k, default=defaults.get(k)): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor"),
+                selector.EntitySelectorConfig(domain="sensor")
             )
             for k in REQUIRED_SOURCES
         }
-        return self.async_show_form(step_id="required_sources", data_schema=vol.Schema(fields), errors=errors)
+        return self.async_show_form(
+            step_id="required_sources", data_schema=vol.Schema(fields), errors=errors
+        )
 
     # ------------------------------------------------------------------
     # Step 3: Optional sensor mapping
@@ -347,11 +340,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         fields = {
             vol.Optional(k, default=defaults.get(k)): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor"),
+                selector.EntitySelectorConfig(domain="sensor")
             )
             for k in OPTIONAL_SOURCES
         }
-        return self.async_show_form(step_id="optional_sources", data_schema=vol.Schema(fields), errors=errors)
+        return self.async_show_form(
+            step_id="optional_sources", data_schema=vol.Schema(fields), errors=errors
+        )
 
     # ------------------------------------------------------------------
     # Step 4: Location — hemisphere, climate region, elevation
@@ -376,33 +371,28 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="location",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_HEMISPHERE, default=auto_hemi): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=HEMISPHERE_OPTIONS,
-                            mode="list",
-                            translation_key="hemisphere",
-                        ),
-                    ),
-                    vol.Required(CONF_CLIMATE_REGION, default=auto_region): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=CLIMATE_REGION_OPTIONS,
-                            mode="dropdown",
-                            translation_key="climate_region",
-                        ),
-                    ),
-                    vol.Optional(CONF_ELEVATION_M, default=auto_elev): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=VALID_ELEVATION_MIN_M,
-                            max=VALID_ELEVATION_MAX_M,
-                            step=1,
-                            mode="box",
-                            unit_of_measurement="m",
-                        ),
-                    ),
-                },
-            ),
+            data_schema=vol.Schema({
+                vol.Required(CONF_HEMISPHERE, default=auto_hemi): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=HEMISPHERE_OPTIONS,
+                        mode="list",
+                        translation_key="hemisphere",
+                    )
+                ),
+                vol.Required(CONF_CLIMATE_REGION, default=auto_region): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=CLIMATE_REGION_OPTIONS,
+                        mode="dropdown",
+                        translation_key="climate_region",
+                    )
+                ),
+                vol.Optional(CONF_ELEVATION_M, default=auto_elev): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=VALID_ELEVATION_MIN_M, max=VALID_ELEVATION_MAX_M,
+                        step=1, mode="box", unit_of_measurement="m"
+                    )
+                ),
+            }),
             errors=errors,
         )
 
@@ -425,30 +415,28 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="display",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_UNITS_MODE, default=default_units): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                {"value": "auto", "label": "Auto (follow Home Assistant)"},
-                                {"value": "metric", "label": "Metric (km/h, mm, hPa)"},
-                                {"value": "imperial", "label": "Imperial (mph, in, inHg)"},
-                            ],
-                            mode="list",
-                        ),
-                    ),
-                    vol.Required(CONF_TEMP_UNIT, default=default_temp): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                {"value": "auto", "label": "Auto (follow Home Assistant)"},
-                                {"value": "C", "label": "Celsius (°C)"},
-                                {"value": "F", "label": "Fahrenheit (°F)"},
-                            ],
-                            mode="list",
-                        ),
-                    ),
-                },
-            ),
+            data_schema=vol.Schema({
+                vol.Required(CONF_UNITS_MODE, default=default_units): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {"value": "auto",     "label": "Auto (follow Home Assistant)"},
+                            {"value": "metric",   "label": "Metric (km/h, mm, hPa)"},
+                            {"value": "imperial", "label": "Imperial (mph, in, inHg)"},
+                        ],
+                        mode="list",
+                    )
+                ),
+                vol.Required(CONF_TEMP_UNIT, default=default_temp): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {"value": "auto", "label": "Auto (follow Home Assistant)"},
+                            {"value": "C",    "label": "Celsius (°C)"},
+                            {"value": "F",    "label": "Fahrenheit (°F)"},
+                        ],
+                        mode="list",
+                    )
+                ),
+            }),
         )
 
     # ------------------------------------------------------------------
@@ -464,22 +452,18 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="forecast",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_FORECAST_ENABLED, default=DEFAULT_FORECAST_ENABLED): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_FORECAST_INTERVAL_MIN, default=DEFAULT_FORECAST_INTERVAL_MIN,
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min"),
-                    ),
-                    vol.Optional(CONF_FORECAST_LAT, default=round(default_lat, 4)): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode="box"),
-                    ),
-                    vol.Optional(CONF_FORECAST_LON, default=round(default_lon, 4)): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode="box"),
-                    ),
-                },
-            ),
+            data_schema=vol.Schema({
+                vol.Required(CONF_FORECAST_ENABLED, default=DEFAULT_FORECAST_ENABLED): selector.BooleanSelector(),
+                vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=DEFAULT_FORECAST_INTERVAL_MIN): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
+                ),
+                vol.Optional(CONF_FORECAST_LAT, default=round(default_lat, 4)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode="box")
+                ),
+                vol.Optional(CONF_FORECAST_LON, default=round(default_lon, 4)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode="box")
+                ),
+            }),
         )
 
     # ------------------------------------------------------------------
@@ -496,22 +480,19 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors = self._validate_alert_inputs(user_input, imperial)
             if not errors:
                 self._data[CONF_THRESH_WIND_GUST_MS] = _convert_gust_to_ms(
-                    float(user_input[CONF_THRESH_WIND_GUST_MS]), imperial,
-                )
+                    float(user_input[CONF_THRESH_WIND_GUST_MS]), imperial)
                 self._data[CONF_THRESH_RAIN_RATE_MMPH] = _convert_rain_to_mmph(
-                    float(user_input[CONF_THRESH_RAIN_RATE_MMPH]), imperial,
-                )
-                self._data[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(float(user_input[CONF_THRESH_FREEZE_C]), imperial)
+                    float(user_input[CONF_THRESH_RAIN_RATE_MMPH]), imperial)
+                self._data[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(
+                    float(user_input[CONF_THRESH_FREEZE_C]), imperial)
                 self._data[CONF_RAIN_FILTER_ALPHA] = float(user_input[CONF_RAIN_FILTER_ALPHA])
                 self._data[CONF_PRESSURE_TREND_WINDOW_H] = int(user_input[CONF_PRESSURE_TREND_WINDOW_H])
                 self._data[CONF_ENABLE_ACTIVITY_SCORES] = bool(user_input[CONF_ENABLE_ACTIVITY_SCORES])
                 self._data[CONF_STALENESS_S] = int(user_input[CONF_STALENESS_S])
                 self._data[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
-                    float(user_input[CONF_RAIN_PENALTY_LIGHT_MMPH]), imperial,
-                )
+                    float(user_input[CONF_RAIN_PENALTY_LIGHT_MMPH]), imperial)
                 self._data[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
-                    float(user_input[CONF_RAIN_PENALTY_HEAVY_MMPH]), imperial,
-                )
+                    float(user_input[CONF_RAIN_PENALTY_HEAVY_MMPH]), imperial)
 
                 title = self._data.get(CONF_NAME, DEFAULT_NAME)
                 return self.async_create_entry(title=title, data=self._data)
@@ -520,54 +501,33 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="alerts",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_THRESH_WIND_GUST_MS,
-                        default=round(_convert_gust_to_display(DEFAULT_THRESH_WIND_GUST_MS, imperial), 1),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0, max=gust_max, step=0.1, mode="box", unit_of_measurement=gust_u,
-                        ),
-                    ),
-                    vol.Optional(
-                        CONF_THRESH_RAIN_RATE_MMPH,
-                        default=round(_convert_rain_to_display(DEFAULT_THRESH_RAIN_RATE_MMPH, imperial), 2),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0, max=200, step=0.5, mode="box", unit_of_measurement=rain_u),
-                    ),
-                    vol.Optional(
-                        CONF_THRESH_FREEZE_C,
-                        default=round(_convert_temp_to_display(DEFAULT_THRESH_FREEZE_C, imperial), 1),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u),
-                    ),
-                    vol.Optional(CONF_STALENESS_S, default=DEFAULT_STALENESS_S): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=60, max=3600, step=60, mode="box", unit_of_measurement="s"),
-                    ),
-                    vol.Optional(CONF_RAIN_FILTER_ALPHA, default=DEFAULT_RAIN_FILTER_ALPHA): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="slider"),
-                    ),
-                    vol.Optional(
-                        CONF_PRESSURE_TREND_WINDOW_H, default=DEFAULT_PRESSURE_TREND_WINDOW_H,
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h"),
-                    ),
-                    vol.Optional(CONF_ENABLE_ACTIVITY_SCORES, default=False): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_RAIN_PENALTY_LIGHT_MMPH,
-                        default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_LIGHT_MMPH, imperial), 2),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u),
-                    ),
-                    vol.Optional(
-                        CONF_RAIN_PENALTY_HEAVY_MMPH,
-                        default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_HEAVY_MMPH, imperial), 1),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u),
-                    ),
-                },
-            ),
+            data_schema=vol.Schema({
+                vol.Optional(CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(DEFAULT_THRESH_WIND_GUST_MS, imperial), 1)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=gust_max, step=0.1, mode="box", unit_of_measurement=gust_u)
+                ),
+                vol.Optional(CONF_THRESH_RAIN_RATE_MMPH, default=round(_convert_rain_to_display(DEFAULT_THRESH_RAIN_RATE_MMPH, imperial), 2)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=200, step=0.5, mode="box", unit_of_measurement=rain_u)
+                ),
+                vol.Optional(CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(DEFAULT_THRESH_FREEZE_C, imperial), 1)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u)
+                ),
+                vol.Optional(CONF_STALENESS_S, default=DEFAULT_STALENESS_S): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=60, max=3600, step=60, mode="box", unit_of_measurement="s")
+                ),
+                vol.Optional(CONF_RAIN_FILTER_ALPHA, default=DEFAULT_RAIN_FILTER_ALPHA): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="slider")
+                ),
+                vol.Optional(CONF_PRESSURE_TREND_WINDOW_H, default=DEFAULT_PRESSURE_TREND_WINDOW_H): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
+                ),
+                vol.Optional(CONF_ENABLE_ACTIVITY_SCORES, default=False): selector.BooleanSelector(),
+                vol.Optional(CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_LIGHT_MMPH, imperial), 2)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u)
+                ),
+                vol.Optional(CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_HEAVY_MMPH, imperial), 1)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
+                ),
+            }),
         )
 
     @staticmethod
@@ -585,7 +545,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 # ---------------------------------------------------------------------------
 # Options Flow (Configure button post-install)
 # ---------------------------------------------------------------------------
-
 
 class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry):
@@ -619,21 +578,11 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 pass
 
             # Convert thresholds to canonical metric
-            out[CONF_THRESH_WIND_GUST_MS] = _convert_gust_to_ms(
-                float(out.get(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS)), imperial,
-            )
-            out[CONF_THRESH_RAIN_RATE_MMPH] = _convert_rain_to_mmph(
-                float(out.get(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH)), imperial,
-            )
-            out[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(
-                float(out.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C)), imperial,
-            )
-            out[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
-                float(out.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)), imperial,
-            )
-            out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
-                float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), imperial,
-            )
+            out[CONF_THRESH_WIND_GUST_MS] = _convert_gust_to_ms(float(out.get(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS)), imperial)
+            out[CONF_THRESH_RAIN_RATE_MMPH] = _convert_rain_to_mmph(float(out.get(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH)), imperial)
+            out[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(float(out.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C)), imperial)
+            out[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(float(out.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)), imperial)
+            out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), imperial)
             return self.async_create_entry(title="", data=out)
 
         return self.async_show_form(
@@ -643,103 +592,70 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
 
     def _build_options_schema(self, imperial: bool, gust_u: str, rain_u: str, temp_u: str) -> vol.Schema:
         g = self._get
-        cur_gust_ms = float(g(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
-        cur_rain_mmph = float(g(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
-        cur_freeze_c = float(g(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
+        cur_gust_ms   = float(g(CONF_THRESH_WIND_GUST_MS,   DEFAULT_THRESH_WIND_GUST_MS))
+        cur_rain_mmph  = float(g(CONF_THRESH_RAIN_RATE_MMPH,  DEFAULT_THRESH_RAIN_RATE_MMPH))
+        cur_freeze_c   = float(g(CONF_THRESH_FREEZE_C,        DEFAULT_THRESH_FREEZE_C))
         cur_light_mmph = float(g(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH))
         cur_heavy_mmph = float(g(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH))
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
         default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
 
-        return vol.Schema(
-            {
-                vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
-                # Location & Zambretti
-                vol.Optional(CONF_HEMISPHERE, default=g(CONF_HEMISPHERE, DEFAULT_HEMISPHERE)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=HEMISPHERE_OPTIONS, mode="list"),
-                ),
-                vol.Optional(
-                    CONF_CLIMATE_REGION, default=g(CONF_CLIMATE_REGION, DEFAULT_CLIMATE_REGION),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=CLIMATE_REGION_OPTIONS, mode="dropdown"),
-                ),
-                vol.Optional(
-                    CONF_ELEVATION_M, default=g(CONF_ELEVATION_M, DEFAULT_ELEVATION_M),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=VALID_ELEVATION_MIN_M,
-                        max=VALID_ELEVATION_MAX_M,
-                        step=1,
-                        mode="box",
-                        unit_of_measurement="m",
-                    ),
-                ),
-                # Units
-                vol.Optional(CONF_UNITS_MODE, default=g(CONF_UNITS_MODE, DEFAULT_UNITS_MODE)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=UNITS_MODE_OPTIONS, mode="dropdown"),
-                ),
-                vol.Optional(CONF_TEMP_UNIT, default=g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=TEMP_UNIT_OPTIONS, mode="list"),
-                ),
-                # Forecast
-                vol.Optional(
-                    CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED),
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_FORECAST_INTERVAL_MIN, default=g(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min"),
-                ),
-                vol.Optional(
-                    CONF_FORECAST_LAT, default=g(CONF_FORECAST_LAT, round(default_lat, 4)),
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode="box")),
-                vol.Optional(
-                    CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4)),
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode="box")),
-                # Alerts
-                vol.Optional(
-                    CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, imperial), 1),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=120, step=0.1, mode="box", unit_of_measurement=gust_u),
-                ),
-                vol.Optional(
-                    CONF_THRESH_RAIN_RATE_MMPH, default=round(_convert_rain_to_display(cur_rain_mmph, imperial), 2),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=200, step=0.5, mode="box", unit_of_measurement=rain_u),
-                ),
-                vol.Optional(
-                    CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, imperial), 1),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u),
-                ),
-                # Advanced
-                vol.Optional(
-                    CONF_STALENESS_S, default=g(CONF_STALENESS_S, DEFAULT_STALENESS_S),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=60, max=3600, step=60, mode="box", unit_of_measurement="s"),
-                ),
-                vol.Optional(
-                    CONF_RAIN_FILTER_ALPHA, default=g(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA),
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="slider")),
-                vol.Optional(
-                    CONF_PRESSURE_TREND_WINDOW_H,
-                    default=g(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h"),
-                ),
-                vol.Optional(
-                    CONF_ENABLE_ACTIVITY_SCORES, default=g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_ACTIVITY_SCORES),
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(cur_light_mmph, imperial), 2),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u),
-                ),
-                vol.Optional(
-                    CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(cur_heavy_mmph, imperial), 1),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u),
-                ),
-            },
-        )
+        return vol.Schema({
+            vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
+            # Location & Zambretti
+            vol.Optional(CONF_HEMISPHERE, default=g(CONF_HEMISPHERE, DEFAULT_HEMISPHERE)): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=HEMISPHERE_OPTIONS, mode="list")
+            ),
+            vol.Optional(CONF_CLIMATE_REGION, default=g(CONF_CLIMATE_REGION, DEFAULT_CLIMATE_REGION)): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=CLIMATE_REGION_OPTIONS, mode="dropdown")
+            ),
+            vol.Optional(CONF_ELEVATION_M, default=g(CONF_ELEVATION_M, DEFAULT_ELEVATION_M)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=VALID_ELEVATION_MIN_M, max=VALID_ELEVATION_MAX_M, step=1, mode="box", unit_of_measurement="m")
+            ),
+            # Units
+            vol.Optional(CONF_UNITS_MODE, default=g(CONF_UNITS_MODE, DEFAULT_UNITS_MODE)): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=UNITS_MODE_OPTIONS, mode="dropdown")
+            ),
+            vol.Optional(CONF_TEMP_UNIT, default=g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)): selector.SelectSelector(
+                selector.SelectSelectorConfig(options=TEMP_UNIT_OPTIONS, mode="list")
+            ),
+            # Forecast
+            vol.Optional(CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)): selector.BooleanSelector(),
+            vol.Optional(CONF_FORECAST_INTERVAL_MIN, default=g(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
+            ),
+            vol.Optional(CONF_FORECAST_LAT, default=g(CONF_FORECAST_LAT, round(default_lat, 4))): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=-90, max=90, step=0.0001, mode="box")
+            ),
+            vol.Optional(CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=-180, max=180, step=0.0001, mode="box")
+            ),
+            # Alerts
+            vol.Optional(CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, imperial), 1)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=120, step=0.1, mode="box", unit_of_measurement=gust_u)
+            ),
+            vol.Optional(CONF_THRESH_RAIN_RATE_MMPH, default=round(_convert_rain_to_display(cur_rain_mmph, imperial), 2)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=200, step=0.5, mode="box", unit_of_measurement=rain_u)
+            ),
+            vol.Optional(CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, imperial), 1)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u)
+            ),
+            # Advanced
+            vol.Optional(CONF_STALENESS_S, default=g(CONF_STALENESS_S, DEFAULT_STALENESS_S)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=60, max=3600, step=60, mode="box", unit_of_measurement="s")
+            ),
+            vol.Optional(CONF_RAIN_FILTER_ALPHA, default=g(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="slider")
+            ),
+            vol.Optional(CONF_PRESSURE_TREND_WINDOW_H, default=g(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
+            ),
+            vol.Optional(CONF_ENABLE_ACTIVITY_SCORES, default=g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_ACTIVITY_SCORES)): selector.BooleanSelector(),
+            vol.Optional(CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(cur_light_mmph, imperial), 2)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u)
+            ),
+            vol.Optional(CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(cur_heavy_mmph, imperial), 1)): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
+            ),
+        })

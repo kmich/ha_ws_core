@@ -262,9 +262,9 @@ def determine_current_condition(temp_c, humidity, wind_speed_ms, wind_gust_ms, r
     elif wind_gust_ms > 25 and pressure_trend < -3: return "severe-storm"
     elif "Storm" in zambretti and rain_rate_mmph > 10: return "thunderstorm"
     elif "Storm" in zambretti or (rain_rate_mmph > 5 and wind_gust_ms > 15): return "pre-storm"
-    elif 0 <= temp_c < 2 and (rain_rate_mmph > 0 or is_wet) and humidity > 85: return "sleet"
     elif temp_c < 0 and (rain_rate_mmph > 0 or is_wet):
         return "snow-accumulation" if (wind_speed_ms > 8 and rain_rate_mmph > 2) else "snowy"
+    elif 0 <= temp_c < 2 and (rain_rate_mmph > 0 or is_wet) and humidity > 85: return "sleet"
     elif rain_rate_mmph > 10: return "heavy-rain"
     elif rain_rate_mmph > 2 or (is_wet and rain_rate_mmph > 0.5): return "rainy"
     elif rain_rate_mmph > 0 or is_wet: return "drizzle"
@@ -478,9 +478,9 @@ def _julian_day_gregorian(year: int, month: int, day: int) -> float:
 
 
 def calculate_moon_phase(year: int, month: int, day: int) -> str:
-    """Return a moon phase label for the given date (UTC).
+    """Return a simple moon phase label for the given date (UTC).
 
-    Lightweight approximation for UI display (not ephemeris-grade).
+    Lightweight approximation intended for UI display.
     """
     jd = _julian_day_gregorian(year, month, day)
     age = (jd - 2451550.1) % 29.53058867  # synodic month (days)
@@ -502,22 +502,3 @@ def calculate_moon_phase(year: int, month: int, day: int) -> str:
     if age < 27.68:
         return "waning_crescent"
     return "new_moon"
-
-
-MOON_ILLUMINATION = {"new_moon": 0, "waxing_crescent": 25, "first_quarter": 50,
-                     "waxing_gibbous": 75, "full_moon": 100, "waning_gibbous": 75,
-                     "last_quarter": 50, "waning_crescent": 25}
-
-MOON_ICONS = {"new_moon": "mdi:moon-new", "waxing_crescent": "mdi:moon-waxing-crescent",
-              "first_quarter": "mdi:moon-first-quarter", "waxing_gibbous": "mdi:moon-waxing-gibbous",
-              "full_moon": "mdi:moon-full", "waning_gibbous": "mdi:moon-waning-gibbous",
-              "last_quarter": "mdi:moon-last-quarter", "waning_crescent": "mdi:moon-waning-crescent"}
-
-
-def moon_stargazing_impact(moon_phase: str) -> str:
-    if moon_phase == "new_moon": return "Perfect (No moon interference)"
-    elif "crescent" in moon_phase: return "Excellent (Minimal interference)"
-    elif "quarter" in moon_phase: return "Good (Moderate moon)"
-    elif "gibbous" in moon_phase: return "Fair (Bright moon)"
-    elif moon_phase == "full_moon": return "Poor (Full moon washes out stars)"
-    else: return "Unknown"

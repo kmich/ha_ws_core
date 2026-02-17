@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, time
 from typing import Any
 
 from homeassistant.components.weather import WeatherEntity
-
 try:
     from homeassistant.components.weather import WeatherEntityFeature
 except Exception:  # pragma: no cover
@@ -20,20 +20,21 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
-    CONF_PREFIX,
     DEFAULT_PREFIX,
+    CONF_PREFIX,
     DOMAIN,
     KEY_CURRENT_CONDITION,
     KEY_FORECAST,
     KEY_NORM_HUMIDITY,
     KEY_NORM_PRESSURE_HPA,
+    KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_NORM_TEMP_C,
     KEY_NORM_WIND_DIR_DEG,
     KEY_NORM_WIND_SPEED_MS,
     KEY_PACKAGE_OK,
-    KEY_SEA_LEVEL_PRESSURE_HPA,
 )
 
 
@@ -139,31 +140,15 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
 
     # Map local condition keys to HA WeatherEntity condition strings
     _LOCAL_CONDITION_MAP = {
-        "sunny": "sunny",
-        "partly-cloudy": "partlycloudy",
-        "cloudy": "cloudy",
-        "overcast": "cloudy",
-        "overcast-night": "cloudy",
-        "clear-night": "clear-night",
-        "rainy": "rainy",
-        "drizzle": "rainy",
-        "heavy-rain": "pouring",
-        "thunderstorm": "lightning-rainy",
-        "pre-storm": "lightning-rainy",
-        "severe-storm": "lightning-rainy",
-        "hurricane": "lightning-rainy",
-        "snowy": "snowy",
-        "snow-accumulation": "snowy",
-        "sleet": "snowy-rainy",
-        "fog": "fog",
-        "misty-morning": "fog",
-        "windy": "windy",
-        "windy-night": "windy",
-        "hot": "sunny",
-        "cold": "clear-night",
-        "sunrise": "sunny",
-        "sunset": "sunny",
-        "golden-hour": "sunny",
+        "sunny": "sunny", "partly-cloudy": "partlycloudy", "cloudy": "cloudy",
+        "overcast": "cloudy", "overcast-night": "cloudy", "clear-night": "clear-night",
+        "rainy": "rainy", "drizzle": "rainy", "heavy-rain": "pouring",
+        "thunderstorm": "lightning-rainy", "pre-storm": "lightning-rainy",
+        "severe-storm": "lightning-rainy", "hurricane": "lightning-rainy",
+        "snowy": "snowy", "snow-accumulation": "snowy", "sleet": "snowy-rainy",
+        "fog": "fog", "misty-morning": "fog", "windy": "windy", "windy-night": "windy",
+        "hot": "sunny", "cold": "clear-night",
+        "sunrise": "sunny", "sunset": "sunny", "golden-hour": "sunny",
         "clearing-after-rain": "partlycloudy",
     }
 
@@ -186,7 +171,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
     def _build_daily_forecast(self) -> list[dict[str, Any]] | None:
         d = self.coordinator.data or {}
         fc = d.get(KEY_FORECAST) or {}
-        daily = fc.get("daily") or []
+        daily = (fc.get("daily") or [])
         if not daily:
             return None
 
@@ -208,7 +193,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                     "wind_speed": wind_ms,
                     "condition": _weathercode_to_condition(item.get("weathercode")),
                     ATTR_ATTRIBUTION: self.attribution,
-                },
+                }
             )
         return out
 

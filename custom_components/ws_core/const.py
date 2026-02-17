@@ -10,10 +10,10 @@ PLATFORMS = ["sensor", "binary_sensor", "weather"]
 CONF_NAME = "name"
 CONF_PREFIX = "prefix"
 CONF_SOURCES = "sources"
-CONF_UNITS_MODE = "units_mode"  # auto | metric | imperial
-CONF_TEMP_UNIT = "temp_unit"  # auto | C | F
+CONF_UNITS_MODE = "units_mode"          # auto | metric | imperial
+CONF_TEMP_UNIT = "temp_unit"            # auto | C | F
 CONF_ELEVATION_M = "elevation_m"
-CONF_HEMISPHERE = "hemisphere"  # Northern | Southern
+CONF_HEMISPHERE = "hemisphere"          # Northern | Southern
 CONF_CLIMATE_REGION = "climate_region"  # for Zambretti wind pattern
 CONF_STALENESS_S = "staleness_s"
 CONF_FORECAST_ENABLED = "forecast_enabled"
@@ -76,23 +76,23 @@ TEMP_UNIT_OPTIONS = ["auto", "C", "F"]
 # ---------------------------------------------------------------------------
 # Physical validation limits (WMO / ICAO records)
 # ---------------------------------------------------------------------------
-VALID_TEMP_MIN_C = -60.0  # below lowest recorded (-89.2°C Antarctica)
-VALID_TEMP_MAX_C = 60.0  # above highest recorded (54.4°C Death Valley)
+VALID_TEMP_MIN_C = -60.0    # below lowest recorded (-89.2°C Antarctica)
+VALID_TEMP_MAX_C = 60.0     # above highest recorded (54.4°C Death Valley)
 VALID_TEMP_WARN_MIN_C = -40.0
 VALID_TEMP_WARN_MAX_C = 50.0
 
-VALID_PRESSURE_MIN_HPA = 870.0  # typhoon record low
+VALID_PRESSURE_MIN_HPA = 870.0   # typhoon record low
 VALID_PRESSURE_MAX_HPA = 1085.0  # Siberia record high
 VALID_PRESSURE_WARN_MIN_HPA = 940.0
 VALID_PRESSURE_WARN_MAX_HPA = 1060.0
 
-VALID_ELEVATION_MIN_M = -500.0  # Dead Sea ~-430m
-VALID_ELEVATION_MAX_M = 9000.0  # above Everest summit
+VALID_ELEVATION_MIN_M = -500.0   # Dead Sea ~-430m
+VALID_ELEVATION_MAX_M = 9000.0   # above Everest summit
 
 VALID_HUMIDITY_MIN = 0.0
 VALID_HUMIDITY_MAX = 100.0
 
-VALID_WIND_GUST_MAX_MS = 113.0  # highest recorded gust (Barrow Island)
+VALID_WIND_GUST_MAX_MS = 113.0   # highest recorded gust (Barrow Island)
 VALID_RAIN_RATE_MAX_MMPH = 500.0  # highest reliable tipping-bucket reading
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ BEAUFORT_BOUNDARIES = [0.3, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28
 
 # Pressure trend window (samples × interval = total history)
 PRESSURE_HISTORY_SAMPLES = 12
-PRESSURE_HISTORY_INTERVAL_MIN = 15  # minutes between samples → 3h window
+PRESSURE_HISTORY_INTERVAL_MIN = 15   # minutes between samples → 3h window
 
 # WMO pressure tendency thresholds (WMO No. 306, Table 4680) in hPa/3h
 PRESSURE_TREND_RISING_RAPID: float = 1.6
