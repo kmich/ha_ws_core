@@ -10,5 +10,5 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/kmich/ha_ws_core/issues",
   "requirements": [],
-  "version": "0.3.8"
+  "version": "0.3.9"
 }
