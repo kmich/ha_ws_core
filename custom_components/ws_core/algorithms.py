@@ -16,6 +16,7 @@ References:
 
 from __future__ import annotations
 
+import contextlib
 import math
 from datetime import datetime
 
@@ -1151,50 +1152,38 @@ def parse_metar_json(report: dict) -> dict:
     # Temperature
     temp = report.get("temp")
     if temp is not None:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             result["temp_c"] = float(temp)
-        except (ValueError, TypeError):
-            pass
 
     # Dewpoint
     dewp = report.get("dewp")
     if dewp is not None:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             result["dewpoint_c"] = float(dewp)
-        except (ValueError, TypeError):
-            pass
 
     # Altimeter (inHg) → hPa,  or directly from altimHg/slp
     # Try slp first (sea level pressure in hPa)
     slp = report.get("slp")
     altim = report.get("altim")
     if slp is not None:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             result["pressure_hpa"] = float(slp)
-        except (ValueError, TypeError):
-            pass
     elif altim is not None:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             # altim in inHg → hPa (1 inHg = 33.8639 hPa)
             result["pressure_hpa"] = round(float(altim) * 33.8639, 1)
-        except (ValueError, TypeError):
-            pass
 
     # Wind speed (knots) → m/s
     wspd = report.get("wspd")
     if wspd is not None:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             result["wind_ms"] = round(float(wspd) * 0.514444, 1)
-        except (ValueError, TypeError):
-            pass
 
     # Wind direction
     wdir = report.get("wdir")
     if wdir is not None:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             result["wind_dir_deg"] = int(float(wdir))
-        except (ValueError, TypeError):
-            pass
 
     # Observation age in minutes (use obsTime epoch if available)
     import time as _time
