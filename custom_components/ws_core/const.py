@@ -28,8 +28,15 @@ CONF_THRESH_FREEZE_C = "thresh_freeze_c"
 CONF_RAIN_FILTER_ALPHA = "rain_filter_alpha"
 CONF_PRESSURE_TREND_WINDOW_H = "pressure_trend_window_h"
 CONF_ENABLE_ACTIVITY_SCORES = "enable_activity_scores"
+CONF_ENABLE_EXTENDED_SENSORS = "enable_extended_sensors"
 CONF_RAIN_PENALTY_LIGHT_MMPH = "rain_penalty_light_mmph"
 CONF_RAIN_PENALTY_HEAVY_MMPH = "rain_penalty_heavy_mmph"
+
+# Calibration offsets (applied after unit conversion, in canonical metric units)
+CONF_CAL_TEMP_C = "cal_temp_c"
+CONF_CAL_HUMIDITY = "cal_humidity"
+CONF_CAL_PRESSURE_HPA = "cal_pressure_hpa"
+CONF_CAL_WIND_MS = "cal_wind_ms"
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -51,8 +58,14 @@ DEFAULT_THRESH_FREEZE_C = 0.0
 DEFAULT_RAIN_FILTER_ALPHA = 0.7
 DEFAULT_PRESSURE_TREND_WINDOW_H = 3
 DEFAULT_ENABLE_ACTIVITY_SCORES = False
+DEFAULT_ENABLE_EXTENDED_SENSORS = True
 DEFAULT_RAIN_PENALTY_LIGHT_MMPH = 0.2
 DEFAULT_RAIN_PENALTY_HEAVY_MMPH = 5.0
+
+DEFAULT_CAL_TEMP_C = 0.0
+DEFAULT_CAL_HUMIDITY = 0.0
+DEFAULT_CAL_PRESSURE_HPA = 0.0
+DEFAULT_CAL_WIND_MS = 0.0
 
 # ---------------------------------------------------------------------------
 # Selectable option lists

@@ -14,6 +14,8 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_ENABLE_ACTIVITY_SCORES,
+    CONF_ENABLE_EXTENDED_SENSORS,
     CONF_PREFIX,
     DEFAULT_PREFIX,
     DOMAIN,
@@ -170,14 +172,16 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_RAIN_RATE_RAW,
         name="WS Rain Rate Raw",
         icon="mdi:weather-pouring",
+        device_class=SensorDeviceClass.PRECIPITATION_INTENSITY,
         native_unit="mm/h",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
         key=KEY_RAIN_RATE_FILT,
-        name="WS Rain Rate Filtered",
+        name="WS Rain Rate",
         icon="mdi:weather-pouring",
+        device_class=SensorDeviceClass.PRECIPITATION_INTENSITY,
         native_unit="mm/h",
         state_class=SensorStateClass.MEASUREMENT,
     ),
@@ -550,11 +554,40 @@ SENSORS: list[WSSensorDescription] = [
     ),
 ]
 
+# Sensor groups for feature toggles
+_ACTIVITY_SCORE_KEYS = {KEY_LAUNDRY_SCORE, KEY_STARGAZE_SCORE, KEY_FIRE_RISK_SCORE, KEY_RUNNING_SCORE}
+_EXTENDED_SENSOR_KEYS = {
+    KEY_ZAMBRETTI_FORECAST,
+    KEY_ZAMBRETTI_NUMBER,
+    KEY_CURRENT_CONDITION,
+    KEY_HUMIDITY_LEVEL_DISPLAY,
+    KEY_UV_LEVEL_DISPLAY,
+    KEY_TEMP_DISPLAY,
+    KEY_RAIN_DISPLAY,
+    KEY_PRESSURE_TREND_DISPLAY,
+    KEY_HEALTH_DISPLAY,
+    KEY_FORECAST_TILES,
+    KEY_BATTERY_DISPLAY,
+}
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
     prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
-    entities: list[WSSensor] = [WSSensor(coordinator, entry, desc, prefix) for desc in SENSORS]
+
+    opts = {**entry.data, **entry.options}
+    activity_enabled = opts.get(CONF_ENABLE_ACTIVITY_SCORES, False)
+    extended_enabled = opts.get(CONF_ENABLE_EXTENDED_SENSORS, True)
+
+    filtered: list[WSSensorDescription] = []
+    for desc in SENSORS:
+        if desc.key in _ACTIVITY_SCORE_KEYS and not activity_enabled:
+            continue
+        if desc.key in _EXTENDED_SENSOR_KEYS and not extended_enabled:
+            continue
+        filtered.append(desc)
+
+    entities: list[WSSensor] = [WSSensor(coordinator, entry, desc, prefix) for desc in filtered]
     async_add_entities(entities)
 
 

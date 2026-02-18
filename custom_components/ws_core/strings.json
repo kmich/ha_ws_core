@@ -73,6 +73,14 @@
           "rain_penalty_light_mmph": "Rain penalty start threshold",
           "rain_penalty_heavy_mmph": "Rain penalty maximum threshold"
         }
+      },
+      "features": {
+        "title": "Features",
+        "description": "Choose which sensor groups to enable. You can change these later in Configure.",
+        "data": {
+          "enable_extended_sensors": "Extended analysis (Zambretti forecast, weather classifier, display sensors)",
+          "enable_activity_scores": "Activity scores (laundry drying, stargazing, fire risk, running)"
+        }
       }
     },
     "error": {
@@ -108,7 +116,12 @@
           "pressure_trend_window_h": "Pressure trend window",
           "enable_activity_scores": "Enable activity scores",
           "rain_penalty_light_mmph": "Rain penalty start",
-          "rain_penalty_heavy_mmph": "Rain penalty maximum"
+          "rain_penalty_heavy_mmph": "Rain penalty maximum",
+          "cal_temp_c": "Temperature calibration offset",
+          "cal_humidity": "Humidity calibration offset",
+          "cal_pressure_hpa": "Pressure calibration offset",
+          "cal_wind_ms": "Wind speed calibration offset",
+          "enable_extended_sensors": "Extended analysis (Zambretti, classifier, display sensors)"
         }
       }
     }

@@ -2,6 +2,56 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [0.4.3] - 2026-02-18
+
+### Added
+- **Features step in config flow**: New dedicated step during initial setup with clear toggles for "Extended analysis" (Zambretti, classifier, display sensors) and "Activity scores" (laundry, stargazing, fire, running). Both also available in Options flow (Configure button).
+- **Sensor group filtering**: Sensors are now only created when their feature group is enabled. Disabling a group removes its entities entirely instead of just hiding them.
+- **Weather entity: apparent temperature, dew point, wind gust, UV index** — standard HA weather entity attributes now properly exposed.
+- **Forecast: precipitation probability** (daily), **wind gust, apparent temp, dew point, cloud coverage** (hourly) — expanded Open-Meteo API request.
+- **Calibration offsets**: Temperature, humidity, pressure, and wind speed offsets in Options flow.
+
+### Fixed
+- **Rain rate `device_class`**: Added `SensorDeviceClass.PRECIPITATION_INTENSITY` to rain rate sensors. Missing device class could cause HA to show "no unique ID" warning for stale entities.
+- **Rain rate entity name**: Renamed from "WS Rain Rate Filtered" to "WS Rain Rate" for cleaner display.
+- **Activity scores toggle**: Moved from buried position in Alerts step to prominent Features step.
+- **Repo cleanup**: Actually removed `.BAK`/`.BROKEN` files, `themes/`, old `.md` issue templates from git.
+- **BOM encoding**: Removed UTF-8 BOM from `release.yml`.
+- **README Zambretti**: Clarified as authentic N&Z lookup table, not parameterized approximation.
+
+### Changed
+- Dashboard v1.1.0: Restructured into 4 pages (Weather, Analysis, Station, Activities) with conditional cards for optional sensor groups.
+- Config flow is now 8 steps: User → Required Sources → Optional Sources → Location → Display → Forecast → **Features** → Alerts.
+
+### Note
+If you see "no unique ID" warnings on rain rate or other sensors after upgrading, remove the integration and re-add it. This clears stale entity registry entries from earlier versions.
+
+## [0.4.2] - 2026-02-18
+
+### Added
+- **Weather entity: apparent temperature, dew point, wind gust, UV index** — standard HA weather entity attributes now properly exposed (were only available as separate sensors before).
+- **Daily forecast: precipitation probability** — already fetched from Open-Meteo but was not included in forecast output.
+- **Hourly forecast: apparent temperature, dew point, wind gust, cloud coverage** — expanded Open-Meteo API request to provide richer hourly data.
+- **Daily forecast: wind gust** — added `windgusts_10m_max` from Open-Meteo.
+- **Calibration offsets**: Temperature, humidity, pressure, and wind speed offsets in Options flow. Applied after unit conversion, before all derived calculations.
+- **HACS `ignore: brands`** in validate.yml to prevent false CI failures before brands PR is merged.
+
+### Fixed
+- **Repo cleanup**: Actually removed `.BAK`/`.BROKEN` files, `themes/` directory, and old `.md` issue templates from git tracking (deletions from 0.4.0 were documented but not committed).
+- **BOM encoding**: Removed UTF-8 BOM from `release.yml` that could cause YAML parse issues.
+- **README Zambretti description**: Clarified that the implementation uses the authentic Negretti & Zambra lookup table, not a parameterized approximation.
+
+### Changed
+- Structured `.yml` GitHub issue templates now properly tracked (replacing old `.md` templates).
+- Version 0.4.2 aligned across manifest.json, pyproject.toml, and __init__.py.
+
+## [0.4.1] - 2026-02-17
+
+### Fixed
+- **Config flow crash on HA 2025.12+**: `NumberSelectorConfig(step=0.0001)` rejected by newer HA versions; changed to `step=0.001` for lat/lon selectors.
+- **Removed `hass.config.units.is_metric`**: Property removed in HA 2025.12; replaced with `temperature_unit == "°C"` check.
+- **OptionsFlow deprecation**: Removed `self.config_entry` assignment in `__init__` (now provided by parent class since HA 2025.12).
+
 ## [0.4.0] - 2026-02-17
 
 ### Breaking Changes

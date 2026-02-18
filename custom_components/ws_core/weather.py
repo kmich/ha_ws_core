@@ -26,14 +26,18 @@ from .const import (
     DEFAULT_PREFIX,
     DOMAIN,
     KEY_CURRENT_CONDITION,
+    KEY_DEW_POINT_C,
+    KEY_FEELS_LIKE_C,
     KEY_FORECAST,
     KEY_NORM_HUMIDITY,
     KEY_NORM_PRESSURE_HPA,
     KEY_NORM_TEMP_C,
     KEY_NORM_WIND_DIR_DEG,
+    KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
     KEY_PACKAGE_OK,
     KEY_SEA_LEVEL_PRESSURE_HPA,
+    KEY_UV,
 )
 
 
@@ -125,6 +129,22 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         return (self.coordinator.data or {}).get(KEY_NORM_WIND_DIR_DEG)
 
     @property
+    def native_apparent_temperature(self) -> float | None:
+        return (self.coordinator.data or {}).get(KEY_FEELS_LIKE_C)
+
+    @property
+    def native_dew_point(self) -> float | None:
+        return (self.coordinator.data or {}).get(KEY_DEW_POINT_C)
+
+    @property
+    def native_wind_gust_speed(self) -> float | None:
+        return (self.coordinator.data or {}).get(KEY_NORM_WIND_GUST_MS)
+
+    @property
+    def uv_index(self) -> float | None:
+        return (self.coordinator.data or {}).get(KEY_UV)
+
+    @property
     def attribution(self) -> str | None:
         fc = (self.coordinator.data or {}).get(KEY_FORECAST) or {}
         if fc.get("provider") == "open-meteo":
@@ -188,13 +208,17 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             dt = f"{date_s}T12:00:00"
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
+            gust_kmh = item.get("gust_kmh")
+            gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
             out.append(
                 {
                     "datetime": dt,
                     "temperature": item.get("tmax_c"),
                     "templow": item.get("tmin_c"),
                     "precipitation": item.get("precip_mm"),
+                    "precipitation_probability": item.get("precip_prob"),
                     "wind_speed": wind_ms,
+                    "native_wind_gust_speed": gust_ms,
                     "condition": _weathercode_to_condition(item.get("weathercode")),
                     ATTR_ATTRIBUTION: self.attribution,
                 }
@@ -216,14 +240,20 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             dt = f"{dt_s}:00" if len(dt_s) == 16 else dt_s
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
+            gust_kmh = item.get("gust_kmh")
+            gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
             out.append(
                 {
                     "datetime": dt,
                     "temperature": item.get("temp_c"),
+                    "native_apparent_temperature": item.get("apparent_temp_c"),
+                    "native_dew_point": item.get("dewpoint_c"),
                     "precipitation_probability": item.get("precip_prob"),
                     "precipitation": item.get("precip_mm"),
                     "wind_speed": wind_ms,
+                    "native_wind_gust_speed": gust_ms,
                     "humidity": item.get("humidity"),
+                    "cloud_coverage": item.get("cloud_cover"),
                     "condition": _weathercode_to_condition(item.get("weathercode")),
                     ATTR_ATTRIBUTION: self.attribution,
                 }

@@ -413,21 +413,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         t_raw = num(SRC_TEMP)
         tc = round(self._to_celsius(t_raw, uom(SRC_TEMP)), 2) if t_raw is not None else None
         if tc is not None:
+            tc = round(tc + float(self.entry_options.get("cal_temp_c", 0.0)), 2)
             data[KEY_NORM_TEMP_C] = tc
 
         h_raw = num(SRC_HUM)
         rh = round(h_raw, 1) if h_raw is not None else None
         if rh is not None:
+            rh = round(max(0.0, min(100.0, rh + float(self.entry_options.get("cal_humidity", 0.0)))), 1)
             data[KEY_NORM_HUMIDITY] = rh
 
         p_raw = num(SRC_PRESS)
         pressure_hpa = round(self._to_hpa(p_raw, uom(SRC_PRESS)), 1) if p_raw is not None else None
         if pressure_hpa is not None:
+            pressure_hpa = round(pressure_hpa + float(self.entry_options.get("cal_pressure_hpa", 0.0)), 1)
             data[KEY_NORM_PRESSURE_HPA] = pressure_hpa
 
         ws_raw = num(SRC_WIND)
         wind_ms = round(self._to_ms(ws_raw, uom(SRC_WIND)), 2) if ws_raw is not None else None
         if wind_ms is not None:
+            wind_ms = round(max(0.0, wind_ms + float(self.entry_options.get("cal_wind_ms", 0.0))), 2)
             data[KEY_NORM_WIND_SPEED_MS] = wind_ms
 
         wg_raw = num(SRC_GUST)
@@ -989,9 +993,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "https://api.open-meteo.com/v1/forecast"
             f"?latitude={lat}&longitude={lon}"
             "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,"
-            "windspeed_10m_max,weathercode,precipitation_probability_max"
-            "&hourly=temperature_2m,precipitation_probability,precipitation,"
-            "weathercode,windspeed_10m,relativehumidity_2m"
+            "windspeed_10m_max,windgusts_10m_max,weathercode,precipitation_probability_max"
+            "&hourly=temperature_2m,apparent_temperature,dewpoint_2m,"
+            "precipitation_probability,precipitation,"
+            "weathercode,windspeed_10m,windgusts_10m,"
+            "relativehumidity_2m,cloudcover"
             "&forecast_hours=24"
             "&timezone=auto"
         )
@@ -1018,6 +1024,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         tmin = daily.get("temperature_2m_min") or []
         pr = daily.get("precipitation_sum") or []
         ws = daily.get("windspeed_10m_max") or []
+        wg = daily.get("windgusts_10m_max") or []
         wc = daily.get("weathercode") or []
         pp = daily.get("precipitation_probability_max") or []
 
@@ -1028,6 +1035,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "tmin_c": tmin[i] if i < len(tmin) else None,
                 "precip_mm": pr[i] if i < len(pr) else None,
                 "wind_kmh": ws[i] if i < len(ws) else None,
+                "gust_kmh": wg[i] if i < len(wg) else None,
                 "weathercode": wc[i] if i < len(wc) else None,
                 "precip_prob": pp[i] if i < len(pp) else None,
             }
@@ -1038,21 +1046,29 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hourly = js.get("hourly") or {}
         h_times = hourly.get("time") or []
         h_temp = hourly.get("temperature_2m") or []
+        h_app = hourly.get("apparent_temperature") or []
+        h_dew = hourly.get("dewpoint_2m") or []
         h_pp = hourly.get("precipitation_probability") or []
         h_precip = hourly.get("precipitation") or []
         h_wc = hourly.get("weathercode") or []
         h_ws = hourly.get("windspeed_10m") or []
+        h_wg = hourly.get("windgusts_10m") or []
         h_rh = hourly.get("relativehumidity_2m") or []
+        h_cc = hourly.get("cloudcover") or []
 
         hourly_out = [
             {
                 "datetime": h_times[i],
                 "temp_c": h_temp[i] if i < len(h_temp) else None,
+                "apparent_temp_c": h_app[i] if i < len(h_app) else None,
+                "dewpoint_c": h_dew[i] if i < len(h_dew) else None,
                 "precip_prob": h_pp[i] if i < len(h_pp) else None,
                 "precip_mm": h_precip[i] if i < len(h_precip) else None,
                 "weathercode": h_wc[i] if i < len(h_wc) else None,
                 "wind_kmh": h_ws[i] if i < len(h_ws) else None,
+                "gust_kmh": h_wg[i] if i < len(h_wg) else None,
                 "humidity": h_rh[i] if i < len(h_rh) else None,
+                "cloud_cover": h_cc[i] if i < len(h_cc) else None,
             }
             for i in range(min(len(h_times), 24))
         ]

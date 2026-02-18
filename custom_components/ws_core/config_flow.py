@@ -24,9 +24,14 @@ from homeassistant.helpers import selector
 
 from .const import (
     CLIMATE_REGION_OPTIONS,
+    CONF_CAL_HUMIDITY,
+    CONF_CAL_PRESSURE_HPA,
+    CONF_CAL_TEMP_C,
+    CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
     CONF_ENABLE_ACTIVITY_SCORES,
+    CONF_ENABLE_EXTENDED_SENSORS,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
@@ -46,9 +51,14 @@ from .const import (
     CONF_THRESH_WIND_GUST_MS,
     CONF_UNITS_MODE,
     CONFIG_VERSION,
+    DEFAULT_CAL_HUMIDITY,
+    DEFAULT_CAL_PRESSURE_HPA,
+    DEFAULT_CAL_TEMP_C,
+    DEFAULT_CAL_WIND_MS,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ELEVATION_M,
     DEFAULT_ENABLE_ACTIVITY_SCORES,
+    DEFAULT_ENABLE_EXTENDED_SENSORS,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_HEMISPHERE,
@@ -459,7 +469,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_forecast(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data.update(user_input)
-            return await self.async_step_alerts()
+            return await self.async_step_features()
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
         default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
@@ -485,7 +495,32 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 7: Alerts & advanced options
+    # Step 7: Features (toggle advanced sensor groups)
+    # ------------------------------------------------------------------
+    async def async_step_features(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data[CONF_ENABLE_ACTIVITY_SCORES] = bool(user_input.get(CONF_ENABLE_ACTIVITY_SCORES, False))
+            self._data[CONF_ENABLE_EXTENDED_SENSORS] = bool(
+                user_input.get(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_EXTENDED_SENSORS)
+            )
+            return await self.async_step_alerts()
+
+        return self.async_show_form(
+            step_id="features",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_ENABLE_EXTENDED_SENSORS, default=DEFAULT_ENABLE_EXTENDED_SENSORS
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_ACTIVITY_SCORES, default=DEFAULT_ENABLE_ACTIVITY_SCORES
+                    ): selector.BooleanSelector(),
+                }
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Step 8: Alerts & thresholds
     # ------------------------------------------------------------------
     async def async_step_alerts(self, user_input: dict[str, Any] | None = None):
         units_mode = str(self._data.get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
@@ -506,7 +541,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(float(user_input[CONF_THRESH_FREEZE_C]), imperial)
                 self._data[CONF_RAIN_FILTER_ALPHA] = float(user_input[CONF_RAIN_FILTER_ALPHA])
                 self._data[CONF_PRESSURE_TREND_WINDOW_H] = int(user_input[CONF_PRESSURE_TREND_WINDOW_H])
-                self._data[CONF_ENABLE_ACTIVITY_SCORES] = bool(user_input[CONF_ENABLE_ACTIVITY_SCORES])
                 self._data[CONF_STALENESS_S] = int(user_input[CONF_STALENESS_S])
                 self._data[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
                     float(user_input[CONF_RAIN_PENALTY_LIGHT_MMPH]), imperial
@@ -555,7 +589,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
                     ),
-                    vol.Optional(CONF_ENABLE_ACTIVITY_SCORES, default=False): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_RAIN_PENALTY_LIGHT_MMPH,
                         default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_LIGHT_MMPH, imperial), 2),
@@ -730,6 +763,10 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
                 ),
                 vol.Optional(
+                    CONF_ENABLE_EXTENDED_SENSORS,
+                    default=g(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_EXTENDED_SENSORS),
+                ): selector.BooleanSelector(),
+                vol.Optional(
                     CONF_ENABLE_ACTIVITY_SCORES, default=g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_ACTIVITY_SCORES)
                 ): selector.BooleanSelector(),
                 vol.Optional(
@@ -741,6 +778,25 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(cur_heavy_mmph, imperial), 1)
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
+                ),
+                # Calibration offsets
+                vol.Optional(CONF_CAL_TEMP_C, default=g(CONF_CAL_TEMP_C, DEFAULT_CAL_TEMP_C)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="°C")
+                ),
+                vol.Optional(
+                    CONF_CAL_HUMIDITY, default=g(CONF_CAL_HUMIDITY, DEFAULT_CAL_HUMIDITY)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-20, max=20, step=0.5, mode="box", unit_of_measurement="%")
+                ),
+                vol.Optional(
+                    CONF_CAL_PRESSURE_HPA, default=g(CONF_CAL_PRESSURE_HPA, DEFAULT_CAL_PRESSURE_HPA)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="hPa")
+                ),
+                vol.Optional(
+                    CONF_CAL_WIND_MS, default=g(CONF_CAL_WIND_MS, DEFAULT_CAL_WIND_MS)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-5, max=5, step=0.1, mode="box", unit_of_measurement="m/s")
                 ),
             }
         )

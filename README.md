@@ -219,7 +219,7 @@ Valid for any temperature range (unlike NWS wind chill / heat index which have v
 
 ### Zambretti Barometric Forecaster (Negretti & Zambra, 1915)
 
-Maps MSLP (950–1050 hPa) to Z-numbers 1–26 on a linear scale, then applies corrections for pressure trend (±4 Z-numbers for rapid change), wind direction (climate-region-aware), season, and humidity.
+Implements the authentic Negretti & Zambra forecast table with all 26 Z-number entries mapped to their original weather descriptions. The base Z-number is derived from MSLP (950–1050 hPa), then corrected for pressure trend (±4 Z-numbers for rapid change), wind direction (climate-region-aware biases from Watts, 2012), season, and humidity. The final Z-number indexes the historical lookup table — not a parameterized approximation.
 
 Accuracy: 65–75% for 6–12h forecasts in maritime/Mediterranean climates. Less reliable in continental interiors and tropics.
 
@@ -251,6 +251,21 @@ Example Blueprint automations are provided in `blueprints/`:
 - **Storm Warning**: Alert on rapid pressure drop with high wind
 
 See `blueprints/README.md` for installation instructions.
+
+---
+
+## Sensor Calibration
+
+All weather sensors drift over time. Use calibration offsets (Settings → Integrations → WS Core → Configure) to correct for known bias by comparing your station to a trusted reference (nearby airport METAR, MADIS station, or a calibrated instrument).
+
+| Offset | Range | Typical use |
+|--------|-------|-------------|
+| Temperature | ±10 °C | Correct for sensor placement (radiation shield quality, proximity to heat sources) |
+| Humidity | ±20% | Compensate for sensor aging (capacitive humidity sensors drift 1–2%/year) |
+| Pressure | ±10 hPa | Correct for altitude error if MSLP doesn't match nearby stations |
+| Wind speed | ±5 m/s | Adjust for sheltered mounting or anemometer calibration |
+
+Offsets are applied after unit conversion, before all derived calculations (dew point, feels-like, Zambretti, etc.).
 
 ---
 
