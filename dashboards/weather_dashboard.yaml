@@ -1896,32 +1896,16 @@ views:
                 ]]]
 
       # =======================================================================
-      # WIND ROSE  (v0.5.0) — requires custom:windrose-card from HACS
+      # WIND ROSE  (v0.5.0) — requires custom:windrose-card from HACS Frontend
       # =======================================================================
       - type: grid
         column_span: 2
         cards:
-          - type: custom:windrose-card
-            title: Wind Rose (24h)
-            hours_to_show: 24
-            max_width: 460
-            wind_direction_entity:
-              entity: sensor.ws_wind_direction
-            wind_speed_entities:
-              - entity: sensor.ws_wind_speed
-                name: Wind Speed
-                speed_range_beaufort: true
-            compass:
-              auto_align: true
-            cardinal_direction_letters: NESW
-            center_calm_percentage: true
-            matching_strategy: time-frame
-            current_direction:
-              show: true
-              entity: sensor.ws_wind_direction
-              style:
-                color: "#38bdf8"
-                size: 20%
+          - type: custom:button-card
+            entity: sensor.ws_wind_direction
+            show_state: false
+            show_icon: false
+            show_name: false
             card_mod:
               style: |
                 ha-card {
@@ -1929,13 +1913,32 @@ views:
                   border: 1px solid rgba(255,255,255,0.08) !important;
                   border-radius: 16px !important;
                   padding: 12px !important;
+                  min-height: 60px !important;
                 }
-                .card-header {
-                  color: rgba(255,255,255,0.85) !important;
-                  font-size: 14px !important;
-                  font-weight: 600 !important;
-                  padding-bottom: 6px !important;
-                }
+            custom_fields:
+              content: |
+                [[[
+                  const isInstalled = customElements.get('windrose-card') !== undefined;
+                  if (isInstalled) {
+                    return `<windrose-card
+                      style="display:block;width:100%;height:400px;"
+                    ></windrose-card>`;
+                  }
+                  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                    padding:32px 16px;gap:12px;text-align:center;">
+                    <ha-icon icon="mdi:chart-donut" style="--mdi-icon-size:40px;color:rgba(56,189,248,0.6);"></ha-icon>
+                    <div style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.85);">Wind Rose</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,0.5);max-width:320px;line-height:1.6;">
+                      Install <b style="color:rgba(56,189,248,0.8);">Wind Rose Card</b> from
+                      <b style="color:rgba(56,189,248,0.8);">HACS → Frontend</b>
+                      then restart Home Assistant to enable this widget.
+                    </div>
+                  </div>`;
+                ]]]
+            styles:
+              custom_fields:
+                content:
+                  - width: 100%
 
       # =======================================================================
       # RADAR  (v0.5.0) — RainViewer live radar via iframe
@@ -1996,37 +1999,64 @@ views:
                 ]]]
 
       # =======================================================================
-      # DEGREE DAYS & ET₀  (v0.5.0 / v0.6.0) — shows only when enabled
+      # DEGREE DAYS, ET₀ & UPLOAD STATUS  (v0.5.1/v0.6.0)
+      # Dynamically shows only entities that are enabled/exist
       # =======================================================================
       - type: grid
         column_span: 2
         cards:
-          - type: entities
-            title: Degree Days & Evapotranspiration
+          - type: custom:button-card
+            entity: sensor.ws_station_health
+            show_state: false
+            show_icon: false
+            show_name: false
             card_mod:
               style: |
                 ha-card {
                   background: rgba(20,20,35,0.95) !important;
                   border: 1px solid rgba(255,255,255,0.08) !important;
                   border-radius: 16px !important;
+                  padding: 16px !important;
                 }
-            entities:
-              - entity: sensor.ws_heating_degree_days_today
-                name: HDD Today
-                icon: mdi:thermometer-minus
-              - entity: sensor.ws_cooling_degree_days_today
-                name: CDD Today
-                icon: mdi:thermometer-plus
-              - entity: sensor.ws_et0_daily
-                name: ET₀ (Daily)
-                icon: mdi:sprout
-              - entity: sensor.ws_metar_validation
-                name: METAR Validation
-                icon: mdi:shield-check
-              - entity: sensor.ws_cwop_upload_status
-                name: CWOP Upload
-                icon: mdi:broadcast
-              - entity: sensor.ws_wu_upload_status
-                name: WUnderground Upload
-                icon: mdi:weather-cloudy-clock
+            custom_fields:
+              content: |
+                [[[
+                  const ents = [
+                    { id: 'sensor.ws_heating_degree_days_today',  label: 'HDD Today',          icon: 'mdi:thermometer-minus',      unit: '' },
+                    { id: 'sensor.ws_cooling_degree_days_today',  label: 'CDD Today',          icon: 'mdi:thermometer-plus',       unit: '' },
+                    { id: 'sensor.ws_et0_daily',                  label: 'ET\u2080 (Daily)',   icon: 'mdi:sprout',                 unit: '' },
+                    { id: 'sensor.ws_metar_validation',           label: 'METAR Validation',   icon: 'mdi:shield-check',           unit: '' },
+                    { id: 'sensor.ws_cwop_upload_status',         label: 'CWOP Upload',        icon: 'mdi:broadcast',              unit: '' },
+                    { id: 'sensor.ws_wu_upload_status',           label: 'WUnderground Upload',icon: 'mdi:weather-cloudy-clock',   unit: '' },
+                    { id: 'sensor.ws_last_export_time',           label: 'Last Export',        icon: 'mdi:file-export',            unit: '' },
+                  ];
+                  const rows = ents
+                    .filter(e => states[e.id] !== undefined)
+                    .map(e => {
+                      const s = states[e.id];
+                      const val = s.state === 'unavailable' || s.state === 'unknown'
+                        ? '<span style="color:rgba(255,255,255,0.3)">—</span>'
+                        : `<span style="color:rgba(255,255,255,0.9)">${s.state}${s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : ''}</span>`;
+                      return `<div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                          <ha-icon icon="${e.icon}" style="--mdi-icon-size:18px;color:rgba(56,189,248,0.7);"></ha-icon>
+                          <span style="font-size:13px;color:rgba(255,255,255,0.7);">${e.label}</span>
+                        </div>
+                        <span style="font-size:13px;font-weight:500;">${val}</span>
+                      </div>`;
+                    });
+                  if (rows.length === 0) return '';
+                  return `<div style="width:100%;">
+                    <div style="font-size:13px;font-weight:700;letter-spacing:0.5px;
+                      color:rgba(255,255,255,0.5);text-transform:uppercase;
+                      margin-bottom:8px;">Degree Days &amp; Uploads</div>
+                    ${rows.join('')}
+                  </div>`;
+                ]]]
+            styles:
+              custom_fields:
+                content:
+                  - width: 100%
+                  - padding: "0"
 
