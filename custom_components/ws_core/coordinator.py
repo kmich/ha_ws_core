@@ -76,11 +76,14 @@ from .algorithms import (
 from .const import (
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
+    CONF_ENABLE_SEA_TEMP,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
     CONF_HEMISPHERE,
+    CONF_SEA_TEMP_LAT,
+    CONF_SEA_TEMP_LON,
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_UNITS_MODE,
@@ -127,6 +130,7 @@ from .const import (
     KEY_RAIN_RATE_RAW,
     KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
+    KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_QUALITY_FLAGS,
     KEY_STARGAZE_SCORE,
     KEY_TEMP_AVG_24H,
@@ -159,6 +163,7 @@ from .const import (
     SRC_UV,
     SRC_WIND,
     SRC_WIND_DIR,
+    STALENESS_CHECK_SOURCES,
     VALID_HUMIDITY_MAX,
     VALID_HUMIDITY_MIN,
     VALID_PRESSURE_MAX_HPA,
@@ -246,6 +251,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.forecast_lat = _get(CONF_FORECAST_LAT, None)
         self.forecast_lon = _get(CONF_FORECAST_LON, None)
         self.forecast_interval_min = int(_get(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN))
+
+        # Sea surface temperature (Open-Meteo Marine API)
+        self.sea_temp_enabled = bool(_get(CONF_ENABLE_SEA_TEMP, False))
+        self.sea_temp_lat = _get(CONF_SEA_TEMP_LAT, None)
+        self.sea_temp_lon = _get(CONF_SEA_TEMP_LON, None)
+        self._sea_temp_cache: dict[str, Any] | None = None
 
         super().__init__(
             hass,
@@ -807,6 +818,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for k, eid in self.sources.items():
             if not eid:
                 continue
+            # Only check frequently-updating core sensors for staleness.
+            # Exclude rain_total (static when dry), UV (zero at night), battery
+            # (slow-reporting), etc.
+            if k not in STALENESS_CHECK_SOURCES:
+                continue
             st = self.hass.states.get(eid)
             if st is None:
                 continue
@@ -960,6 +976,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if fc and fc.get("daily"):
             data[KEY_FORECAST_TILES] = self._build_forecast_tiles(fc["daily"])
 
+        # Sea surface temperature
+        if self.sea_temp_enabled and self._sea_temp_cache:
+            data[KEY_SEA_SURFACE_TEMP] = self._sea_temp_cache.get("current_c")
+            data["_sea_temp_comfort"] = self._sea_temp_cache.get("comfort")
+            data["_sea_temp_hourly"] = self._sea_temp_cache.get("hourly")
+            data["_sea_temp_grid_lat"] = self._sea_temp_cache.get("grid_lat")
+            data["_sea_temp_grid_lon"] = self._sea_temp_cache.get("grid_lon")
+            data["_sea_temp_disclaimer"] = self._sea_temp_cache.get("disclaimer")
+
         self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
         return data
 
@@ -1023,6 +1048,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass.async_create_task(self._async_fetch_forecast())
         except Exception:
             rt.forecast_inflight = False
+
+        # Piggyback sea temp fetch on the same schedule as forecast
+        if self.sea_temp_enabled and not getattr(rt, "sea_temp_inflight", False):
+            rt.sea_temp_inflight = True
+            self.hass.async_create_task(self._async_fetch_sea_temp())
         return cached
 
     async def _async_fetch_forecast(self) -> None:
@@ -1128,3 +1158,74 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         rt.forecast_consecutive_failures = 0
         self.async_set_updated_data(self._compute())
         rt.forecast_inflight = False
+
+    async def _async_fetch_sea_temp(self) -> None:
+        """Fetch sea surface temperature from Open-Meteo Marine API."""
+        rt = self.runtime
+        try:
+            lat = self.sea_temp_lat or float(self.hass.config.latitude)
+            lon = self.sea_temp_lon or float(self.hass.config.longitude)
+
+            url = (
+                "https://api.open-meteo.com/v1/marine"
+                f"?latitude={lat}&longitude={lon}"
+                "&current=sea_surface_temperature"
+                "&hourly=sea_surface_temperature"
+                "&forecast_hours=24"
+                "&cell_selection=sea"
+                "&timezone=auto"
+            )
+            from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+            session = async_get_clientsession(self.hass)
+            async with session.get(url, timeout=20) as resp:
+                if resp.status != 200:
+                    _LOGGER.warning("Open-Meteo Marine returned HTTP %s", resp.status)
+                    return
+                js = await resp.json()
+
+            current = js.get("current") or {}
+            sst_c = current.get("sea_surface_temperature")
+
+            # Parse hourly SST for chart attributes
+            hourly = js.get("hourly") or {}
+            h_times = hourly.get("time") or []
+            h_sst = hourly.get("sea_surface_temperature") or []
+            hourly_out = [
+                {"datetime": h_times[i], "sst_c": h_sst[i]}
+                for i in range(min(len(h_times), 24))
+                if i < len(h_sst) and h_sst[i] is not None
+            ]
+
+            # Swimming comfort label
+            comfort = "Unknown"
+            if sst_c is not None:
+                if sst_c < 16:
+                    comfort = "Cold"
+                elif sst_c < 20:
+                    comfort = "Cool"
+                elif sst_c < 24:
+                    comfort = "Comfortable"
+                elif sst_c < 28:
+                    comfort = "Warm"
+                else:
+                    comfort = "Hot"
+
+            self._sea_temp_cache = {
+                "current_c": round(sst_c, 1) if sst_c is not None else None,
+                "comfort": comfort,
+                "hourly": hourly_out,
+                "grid_lat": js.get("latitude"),
+                "grid_lon": js.get("longitude"),
+                "disclaimer": (
+                    "Satellite-derived SST for nearest sea grid cell. "
+                    "Coastal accuracy limited by grid resolution (~5 km). "
+                    "Not a direct measurement."
+                ),
+            }
+            self.async_set_updated_data(self._compute())
+
+        except Exception as exc:
+            _LOGGER.warning("Open-Meteo Marine fetch failed: %s", exc)
+        finally:
+            rt.sea_temp_inflight = False

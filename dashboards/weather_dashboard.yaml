@@ -1500,6 +1500,69 @@ views:
                     + '</div></div>';
                 ]]]
 
+      # SEA SURFACE TEMPERATURE (only shown when sensor exists)
+      - type: grid
+        column_span: 2
+        cards:
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.ws_sea_surface_temperature
+                state_not: unavailable
+            card:
+              type: custom:button-card
+              entity: sensor.ws_sea_surface_temperature
+              name: Sea Temperature
+              show_state: false
+              show_icon: true
+              icon: mdi:waves
+              styles:
+                card:
+                  - background: rgba(30,30,30,0.9)
+                  - border-radius: 14px
+                  - padding: 16px
+                  - border: 1px solid rgba(255,255,255,0.1)
+                name:
+                  - font-size: 16px
+                  - font-weight: 600
+                  - color: white
+                icon:
+                  - width: 48px
+                  - color: |
+                      [[[
+                        var t = parseFloat(entity && entity.state) || 0;
+                        if (t >= 28) return '#ef4444';
+                        if (t >= 24) return '#f59e0b';
+                        if (t >= 20) return '#10b981';
+                        if (t >= 16) return '#06b6d4';
+                        return '#3b82f6';
+                      ]]]
+              custom_fields:
+                details: |
+                  [[[
+                    var t = parseFloat(entity && entity.state);
+                    var attrs = (entity && entity.attributes) || {};
+                    var comfort = attrs.comfort || '--';
+                    var comfortColor = comfort === 'Hot' ? '#ef4444' : comfort === 'Warm' ? '#f59e0b' : comfort === 'Comfortable' ? '#10b981' : comfort === 'Cool' ? '#06b6d4' : '#3b82f6';
+                    var hourly = attrs.hourly_forecast || [];
+                    var minT = t, maxT = t;
+                    for (var i = 0; i < hourly.length; i++) {
+                      var v = hourly[i].sst_c;
+                      if (v !== null && v !== undefined) {
+                        if (v < minT) minT = v;
+                        if (v > maxT) maxT = v;
+                      }
+                    }
+                    var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                    return '<div style="margin-top:8px;">'
+                      + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(t) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">°C</span></div>'
+                      + '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + comfortColor + '22;border:1px solid ' + comfortColor + '55;font-size:13px;font-weight:600;color:' + comfortColor + ';">' + comfort + '</div>'
+                      + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:10px;line-height:1.8;">'
+                      + '<div><strong>24h range:</strong> ' + fmt(minT) + ' – ' + fmt(maxT) + ' °C</div>'
+                      + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;font-style:italic;">Satellite-derived · nearest sea grid cell</div>'
+                      + '</div></div>';
+                  ]]]
+
       # RAIN ANALYSIS / TEMPERATURE DETAIL
       - type: grid
         column_span: 2

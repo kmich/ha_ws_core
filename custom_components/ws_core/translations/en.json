@@ -69,17 +69,29 @@
           "staleness_s": "Sensor staleness timeout",
           "rain_filter_alpha": "Rain-rate Kalman filter smoothing",
           "pressure_trend_window_h": "Pressure trend window",
-          "enable_activity_scores": "Enable activity scores (laundry / stargazing / fire / running)",
           "rain_penalty_light_mmph": "Rain penalty start threshold",
           "rain_penalty_heavy_mmph": "Rain penalty maximum threshold"
         }
       },
       "features": {
         "title": "Features",
-        "description": "Choose which sensor groups to enable. You can change these later in Configure.",
+        "description": "Choose which sensors to enable. Each can be toggled independently. You can change these later in Configure.",
         "data": {
-          "enable_extended_sensors": "Extended analysis (Zambretti forecast, weather classifier, display sensors)",
-          "enable_activity_scores": "Activity scores (laundry drying, stargazing, fire risk, running)"
+          "enable_zambretti": "Zambretti barometric forecast & weather classifier",
+          "enable_display_sensors": "Display sensors (humidity level, UV level, pressure trend, station health)",
+          "enable_laundry_score": "Laundry drying score",
+          "enable_stargazing_score": "Stargazing quality",
+          "enable_fire_risk_score": "Fire risk score",
+          "enable_running_score": "Running conditions score",
+          "enable_sea_temp": "Sea surface temperature (Open-Meteo Marine API)"
+        }
+      },
+      "sea_temp": {
+        "title": "Sea temperature location",
+        "description": "Coordinates for sea surface temperature lookup. Defaults to your Home Assistant location. Override if your home is inland or you want a specific coastal point.",
+        "data": {
+          "sea_temp_lat": "Sea temperature latitude",
+          "sea_temp_lon": "Sea temperature longitude"
         }
       }
     },
@@ -114,14 +126,21 @@
           "staleness_s": "Sensor staleness timeout",
           "rain_filter_alpha": "Rain-rate filter smoothing",
           "pressure_trend_window_h": "Pressure trend window",
-          "enable_activity_scores": "Enable activity scores",
           "rain_penalty_light_mmph": "Rain penalty start",
           "rain_penalty_heavy_mmph": "Rain penalty maximum",
           "cal_temp_c": "Temperature calibration offset",
           "cal_humidity": "Humidity calibration offset",
           "cal_pressure_hpa": "Pressure calibration offset",
           "cal_wind_ms": "Wind speed calibration offset",
-          "enable_extended_sensors": "Extended analysis (Zambretti, classifier, display sensors)"
+          "enable_zambretti": "Zambretti forecast & classifier",
+          "enable_display_sensors": "Display sensors (levels, trends, health)",
+          "enable_laundry_score": "Laundry drying score",
+          "enable_stargazing_score": "Stargazing quality",
+          "enable_fire_risk_score": "Fire risk score",
+          "enable_running_score": "Running conditions score",
+          "enable_sea_temp": "Sea surface temperature",
+          "sea_temp_lat": "Sea temperature latitude",
+          "sea_temp_lon": "Sea temperature longitude"
         }
       }
     }

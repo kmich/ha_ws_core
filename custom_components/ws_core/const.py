@@ -29,6 +29,17 @@ CONF_RAIN_FILTER_ALPHA = "rain_filter_alpha"
 CONF_PRESSURE_TREND_WINDOW_H = "pressure_trend_window_h"
 CONF_ENABLE_ACTIVITY_SCORES = "enable_activity_scores"
 CONF_ENABLE_EXTENDED_SENSORS = "enable_extended_sensors"
+
+# Granular feature toggles (override the coarse group toggles above)
+CONF_ENABLE_ZAMBRETTI = "enable_zambretti"
+CONF_ENABLE_DISPLAY_SENSORS = "enable_display_sensors"
+CONF_ENABLE_LAUNDRY = "enable_laundry_score"
+CONF_ENABLE_STARGAZING = "enable_stargazing_score"
+CONF_ENABLE_FIRE_RISK = "enable_fire_risk_score"
+CONF_ENABLE_RUNNING = "enable_running_score"
+CONF_ENABLE_SEA_TEMP = "enable_sea_temp"
+CONF_SEA_TEMP_LAT = "sea_temp_lat"
+CONF_SEA_TEMP_LON = "sea_temp_lon"
 CONF_RAIN_PENALTY_LIGHT_MMPH = "rain_penalty_light_mmph"
 CONF_RAIN_PENALTY_HEAVY_MMPH = "rain_penalty_heavy_mmph"
 
@@ -59,6 +70,14 @@ DEFAULT_RAIN_FILTER_ALPHA = 0.7
 DEFAULT_PRESSURE_TREND_WINDOW_H = 3
 DEFAULT_ENABLE_ACTIVITY_SCORES = False
 DEFAULT_ENABLE_EXTENDED_SENSORS = True
+
+DEFAULT_ENABLE_ZAMBRETTI = True
+DEFAULT_ENABLE_DISPLAY_SENSORS = True
+DEFAULT_ENABLE_LAUNDRY = False
+DEFAULT_ENABLE_STARGAZING = False
+DEFAULT_ENABLE_FIRE_RISK = False
+DEFAULT_ENABLE_RUNNING = False
+DEFAULT_ENABLE_SEA_TEMP = False
 DEFAULT_RAIN_PENALTY_LIGHT_MMPH = 0.2
 DEFAULT_RAIN_PENALTY_HEAVY_MMPH = 5.0
 
@@ -181,6 +200,9 @@ KEY_FIRE_RISK_SCORE = "fire_risk_score"
 KEY_RUNNING_SCORE = "running_score"
 KEY_PRESSURE_TREND_HPAH = "pressure_trend_hpah"
 
+# Sea surface temperature (Open-Meteo Marine API)
+KEY_SEA_SURFACE_TEMP = "sea_surface_temperature"
+
 # Sensor quality / validation flags
 KEY_SENSOR_QUALITY_FLAGS = "sensor_quality_flags"
 
@@ -201,6 +223,10 @@ SRC_BATTERY = "battery"
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
 OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY]
+
+# Only these sources trigger staleness warnings. Excluded: rain_total (static
+# when dry), lux/uv (zero at night), dew_point, battery (slow-reporting).
+STALENESS_CHECK_SOURCES = {SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR}
 
 # ---------------------------------------------------------------------------
 # Named physical / algorithm constants

@@ -14,8 +14,13 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    CONF_ENABLE_ACTIVITY_SCORES,
-    CONF_ENABLE_EXTENDED_SENSORS,
+    CONF_ENABLE_DISPLAY_SENSORS,
+    CONF_ENABLE_FIRE_RISK,
+    CONF_ENABLE_LAUNDRY,
+    CONF_ENABLE_RUNNING,
+    CONF_ENABLE_SEA_TEMP,
+    CONF_ENABLE_STARGAZING,
+    CONF_ENABLE_ZAMBRETTI,
     CONF_PREFIX,
     DEFAULT_PREFIX,
     DOMAIN,
@@ -55,6 +60,7 @@ from .const import (
     KEY_RAIN_RATE_RAW,
     KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
+    KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_QUALITY_FLAGS,
     KEY_STARGAZE_SCORE,
     KEY_TEMP_AVG_24H,
@@ -533,6 +539,7 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_LAUNDRY_SCORE,
         name="WS Laundry Drying Score",
         icon="mdi:hanger",
+        native_unit="score",
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "recommendation": d.get("_laundry_recommendation"),
@@ -552,6 +559,7 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_FIRE_RISK_SCORE,
         name="WS Fire Risk Score",
         icon="mdi:fire",
+        native_unit="score",
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "danger_level": d.get("_fire_danger_level"),
@@ -571,6 +579,7 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_RUNNING_SCORE,
         name="WS Running Score",
         icon="mdi:run",
+        native_unit="score",
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "level": d.get("_running_level"),
@@ -579,22 +588,48 @@ SENSORS: list[WSSensorDescription] = [
             "uv_index": d.get(KEY_UV),
         },
     ),
+    # =========================================================================
+    # SEA SURFACE TEMPERATURE (Open-Meteo Marine API)
+    # =========================================================================
+    WSSensorDescription(
+        key=KEY_SEA_SURFACE_TEMP,
+        name="WS Sea Surface Temperature",
+        icon="mdi:waves",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "comfort": d.get("_sea_temp_comfort"),
+            "hourly_forecast": d.get("_sea_temp_hourly"),
+            "grid_latitude": d.get("_sea_temp_grid_lat"),
+            "grid_longitude": d.get("_sea_temp_grid_lon"),
+            "disclaimer": d.get("_sea_temp_disclaimer"),
+        },
+    ),
 ]
 
-# Sensor groups for feature toggles
-_ACTIVITY_SCORE_KEYS = {KEY_LAUNDRY_SCORE, KEY_STARGAZE_SCORE, KEY_FIRE_RISK_SCORE, KEY_RUNNING_SCORE}
-_EXTENDED_SENSOR_KEYS = {
-    KEY_ZAMBRETTI_FORECAST,
-    KEY_ZAMBRETTI_NUMBER,
-    KEY_CURRENT_CONDITION,
-    KEY_HUMIDITY_LEVEL_DISPLAY,
-    KEY_UV_LEVEL_DISPLAY,
-    KEY_TEMP_DISPLAY,
-    KEY_RAIN_DISPLAY,
-    KEY_PRESSURE_TREND_DISPLAY,
-    KEY_HEALTH_DISPLAY,
-    KEY_FORECAST_TILES,
-    KEY_BATTERY_DISPLAY,
+# Sensor-to-feature-toggle mapping for granular control
+_FEATURE_TOGGLE_MAP: dict[str, str] = {
+    # Zambretti / condition classifier
+    KEY_ZAMBRETTI_FORECAST: CONF_ENABLE_ZAMBRETTI,
+    KEY_ZAMBRETTI_NUMBER: CONF_ENABLE_ZAMBRETTI,
+    KEY_CURRENT_CONDITION: CONF_ENABLE_ZAMBRETTI,
+    # Display sensors
+    KEY_HUMIDITY_LEVEL_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
+    KEY_UV_LEVEL_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
+    KEY_TEMP_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
+    KEY_RAIN_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
+    KEY_PRESSURE_TREND_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
+    KEY_HEALTH_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
+    KEY_FORECAST_TILES: CONF_ENABLE_DISPLAY_SENSORS,
+    KEY_BATTERY_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
+    # Individual activity scores
+    KEY_LAUNDRY_SCORE: CONF_ENABLE_LAUNDRY,
+    KEY_STARGAZE_SCORE: CONF_ENABLE_STARGAZING,
+    KEY_FIRE_RISK_SCORE: CONF_ENABLE_FIRE_RISK,
+    KEY_RUNNING_SCORE: CONF_ENABLE_RUNNING,
+    # Sea temperature
+    KEY_SEA_SURFACE_TEMP: CONF_ENABLE_SEA_TEMP,
 }
 
 
@@ -603,14 +638,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
 
     opts = {**entry.data, **entry.options}
-    activity_enabled = opts.get(CONF_ENABLE_ACTIVITY_SCORES, False)
-    extended_enabled = opts.get(CONF_ENABLE_EXTENDED_SENSORS, True)
 
     filtered: list[WSSensorDescription] = []
     for desc in SENSORS:
-        if desc.key in _ACTIVITY_SCORE_KEYS and not activity_enabled:
-            continue
-        if desc.key in _EXTENDED_SENSOR_KEYS and not extended_enabled:
+        toggle_key = _FEATURE_TOGGLE_MAP.get(desc.key)
+        if toggle_key is not None and not opts.get(toggle_key, False):
             continue
         filtered.append(desc)
 
@@ -719,6 +751,7 @@ class WSSensor(CoordinatorEntity, SensorEntity):
             KEY_PACKAGE_STATUS: "package_status",
             KEY_PRESSURE_CHANGE_WINDOW_HPA: "pressure_change_window",
             KEY_PRESSURE_TREND_HPAH: "pressure_trend_raw",
+            KEY_SEA_SURFACE_TEMP: "sea_surface_temperature",
         }
         if key in overrides:
             return overrides[key]

@@ -2,6 +2,29 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [0.5.0] - 2026-02-18
+
+### Added
+- **Sea Surface Temperature**: New `sensor.ws_sea_surface_temperature` via Open-Meteo Marine API. Opt-in toggle with separate lat/lon override. Attributes include swimming comfort label (Cold/Cool/Comfortable/Warm/Hot), 24h hourly forecast, and grid cell metadata.
+- **Granular feature toggles**: Each sensor group now has its own on/off toggle in both setup wizard and Configure:
+  - Zambretti forecast & weather classifier
+  - Display sensors (humidity level, UV level, pressure trend, station health)
+  - Laundry drying score
+  - Stargazing quality
+  - Fire risk score
+  - Running conditions score
+  - Sea surface temperature
+- **Sea temperature dashboard card**: Conditional card on Advanced page showing current SST, comfort badge, and 24h range.
+- **Config flow step**: New `sea_temp` step shown when sea temp is enabled, for lat/lon override.
+
+### Fixed
+- **Staleness false positives**: Only core weather sensors (temp, humidity, pressure, wind speed/gust/direction) are now checked for staleness. Rain total (static when dry), UV index (zero at night), battery (slow-reporting), and dew point are excluded. Fixes the "sensors are stale" warning for rain_total, uv_index, battery.
+- **Activity score unit migration**: Added explicit `native_unit="score"` to laundry drying score, fire risk score, and running score. Fixes "The unit has changed" statistics migration prompt.
+
+### Changed
+- **Feature toggles replace coarse groups**: The old `enable_extended_sensors` and `enable_activity_scores` toggles are replaced by individual per-feature toggles. Existing configs auto-migrate via fallback defaults in the Options flow.
+- Config flow step 7 (Features) now shows 7 individual toggles instead of 2 group toggles.
+
 ## [0.4.5] - 2026-02-18
 
 ### Added

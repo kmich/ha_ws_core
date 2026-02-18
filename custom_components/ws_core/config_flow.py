@@ -31,7 +31,14 @@ from .const import (
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
     CONF_ENABLE_ACTIVITY_SCORES,
+    CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_EXTENDED_SENSORS,
+    CONF_ENABLE_FIRE_RISK,
+    CONF_ENABLE_LAUNDRY,
+    CONF_ENABLE_RUNNING,
+    CONF_ENABLE_SEA_TEMP,
+    CONF_ENABLE_STARGAZING,
+    CONF_ENABLE_ZAMBRETTI,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
@@ -43,6 +50,8 @@ from .const import (
     CONF_RAIN_FILTER_ALPHA,
     CONF_RAIN_PENALTY_HEAVY_MMPH,
     CONF_RAIN_PENALTY_LIGHT_MMPH,
+    CONF_SEA_TEMP_LAT,
+    CONF_SEA_TEMP_LON,
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_TEMP_UNIT,
@@ -57,8 +66,13 @@ from .const import (
     DEFAULT_CAL_WIND_MS,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ELEVATION_M,
-    DEFAULT_ENABLE_ACTIVITY_SCORES,
-    DEFAULT_ENABLE_EXTENDED_SENSORS,
+    DEFAULT_ENABLE_DISPLAY_SENSORS,
+    DEFAULT_ENABLE_FIRE_RISK,
+    DEFAULT_ENABLE_LAUNDRY,
+    DEFAULT_ENABLE_RUNNING,
+    DEFAULT_ENABLE_SEA_TEMP,
+    DEFAULT_ENABLE_STARGAZING,
+    DEFAULT_ENABLE_ZAMBRETTI,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_HEMISPHERE,
@@ -499,22 +513,56 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_features(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
-            self._data[CONF_ENABLE_ACTIVITY_SCORES] = bool(user_input.get(CONF_ENABLE_ACTIVITY_SCORES, False))
-            self._data[CONF_ENABLE_EXTENDED_SENSORS] = bool(
-                user_input.get(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_EXTENDED_SENSORS)
-            )
+            self._data[CONF_ENABLE_ZAMBRETTI] = bool(user_input.get(CONF_ENABLE_ZAMBRETTI, True))
+            self._data[CONF_ENABLE_DISPLAY_SENSORS] = bool(user_input.get(CONF_ENABLE_DISPLAY_SENSORS, True))
+            self._data[CONF_ENABLE_LAUNDRY] = bool(user_input.get(CONF_ENABLE_LAUNDRY, False))
+            self._data[CONF_ENABLE_STARGAZING] = bool(user_input.get(CONF_ENABLE_STARGAZING, False))
+            self._data[CONF_ENABLE_FIRE_RISK] = bool(user_input.get(CONF_ENABLE_FIRE_RISK, False))
+            self._data[CONF_ENABLE_RUNNING] = bool(user_input.get(CONF_ENABLE_RUNNING, False))
+            self._data[CONF_ENABLE_SEA_TEMP] = bool(user_input.get(CONF_ENABLE_SEA_TEMP, False))
+            if self._data[CONF_ENABLE_SEA_TEMP]:
+                return await self.async_step_sea_temp()
             return await self.async_step_alerts()
 
         return self.async_show_form(
             step_id="features",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_ENABLE_ZAMBRETTI, default=DEFAULT_ENABLE_ZAMBRETTI): selector.BooleanSelector(),
                     vol.Optional(
-                        CONF_ENABLE_EXTENDED_SENSORS, default=DEFAULT_ENABLE_EXTENDED_SENSORS
+                        CONF_ENABLE_DISPLAY_SENSORS, default=DEFAULT_ENABLE_DISPLAY_SENSORS
                     ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_ACTIVITY_SCORES, default=DEFAULT_ENABLE_ACTIVITY_SCORES
-                    ): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_LAUNDRY, default=DEFAULT_ENABLE_LAUNDRY): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_STARGAZING, default=DEFAULT_ENABLE_STARGAZING): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_FIRE_RISK, default=DEFAULT_ENABLE_FIRE_RISK): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_RUNNING, default=DEFAULT_ENABLE_RUNNING): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_SEA_TEMP, default=DEFAULT_ENABLE_SEA_TEMP): selector.BooleanSelector(),
+                }
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # Step 7b: Sea temperature location (only shown if sea temp enabled)
+    # ------------------------------------------------------------------
+    async def async_step_sea_temp(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data[CONF_SEA_TEMP_LAT] = user_input.get(CONF_SEA_TEMP_LAT)
+            self._data[CONF_SEA_TEMP_LON] = user_input.get(CONF_SEA_TEMP_LON)
+            return await self.async_step_alerts()
+
+        default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
+        default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
+
+        return self.async_show_form(
+            step_id="sea_temp",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_SEA_TEMP_LAT, default=round(default_lat, 4)): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")
+                    ),
+                    vol.Optional(CONF_SEA_TEMP_LON, default=round(default_lon, 4)): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")
+                    ),
                 }
             ),
         )
@@ -763,12 +811,41 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
                 ),
                 vol.Optional(
-                    CONF_ENABLE_EXTENDED_SENSORS,
-                    default=g(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_EXTENDED_SENSORS),
+                    CONF_ENABLE_ZAMBRETTI,
+                    default=g(CONF_ENABLE_ZAMBRETTI, g(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_ZAMBRETTI)),
                 ): selector.BooleanSelector(),
                 vol.Optional(
-                    CONF_ENABLE_ACTIVITY_SCORES, default=g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_ACTIVITY_SCORES)
+                    CONF_ENABLE_DISPLAY_SENSORS,
+                    default=g(
+                        CONF_ENABLE_DISPLAY_SENSORS, g(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_DISPLAY_SENSORS)
+                    ),
                 ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_LAUNDRY,
+                    default=g(CONF_ENABLE_LAUNDRY, g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_LAUNDRY)),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_STARGAZING,
+                    default=g(CONF_ENABLE_STARGAZING, g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_STARGAZING)),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_FIRE_RISK,
+                    default=g(CONF_ENABLE_FIRE_RISK, g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_FIRE_RISK)),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_RUNNING,
+                    default=g(CONF_ENABLE_RUNNING, g(CONF_ENABLE_ACTIVITY_SCORES, DEFAULT_ENABLE_RUNNING)),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_SEA_TEMP,
+                    default=g(CONF_ENABLE_SEA_TEMP, DEFAULT_ENABLE_SEA_TEMP),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_SEA_TEMP_LAT, default=g(CONF_SEA_TEMP_LAT, round(default_lat, 4))
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")),
+                vol.Optional(
+                    CONF_SEA_TEMP_LON, default=g(CONF_SEA_TEMP_LON, round(default_lon, 4))
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
                 vol.Optional(
                     CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(cur_light_mmph, imperial), 2)
                 ): selector.NumberSelector(
