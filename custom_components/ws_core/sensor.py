@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v0.4.0."""
+"""Sensors for Weather Station Core -- v0.5.0."""
 
 from __future__ import annotations
 
@@ -11,17 +11,22 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_LAUNDRY,
+    CONF_ENABLE_METAR,
     CONF_ENABLE_RUNNING,
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_STARGAZING,
     CONF_ENABLE_ZAMBRETTI,
     CONF_PREFIX,
+    DEFAULT_ENABLE_DEGREE_DAYS,
+    DEFAULT_ENABLE_METAR,
     DEFAULT_PREFIX,
     DOMAIN,
     KEY_ALERT_MESSAGE,
@@ -78,6 +83,26 @@ from .const import (
     KEY_WIND_QUADRANT,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
+    # v0.5.0
+    KEY_HDD_TODAY,
+    KEY_CDD_TODAY,
+    KEY_HDD_RATE,
+    KEY_CDD_RATE,
+    KEY_METAR_TEMP_C,
+    KEY_METAR_PRESSURE_HPA,
+    KEY_METAR_WIND_MS,
+    KEY_METAR_WIND_DIR,
+    KEY_METAR_DELTA_TEMP,
+    KEY_METAR_DELTA_PRESSURE,
+    KEY_METAR_VALIDATION,
+    KEY_METAR_STATION,
+    KEY_METAR_AGE_MIN,
+    # v0.6.0
+    KEY_ET0_DAILY_MM,
+    KEY_ET0_HOURLY_MM,
+    KEY_CWOP_STATUS,
+    KEY_WU_STATUS,
+    KEY_LAST_EXPORT_TIME,
     UNIT_PRESSURE_HPA,
     UNIT_RAIN_MM,
     UNIT_TEMP_C,
@@ -606,6 +631,160 @@ SENSORS: list[WSSensorDescription] = [
             "disclaimer": d.get("_sea_temp_disclaimer"),
         },
     ),
+    # ---------------------------------------------------------------
+    # Degree Days  (v0.5.0)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_HDD_TODAY,
+        name="WS Heating Degree Days (Today)",
+        icon="mdi:thermometer-minus",
+        native_unit="°C·d",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        attrs_fn=lambda d: {
+            "hdd_rate_ch": d.get(KEY_HDD_RATE),
+            "base_temp_c": d.get("_degree_day_base_c"),
+            "description": "Heating degree days accumulated today (resets at midnight)",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_CDD_TODAY,
+        name="WS Cooling Degree Days (Today)",
+        icon="mdi:thermometer-plus",
+        native_unit="°C·d",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        attrs_fn=lambda d: {
+            "cdd_rate_ch": d.get(KEY_CDD_RATE),
+            "base_temp_c": d.get("_degree_day_base_c"),
+            "description": "Cooling degree days accumulated today (resets at midnight)",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_HDD_RATE,
+        name="WS HDD Rate",
+        icon="mdi:thermometer-low",
+        native_unit="°C",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"description": "Instantaneous heating degree-hour rate (use Riemann sum helper for daily totals)"},
+    ),
+    WSSensorDescription(
+        key=KEY_CDD_RATE,
+        name="WS CDD Rate",
+        icon="mdi:thermometer-high",
+        native_unit="°C",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"description": "Instantaneous cooling degree-hour rate (use Riemann sum helper for daily totals)"},
+    ),
+    # ---------------------------------------------------------------
+    # METAR Cross-Validation  (v0.5.0)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_METAR_VALIDATION,
+        name="WS METAR Validation",
+        icon="mdi:shield-check",
+        attrs_fn=lambda d: {
+            "station_id": d.get(KEY_METAR_STATION),
+            "metar_temp_c": d.get(KEY_METAR_TEMP_C),
+            "metar_pressure_hpa": d.get(KEY_METAR_PRESSURE_HPA),
+            "metar_wind_ms": d.get(KEY_METAR_WIND_MS),
+            "metar_wind_dir_deg": d.get(KEY_METAR_WIND_DIR),
+            "delta_temp_c": d.get(KEY_METAR_DELTA_TEMP),
+            "delta_pressure_hpa": d.get(KEY_METAR_DELTA_PRESSURE),
+            "metar_age_min": d.get(KEY_METAR_AGE_MIN),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_METAR_TEMP_C,
+        name="WS METAR Temperature",
+        icon="mdi:thermometer-lines",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_METAR_PRESSURE_HPA,
+        name="WS METAR Pressure",
+        icon="mdi:gauge",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit=UNIT_PRESSURE_HPA,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_METAR_DELTA_TEMP,
+        name="WS Temp vs METAR Delta",
+        icon="mdi:thermometer-alert",
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "local_temp_c": d.get(KEY_NORM_TEMP_C),
+            "metar_temp_c": d.get(KEY_METAR_TEMP_C),
+            "station_id": d.get(KEY_METAR_STATION),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_METAR_DELTA_PRESSURE,
+        name="WS Pressure vs METAR Delta",
+        icon="mdi:gauge-empty",
+        native_unit=UNIT_PRESSURE_HPA,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "local_pressure_hpa": d.get(KEY_SEA_LEVEL_PRESSURE_HPA),
+            "metar_pressure_hpa": d.get(KEY_METAR_PRESSURE_HPA),
+            "station_id": d.get(KEY_METAR_STATION),
+        },
+    ),
+    # ---------------------------------------------------------------
+    # ET₀ Evapotranspiration  (v0.6.0)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_ET0_DAILY_MM,
+        name="WS ET₀ (Daily)",
+        icon="mdi:sprout",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit="mm",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "method": "Hargreaves-Samani 1985",
+            "et0_hourly_mm": d.get(KEY_ET0_HOURLY_MM),
+            "accuracy_note": "±15-20% vs Penman-Monteith; improves with solar radiation sensor",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_ET0_HOURLY_MM,
+        name="WS ET₀ (Hourly)",
+        icon="mdi:sprout-outline",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit="mm",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # ---------------------------------------------------------------
+    # Upload / Export Status  (v0.6.0)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_CWOP_STATUS,
+        name="WS CWOP Upload Status",
+        icon="mdi:broadcast",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_WU_STATUS,
+        name="WS Weather Underground Status",
+        icon="mdi:weather-cloudy-clock",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_LAST_EXPORT_TIME,
+        name="WS Last Export Time",
+        icon="mdi:export",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 ]
 
 # Sensor-to-feature-toggle mapping for granular control
@@ -630,6 +809,17 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_RUNNING_SCORE: CONF_ENABLE_RUNNING,
     # Sea temperature
     KEY_SEA_SURFACE_TEMP: CONF_ENABLE_SEA_TEMP,
+    # Degree days  (v0.5.0)
+    KEY_HDD_TODAY: CONF_ENABLE_DEGREE_DAYS,
+    KEY_CDD_TODAY: CONF_ENABLE_DEGREE_DAYS,
+    KEY_HDD_RATE: CONF_ENABLE_DEGREE_DAYS,
+    KEY_CDD_RATE: CONF_ENABLE_DEGREE_DAYS,
+    # METAR  (v0.5.0)
+    KEY_METAR_VALIDATION: CONF_ENABLE_METAR,
+    KEY_METAR_TEMP_C: CONF_ENABLE_METAR,
+    KEY_METAR_PRESSURE_HPA: CONF_ENABLE_METAR,
+    KEY_METAR_DELTA_TEMP: CONF_ENABLE_METAR,
+    KEY_METAR_DELTA_PRESSURE: CONF_ENABLE_METAR,
 }
 
 
@@ -650,8 +840,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(entities)
 
 
-class WSSensor(CoordinatorEntity, SensorEntity):
-    """A single derived sensor for Weather Station Core."""
+class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
+    """A single derived sensor for Weather Station Core.
+
+    Mixes in RestoreEntity so that sensors that warm up slowly (24h stats,
+    Kalman filter, degree days, ET₀) report their last-known value on HA
+    restart until the coordinator computes a fresh value.
+    """
+
+    # Keys that benefit from restore (slow-to-warm-up or accumulating sensors)
+    _RESTORE_KEYS = {
+        KEY_HDD_TODAY, KEY_CDD_TODAY, KEY_HDD_RATE, KEY_CDD_RATE,
+        KEY_ET0_DAILY_MM,
+        KEY_TEMP_HIGH_24H, KEY_TEMP_LOW_24H, KEY_TEMP_AVG_24H, KEY_WIND_GUST_MAX_24H,
+        KEY_RAIN_ACCUM_1H, KEY_RAIN_ACCUM_24H,
+        KEY_METAR_VALIDATION, KEY_METAR_TEMP_C, KEY_METAR_PRESSURE_HPA,
+        KEY_METAR_DELTA_TEMP, KEY_METAR_DELTA_PRESSURE,
+    }
 
     _DISABLED_BY_DEFAULT = {
         KEY_TEMP_AVG_24H,
@@ -660,6 +865,12 @@ class WSSensor(CoordinatorEntity, SensorEntity):
         KEY_BATTERY_DISPLAY,
         KEY_SENSOR_QUALITY_FLAGS,
         KEY_ZAMBRETTI_NUMBER,
+        # New v0.5.0 diagnostic/rate sensors hidden by default
+        KEY_HDD_RATE,
+        KEY_CDD_RATE,
+        KEY_ET0_HOURLY_MM,
+        KEY_METAR_TEMP_C,
+        KEY_METAR_PRESSURE_HPA,
     }
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
@@ -667,6 +878,7 @@ class WSSensor(CoordinatorEntity, SensorEntity):
         self._desc = desc
         self._entry = entry
         self._prefix = prefix
+        self._restored_value: Any = None  # populated by async_added_to_hass for restore-capable sensors
 
         self._attr_unique_id = f"{entry.entry_id}_{desc.key}"
         self._attr_suggested_object_id = f"{prefix}_{self._slug_for_key(desc.key)}"
@@ -696,6 +908,20 @@ class WSSensor(CoordinatorEntity, SensorEntity):
             current = reg.async_get(self.entity_id)
             if current and current.unique_id == self.unique_id and reg.async_get(desired) is None:
                 reg.async_update_entity(self.entity_id, new_entity_id=desired)
+
+        # Restore last known value for sensors that are slow to warm up
+        if self._desc.key in self._RESTORE_KEYS:
+            last_state = await self.async_get_last_state()
+            if (
+                last_state is not None
+                and last_state.state not in ("unknown", "unavailable", None, "")
+            ):
+                try:
+                    self._restored_value = float(last_state.state)
+                except (ValueError, TypeError):
+                    self._restored_value = last_state.state
+            else:
+                self._restored_value = None
 
     @staticmethod
     def _slug_for_key(key: str) -> str:
@@ -752,6 +978,22 @@ class WSSensor(CoordinatorEntity, SensorEntity):
             KEY_PRESSURE_CHANGE_WINDOW_HPA: "pressure_change_window",
             KEY_PRESSURE_TREND_HPAH: "pressure_trend_raw",
             KEY_SEA_SURFACE_TEMP: "sea_surface_temperature",
+            # v0.5.0
+            KEY_HDD_TODAY: "heating_degree_days_today",
+            KEY_CDD_TODAY: "cooling_degree_days_today",
+            KEY_HDD_RATE: "hdd_rate",
+            KEY_CDD_RATE: "cdd_rate",
+            KEY_METAR_VALIDATION: "metar_validation",
+            KEY_METAR_TEMP_C: "metar_temperature",
+            KEY_METAR_PRESSURE_HPA: "metar_pressure",
+            KEY_METAR_DELTA_TEMP: "temp_vs_metar_delta",
+            KEY_METAR_DELTA_PRESSURE: "pressure_vs_metar_delta",
+            # v0.6.0
+            KEY_ET0_DAILY_MM: "et0_daily",
+            KEY_ET0_HOURLY_MM: "et0_hourly",
+            KEY_CWOP_STATUS: "cwop_upload_status",
+            KEY_WU_STATUS: "wu_upload_status",
+            KEY_LAST_EXPORT_TIME: "last_export_time",
         }
         if key in overrides:
             return overrides[key]
@@ -767,10 +1009,21 @@ class WSSensor(CoordinatorEntity, SensorEntity):
         d = self.coordinator.data or {}
         if self._desc.value_fn is not None:
             try:
-                return self._desc.value_fn(d)
+                val = self._desc.value_fn(d)
             except Exception:
-                return None
-        return d.get(self._desc.key)
+                val = None
+        else:
+            val = d.get(self._desc.key)
+
+        # Fall back to last-restored value for slow-warm-up sensors during startup
+        if val is None and self._restored_value is not None and self._desc.key in self._RESTORE_KEYS:
+            return self._restored_value
+
+        # Once the coordinator provides a real value, clear the restore cache
+        if val is not None and self._restored_value is not None:
+            self._restored_value = None
+
+        return val
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

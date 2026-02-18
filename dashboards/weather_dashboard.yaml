@@ -121,6 +121,94 @@ views:
                 - font-size: 11px
                 - font-weight: 600
                 - letter-spacing: 0.3px
+
+          # STORM BANNER (v0.5.0) — shows when Beaufort >= 7 OR thunderstorm condition
+          - type: custom:button-card
+            entity: sensor.ws_wind_beaufort
+            triggers_update:
+              - sensor.ws_wind_beaufort
+              - sensor.ws_current_condition
+              - sensor.ws_wind_gust
+              - sensor.ws_rain_rate
+            show_icon: true
+            show_name: true
+            show_state: false
+            icon: >
+              [[[
+                const cond = (states['sensor.ws_current_condition'] || {}).state || '';
+                const isThunder = cond.toLowerCase().includes('thunder') || cond.toLowerCase().includes('storm');
+                const bf = parseFloat(entity?.state);
+                if (isThunder) return 'mdi:weather-lightning';
+                if (bf >= 10) return 'mdi:weather-hurricane';
+                if (bf >= 8) return 'mdi:weather-windy-variant';
+                return 'mdi:weather-windy';
+              ]]]
+            name: >
+              [[[
+                const bf = parseFloat(entity?.state);
+                const gust = parseFloat((states['sensor.ws_wind_gust'] || {}).state);
+                const cond = (states['sensor.ws_current_condition'] || {}).state || '';
+                const isThunder = cond.toLowerCase().includes('thunder') || cond.toLowerCase().includes('storm');
+                const rr = parseFloat((states['sensor.ws_rain_rate'] || {}).state);
+                if (isThunder) return 'THUNDERSTORM DETECTED' + (isNaN(rr) ? '' : ' · Rain: ' + rr.toFixed(1) + ' mm/h');
+                if (bf >= 10) return 'STORM WARNING — Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
+                if (bf >= 8) return 'GALE WARNING — Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
+                return 'NEAR-GALE — Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
+              ]]]
+            styles:
+              card:
+                - display: >
+                    [[[
+                      const bf = parseFloat(entity?.state);
+                      const cond = (states['sensor.ws_current_condition'] || {}).state || '';
+                      const isThunder = cond.toLowerCase().includes('thunder') || cond.toLowerCase().includes('storm');
+                      if (isNaN(bf) || entity?.state === 'unavailable') return 'none';
+                      if (isThunder || bf >= 7) return 'block';
+                      return 'none';
+                    ]]]
+                - background: >
+                    [[[
+                      const bf = parseFloat(entity?.state);
+                      const cond = (states['sensor.ws_current_condition'] || {}).state || '';
+                      const isThunder = cond.toLowerCase().includes('thunder') || cond.toLowerCase().includes('storm');
+                      if (isThunder || bf >= 10) return 'linear-gradient(90deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%)';
+                      if (bf >= 8) return 'linear-gradient(90deg, #b45309 0%, #d97706 50%, #b45309 100%)';
+                      return 'linear-gradient(90deg, #0369a1 0%, #0284c7 50%, #0369a1 100%)';
+                    ]]]
+                - border-radius: 10px
+                - padding: 8px 14px
+                - box-shadow: >
+                    [[[
+                      const bf = parseFloat(entity?.state);
+                      const cond = (states['sensor.ws_current_condition'] || {}).state || '';
+                      const isThunder = cond.toLowerCase().includes('thunder');
+                      return isThunder || bf >= 10 ? '0 4px 16px rgba(109,40,217,0.5)' : '0 4px 12px rgba(0,0,0,0.35)';
+                    ]]]
+                - margin: 0
+                - color: white
+                - animation: >
+                    [[[
+                      const bf = parseFloat(entity?.state);
+                      const cond = (states['sensor.ws_current_condition'] || {}).state || '';
+                      const isThunder = cond.toLowerCase().includes('thunder');
+                      return isThunder || bf >= 10 ? 'pulse 2s ease-in-out infinite' : 'none';
+                    ]]]
+              grid:
+                - grid-template-areas: '"i n"'
+                - grid-template-columns: 20px 1fr
+                - align-items: center
+                - column-gap: 10px
+              icon:
+                - color: white
+                - width: 20px
+                - height: 20px
+              name:
+                - justify-self: start
+                - font-size: 12px
+                - font-weight: 700
+                - letter-spacing: 0.8px
+                - text-transform: uppercase
+
           - type: horizontal-stack
             grid_options:
               columns: full
@@ -1806,3 +1894,139 @@ views:
                     + '<div><strong>Forecast:</strong> ' + zambretti + '</div>'
                     + '</div></div>';
                 ]]]
+
+      # =======================================================================
+      # WIND ROSE  (v0.5.0) — requires custom:windrose-card from HACS
+      # =======================================================================
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:windrose-card
+            title: Wind Rose (24h)
+            hours_to_show: 24
+            max_width: 460
+            wind_direction_entity:
+              entity: sensor.ws_wind_direction
+            wind_speed_entities:
+              - entity: sensor.ws_wind_speed
+                name: Wind Speed
+                speed_range_beaufort: true
+            compass:
+              auto_align: true
+            cardinal_direction_letters: NESW
+            center_calm_percentage: true
+            matching_strategy: time-frame
+            current_direction:
+              show: true
+              entity: sensor.ws_wind_direction
+              style:
+                color: "#38bdf8"
+                size: 20%
+            card_mod:
+              style: |
+                ha-card {
+                  background: rgba(20,20,35,0.95) !important;
+                  border: 1px solid rgba(255,255,255,0.08) !important;
+                  border-radius: 16px !important;
+                  padding: 12px !important;
+                }
+                .card-header {
+                  color: rgba(255,255,255,0.85) !important;
+                  font-size: 14px !important;
+                  font-weight: 600 !important;
+                  padding-bottom: 6px !important;
+                }
+
+      # =======================================================================
+      # RADAR  (v0.5.0) — RainViewer live radar via iframe
+      # Uses your HA location to center the radar map.
+      # =======================================================================
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:button-card
+            name: "RADAR"
+            show_state: false
+            show_icon: false
+            show_name: true
+            entity: sensor.ws_station_health
+            card_mod:
+              style: |
+                ha-card {
+                  background: rgba(20,20,35,0.95) !important;
+                  border: 1px solid rgba(255,255,255,0.08) !important;
+                  border-radius: 16px !important;
+                  overflow: hidden !important;
+                  padding: 0 !important;
+                  height: 420px !important;
+                }
+            styles:
+              card:
+                - padding: 0
+                - height: 420px
+                - overflow: hidden
+                - position: relative
+              name:
+                - position: absolute
+                - top: 10px
+                - left: 16px
+                - font-size: 11px
+                - font-weight: 700
+                - letter-spacing: 1px
+                - color: rgba(255,255,255,0.5)
+                - z-index: 10
+            custom_fields:
+              iframe: |
+                [[[
+                  // RainViewer free viewer — centered on HA lat/lon
+                  // Uses your HA configured lat/lon for centering
+                  const lat = states['zone.home']?.attributes?.latitude 
+                              || 37.9838;  // fallback: Athens
+                  const lon = states['zone.home']?.attributes?.longitude 
+                              || 23.7275;
+                  const zoom = 9;
+                  const url = `https://www.rainviewer.com/map.html?loc=${lat},${lon},${zoom}/2/1/1/0/1/1`;
+                  return `<iframe
+                    src="${url}"
+                    style="width:100%;height:420px;border:none;border-radius:16px;display:block;"
+                    allow="fullscreen"
+                    loading="lazy"
+                    title="RainViewer Radar"
+                  ></iframe>`;
+                ]]]
+
+      # =======================================================================
+      # DEGREE DAYS & ET₀  (v0.5.0 / v0.6.0) — shows only when enabled
+      # =======================================================================
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Degree Days & Evapotranspiration
+            card_mod:
+              style: |
+                ha-card {
+                  background: rgba(20,20,35,0.95) !important;
+                  border: 1px solid rgba(255,255,255,0.08) !important;
+                  border-radius: 16px !important;
+                }
+            entities:
+              - entity: sensor.ws_heating_degree_days_today
+                name: HDD Today
+                icon: mdi:thermometer-minus
+              - entity: sensor.ws_cooling_degree_days_today
+                name: CDD Today
+                icon: mdi:thermometer-plus
+              - entity: sensor.ws_et0_daily
+                name: ET₀ (Daily)
+                icon: mdi:sprout
+              - entity: sensor.ws_metar_validation
+                name: METAR Validation
+                icon: mdi:shield-check
+              - entity: sensor.ws_cwop_upload_status
+                name: CWOP Upload
+                icon: mdi:broadcast
+              - entity: sensor.ws_wu_upload_status
+                name: WUnderground Upload
+                icon: mdi:weather-cloudy-clock
+

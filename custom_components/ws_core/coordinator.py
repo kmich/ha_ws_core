@@ -1,4 +1,4 @@
-"""Coordinator for Weather Station Core -- v0.4.0.
+"""Coordinator for Weather Station Core -- v0.5.0.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors
@@ -9,8 +9,14 @@ The _compute() method is broken into focused sub-methods:
   _compute_condition()             36-condition classifier
   _compute_rain_probability()      Local + API probability
   _compute_activity_scores()       Laundry, fire risk, running, stargazing
+  _compute_degree_days()           HDD/CDD daily accumulators  [v0.5.0]
+  _compute_et0()                   ET₀ Hargreaves-Samani       [v0.6.0]
   _compute_health()                Staleness, package status, alerts
   _compute()                       Orchestrator -- calls all sub-methods
+  _async_fetch_metar()             Aviation METAR cross-validation [v0.5.0]
+  _async_fetch_cwop()              CWOP APRS-IS upload         [v0.6.0]
+  _async_fetch_wunderground()      Weather Underground upload  [v0.6.0]
+  _async_export_data()             CSV/JSON file export        [v0.6.0]
 """
 
 from __future__ import annotations
@@ -51,16 +57,22 @@ from .algorithms import (
     combine_rain_probability,
     determine_current_condition,
     direction_to_quadrant,
+    et0_hargreaves,
+    et0_hourly_estimate,
     fire_danger_level,
     fire_risk_score,
     format_rain_display,
     get_condition_severity,
+    heating_degree_hours,
+    cooling_degree_hours,
     humidity_level,
     laundry_dry_time,
     laundry_drying_score,
     laundry_recommendation,
     least_squares_pressure_trend,
+    metar_validation_label,
     moon_stargazing_impact,
+    parse_metar_json,
     pressure_trend_display,
     running_level,
     running_recommendation,
@@ -171,6 +183,57 @@ from .const import (
     VALID_TEMP_MAX_C,
     VALID_TEMP_MIN_C,
     WIND_SMOOTH_ALPHA,
+    # v0.5.0 new
+    CONF_ENABLE_DEGREE_DAYS,
+    CONF_DEGREE_DAY_BASE_C,
+    CONF_ENABLE_METAR,
+    CONF_METAR_ICAO,
+    CONF_METAR_INTERVAL_MIN,
+    DEFAULT_ENABLE_DEGREE_DAYS,
+    DEFAULT_DEGREE_DAY_BASE_C,
+    DEFAULT_ENABLE_METAR,
+    DEFAULT_METAR_INTERVAL_MIN,
+    KEY_HDD_TODAY,
+    KEY_CDD_TODAY,
+    KEY_HDD_RATE,
+    KEY_CDD_RATE,
+    KEY_METAR_TEMP_C,
+    KEY_METAR_PRESSURE_HPA,
+    KEY_METAR_WIND_MS,
+    KEY_METAR_WIND_DIR,
+    KEY_METAR_CONDITION,
+    KEY_METAR_DELTA_TEMP,
+    KEY_METAR_DELTA_PRESSURE,
+    KEY_METAR_VALIDATION,
+    KEY_METAR_STATION,
+    KEY_METAR_AGE_MIN,
+    # v0.6.0 new
+    CONF_ENABLE_CWOP,
+    CONF_CWOP_CALLSIGN,
+    CONF_CWOP_PASSCODE,
+    CONF_CWOP_INTERVAL_MIN,
+    CONF_ENABLE_WUNDERGROUND,
+    CONF_WU_STATION_ID,
+    CONF_WU_API_KEY,
+    CONF_WU_INTERVAL_MIN,
+    CONF_ENABLE_EXPORT,
+    CONF_EXPORT_PATH,
+    CONF_EXPORT_FORMAT,
+    CONF_EXPORT_INTERVAL_MIN,
+    DEFAULT_ENABLE_CWOP,
+    DEFAULT_CWOP_INTERVAL_MIN,
+    DEFAULT_ENABLE_WUNDERGROUND,
+    DEFAULT_WU_INTERVAL_MIN,
+    DEFAULT_ENABLE_EXPORT,
+    DEFAULT_EXPORT_FORMAT,
+    DEFAULT_EXPORT_INTERVAL_MIN,
+    CONF_FORECAST_LAT,
+    CONF_FORECAST_LON,
+    KEY_ET0_DAILY_MM,
+    KEY_ET0_HOURLY_MM,
+    KEY_CWOP_STATUS,
+    KEY_WU_STATUS,
+    KEY_LAST_EXPORT_TIME,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -259,6 +322,44 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sea_temp_lon = _get(CONF_SEA_TEMP_LON, None)
         self._sea_temp_cache: dict[str, Any] | None = None
 
+        # Degree days (v0.5.0)
+        self.degree_days_enabled = bool(_get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS))
+        self.degree_day_base_c = float(_get(CONF_DEGREE_DAY_BASE_C, DEFAULT_DEGREE_DAY_BASE_C))
+        self._hdd_today: float = 0.0
+        self._cdd_today: float = 0.0
+        self._degree_day_date: str = ""
+        self._degree_day_last_ts: Any = None  # datetime of last accumulation tick
+
+        # METAR cross-validation (v0.5.0)
+        self.metar_enabled = bool(_get(CONF_ENABLE_METAR, DEFAULT_ENABLE_METAR))
+        self.metar_icao: str = str(_get(CONF_METAR_ICAO, "") or "")
+        self.metar_interval_min = int(_get(CONF_METAR_INTERVAL_MIN, DEFAULT_METAR_INTERVAL_MIN))
+        self._metar_cache: dict[str, Any] | None = None
+        self._metar_last_fetch: Any = None
+
+        # v0.6.0 CWOP upload
+        self.cwop_enabled = bool(_get(CONF_ENABLE_CWOP, DEFAULT_ENABLE_CWOP))
+        self.cwop_callsign: str = str(_get(CONF_CWOP_CALLSIGN, "") or "")
+        self.cwop_passcode: str = str(_get(CONF_CWOP_PASSCODE, "-1") or "-1")
+        self.cwop_interval_min = int(_get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN))
+        self._cwop_last_upload: Any = None
+        self._cwop_status: str = "Disabled"
+
+        # v0.6.0 Weather Underground upload
+        self.wu_enabled = bool(_get(CONF_ENABLE_WUNDERGROUND, DEFAULT_ENABLE_WUNDERGROUND))
+        self.wu_station_id: str = str(_get(CONF_WU_STATION_ID, "") or "")
+        self.wu_api_key: str = str(_get(CONF_WU_API_KEY, "") or "")
+        self.wu_interval_min = int(_get(CONF_WU_INTERVAL_MIN, DEFAULT_WU_INTERVAL_MIN))
+        self._wu_last_upload: Any = None
+        self._wu_status: str = "Disabled"
+
+        # v0.6.0 CSV/JSON export
+        self.export_enabled = bool(_get(CONF_ENABLE_EXPORT, DEFAULT_ENABLE_EXPORT))
+        self.export_path: str = str(_get(CONF_EXPORT_PATH, "/config/ws_core_export") or "/config/ws_core_export")
+        self.export_format: str = str(_get(CONF_EXPORT_FORMAT, DEFAULT_EXPORT_FORMAT))
+        self.export_interval_min = int(_get(CONF_EXPORT_INTERVAL_MIN, DEFAULT_EXPORT_INTERVAL_MIN))
+        self._export_last_time: Any = None
+
         super().__init__(
             hass,
             logger=_LOGGER,
@@ -276,6 +377,48 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if entity_ids:
             self._unsubs.append(async_track_state_change_event(self.hass, entity_ids, self._handle_source_change))
         self._unsubs.append(async_track_time_interval(self.hass, self._handle_tick, timedelta(seconds=60)))
+
+        # METAR periodic fetch (v0.5.0)
+        if self.metar_enabled and self.metar_icao:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_metar()),
+                    timedelta(minutes=self.metar_interval_min),
+                )
+            )
+            self.hass.async_create_task(self._async_fetch_metar())
+
+        # CWOP periodic upload (v0.6.0)
+        if self.cwop_enabled and self.cwop_callsign:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_cwop()),
+                    timedelta(minutes=self.cwop_interval_min),
+                )
+            )
+
+        # Weather Underground periodic upload (v0.6.0)
+        if self.wu_enabled and self.wu_station_id and self.wu_api_key:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_wunderground()),
+                    timedelta(minutes=self.wu_interval_min),
+                )
+            )
+
+        # CSV/JSON export (v0.6.0)
+        if self.export_enabled:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_export_data()),
+                    timedelta(minutes=self.export_interval_min),
+                )
+            )
+
         await self.async_refresh()
 
     async def async_stop(self) -> None:
@@ -813,6 +956,79 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_uv_recommendation"] = uv_recommendation(float(uv))
             data["_uv_burn_fair_skin"] = f"{uv_burn_time_minutes(float(uv), 2)} minutes"
 
+    def _compute_degree_days(self, data: dict, now: Any) -> None:
+        """Accumulate heating/cooling degree days for today.  (v0.5.0)
+
+        HDD/CDD accumulate as degree-hours, reset at local midnight.
+        The hourly rate sensors (hdd_rate, cdd_rate) always reflect the
+        instantaneous contribution — useful for Riemann-sum utility meters.
+        """
+        if not self.degree_days_enabled:
+            return
+        temp_c: float | None = data.get(KEY_NORM_TEMP_C)
+        if temp_c is None:
+            return
+
+        base = self.degree_day_base_c
+        date_str = now.strftime("%Y-%m-%d")
+
+        # Reset at midnight
+        if date_str != self._degree_day_date:
+            self._hdd_today = 0.0
+            self._cdd_today = 0.0
+            self._degree_day_date = date_str
+            self._degree_day_last_ts = now
+
+        # Accumulate degree-hours since last tick
+        if self._degree_day_last_ts is not None:
+            elapsed_h = (now - self._degree_day_last_ts).total_seconds() / 3600.0
+            elapsed_h = min(elapsed_h, 1.5)  # cap at 1.5h to guard against cold-start spikes
+            self._hdd_today += heating_degree_hours(temp_c, base) * elapsed_h
+            self._cdd_today += cooling_degree_hours(temp_c, base) * elapsed_h
+        self._degree_day_last_ts = now
+
+        # Publish: convert degree-hours → degree-days (divide by 24)
+        data[KEY_HDD_TODAY] = round(self._hdd_today / 24.0, 3)
+        data[KEY_CDD_TODAY] = round(self._cdd_today / 24.0, 3)
+        # Instantaneous rates in °C·h⁻¹ (for Riemann sum integrations)
+        data[KEY_HDD_RATE] = round(heating_degree_hours(temp_c, base), 2)
+        data[KEY_CDD_RATE] = round(cooling_degree_hours(temp_c, base), 2)
+
+    def _compute_et0(self, data: dict, now: Any) -> None:
+        """Calculate ET₀ (reference evapotranspiration) via Hargreaves-Samani.  (v0.6.0)
+
+        Requires: today's temp high/low from 24h stats + location.
+        Falls back gracefully if 24h stats aren't populated yet (first hour of runtime).
+        """
+        lat = self.forecast_lat
+        if lat is None:
+            return
+        try:
+            lat_f = float(lat)
+        except (TypeError, ValueError):
+            return
+
+        t_max = data.get(KEY_TEMP_HIGH_24H)
+        t_min = data.get(KEY_TEMP_LOW_24H)
+        t_mean = data.get(KEY_NORM_TEMP_C)
+
+        # Hargreaves needs valid t_max, t_min, t_mean
+        if None in (t_max, t_min, t_mean):
+            return
+        if t_max <= t_min:  # pathological — sensor noise
+            return
+
+        doy = now.timetuple().tm_yday
+        et0_daily = et0_hargreaves(
+            t_max_c=float(t_max),
+            t_min_c=float(t_min),
+            t_mean_c=float(t_mean),
+            lat_deg=lat_f,
+            day_of_year=doy,
+        )
+        data[KEY_ET0_DAILY_MM] = et0_daily
+        data[KEY_ET0_HOURLY_MM] = et0_hourly_estimate(et0_daily, now.hour)
+
     def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list) -> None:
         """Staleness, package status, data quality, configurable alerts."""
         stale = []
@@ -966,6 +1182,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._compute_condition(data, tc, rh, wind_ms, gust_ms, rain_rate, dew_c, lux, uv)
         self._compute_activity_scores(data, tc, rh, wind_ms, rain_rate, uv)
+        self._compute_degree_days(data, now)
+        self._compute_et0(data, now)
         self._compute_health(data, now, missing, missing_entities)
 
         if self.forecast_enabled:
@@ -989,6 +1207,33 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_sea_temp_grid_lat"] = self._sea_temp_cache.get("grid_lat")
             data["_sea_temp_grid_lon"] = self._sea_temp_cache.get("grid_lon")
             data["_sea_temp_disclaimer"] = self._sea_temp_cache.get("disclaimer")
+
+        # METAR cross-validation (v0.5.0)
+        if self.metar_enabled and self._metar_cache:
+            m = self._metar_cache
+            data[KEY_METAR_TEMP_C] = m.get("temp_c")
+            data[KEY_METAR_PRESSURE_HPA] = m.get("pressure_hpa")
+            data[KEY_METAR_WIND_MS] = m.get("wind_ms")
+            data[KEY_METAR_WIND_DIR] = m.get("wind_dir_deg")
+            data[KEY_METAR_STATION] = m.get("station_id")
+            data[KEY_METAR_AGE_MIN] = m.get("age_min")
+            # Compute deltas against local readings
+            local_temp = data.get(KEY_NORM_TEMP_C)
+            local_press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+            metar_temp = m.get("temp_c")
+            metar_press = m.get("pressure_hpa")
+            delta_t = round(float(local_temp) - float(metar_temp), 1) if (local_temp is not None and metar_temp is not None) else None
+            delta_p = round(float(local_press) - float(metar_press), 1) if (local_press is not None and metar_press is not None) else None
+            data[KEY_METAR_DELTA_TEMP] = delta_t
+            data[KEY_METAR_DELTA_PRESSURE] = delta_p
+            data[KEY_METAR_VALIDATION] = metar_validation_label(delta_t, delta_p, m.get("age_min"))
+
+        # Upload/export status (v0.6.0)
+        data[KEY_CWOP_STATUS] = self._cwop_status
+        data[KEY_WU_STATUS] = self._wu_status
+        data[KEY_LAST_EXPORT_TIME] = (
+            self._export_last_time.isoformat() if self._export_last_time else None
+        )
 
         self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
         return data
@@ -1256,3 +1501,266 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.warning("Open-Meteo Marine fetch failed: %s", exc)
         finally:
             rt.sea_temp_inflight = False
+
+    # ------------------------------------------------------------------
+    # METAR cross-validation  (v0.5.0)
+    # ------------------------------------------------------------------
+
+    async def _async_fetch_metar(self) -> None:
+        """Fetch METAR from aviationweather.gov and update cache."""
+        if not self.metar_icao:
+            return
+        icao = self.metar_icao.upper().strip()
+        url = f"https://aviationweather.gov/api/data/metar?ids={icao}&format=json&taf=false"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.get(url, timeout=15) as resp:
+                if resp.status != 200:
+                    _LOGGER.warning("METAR fetch failed HTTP %d for %s", resp.status, icao)
+                    return
+                reports = await resp.json()
+                if not reports:
+                    _LOGGER.debug("No METAR reports found for %s", icao)
+                    return
+                self._metar_cache = parse_metar_json(reports[0])
+                self._metar_last_fetch = dt_util.utcnow()
+                _LOGGER.debug("METAR %s fetched: %s", icao, self._metar_cache.get("raw_text", ""))
+                self.async_set_updated_data(self._compute())
+        except Exception as exc:
+            _LOGGER.warning("METAR fetch error for %s: %s", icao, exc)
+
+    # ------------------------------------------------------------------
+    # CWOP APRS-IS upload  (v0.6.0)
+    # ------------------------------------------------------------------
+
+    async def _async_upload_cwop(self) -> None:
+        """Upload observation to CWOP via APRS-IS TCP."""
+        import asyncio
+        data = self.data
+        if not data:
+            return
+        callsign = self.cwop_callsign.upper().strip()
+        if not callsign:
+            return
+
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+        if lat is None or lon is None:
+            _LOGGER.warning("CWOP upload: lat/lon not configured")
+            return
+
+        # Format APRS packet
+        def _aprs_lat(deg: float) -> str:
+            d = abs(deg)
+            dd = int(d)
+            mm = (d - dd) * 60
+            hem = "N" if deg >= 0 else "S"
+            return f"{dd:02d}{mm:05.2f}{hem}"
+
+        def _aprs_lon(deg: float) -> str:
+            d = abs(deg)
+            dd = int(d)
+            mm = (d - dd) * 60
+            hem = "E" if deg >= 0 else "W"
+            return f"{dd:03d}{mm:05.2f}{hem}"
+
+        now_utc = dt_util.utcnow()
+        time_str = now_utc.strftime("%d%H%Mz")
+
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        temp_f = round(float(temp_c) * 9 / 5 + 32) if temp_c is not None else 0
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
+        wind_kt = round(float(wind_ms) * 1.94384)
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
+        gust_kt = round(float(gust_ms) * 1.94384)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        h_str = f"h{round(float(humidity)):02d}" if humidity is not None else ""
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
+        rain_1h_hun = round(float(rain_1h) * 3.93701)  # mm → 1/100 inch
+        rain_24h_hun = round(float(rain_24h) * 3.93701)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        b_str = f"b{round(float(press) * 10):05d}" if press is not None else ""
+
+        aprs_lat = _aprs_lat(float(lat))
+        aprs_lon = _aprs_lon(float(lon))
+        packet = (
+            f"{callsign}>APRS,TCPIP*:@{time_str}{aprs_lat}/{aprs_lon}_"
+            f"{int(wind_dir):03d}/{wind_kt:03d}g{gust_kt:03d}"
+            f"t{temp_f:03d}r{rain_1h_hun:03d}p{rain_24h_hun:03d}"
+            f"{h_str}{b_str}ws_core"
+        )
+
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection("cwop.aprs.net", 14580), timeout=15
+            )
+            # Read banner
+            await asyncio.wait_for(reader.read(512), timeout=5)
+            # Login
+            login_str = f"user {callsign} pass {self.cwop_passcode} vers ws_core 0.6.0\r\n"
+            writer.write(login_str.encode())
+            await writer.drain()
+            await asyncio.sleep(1)
+            # Send packet
+            writer.write(f"{packet}\r\n".encode())
+            await writer.drain()
+            writer.close()
+            self._cwop_last_upload = dt_util.utcnow()
+            self._cwop_status = f"OK {self._cwop_last_upload.strftime('%H:%M')}"
+            _LOGGER.debug("CWOP upload OK: %s", packet)
+        except Exception as exc:
+            self._cwop_status = f"Error: {exc}"
+            _LOGGER.warning("CWOP upload failed: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Weather Underground upload  (v0.6.0)
+    # ------------------------------------------------------------------
+
+    async def _async_upload_wunderground(self) -> None:
+        """Upload observation to Weather Underground Personal Weather Station API."""
+        data = self.data
+        if not data or not self.wu_station_id or not self.wu_api_key:
+            return
+
+        now_utc = dt_util.utcnow()
+        date_utc = now_utc.strftime("%Y-%m-%d %H:%M:%S")
+
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        dew_c = data.get(KEY_DEW_POINT_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
+
+        def _c_to_f(c: float) -> float:
+            return round(c * 9 / 5 + 32, 1)
+
+        def _ms_to_mph(ms: float) -> float:
+            return round(float(ms) * 2.23694, 1)
+
+        def _mm_to_in(mm: float) -> float:
+            return round(float(mm) / 25.4, 3)
+
+        def _hpa_to_inhg(hpa: float) -> float:
+            return round(float(hpa) / 33.8639, 2)
+
+        params = {
+            "ID": self.wu_station_id,
+            "PASSWORD": self.wu_api_key,
+            "dateutc": date_utc,
+            "winddir": int(wind_dir),
+            "windspeedmph": _ms_to_mph(wind_ms),
+            "windgustmph": _ms_to_mph(gust_ms),
+            "rainin": _mm_to_in(rain_1h),
+            "dailyrainin": _mm_to_in(rain_24h),
+            "action": "updateraw",
+            "softwaretype": "ws_core_0.6.0",
+        }
+        if temp_c is not None:
+            params["tempf"] = _c_to_f(float(temp_c))
+        if dew_c is not None:
+            params["dewptf"] = _c_to_f(float(dew_c))
+        if humidity is not None:
+            params["humidity"] = int(float(humidity))
+        if press is not None:
+            params["baromin"] = _hpa_to_inhg(float(press))
+
+        url = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.get(url, params=params, timeout=15) as resp:
+                body = await resp.text()
+                if resp.status == 200 and "success" in body.lower():
+                    self._wu_last_upload = now_utc
+                    self._wu_status = f"OK {self._wu_last_upload.strftime('%H:%M')}"
+                    _LOGGER.debug("WUnderground upload OK")
+                else:
+                    self._wu_status = f"Error HTTP {resp.status}: {body[:60]}"
+                    _LOGGER.warning("WUnderground upload failed HTTP %d: %s", resp.status, body[:120])
+        except Exception as exc:
+            self._wu_status = f"Error: {exc}"
+            _LOGGER.warning("WUnderground upload error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # CSV / JSON export  (v0.6.0)
+    # ------------------------------------------------------------------
+
+    async def _async_export_data(self) -> None:
+        """Write current observations to CSV and/or JSON on disk."""
+        import asyncio
+        import csv
+        import json
+        import os
+
+        data = self.data
+        if not data:
+            return
+
+        def _do_export() -> None:
+            now = dt_util.utcnow()
+            row = {
+                "timestamp_utc": now.isoformat(),
+                "temperature_c": data.get(KEY_NORM_TEMP_C),
+                "humidity_pct": data.get(KEY_NORM_HUMIDITY),
+                "dew_point_c": data.get(KEY_DEW_POINT_C),
+                "wet_bulb_c": data.get(KEY_WET_BULB_C),
+                "frost_point_c": data.get(KEY_FROST_POINT_C),
+                "feels_like_c": data.get(KEY_FEELS_LIKE_C),
+                "station_pressure_hpa": data.get(KEY_NORM_PRESSURE_HPA),
+                "sea_level_pressure_hpa": data.get(KEY_SEA_LEVEL_PRESSURE_HPA),
+                "pressure_trend_hpah": data.get(KEY_PRESSURE_TREND_HPAH),
+                "wind_speed_ms": data.get(KEY_NORM_WIND_SPEED_MS),
+                "wind_gust_ms": data.get(KEY_NORM_WIND_GUST_MS),
+                "wind_direction_deg": data.get(KEY_NORM_WIND_DIR_DEG),
+                "rain_total_mm": data.get(KEY_NORM_RAIN_TOTAL_MM),
+                "rain_rate_mmph": data.get(KEY_RAIN_RATE_FILT),
+                "rain_1h_mm": data.get(KEY_RAIN_ACCUM_1H),
+                "rain_24h_mm": data.get(KEY_RAIN_ACCUM_24H),
+                "illuminance_lx": data.get(KEY_LUX),
+                "uv_index": data.get(KEY_UV),
+                "hdd_today": data.get(KEY_HDD_TODAY),
+                "cdd_today": data.get(KEY_CDD_TODAY),
+                "et0_daily_mm": data.get(KEY_ET0_DAILY_MM),
+                "current_condition": data.get(KEY_CURRENT_CONDITION),
+                "zambretti_forecast": data.get(KEY_ZAMBRETTI_FORECAST),
+                "rain_probability_combined": data.get(KEY_RAIN_PROBABILITY_COMBINED),
+            }
+
+            fmt = self.export_format.lower()
+            export_dir = self.export_path
+            os.makedirs(export_dir, exist_ok=True)
+            date_str = now.strftime("%Y%m%d")
+
+            if fmt in ("csv", "both"):
+                csv_path = os.path.join(export_dir, f"ws_core_{date_str}.csv")
+                write_header = not os.path.exists(csv_path)
+                with open(csv_path, "a", newline="") as f:
+                    writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+                    if write_header:
+                        writer.writeheader()
+                    writer.writerow(row)
+
+            if fmt in ("json", "both"):
+                json_path = os.path.join(export_dir, f"ws_core_{date_str}.json")
+                existing = []
+                if os.path.exists(json_path):
+                    try:
+                        with open(json_path) as f:
+                            existing = json.load(f)
+                    except Exception:
+                        existing = []
+                existing.append(row)
+                with open(json_path, "w") as f:
+                    json.dump(existing, f, indent=2)
+
+        try:
+            await asyncio.get_event_loop().run_in_executor(None, _do_export)
+            self._export_last_time = dt_util.utcnow()
+            _LOGGER.debug("ws_core data exported to %s", self.export_path)
+        except Exception as exc:
+            _LOGGER.warning("ws_core export failed: %s", exc)

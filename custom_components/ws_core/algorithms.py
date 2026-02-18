@@ -1034,3 +1034,200 @@ def calculate_moon_phase(year: int, month: int, day: int) -> str:
     if age < 27.68:
         return "waning_crescent"
     return "new_moon"
+
+
+# =============================================================================
+# DEGREE DAYS  (v0.5.0)
+# =============================================================================
+
+def heating_degree_hours(temp_c: float, base_c: float = 18.0) -> float:
+    """Return the heating degree-hour contribution for current temperature.
+
+    HDH = max(0, base - temp).  Accumulate over one hour to get HDH/day.
+    Divide running sum by 24 to express in degree-day units.
+    """
+    return max(0.0, base_c - temp_c)
+
+
+def cooling_degree_hours(temp_c: float, base_c: float = 18.0) -> float:
+    """Return the cooling degree-hour contribution for current temperature."""
+    return max(0.0, temp_c - base_c)
+
+
+# =============================================================================
+# EXTRATERRESTRIAL RADIATION & ET₀  (v0.6.0 Hargreaves-Samani)
+# =============================================================================
+
+def extraterrestrial_radiation_mj(lat_deg: float, day_of_year: int) -> float:
+    """Return extraterrestrial radiation Ra in MJ m⁻² day⁻¹.
+
+    Uses FAO-56 equations 21-24.
+    """
+    phi = math.radians(lat_deg)
+    dr = 1 + 0.033 * math.cos(2 * math.pi * day_of_year / 365)
+    delta = 0.409 * math.sin(2 * math.pi * day_of_year / 365 - 1.39)
+    ws = math.acos(-math.tan(phi) * math.tan(delta))
+    Gsc = 0.0820  # solar constant MJ m⁻² min⁻¹
+    Ra = (24 * 60 / math.pi) * Gsc * dr * (
+        ws * math.sin(phi) * math.sin(delta)
+        + math.cos(phi) * math.cos(delta) * math.sin(ws)
+    )
+    return max(0.0, Ra)
+
+
+def et0_hargreaves(
+    t_max_c: float,
+    t_min_c: float,
+    t_mean_c: float,
+    lat_deg: float,
+    day_of_year: int,
+) -> float:
+    """Calculate reference evapotranspiration ET₀ (mm/day) using Hargreaves-Samani.
+
+    Hargreaves & Samani 1985, validated against Penman-Monteith in FAO-56.
+    Accuracy: ±15-20% vs full P-M when solar radiation is unavailable.
+
+    Args:
+        t_max_c: Daily max temperature °C
+        t_min_c: Daily min temperature °C
+        t_mean_c: Daily mean temperature °C (or use (max+min)/2)
+        lat_deg: Latitude in decimal degrees
+        day_of_year: Day of year (1-365)
+    Returns:
+        ET₀ in mm/day, or 0.0 if inputs are invalid.
+    """
+    try:
+        if None in (t_max_c, t_min_c, t_mean_c):
+            return 0.0
+        t_range = max(0.0, t_max_c - t_min_c)
+        Ra = extraterrestrial_radiation_mj(lat_deg, day_of_year)
+        # Hargreaves-Samani: ET₀ = 0.0023 × Ra × (T_mean + 17.8) × √ΔT
+        # Convert Ra from MJ to mm/day equivalent: Ra_mm = Ra / 2.45
+        Ra_mm = Ra / 2.45
+        et0 = 0.0023 * Ra_mm * (t_mean_c + 17.8) * (t_range ** 0.5)
+        return max(0.0, round(et0, 2))
+    except Exception:
+        return 0.0
+
+
+def et0_hourly_estimate(et0_daily_mm: float, hour_utc: int) -> float:
+    """Distribute daily ET₀ across hours using a sinusoidal solar curve.
+
+    Assumes ~80 % of daily ET₀ occurs during daylight hours 6-18 UTC.
+    Returns mm for the current hour.
+    """
+    if et0_daily_mm <= 0:
+        return 0.0
+    if 6 <= hour_utc <= 18:
+        daytime_hours = 13
+        # Sine curve peaked at noon (hour 12)
+        angle = math.pi * (hour_utc - 6) / daytime_hours
+        weight = math.sin(angle)
+        return round(et0_daily_mm * 0.80 * weight / 6.37, 3)
+    return 0.0
+
+
+# =============================================================================
+# METAR PARSING  (v0.5.0)
+# =============================================================================
+
+def parse_metar_json(report: dict) -> dict:
+    """Parse an aviationweather.gov JSON METAR report into a normalised dict.
+
+    Returns keys: temp_c, dewpoint_c, pressure_hpa, wind_ms, wind_dir_deg,
+                  raw_text, station_id, age_min.  Missing fields are None.
+    """
+    result: dict = {
+        "station_id": report.get("icaoId") or report.get("stationId"),
+        "raw_text": report.get("rawOb") or report.get("rawMETAR"),
+        "temp_c": None,
+        "dewpoint_c": None,
+        "pressure_hpa": None,
+        "wind_ms": None,
+        "wind_dir_deg": None,
+        "age_min": None,
+    }
+
+    # Temperature
+    temp = report.get("temp")
+    if temp is not None:
+        try:
+            result["temp_c"] = float(temp)
+        except (ValueError, TypeError):
+            pass
+
+    # Dewpoint
+    dewp = report.get("dewp")
+    if dewp is not None:
+        try:
+            result["dewpoint_c"] = float(dewp)
+        except (ValueError, TypeError):
+            pass
+
+    # Altimeter (inHg) → hPa,  or directly from altimHg/slp
+    # Try slp first (sea level pressure in hPa)
+    slp = report.get("slp")
+    altim = report.get("altim")
+    if slp is not None:
+        try:
+            result["pressure_hpa"] = float(slp)
+        except (ValueError, TypeError):
+            pass
+    elif altim is not None:
+        try:
+            # altim in inHg → hPa (1 inHg = 33.8639 hPa)
+            result["pressure_hpa"] = round(float(altim) * 33.8639, 1)
+        except (ValueError, TypeError):
+            pass
+
+    # Wind speed (knots) → m/s
+    wspd = report.get("wspd")
+    if wspd is not None:
+        try:
+            result["wind_ms"] = round(float(wspd) * 0.514444, 1)
+        except (ValueError, TypeError):
+            pass
+
+    # Wind direction
+    wdir = report.get("wdir")
+    if wdir is not None:
+        try:
+            result["wind_dir_deg"] = int(float(wdir))
+        except (ValueError, TypeError):
+            pass
+
+    # Observation age in minutes (use obsTime epoch if available)
+    import time as _time
+    obs_time = report.get("obsTime")
+    if obs_time is not None:
+        try:
+            age_s = _time.time() - float(obs_time)
+            result["age_min"] = round(age_s / 60, 0)
+        except (ValueError, TypeError):
+            pass
+
+    return result
+
+
+def metar_validation_label(
+    delta_temp: float | None,
+    delta_pressure: float | None,
+    age_min: float | None,
+) -> str:
+    """Classify local vs METAR agreement.
+
+    Returns one of: "Match" / "Plausible" / "Check sensor" / "Stale METAR" / "No data"
+    """
+    if delta_temp is None and delta_pressure is None:
+        return "No data"
+    if age_min is not None and age_min > 90:
+        return "Stale METAR"
+
+    temp_ok = delta_temp is None or abs(delta_temp) <= 2.5
+    press_ok = delta_pressure is None or abs(delta_pressure) <= 3.0
+
+    if temp_ok and press_ok:
+        return "Match"
+    if abs(delta_temp or 0) <= 5.0 and abs(delta_pressure or 0) <= 6.0:
+        return "Plausible"
+    return "Check sensor"

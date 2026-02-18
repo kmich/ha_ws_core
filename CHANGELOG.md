@@ -2,7 +2,31 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
-## [0.5.0] - 2026-02-18
+## [0.5.1] - 2026-02-18
+
+### Added (v0.5.0 completion)
+
+- **RestoreEntity mixin**: `WSSensor` now mixes in `RestoreEntity` so sensors that are slow to warm up (24h stats, Kalman filter, degree days, METAR, ET₀) report their last-known value immediately on HA restart instead of showing `unknown` for several minutes.
+- **Heating/Cooling Degree Days**: New sensors `sensor.ws_heating_degree_days_today` and `sensor.ws_cooling_degree_days_today` accumulate HDD/CDD throughout the day (resets at midnight). Configurable base temperature (default 18°C). Companion rate sensors (`hdd_rate`, `cdd_rate`) are available as diagnostic sensors for use with HA's Riemann sum utility meter for monthly/seasonal totals. Toggle: `enable_degree_days`.
+- **METAR cross-validation**: Fetches aviation METAR from aviationweather.gov (free, no key) for a user-configured ICAO station (e.g. `LGAV`). Exposes `sensor.ws_metar_validation` (Match/Plausible/Check sensor/Stale METAR), `sensor.ws_temp_vs_metar_delta`, `sensor.ws_pressure_vs_metar_delta`, plus raw METAR temperature and pressure sensors. Toggle: `enable_metar`. Config step prompts for ICAO code.
+- **Storm banner** (dashboard): A new `custom:button-card` banner that activates automatically when wind Beaufort >= 7 or the condition contains "thunderstorm". Shows Near-Gale / Gale Warning / Storm Warning / Thunderstorm with appropriate colour and pulse animation for severe events. Appears above the existing alert/data quality banners.
+- **Wind rose** (dashboard): New section on the Advanced page using `custom:windrose-card` (HACS card). Displays 24h wind direction/speed distribution. Requires `custom:windrose-card` to be installed from HACS.
+- **Radar** (dashboard): New section on the Advanced page showing RainViewer live radar iframe, auto-centred on your HA home location. Free, no API key required.
+
+### Added (v0.6.0 preview — sensors available, upload activated via config)
+
+- **ET₀ reference evapotranspiration** (`sensor.ws_et0_daily`, `sensor.ws_et0_hourly`): Hargreaves-Samani 1985 method using daily temp high/low and latitude. Accuracy ±15-20% vs Penman-Monteith; improves with a solar radiation sensor (future enhancement). Activates automatically when forecast lat/lon is configured.
+- **CWOP upload** (`sensor.ws_cwop_upload_status`): Uploads observations to cwop.aprs.net via APRS-IS TCP. Configure callsign, passcode (-1 for citizens), and interval. Toggle: `enable_cwop`.
+- **Weather Underground upload** (`sensor.ws_wu_upload_status`): Uploads to WUnderground Personal Weather Station API. Configure station ID, API key, and interval. Toggle: `enable_wunderground`.
+- **CSV/JSON export** (`sensor.ws_last_export_time`): Periodically writes all sensor readings to `/config/ws_core_export/ws_core_YYYYMMDD.csv` and/or `.json`. Appends to the daily file. Toggle: `enable_export`.
+
+### Changed
+
+- Config flow Features step now shows 12 toggles (added: Degree Days, METAR, CWOP, WUnderground, Export).
+- New conditional config steps: `degree_days` (base temp), `metar` (ICAO + interval), `cwop`, `wunderground`, `export`.
+- Dashboard `weather_dashboard.yaml` bumped to v2.1.0.
+
+
 
 ### Added
 - **Sea Surface Temperature**: New `sensor.ws_sea_surface_temperature` via Open-Meteo Marine API. Opt-in toggle with separate lat/lon override. Attributes include swimming comfort label (Cold/Cool/Comfortable/Warm/Hot), 24h hourly forecast, and grid cell metadata.

@@ -43,6 +43,33 @@ CONF_SEA_TEMP_LON = "sea_temp_lon"
 CONF_RAIN_PENALTY_LIGHT_MMPH = "rain_penalty_light_mmph"
 CONF_RAIN_PENALTY_HEAVY_MMPH = "rain_penalty_heavy_mmph"
 
+# Degree days (v0.5.0)
+CONF_ENABLE_DEGREE_DAYS = "enable_degree_days"
+CONF_DEGREE_DAY_BASE_C = "degree_day_base_c"
+
+# METAR cross-validation (v0.5.0)
+CONF_ENABLE_METAR = "enable_metar"
+CONF_METAR_ICAO = "metar_icao"
+CONF_METAR_INTERVAL_MIN = "metar_interval_min"
+
+# v0.6.0 CWOP upload
+CONF_ENABLE_CWOP = "enable_cwop"
+CONF_CWOP_CALLSIGN = "cwop_callsign"
+CONF_CWOP_PASSCODE = "cwop_passcode"
+CONF_CWOP_INTERVAL_MIN = "cwop_interval_min"
+
+# v0.6.0 Weather Underground upload
+CONF_ENABLE_WUNDERGROUND = "enable_wunderground"
+CONF_WU_STATION_ID = "wu_station_id"
+CONF_WU_API_KEY = "wu_api_key"
+CONF_WU_INTERVAL_MIN = "wu_interval_min"
+
+# v0.6.0 CSV/JSON export
+CONF_ENABLE_EXPORT = "enable_export"
+CONF_EXPORT_PATH = "export_path"
+CONF_EXPORT_FORMAT = "export_format"
+CONF_EXPORT_INTERVAL_MIN = "export_interval_min"
+
 # Calibration offsets (applied after unit conversion, in canonical metric units)
 CONF_CAL_TEMP_C = "cal_temp_c"
 CONF_CAL_HUMIDITY = "cal_humidity"
@@ -80,6 +107,23 @@ DEFAULT_ENABLE_RUNNING = False
 DEFAULT_ENABLE_SEA_TEMP = False
 DEFAULT_RAIN_PENALTY_LIGHT_MMPH = 0.2
 DEFAULT_RAIN_PENALTY_HEAVY_MMPH = 5.0
+
+# Degree days defaults
+DEFAULT_ENABLE_DEGREE_DAYS = False
+DEFAULT_DEGREE_DAY_BASE_C = 18.0
+
+# METAR defaults
+DEFAULT_ENABLE_METAR = False
+DEFAULT_METAR_INTERVAL_MIN = 60
+
+# v0.6.0 defaults
+DEFAULT_ENABLE_CWOP = False
+DEFAULT_CWOP_INTERVAL_MIN = 10
+DEFAULT_ENABLE_WUNDERGROUND = False
+DEFAULT_WU_INTERVAL_MIN = 5
+DEFAULT_ENABLE_EXPORT = False
+DEFAULT_EXPORT_FORMAT = "csv"
+DEFAULT_EXPORT_INTERVAL_MIN = 60
 
 DEFAULT_CAL_TEMP_C = 0.0
 DEFAULT_CAL_HUMIDITY = 0.0
@@ -205,6 +249,33 @@ KEY_SEA_SURFACE_TEMP = "sea_surface_temperature"
 
 # Sensor quality / validation flags
 KEY_SENSOR_QUALITY_FLAGS = "sensor_quality_flags"
+
+# Degree days (v0.5.0)
+KEY_HDD_TODAY = "hdd_today"
+KEY_CDD_TODAY = "cdd_today"
+KEY_HDD_RATE = "hdd_rate"
+KEY_CDD_RATE = "cdd_rate"
+
+# METAR cross-validation (v0.5.0)
+KEY_METAR_TEMP_C = "metar_temp_c"
+KEY_METAR_PRESSURE_HPA = "metar_pressure_hpa"
+KEY_METAR_WIND_MS = "metar_wind_ms"
+KEY_METAR_WIND_DIR = "metar_wind_dir_deg"
+KEY_METAR_CONDITION = "metar_condition"
+KEY_METAR_DELTA_TEMP = "metar_delta_temp_c"
+KEY_METAR_DELTA_PRESSURE = "metar_delta_pressure_hpa"
+KEY_METAR_VALIDATION = "metar_validation"
+KEY_METAR_STATION = "metar_station_id"
+KEY_METAR_AGE_MIN = "metar_age_min"
+
+# ET₀ irrigation (v0.6.0)
+KEY_ET0_DAILY_MM = "et0_daily_mm"
+KEY_ET0_HOURLY_MM = "et0_hourly_mm"
+
+# Upload status (v0.6.0)
+KEY_CWOP_STATUS = "cwop_upload_status"
+KEY_WU_STATUS = "wu_upload_status"
+KEY_LAST_EXPORT_TIME = "last_export_time"
 
 # ---------------------------------------------------------------------------
 # Source mapping keys

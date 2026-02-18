@@ -29,21 +29,35 @@ from .const import (
     CONF_CAL_TEMP_C,
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
+    CONF_DEGREE_DAY_BASE_C,
     CONF_ELEVATION_M,
     CONF_ENABLE_ACTIVITY_SCORES,
+    CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_EXTENDED_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_LAUNDRY,
+    CONF_ENABLE_METAR,
     CONF_ENABLE_RUNNING,
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_STARGAZING,
     CONF_ENABLE_ZAMBRETTI,
+    CONF_CWOP_CALLSIGN,
+    CONF_CWOP_INTERVAL_MIN,
+    CONF_CWOP_PASSCODE,
+    CONF_ENABLE_CWOP,
+    CONF_ENABLE_EXPORT,
+    CONF_ENABLE_WUNDERGROUND,
+    CONF_EXPORT_FORMAT,
+    CONF_EXPORT_INTERVAL_MIN,
+    CONF_EXPORT_PATH,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
     CONF_HEMISPHERE,
+    CONF_METAR_ICAO,
+    CONF_METAR_INTERVAL_MIN,
     CONF_NAME,
     CONF_PREFIX,
     CONF_PRESSURE_TREND_WINDOW_H,
@@ -59,23 +73,36 @@ from .const import (
     CONF_THRESH_RAIN_RATE_MMPH,
     CONF_THRESH_WIND_GUST_MS,
     CONF_UNITS_MODE,
+    CONF_WU_API_KEY,
+    CONF_WU_INTERVAL_MIN,
+    CONF_WU_STATION_ID,
     CONFIG_VERSION,
     DEFAULT_CAL_HUMIDITY,
     DEFAULT_CAL_PRESSURE_HPA,
     DEFAULT_CAL_TEMP_C,
     DEFAULT_CAL_WIND_MS,
     DEFAULT_CLIMATE_REGION,
+    DEFAULT_CWOP_INTERVAL_MIN,
+    DEFAULT_DEGREE_DAY_BASE_C,
     DEFAULT_ELEVATION_M,
+    DEFAULT_ENABLE_CWOP,
+    DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
+    DEFAULT_ENABLE_EXPORT,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_LAUNDRY,
+    DEFAULT_ENABLE_METAR,
     DEFAULT_ENABLE_RUNNING,
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_STARGAZING,
+    DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_ENABLE_ZAMBRETTI,
+    DEFAULT_EXPORT_FORMAT,
+    DEFAULT_EXPORT_INTERVAL_MIN,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_HEMISPHERE,
+    DEFAULT_METAR_INTERVAL_MIN,
     DEFAULT_NAME,
     DEFAULT_PREFIX,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
@@ -88,6 +115,7 @@ from .const import (
     DEFAULT_THRESH_RAIN_RATE_MMPH,
     DEFAULT_THRESH_WIND_GUST_MS,
     DEFAULT_UNITS_MODE,
+    DEFAULT_WU_INTERVAL_MIN,
     DOMAIN,
     HEMISPHERE_OPTIONS,
     OPTIONAL_SOURCES,
@@ -520,8 +548,23 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_ENABLE_FIRE_RISK] = bool(user_input.get(CONF_ENABLE_FIRE_RISK, False))
             self._data[CONF_ENABLE_RUNNING] = bool(user_input.get(CONF_ENABLE_RUNNING, False))
             self._data[CONF_ENABLE_SEA_TEMP] = bool(user_input.get(CONF_ENABLE_SEA_TEMP, False))
+            self._data[CONF_ENABLE_DEGREE_DAYS] = bool(user_input.get(CONF_ENABLE_DEGREE_DAYS, False))
+            self._data[CONF_ENABLE_METAR] = bool(user_input.get(CONF_ENABLE_METAR, False))
+            self._data[CONF_ENABLE_CWOP] = bool(user_input.get(CONF_ENABLE_CWOP, False))
+            self._data[CONF_ENABLE_WUNDERGROUND] = bool(user_input.get(CONF_ENABLE_WUNDERGROUND, False))
+            self._data[CONF_ENABLE_EXPORT] = bool(user_input.get(CONF_ENABLE_EXPORT, False))
             if self._data[CONF_ENABLE_SEA_TEMP]:
                 return await self.async_step_sea_temp()
+            if self._data[CONF_ENABLE_DEGREE_DAYS]:
+                return await self.async_step_degree_days()
+            if self._data[CONF_ENABLE_METAR]:
+                return await self.async_step_metar()
+            if self._data[CONF_ENABLE_CWOP]:
+                return await self.async_step_cwop()
+            if self._data[CONF_ENABLE_WUNDERGROUND]:
+                return await self.async_step_wunderground()
+            if self._data[CONF_ENABLE_EXPORT]:
+                return await self.async_step_export()
             return await self.async_step_alerts()
 
         return self.async_show_form(
@@ -537,6 +580,11 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_ENABLE_FIRE_RISK, default=DEFAULT_ENABLE_FIRE_RISK): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_RUNNING, default=DEFAULT_ENABLE_RUNNING): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_SEA_TEMP, default=DEFAULT_ENABLE_SEA_TEMP): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_METAR, default=DEFAULT_ENABLE_METAR): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_CWOP, default=DEFAULT_ENABLE_CWOP): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_WUNDERGROUND, default=DEFAULT_ENABLE_WUNDERGROUND): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_EXPORT, default=DEFAULT_ENABLE_EXPORT): selector.BooleanSelector(),
                 }
             ),
         )
@@ -548,6 +596,16 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data[CONF_SEA_TEMP_LAT] = user_input.get(CONF_SEA_TEMP_LAT)
             self._data[CONF_SEA_TEMP_LON] = user_input.get(CONF_SEA_TEMP_LON)
+            if self._data.get(CONF_ENABLE_DEGREE_DAYS):
+                return await self.async_step_degree_days()
+            if self._data.get(CONF_ENABLE_METAR):
+                return await self.async_step_metar()
+            if self._data.get(CONF_ENABLE_CWOP):
+                return await self.async_step_cwop()
+            if self._data.get(CONF_ENABLE_WUNDERGROUND):
+                return await self.async_step_wunderground()
+            if self._data.get(CONF_ENABLE_EXPORT):
+                return await self.async_step_export()
             return await self.async_step_alerts()
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
@@ -568,7 +626,162 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 8: Alerts & thresholds
+    # Step 7c: Degree days configuration  (v0.5.0)
+    # ------------------------------------------------------------------
+    async def async_step_degree_days(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data[CONF_DEGREE_DAY_BASE_C] = float(user_input.get(CONF_DEGREE_DAY_BASE_C, DEFAULT_DEGREE_DAY_BASE_C))
+            if self._data.get(CONF_ENABLE_METAR):
+                return await self.async_step_metar()
+            if self._data.get(CONF_ENABLE_CWOP):
+                return await self.async_step_cwop()
+            if self._data.get(CONF_ENABLE_WUNDERGROUND):
+                return await self.async_step_wunderground()
+            if self._data.get(CONF_ENABLE_EXPORT):
+                return await self.async_step_export()
+            return await self.async_step_alerts()
+
+        return self.async_show_form(
+            step_id="degree_days",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_DEGREE_DAY_BASE_C, default=DEFAULT_DEGREE_DAY_BASE_C): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=-10, max=30, step=0.5, mode="box", unit_of_measurement="°C")
+                    ),
+                }
+            ),
+            description_placeholders={
+                "info": "Base temperature for heating/cooling degree day calculations. Standard: 18°C (64°F)."
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Step 7d: METAR station configuration  (v0.5.0)
+    # ------------------------------------------------------------------
+    async def async_step_metar(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data[CONF_METAR_ICAO] = str(user_input.get(CONF_METAR_ICAO, "")).upper().strip()
+            self._data[CONF_METAR_INTERVAL_MIN] = int(user_input.get(CONF_METAR_INTERVAL_MIN, DEFAULT_METAR_INTERVAL_MIN))
+            if self._data.get(CONF_ENABLE_CWOP):
+                return await self.async_step_cwop()
+            if self._data.get(CONF_ENABLE_WUNDERGROUND):
+                return await self.async_step_wunderground()
+            if self._data.get(CONF_ENABLE_EXPORT):
+                return await self.async_step_export()
+            return await self.async_step_alerts()
+
+        return self.async_show_form(
+            step_id="metar",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_METAR_ICAO): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_METAR_INTERVAL_MIN, default=DEFAULT_METAR_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=30, max=180, step=30, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
+            description_placeholders={
+                "info": "Enter the ICAO code of the nearest airport/METAR station (e.g. LGAV for Athens). Free data from aviationweather.gov."
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Step 7e: CWOP upload configuration  (v0.6.0)
+    # ------------------------------------------------------------------
+    async def async_step_cwop(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data[CONF_CWOP_CALLSIGN] = str(user_input.get(CONF_CWOP_CALLSIGN, "")).upper().strip()
+            self._data[CONF_CWOP_PASSCODE] = str(user_input.get(CONF_CWOP_PASSCODE, "-1")).strip()
+            self._data[CONF_CWOP_INTERVAL_MIN] = int(user_input.get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN))
+            if self._data.get(CONF_ENABLE_WUNDERGROUND):
+                return await self.async_step_wunderground()
+            if self._data.get(CONF_ENABLE_EXPORT):
+                return await self.async_step_export()
+            return await self.async_step_alerts()
+
+        return self.async_show_form(
+            step_id="cwop",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_CWOP_CALLSIGN): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_CWOP_PASSCODE, default="-1"): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_CWOP_INTERVAL_MIN, default=DEFAULT_CWOP_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=5, max=60, step=5, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
+            description_placeholders={
+                "info": "CWOP callsign (e.g. CW1234 or EW1234). Citizens use passcode=-1. Uploads to cwop.aprs.net."
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Step 7f: Weather Underground configuration  (v0.6.0)
+    # ------------------------------------------------------------------
+    async def async_step_wunderground(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data[CONF_WU_STATION_ID] = str(user_input.get(CONF_WU_STATION_ID, "")).strip()
+            self._data[CONF_WU_API_KEY] = str(user_input.get(CONF_WU_API_KEY, "")).strip()
+            self._data[CONF_WU_INTERVAL_MIN] = int(user_input.get(CONF_WU_INTERVAL_MIN, DEFAULT_WU_INTERVAL_MIN))
+            if self._data.get(CONF_ENABLE_EXPORT):
+                return await self.async_step_export()
+            return await self.async_step_alerts()
+
+        return self.async_show_form(
+            step_id="wunderground",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_WU_STATION_ID): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Required(CONF_WU_API_KEY): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(CONF_WU_INTERVAL_MIN, default=DEFAULT_WU_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=30, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
+            description_placeholders={
+                "info": "Station ID and API key from your Weather Underground account."
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Step 7g: CSV/JSON export configuration  (v0.6.0)
+    # ------------------------------------------------------------------
+    async def async_step_export(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data[CONF_EXPORT_PATH] = str(user_input.get(CONF_EXPORT_PATH, "/config/ws_core_export")).strip()
+            self._data[CONF_EXPORT_FORMAT] = str(user_input.get(CONF_EXPORT_FORMAT, DEFAULT_EXPORT_FORMAT))
+            self._data[CONF_EXPORT_INTERVAL_MIN] = int(user_input.get(CONF_EXPORT_INTERVAL_MIN, DEFAULT_EXPORT_INTERVAL_MIN))
+            return await self.async_step_alerts()
+
+        return self.async_show_form(
+            step_id="export",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_EXPORT_PATH, default="/config/ws_core_export"): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_EXPORT_FORMAT, default=DEFAULT_EXPORT_FORMAT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=["csv", "json", "both"])
+                    ),
+                    vol.Optional(CONF_EXPORT_INTERVAL_MIN, default=DEFAULT_EXPORT_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=5, max=1440, step=5, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
+            description_placeholders={
+                "info": "Directory path (on HA host) and interval for periodic observation exports."
+            },
+        )
     # ------------------------------------------------------------------
     async def async_step_alerts(self, user_input: dict[str, Any] | None = None):
         units_mode = str(self._data.get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
