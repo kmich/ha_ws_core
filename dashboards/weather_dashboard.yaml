@@ -1402,108 +1402,109 @@ views:
                     + '</div>';
                 ]]]
 
-      # LAUNDRY DRYING / FIRE RISK
+      # ACTIVITY SCORES & SEA TEMPERATURE (all conditional)
       - type: grid
         column_span: 2
         cards:
-          - type: custom:button-card
-            entity: sensor.ws_laundry_drying_score
-            name: Laundry Drying
-            show_state: false
-            show_icon: true
-            icon: mdi:hanger
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
-                    [[[
-                      var score = parseInt(entity && entity.state) || 0;
-                      if (score >= 75) return '#10b981';
-                      if (score >= 50) return '#fbbf24';
-                      if (score >= 25) return '#f59e0b';
-                      return '#6b7280';
-                    ]]]
-            custom_fields:
-              score: |
-                [[[
-                  var score = parseInt(entity && entity.state) || 0;
-                  var attrs = (entity && entity.attributes) || {};
-                  var recommendation = attrs.recommendation || '';
-                  var dryTime = attrs.estimated_dry_time || 'N/A';
-                  var temp = attrs.temperature_c;
-                  var humid = attrs.humidity_pct;
-                  var wind = attrs.wind_ms;
-                  var scoreColor = score >= 75 ? '#10b981' : score >= 50 ? '#fbbf24' : score >= 25 ? '#f59e0b' : '#6b7280';
-                  var condHtml = (temp !== undefined && humid !== undefined)
-                    ? '<div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.5);">' + parseFloat(temp).toFixed(1) + 'C · ' + humid + '% RH · ' + parseFloat(wind).toFixed(1) + ' m/s</div>'
-                    : '';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:32px;font-weight:300;color:' + scoreColor + ';">' + score + '/100</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;"><strong>Dry time:</strong> ' + dryTime + '</div>'
-                    + condHtml
-                    + '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px;font-style:italic;">' + recommendation + '</div>'
-                    + '</div>';
-                ]]]
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.ws_laundry_drying_score
+                state_not: unavailable
+            card:
+              type: custom:button-card
+              entity: sensor.ws_laundry_drying_score
+              name: Laundry Drying
+              show_state: false
+              show_icon: true
+              icon: mdi:hanger
+              styles:
+                card:
+                  - background: rgba(30,30,30,0.9)
+                  - border-radius: 14px
+                  - padding: 16px
+                  - border: 1px solid rgba(255,255,255,0.1)
+                name:
+                  - font-size: 16px
+                  - font-weight: 600
+                  - color: white
+                icon:
+                  - width: 48px
+                  - color: |
+                      [[[
+                        var score = parseInt(entity && entity.state) || 0;
+                        if (score >= 75) return '#10b981';
+                        if (score >= 50) return '#fbbf24';
+                        if (score >= 25) return '#f59e0b';
+                        return '#6b7280';
+                      ]]]
+              custom_fields:
+                score: |
+                  [[[
+                    var score = parseInt(entity && entity.state) || 0;
+                    var attrs = (entity && entity.attributes) || {};
+                    var recommendation = attrs.recommendation || '';
+                    var dryTime = attrs.estimated_dry_time || 'N/A';
+                    var scoreColor = score >= 75 ? '#10b981' : score >= 50 ? '#fbbf24' : score >= 25 ? '#f59e0b' : '#6b7280';
+                    return '<div style="margin-top:8px;">'
+                      + '<div style="font-size:32px;font-weight:300;color:' + scoreColor + ';">' + score + '/100</div>'
+                      + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;"><strong>Dry time:</strong> ' + dryTime + '</div>'
+                      + '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px;font-style:italic;">' + recommendation + '</div>'
+                      + '</div>';
+                  ]]]
 
-          - type: custom:button-card
-            entity: sensor.ws_fire_risk_score
-            name: Fire Risk Score
-            show_state: false
-            show_icon: true
-            icon: mdi:fire
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
-                    [[[
-                      var fwi = parseFloat(entity && entity.state) || 0;
-                      if (fwi >= 50) return '#991b1b';
-                      if (fwi >= 30) return '#dc2626';
-                      if (fwi >= 19) return '#f59e0b';
-                      if (fwi >= 8) return '#fbbf24';
-                      return '#10b981';
-                    ]]]
-            custom_fields:
-              score: |
-                [[[
-                  var fwi = parseFloat(entity && entity.state) || 0;
-                  var attrs = (entity && entity.attributes) || {};
-                  var level = attrs.danger_level || 'Low';
-                  var temp = attrs.temperature_c;
-                  var humid = attrs.humidity_pct;
-                  var wind = attrs.wind_ms;
-                  var levelColor = level === 'Catastrophic' ? '#991b1b' : level === 'Extreme' ? '#dc2626' : level === 'Very High' ? '#ef4444' : level === 'High' ? '#f59e0b' : level === 'Moderate' ? '#fbbf24' : '#10b981';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:32px;font-weight:300;color:white;">' + fwi.toFixed(0) + ' <span style="font-size:14px;color:' + levelColor + ';font-weight:600;">' + level + '</span></div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.8;">'
-                    + '<div>Temp: ' + (temp !== undefined ? parseFloat(temp).toFixed(1) + 'C' : 'N/A') + '</div>'
-                    + '<div>Humidity: ' + (humid !== undefined ? humid + '%' : 'N/A') + '</div>'
-                    + '<div>Wind: ' + (wind !== undefined ? parseFloat(wind).toFixed(1) + ' m/s' : 'N/A') + '</div>'
-                    + '</div></div>';
-                ]]]
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.ws_fire_risk_score
+                state_not: unavailable
+            card:
+              type: custom:button-card
+              entity: sensor.ws_fire_risk_score
+              name: Fire Risk Score
+              show_state: false
+              show_icon: true
+              icon: mdi:fire
+              styles:
+                card:
+                  - background: rgba(30,30,30,0.9)
+                  - border-radius: 14px
+                  - padding: 16px
+                  - border: 1px solid rgba(255,255,255,0.1)
+                name:
+                  - font-size: 16px
+                  - font-weight: 600
+                  - color: white
+                icon:
+                  - width: 48px
+                  - color: |
+                      [[[
+                        var fwi = parseFloat(entity && entity.state) || 0;
+                        if (fwi >= 50) return '#991b1b';
+                        if (fwi >= 30) return '#dc2626';
+                        if (fwi >= 19) return '#f59e0b';
+                        if (fwi >= 8) return '#fbbf24';
+                        return '#10b981';
+                      ]]]
+              custom_fields:
+                score: |
+                  [[[
+                    var fwi = parseFloat(entity && entity.state) || 0;
+                    var attrs = (entity && entity.attributes) || {};
+                    var level = attrs.danger_level || 'Low';
+                    var temp = attrs.temperature_c;
+                    var humid = attrs.humidity_pct;
+                    var wind = attrs.wind_ms;
+                    var levelColor = level === 'Catastrophic' ? '#991b1b' : level === 'Extreme' ? '#dc2626' : level === 'Very High' ? '#ef4444' : level === 'High' ? '#f59e0b' : level === 'Moderate' ? '#fbbf24' : '#10b981';
+                    return '<div style="margin-top:8px;">'
+                      + '<div style="font-size:32px;font-weight:300;color:white;">' + fwi.toFixed(0) + ' <span style="font-size:14px;color:' + levelColor + ';font-weight:600;">' + level + '</span></div>'
+                      + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.8;">'
+                      + '<div>Temp: ' + (temp !== undefined ? parseFloat(temp).toFixed(1) + 'C' : 'N/A') + '</div>'
+                      + '<div>Humidity: ' + (humid !== undefined ? humid + '%' : 'N/A') + '</div>'
+                      + '<div>Wind: ' + (wind !== undefined ? parseFloat(wind).toFixed(1) + ' m/s' : 'N/A') + '</div>'
+                      + '</div></div>';
+                  ]]]
 
-      # SEA SURFACE TEMPERATURE (only shown when sensor exists)
-      - type: grid
-        column_span: 2
-        cards:
           - type: conditional
             conditions:
               - condition: state
@@ -1555,12 +1556,64 @@ views:
                     }
                     var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
                     return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(t) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">°C</span></div>'
+                      + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(t) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">\u00b0C</span></div>'
                       + '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + comfortColor + '22;border:1px solid ' + comfortColor + '55;font-size:13px;font-weight:600;color:' + comfortColor + ';">' + comfort + '</div>'
                       + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:10px;line-height:1.8;">'
-                      + '<div><strong>24h range:</strong> ' + fmt(minT) + ' – ' + fmt(maxT) + ' °C</div>'
-                      + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;font-style:italic;">Satellite-derived · nearest sea grid cell</div>'
+                      + '<div><strong>24h range:</strong> ' + fmt(minT) + ' \u2013 ' + fmt(maxT) + ' \u00b0C</div>'
+                      + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;font-style:italic;">Satellite-derived \u00b7 nearest sea grid cell</div>'
                       + '</div></div>';
+                  ]]]
+
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.ws_running_score
+                state_not: unavailable
+            card:
+              type: custom:button-card
+              entity: sensor.ws_running_score
+              name: Running Score
+              show_state: false
+              show_icon: true
+              icon: mdi:run
+              styles:
+                card:
+                  - background: rgba(30,30,30,0.9)
+                  - border-radius: 14px
+                  - padding: 16px
+                  - border: 1px solid rgba(255,255,255,0.1)
+                name:
+                  - font-size: 16px
+                  - font-weight: 600
+                  - color: white
+                icon:
+                  - width: 48px
+                  - color: |
+                      [[[
+                        var score = parseInt(entity && entity.state) || 0;
+                        if (score >= 75) return '#10b981';
+                        if (score >= 50) return '#fbbf24';
+                        if (score >= 25) return '#f59e0b';
+                        return '#6b7280';
+                      ]]]
+              custom_fields:
+                score: |
+                  [[[
+                    var score = parseInt(entity && entity.state) || 0;
+                    var attrs = (entity && entity.attributes) || {};
+                    var level = attrs.level || '';
+                    var recommendation = attrs.recommendation || '';
+                    var feelsLike = attrs.feels_like_c;
+                    var uv = attrs.uv_index;
+                    var scoreColor = score >= 75 ? '#10b981' : score >= 50 ? '#fbbf24' : score >= 25 ? '#f59e0b' : '#6b7280';
+                    return '<div style="margin-top:8px;">'
+                      + '<div style="font-size:32px;font-weight:300;color:' + scoreColor + ';">' + score + '/100 <span style="font-size:14px;color:rgba(255,255,255,0.6);">' + level + '</span></div>'
+                      + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.8;">'
+                      + (feelsLike !== undefined ? '<div>Feels like: ' + parseFloat(feelsLike).toFixed(1) + '\u00b0C</div>' : '')
+                      + (uv !== undefined ? '<div>UV: ' + uv + '</div>' : '')
+                      + '</div>'
+                      + '<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;font-style:italic;">' + recommendation + '</div>'
+                      + '</div>';
                   ]]]
 
       # RAIN ANALYSIS / TEMPERATURE DETAIL

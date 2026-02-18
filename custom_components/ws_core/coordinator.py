@@ -208,6 +208,7 @@ class WSStationRuntime:
 
     # Forecast cache
     last_forecast_fetch: Any | None = None
+    last_sea_temp_fetch: Any | None = None
     forecast_inflight: bool = False
     forecast_consecutive_failures: int = 0
 
@@ -972,6 +973,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             data[KEY_FORECAST] = None
 
+        # Sea temperature: independent fetch schedule (every forecast interval)
+        if self.sea_temp_enabled:
+            self._schedule_sea_temp_fetch(now)
+
         fc = getattr(self, "_forecast_cache", None)
         if fc and fc.get("daily"):
             data[KEY_FORECAST_TILES] = self._build_forecast_tiles(fc["daily"])
@@ -1049,11 +1054,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception:
             rt.forecast_inflight = False
 
-        # Piggyback sea temp fetch on the same schedule as forecast
-        if self.sea_temp_enabled and not getattr(rt, "sea_temp_inflight", False):
-            rt.sea_temp_inflight = True
-            self.hass.async_create_task(self._async_fetch_sea_temp())
         return cached
+
+    def _schedule_sea_temp_fetch(self, now: Any) -> None:
+        """Schedule a sea temp fetch if cache is stale or empty."""
+        rt = self.runtime
+        if getattr(rt, "sea_temp_inflight", False):
+            return
+        last = rt.last_sea_temp_fetch
+        if last is not None and self._sea_temp_cache is not None:
+            age_s = (now - last).total_seconds()
+            # Reuse forecast interval; sea temp changes slowly
+            min_interval_s = max(300, self.forecast_interval_min * 60)
+            if age_s < min_interval_s:
+                return
+        rt.sea_temp_inflight = True
+        self.hass.async_create_task(self._async_fetch_sea_temp())
 
     async def _async_fetch_forecast(self) -> None:
         rt = self.runtime
@@ -1223,6 +1239,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "Not a direct measurement."
                 ),
             }
+            rt.last_sea_temp_fetch = dt_util.utcnow()
             self.async_set_updated_data(self._compute())
 
         except Exception as exc:
