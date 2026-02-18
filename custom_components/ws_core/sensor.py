@@ -595,10 +595,6 @@ class WSSensor(CoordinatorEntity, SensorEntity):
     """A single derived sensor for Weather Station Core."""
 
     _DISABLED_BY_DEFAULT = {
-        KEY_LAUNDRY_SCORE,
-        KEY_STARGAZE_SCORE,
-        KEY_FIRE_RISK_SCORE,
-        KEY_RUNNING_SCORE,
         KEY_TEMP_AVG_24H,
         KEY_TEMP_DISPLAY,
         KEY_WIND_DIR_SMOOTH_DEG,

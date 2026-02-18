@@ -2,6 +2,11 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [0.4.4] - 2026-02-18
+
+### Fixed
+- **Activity scores no longer disabled by default**: When the user enables "Activity scores" in the Features toggle, the 4 entities (laundry, stargazing, fire risk, running) now appear enabled immediately. Previously they were double-gated — created by the feature toggle but then hidden by `entity_registry_enabled_default = False`.
+
 ## [0.4.3] - 2026-02-18
 
 ### Added
