@@ -1041,6 +1041,7 @@ def calculate_moon_phase(year: int, month: int, day: int) -> str:
 # DEGREE DAYS  (v0.5.0)
 # =============================================================================
 
+
 def heating_degree_hours(temp_c: float, base_c: float = 18.0) -> float:
     """Return the heating degree-hour contribution for current temperature.
 
@@ -1059,6 +1060,7 @@ def cooling_degree_hours(temp_c: float, base_c: float = 18.0) -> float:
 # EXTRATERRESTRIAL RADIATION & ET₀  (v0.6.0 Hargreaves-Samani)
 # =============================================================================
 
+
 def extraterrestrial_radiation_mj(lat_deg: float, day_of_year: int) -> float:
     """Return extraterrestrial radiation Ra in MJ m⁻² day⁻¹.
 
@@ -1069,9 +1071,11 @@ def extraterrestrial_radiation_mj(lat_deg: float, day_of_year: int) -> float:
     delta = 0.409 * math.sin(2 * math.pi * day_of_year / 365 - 1.39)
     ws = math.acos(-math.tan(phi) * math.tan(delta))
     Gsc = 0.0820  # solar constant MJ m⁻² min⁻¹
-    Ra = (24 * 60 / math.pi) * Gsc * dr * (
-        ws * math.sin(phi) * math.sin(delta)
-        + math.cos(phi) * math.cos(delta) * math.sin(ws)
+    Ra = (
+        (24 * 60 / math.pi)
+        * Gsc
+        * dr
+        * (ws * math.sin(phi) * math.sin(delta) + math.cos(phi) * math.cos(delta) * math.sin(ws))
     )
     return max(0.0, Ra)
 
@@ -1105,7 +1109,7 @@ def et0_hargreaves(
         # Hargreaves-Samani: ET₀ = 0.0023 × Ra × (T_mean + 17.8) × √ΔT
         # Convert Ra from MJ to mm/day equivalent: Ra_mm = Ra / 2.45
         Ra_mm = Ra / 2.45
-        et0 = 0.0023 * Ra_mm * (t_mean_c + 17.8) * (t_range ** 0.5)
+        et0 = 0.0023 * Ra_mm * (t_mean_c + 17.8) * (t_range**0.5)
         return max(0.0, round(et0, 2))
     except Exception:
         return 0.0
@@ -1131,6 +1135,7 @@ def et0_hourly_estimate(et0_daily_mm: float, hour_utc: int) -> float:
 # =============================================================================
 # METAR PARSING  (v0.5.0)
 # =============================================================================
+
 
 def parse_metar_json(report: dict) -> dict:
     """Parse an aviationweather.gov JSON METAR report into a normalised dict.
@@ -1187,6 +1192,7 @@ def parse_metar_json(report: dict) -> dict:
 
     # Observation age in minutes (use obsTime epoch if available)
     import time as _time
+
     obs_time = report.get("obsTime")
     if obs_time is not None:
         try:

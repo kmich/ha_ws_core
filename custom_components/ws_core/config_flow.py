@@ -580,10 +580,14 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_ENABLE_FIRE_RISK, default=DEFAULT_ENABLE_FIRE_RISK): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_RUNNING, default=DEFAULT_ENABLE_RUNNING): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_SEA_TEMP, default=DEFAULT_ENABLE_SEA_TEMP): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS
+                    ): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_METAR, default=DEFAULT_ENABLE_METAR): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_CWOP, default=DEFAULT_ENABLE_CWOP): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_WUNDERGROUND, default=DEFAULT_ENABLE_WUNDERGROUND): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_WUNDERGROUND, default=DEFAULT_ENABLE_WUNDERGROUND
+                    ): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_EXPORT, default=DEFAULT_ENABLE_EXPORT): selector.BooleanSelector(),
                 }
             ),
@@ -630,7 +634,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_degree_days(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
-            self._data[CONF_DEGREE_DAY_BASE_C] = float(user_input.get(CONF_DEGREE_DAY_BASE_C, DEFAULT_DEGREE_DAY_BASE_C))
+            self._data[CONF_DEGREE_DAY_BASE_C] = float(
+                user_input.get(CONF_DEGREE_DAY_BASE_C, DEFAULT_DEGREE_DAY_BASE_C)
+            )
             if self._data.get(CONF_ENABLE_METAR):
                 return await self.async_step_metar()
             if self._data.get(CONF_ENABLE_CWOP):
@@ -661,7 +667,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_metar(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data[CONF_METAR_ICAO] = str(user_input.get(CONF_METAR_ICAO, "")).upper().strip()
-            self._data[CONF_METAR_INTERVAL_MIN] = int(user_input.get(CONF_METAR_INTERVAL_MIN, DEFAULT_METAR_INTERVAL_MIN))
+            self._data[CONF_METAR_INTERVAL_MIN] = int(
+                user_input.get(CONF_METAR_INTERVAL_MIN, DEFAULT_METAR_INTERVAL_MIN)
+            )
             if self._data.get(CONF_ENABLE_CWOP):
                 return await self.async_step_cwop()
             if self._data.get(CONF_ENABLE_WUNDERGROUND):
@@ -674,9 +682,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="metar",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_METAR_ICAO): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
+                    vol.Required(CONF_METAR_ICAO): selector.TextSelector(selector.TextSelectorConfig(type="text")),
                     vol.Optional(CONF_METAR_INTERVAL_MIN, default=DEFAULT_METAR_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=180, step=30, mode="box", unit_of_measurement="min")
                     ),
@@ -705,9 +711,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="cwop",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_CWOP_CALLSIGN): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
+                    vol.Required(CONF_CWOP_CALLSIGN): selector.TextSelector(selector.TextSelectorConfig(type="text")),
                     vol.Optional(CONF_CWOP_PASSCODE, default="-1"): selector.TextSelector(
                         selector.TextSelectorConfig(type="text")
                     ),
@@ -737,20 +741,14 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="wunderground",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_WU_STATION_ID): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Required(CONF_WU_API_KEY): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
+                    vol.Required(CONF_WU_STATION_ID): selector.TextSelector(selector.TextSelectorConfig(type="text")),
+                    vol.Required(CONF_WU_API_KEY): selector.TextSelector(selector.TextSelectorConfig(type="password")),
                     vol.Optional(CONF_WU_INTERVAL_MIN, default=DEFAULT_WU_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=30, step=1, mode="box", unit_of_measurement="min")
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "Station ID and API key from your Weather Underground account."
-            },
+            description_placeholders={"info": "Station ID and API key from your Weather Underground account."},
         )
 
     # ------------------------------------------------------------------
@@ -760,7 +758,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data[CONF_EXPORT_PATH] = str(user_input.get(CONF_EXPORT_PATH, "/config/ws_core_export")).strip()
             self._data[CONF_EXPORT_FORMAT] = str(user_input.get(CONF_EXPORT_FORMAT, DEFAULT_EXPORT_FORMAT))
-            self._data[CONF_EXPORT_INTERVAL_MIN] = int(user_input.get(CONF_EXPORT_INTERVAL_MIN, DEFAULT_EXPORT_INTERVAL_MIN))
+            self._data[CONF_EXPORT_INTERVAL_MIN] = int(
+                user_input.get(CONF_EXPORT_INTERVAL_MIN, DEFAULT_EXPORT_INTERVAL_MIN)
+            )
             return await self.async_step_alerts()
 
         return self.async_show_form(
@@ -773,7 +773,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_EXPORT_FORMAT, default=DEFAULT_EXPORT_FORMAT): selector.SelectSelector(
                         selector.SelectSelectorConfig(options=["csv", "json", "both"])
                     ),
-                    vol.Optional(CONF_EXPORT_INTERVAL_MIN, default=DEFAULT_EXPORT_INTERVAL_MIN): selector.NumberSelector(
+                    vol.Optional(
+                        CONF_EXPORT_INTERVAL_MIN, default=DEFAULT_EXPORT_INTERVAL_MIN
+                    ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=5, max=1440, step=5, mode="box", unit_of_measurement="min")
                     ),
                 }
@@ -782,6 +784,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "info": "Directory path (on HA host) and interval for periodic observation exports."
             },
         )
+
     # ------------------------------------------------------------------
     async def async_step_alerts(self, user_input: dict[str, Any] | None = None):
         units_mode = str(self._data.get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))

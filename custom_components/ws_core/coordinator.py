@@ -1219,8 +1219,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             local_press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
             metar_temp = m.get("temp_c")
             metar_press = m.get("pressure_hpa")
-            delta_t = round(float(local_temp) - float(metar_temp), 1) if (local_temp is not None and metar_temp is not None) else None
-            delta_p = round(float(local_press) - float(metar_press), 1) if (local_press is not None and metar_press is not None) else None
+            delta_t = (
+                round(float(local_temp) - float(metar_temp), 1)
+                if (local_temp is not None and metar_temp is not None)
+                else None
+            )
+            delta_p = (
+                round(float(local_press) - float(metar_press), 1)
+                if (local_press is not None and metar_press is not None)
+                else None
+            )
             data[KEY_METAR_DELTA_TEMP] = delta_t
             data[KEY_METAR_DELTA_PRESSURE] = delta_p
             data[KEY_METAR_VALIDATION] = metar_validation_label(delta_t, delta_p, m.get("age_min"))
@@ -1228,9 +1236,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Upload/export status (v0.6.0)
         data[KEY_CWOP_STATUS] = self._cwop_status
         data[KEY_WU_STATUS] = self._wu_status
-        data[KEY_LAST_EXPORT_TIME] = (
-            self._export_last_time.isoformat() if self._export_last_time else None
-        )
+        data[KEY_LAST_EXPORT_TIME] = self._export_last_time.isoformat() if self._export_last_time else None
 
         self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
         return data
@@ -1533,6 +1539,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_upload_cwop(self) -> None:
         """Upload observation to CWOP via APRS-IS TCP."""
         import asyncio
+
         data = self.data
         if not data:
             return
@@ -1590,9 +1597,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         try:
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection("cwop.aprs.net", 14580), timeout=15
-            )
+            reader, writer = await asyncio.wait_for(asyncio.open_connection("cwop.aprs.net", 14580), timeout=15)
             # Read banner
             await asyncio.wait_for(reader.read(512), timeout=5)
             # Login

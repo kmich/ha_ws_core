@@ -663,7 +663,9 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="°C",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {"description": "Instantaneous heating degree-hour rate (use Riemann sum helper for daily totals)"},
+        attrs_fn=lambda d: {
+            "description": "Instantaneous heating degree-hour rate (use Riemann sum helper for daily totals)"
+        },
     ),
     WSSensorDescription(
         key=KEY_CDD_RATE,
@@ -672,7 +674,9 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="°C",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {"description": "Instantaneous cooling degree-hour rate (use Riemann sum helper for daily totals)"},
+        attrs_fn=lambda d: {
+            "description": "Instantaneous cooling degree-hour rate (use Riemann sum helper for daily totals)"
+        },
     ),
     # ---------------------------------------------------------------
     # METAR Cross-Validation  (v0.5.0)
@@ -848,12 +852,22 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
 
     # Keys that benefit from restore (slow-to-warm-up or accumulating sensors)
     _RESTORE_KEYS = {
-        KEY_HDD_TODAY, KEY_CDD_TODAY, KEY_HDD_RATE, KEY_CDD_RATE,
+        KEY_HDD_TODAY,
+        KEY_CDD_TODAY,
+        KEY_HDD_RATE,
+        KEY_CDD_RATE,
         KEY_ET0_DAILY_MM,
-        KEY_TEMP_HIGH_24H, KEY_TEMP_LOW_24H, KEY_TEMP_AVG_24H, KEY_WIND_GUST_MAX_24H,
-        KEY_RAIN_ACCUM_1H, KEY_RAIN_ACCUM_24H,
-        KEY_METAR_VALIDATION, KEY_METAR_TEMP_C, KEY_METAR_PRESSURE_HPA,
-        KEY_METAR_DELTA_TEMP, KEY_METAR_DELTA_PRESSURE,
+        KEY_TEMP_HIGH_24H,
+        KEY_TEMP_LOW_24H,
+        KEY_TEMP_AVG_24H,
+        KEY_WIND_GUST_MAX_24H,
+        KEY_RAIN_ACCUM_1H,
+        KEY_RAIN_ACCUM_24H,
+        KEY_METAR_VALIDATION,
+        KEY_METAR_TEMP_C,
+        KEY_METAR_PRESSURE_HPA,
+        KEY_METAR_DELTA_TEMP,
+        KEY_METAR_DELTA_PRESSURE,
     }
 
     _DISABLED_BY_DEFAULT = {
@@ -910,10 +924,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         # Restore last known value for sensors that are slow to warm up
         if self._desc.key in self._RESTORE_KEYS:
             last_state = await self.async_get_last_state()
-            if (
-                last_state is not None
-                and last_state.state not in ("unknown", "unavailable", None, "")
-            ):
+            if last_state is not None and last_state.state not in ("unknown", "unavailable", None, ""):
                 try:
                     self._restored_value = float(last_state.state)
                 except (ValueError, TypeError):
