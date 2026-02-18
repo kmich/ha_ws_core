@@ -4,8 +4,18 @@ All notable changes to Weather Station Core are documented in this file.
 
 ## [0.4.4] - 2026-02-18
 
+### Added
+- **Rain nowcasting sensors**: `rain_last_1h`, `rain_last_24h` (precipitation device class), `time_since_rain` (human-readable "3h ago" / "No rain recorded").
+
 ### Fixed
-- **Activity scores no longer disabled by default**: When the user enables "Activity scores" in the Features toggle, the 4 entities (laundry, stargazing, fire risk, running) now appear enabled immediately. Previously they were double-gated — created by the feature toggle but then hidden by `entity_registry_enabled_default = False`.
+- **7 entities had broken slugs**: `_slug_for_key()` had no fallback return — `KEY_LUX`, `KEY_UV`, `KEY_ALERT_STATE`, `KEY_ALERT_MESSAGE`, `KEY_PACKAGE_STATUS`, `KEY_PRESSURE_CHANGE_WINDOW_HPA`, `KEY_PRESSURE_TREND_HPAH` all generated `sensor.ws_None`. Added missing overrides + fallback.
+- **Activity scores no longer disabled by default**: When the user enables "Activity scores" in Features, the 4 entities appear enabled immediately (removed double-gating from `_DISABLED_BY_DEFAULT`).
+- **Dashboard entity references**: Fixed stale `ws_01_*` entity names → current `ws_*` names; `ws_fire_weather_index` → `ws_fire_risk_score`.
+- **Dashboard advanced page alignment**: Paired cards into `column_span: 2` row sections (Moon+UV, Laundry+Fire, Rain+Temp, Wind+Pressure align side-by-side).
+- **Dashboard helper requirements**: Documented all required HA helpers in dashboard header.
+
+### Note
+After upgrading, remove and re-add the integration to clear stale entity registry entries. You must also create the required HA helpers for the advanced dashboard (see dashboard file header).
 
 ## [0.4.3] - 2026-02-18
 

@@ -118,6 +118,8 @@ from .const import (
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
+    KEY_RAIN_ACCUM_1H,
+    KEY_RAIN_ACCUM_24H,
     KEY_RAIN_DISPLAY,
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
@@ -131,6 +133,7 @@ from .const import (
     KEY_TEMP_DISPLAY,
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
+    KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
     KEY_WET_BULB_C,
@@ -181,6 +184,7 @@ class WSStationRuntime:
     last_rain_total_mm: float | None = None
     last_rain_ts: Any | None = None
     last_rain_rate_filt: float = 0.0
+    last_rain_event_ts: Any | None = None
 
     # Pressure tracking
     pressure_history: deque = field(default_factory=lambda: deque(maxlen=PRESSURE_HISTORY_SAMPLES))
@@ -299,6 +303,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         vals = [v for _, v in history]
         total = 0.0
         for prev, cur in zip(vals, vals[1:], strict=False):
+            dv = cur - prev
+            if dv < -0.1:
+                dv = 0.0
+            if dv > 0:
+                total += dv
+        return total
+
+    @staticmethod
+    def _rain_accum_window_from_totals(history: deque, now: Any, window_h: float) -> float:
+        """Rain accumulation over a sliding window (e.g. 1h)."""
+        from datetime import timedelta
+
+        cutoff = now - timedelta(hours=window_h)
+        vals = [(ts, v) for ts, v in history if ts >= cutoff]
+        total = 0.0
+        for (_, prev), (_, cur) in zip(vals, vals[1:], strict=False):
             dv = cur - prev
             if dv < -0.1:
                 dv = 0.0
@@ -628,6 +648,31 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         rain_rate: float = data.get(KEY_RAIN_RATE_FILT, 0.0)
         data[KEY_RAIN_DISPLAY] = format_rain_display(float(rain_rate))
+
+        # Rain accumulations (1h / 24h)
+        if rt.rain_total_history_24h:
+            data[KEY_RAIN_ACCUM_1H] = round(self._rain_accum_window_from_totals(rt.rain_total_history_24h, now, 1.0), 1)
+            data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rt.rain_total_history_24h), 1)
+
+        # Track last rain event and compute time since
+        if float(rain_rate) > 0.0:
+            rt.last_rain_event_ts = now
+        if rt.last_rain_event_ts is not None:
+            delta = now - rt.last_rain_event_ts
+            total_s = int(delta.total_seconds())
+            if total_s < 60:
+                data[KEY_TIME_SINCE_RAIN] = "Just now"
+            elif total_s < 3600:
+                data[KEY_TIME_SINCE_RAIN] = f"{total_s // 60}m ago"
+            elif total_s < 86400:
+                h = total_s // 3600
+                data[KEY_TIME_SINCE_RAIN] = f"{h}h ago"
+            else:
+                d = total_s // 86400
+                data[KEY_TIME_SINCE_RAIN] = f"{d}d ago"
+        else:
+            data[KEY_TIME_SINCE_RAIN] = "No rain recorded"
+
         return rain_rate
 
     def _compute_condition(
@@ -738,8 +783,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Fire Risk Score (renamed from Fire Weather Index)
         if tc is not None and rh is not None and wind_ms is not None:
-            rt = self.runtime
-            rain_24h = self._rain_accum_24h_from_totals(rt.rain_total_history_24h)
+            rain_24h = data.get(KEY_RAIN_ACCUM_24H, 0.0)
             frs = fire_risk_score(float(tc), float(rh), float(wind_ms), rain_24h)
             data[KEY_FIRE_RISK_SCORE] = frs
             data["_fire_danger_level"] = fire_danger_level(frs)

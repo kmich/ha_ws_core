@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION VANILLA DASHBOARD v1.1.0
+# WEATHER STATION VANILLA DASHBOARD v1.2.0
 # =============================================================================
 # Uses ONLY native Home Assistant cards. No HACS frontend dependencies.
 #
@@ -9,20 +9,39 @@
 # find-and-replace "sensor.ws_" with "sensor.YOURPREFIX_"
 # and "weather.ws" with "weather.YOURPREFIX".
 #
-# Feature toggles:
-#   Extended analysis sensors (Zambretti, classifier, display banners)
-#   are only available if "Extended analysis" is enabled in settings.
-#   Activity scores require "Activity scores" to be enabled.
+# Radar: Update lat/lon in the Windy iframe URL to your location.
+#
+# Optional HACS card: lovelace-windrose-card for wind rose on Analysis page.
+# Install via HACS > Frontend, then uncomment the wind rose section below.
 # =============================================================================
 
 views:
   # =============================================
-  # PAGE 1: MAIN WEATHER (core sensors only)
+  # PAGE 1: MAIN WEATHER
   # =============================================
   - title: Weather
     path: weather
     icon: mdi:weather-partly-cloudy
     cards:
+      # --- STORM MODE BANNER (auto-shows when alerts active) ---
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_alert_state
+            state_not: clear
+        card:
+          type: markdown
+          content: >-
+            ## ⚠️ Weather Alert Active
+
+            **{{ states('sensor.ws_alert_message') }}**
+
+            Rain rate: {{ states('sensor.ws_rain_rate') }} mm/h
+            · Wind gust: {{ states('sensor.ws_wind_gust') }}
+            · Condition: {{ states('sensor.ws_current_condition') }}
+          style: |
+            ha-card { background: rgba(255, 152, 0, 0.15); }
+
       # --- Weather entity card (built-in) ---
       - type: weather-forecast
         entity: weather.ws
@@ -87,19 +106,23 @@ views:
           - entity: sensor.ws_sea_level_pressure
             name: Sea Level (MSLP)
 
-      # --- Precipitation ---
+      # --- Rain Nowcasting ---
       - type: entities
-        title: Precipitation
-        icon: mdi:weather-rainy
+        title: "Precipitation Now"
+        icon: mdi:weather-pouring
         entities:
-          - entity: sensor.ws_rain_total
-            name: Rain Total
           - entity: sensor.ws_rain_rate
             name: Rain Rate
-          - entity: sensor.ws_rain_probability
-            name: Rain Probability (local)
+          - entity: sensor.ws_rain_last_1h
+            name: Last 1 Hour
+          - entity: sensor.ws_rain_last_24h
+            name: Last 24 Hours
+          - entity: sensor.ws_rain_total
+            name: Season Total
+          - entity: sensor.ws_time_since_rain
+            name: Last Rain
           - entity: sensor.ws_rain_probability_combined
-            name: Rain Probability (combined)
+            name: Rain Probability
 
       # --- UV & Solar ---
       - type: entities
@@ -160,19 +183,58 @@ views:
             name: Gust
 
   # =============================================
-  # PAGE 2: EXTENDED ANALYSIS
+  # PAGE 2: RADAR & ANALYSIS
   # =============================================
-  # Requires "Extended analysis" enabled in Configure.
-  - title: Analysis
-    path: analysis
-    icon: mdi:chart-line
+  - title: Radar
+    path: radar
+    icon: mdi:radar
     cards:
+      # --- Precipitation Radar (Windy embed) ---
+      # Update lat=XX.XX&lon=XX.XX and detailLat/detailLon to your coordinates.
+      - type: iframe
+        title: Precipitation Radar
+        url: >-
+          https://embed.windy.com/embed2.html?lat=37.80&lon=23.90&zoom=8&level=surface&overlay=radar&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&detailLat=37.80&detailLon=23.90&metricWind=km%2Fh&metricTemp=%C2%B0C
+        aspect_ratio: 75%
+
+      # --- Wind radar (Windy wind layer) ---
+      - type: iframe
+        title: Wind Field
+        url: >-
+          https://embed.windy.com/embed2.html?lat=37.80&lon=23.90&zoom=8&level=surface&overlay=wind&menu=&message=&marker=&calendar=now&pressure=true&type=map&location=coordinates&detail=&detailLat=37.80&detailLon=23.90&metricWind=km%2Fh&metricTemp=%C2%B0C
+        aspect_ratio: 75%
+
+      # --- Rain accumulation history ---
+      - type: history-graph
+        title: Rain Rate & Accumulation (24h)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.ws_rain_rate
+            name: Rate (mm/h)
+          - entity: sensor.ws_rain_last_1h
+            name: Last 1h (mm)
+
+      # --- Wind Rose (requires HACS: lovelace-windrose-card) ---
+      # Uncomment after installing from HACS > Frontend.
+      #
+      # - type: custom:windrose-card
+      #   title: Wind Rose (24h)
+      #   data_period:
+      #     hours_to_show: 24
+      #   wind_direction_entity:
+      #     entity: sensor.ws_wind_direction
+      #   windspeed_entities:
+      #     - entity: sensor.ws_wind_speed
+      #       name: Avg
+      #     - entity: sensor.ws_wind_gust
+      #       name: Gust
+
+      # --- Extended Analysis (requires feature toggle) ---
       - type: markdown
         content: >-
-          These sensors require **Extended analysis** to be enabled in
-          Settings → Devices & Services → Weather Station Core → Configure.
+          Extended analysis sensors below require **Extended analysis** enabled
+          in Configure.
 
-      # --- Zambretti Forecast ---
       - type: conditional
         conditions:
           - condition: state
@@ -188,7 +250,6 @@ views:
             - entity: sensor.ws_current_condition
               name: Current Condition
 
-      # --- Display Sensors ---
       - type: conditional
         conditions:
           - condition: state
@@ -254,15 +315,13 @@ views:
   # =============================================
   # PAGE 4: ACTIVITY SCORES
   # =============================================
-  # Requires "Activity scores" enabled in Configure.
   - title: Activities
     path: activities
     icon: mdi:run
     cards:
       - type: markdown
         content: >-
-          Activity scores require **Activity scores** to be enabled in
-          Settings → Devices & Services → Weather Station Core → Configure.
+          Activity scores require **Activity scores** enabled in Configure.
 
       - type: grid
         columns: 2

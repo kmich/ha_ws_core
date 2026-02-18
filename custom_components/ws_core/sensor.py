@@ -46,6 +46,8 @@ from .const import (
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
+    KEY_RAIN_ACCUM_1H,
+    KEY_RAIN_ACCUM_24H,
     KEY_RAIN_DISPLAY,
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
@@ -59,6 +61,7 @@ from .const import (
     KEY_TEMP_DISPLAY,
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
+    KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
     KEY_WET_BULB_C,
@@ -417,6 +420,27 @@ SENSORS: list[WSSensorDescription] = [
     # Rain / pressure display
     WSSensorDescription(key=KEY_RAIN_DISPLAY, name="WS Rain Display", icon="mdi:weather-rainy"),
     WSSensorDescription(
+        key=KEY_RAIN_ACCUM_1H,
+        name="WS Rain Last 1h",
+        icon="mdi:weather-pouring",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit=UNIT_RAIN_MM,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_RAIN_ACCUM_24H,
+        name="WS Rain Last 24h",
+        icon="mdi:weather-pouring",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit=UNIT_RAIN_MM,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_TIME_SINCE_RAIN,
+        name="WS Time Since Rain",
+        icon="mdi:clock-outline",
+    ),
+    WSSensorDescription(
         key=KEY_PRESSURE_TREND_DISPLAY,
         name="WS Pressure Trend",
         icon="mdi:trending-up",
@@ -667,6 +691,9 @@ class WSSensor(CoordinatorEntity, SensorEntity):
             KEY_RAIN_PROBABILITY: "rain_probability",
             KEY_RAIN_PROBABILITY_COMBINED: "rain_probability_combined",
             KEY_RAIN_DISPLAY: "rain_display",
+            KEY_RAIN_ACCUM_1H: "rain_last_1h",
+            KEY_RAIN_ACCUM_24H: "rain_last_24h",
+            KEY_TIME_SINCE_RAIN: "time_since_rain",
             KEY_PRESSURE_TREND_DISPLAY: "pressure_trend",
             KEY_HEALTH_DISPLAY: "station_health",
             KEY_FORECAST_TILES: "forecast_tiles",
@@ -682,9 +709,18 @@ class WSSensor(CoordinatorEntity, SensorEntity):
             KEY_FIRE_RISK_SCORE: "fire_risk_score",
             KEY_SENSOR_QUALITY_FLAGS: "sensor_quality_flags",
             KEY_RUNNING_SCORE: "running_score",
+            KEY_LUX: "illuminance",
+            KEY_UV: "uv_index",
+            KEY_ALERT_STATE: "alert_state",
+            KEY_ALERT_MESSAGE: "alert_message",
+            KEY_PACKAGE_STATUS: "package_status",
+            KEY_PRESSURE_CHANGE_WINDOW_HPA: "pressure_change_window",
+            KEY_PRESSURE_TREND_HPAH: "pressure_trend_raw",
         }
         if key in overrides:
             return overrides[key]
+        # Fallback: strip common prefixes/suffixes for a clean slug
+        return key.replace("_mmph", "").replace("_ms", "").replace("_hpa", "").replace("_c", "")
         k = key.replace("_c", "").replace("_hpah", "").replace("_hpa", "")
         k = k.replace("_mm", "").replace("_ms", "").replace("_deg", "")
         k = k.replace("_mmph_", "_").replace("_mmph", "").replace("_pct", "").replace("_lx", "")

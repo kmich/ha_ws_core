@@ -11,6 +11,16 @@
 #   - card-mod (for CSS styling)
 #   - kiosk-mode (for clean fullscreen look)
 #
+# Required Helpers (Settings → Devices & Services → Helpers → + Create):
+#   - input_select.weather_graph_range
+#       Options: 6h, 24h, 3d   (initial: 24h)
+#   - input_boolean.ws_advanced_features_enabled
+#       (default: on)
+#   - input_boolean.weather_enable_animations
+#       (default: on, controls weather animation effects)
+#   - input_boolean.weather_enable_wildfire_risk
+#       (default: off, shows/hides wildfire risk card)
+#
 # https://github.com/kmich/ha-weather-station
 # =============================================================================
 kiosk_mode:
@@ -556,13 +566,13 @@ views:
                 }
             cards:
               - type: custom:button-card
-                entity: sensor.ws_01_temperature
+                entity: sensor.ws_temperature
                 triggers_update:
                   - sensor.ws_temperature_display
                   - sensor.ws_feels_like
                   - sensor.ws_temperature
-                  - sensor.ws_01_humidity
-                  - sensor.ws_01_dew_point
+                  - sensor.ws_humidity
+                  - sensor.ws_dew_point
                 show_name: false
                 show_state: false
                 show_icon: false
@@ -593,7 +603,7 @@ views:
                       const pct = parseFloat(dispAttrs.bar_percent) || 50;
 
                       const comfort = states['sensor.ws_feels_like']?.attributes?.comfort_level || 'Comfortable';
-                      const humid = parseFloat(states['sensor.ws_01_humidity']?.state) || 0;
+                      const humid = parseFloat(states['sensor.ws_humidity']?.state) || 0;
 
                       return `
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
@@ -625,7 +635,7 @@ views:
                 triggers_update:
                   - sensor.ws_wind_quadrant
                   - sensor.ws_temperature
-                  - sensor.ws_01_direction
+                  - sensor.ws_wind_direction
                 show_name: false
                 show_state: false
                 show_icon: false
@@ -687,7 +697,7 @@ views:
                     - flex-direction: column
                     - box-sizing: border-box
               - type: custom:button-card
-                entity: sensor.ws_01_illuminance
+                entity: sensor.ws_illuminance
                 triggers_update:
                   - sensor.ws_illuminance
                   - sensor.ws_uv_level
@@ -819,8 +829,8 @@ views:
 
                           // --- Wildfire risk ---
                           const wildfireEnabled = states['input_boolean.weather_enable_wildfire_risk']?.state === 'on';
-                          const t = parseFloat(states['sensor.ws_01_temperature']?.state);
-                          const h = parseFloat(states['sensor.ws_01_humidity']?.state);
+                          const t = parseFloat(states['sensor.ws_temperature']?.state);
+                          const h = parseFloat(states['sensor.ws_humidity']?.state);
                           const w = parseFloat(states['sensor.ws_wind_beaufort']?.attributes?.speed_ms);
                           const fireActive = wildfireEnabled && !isNaN(t) && !isNaN(h) && !isNaN(w) && (t > 32 && h < 25 && w > 6);
 
@@ -894,8 +904,8 @@ views:
                             [[[ 
                               const quake = states['sensor.ws_alert_state']?.state === 'alert';
                               const wildfireEnabled = states['input_boolean.weather_enable_wildfire_risk']?.state === 'on';
-                              const t = parseFloat(states['sensor.ws_01_temperature']?.state);
-                              const h = parseFloat(states['sensor.ws_01_humidity']?.state);
+                              const t = parseFloat(states['sensor.ws_temperature']?.state);
+                              const h = parseFloat(states['sensor.ws_humidity']?.state);
                               const w = parseFloat(states['sensor.ws_wind_beaufort']?.attributes?.speed_ms);
                               const fire = wildfireEnabled && !isNaN(t) && !isNaN(h) && !isNaN(w) && (t > 32 && h < 25 && w > 6);
                               const prefix = states['input_text.weather_lightning_sensor']?.state || 'lightning_detector';
@@ -908,7 +918,7 @@ views:
                               return 'linear-gradient(145deg, rgba(59,130,246,0.12) 0%, rgba(25,28,38,0.98) 100%)';
                             ]]]
                   - type: custom:button-card
-                    entity: sensor.ws_01_humidity
+                    entity: sensor.ws_humidity
                     triggers_update:
                       - sensor.ws_humidity_level
                     show_name: false
@@ -943,7 +953,7 @@ views:
                         - padding: 8px 10px
                         - box-shadow: 0 4px 20px rgba(0,0,0,0.3)
                   - type: custom:button-card
-                    entity: sensor.ws_01_pressure
+                    entity: sensor.ws_sea_level_pressure
                     triggers_update:
                       - sensor.ws_pressure_trend
                     show_name: false
@@ -1232,10 +1242,10 @@ views:
                 card:
                   type: custom:mini-graph-card
                   entities:
-                    - entity: sensor.ws_01_temperature
+                    - entity: sensor.ws_temperature
                       name: Temp
                       color: '#FBBF24'
-                    - entity: sensor.ws_01_humidity
+                    - entity: sensor.ws_humidity
                       name: Humidity
                       color: '#22D3EE'
                       y_axis: secondary
@@ -1306,8 +1316,9 @@ views:
                 - color: rgba(255,255,255,0.7)
                 - justify-self: start
 
-      # MOON & STARGAZING
+      # MOON & STARGAZING / UV EXPOSURE
       - type: grid
+        column_span: 2
         cards:
           - type: custom:button-card
             entity: sensor.ws_stargazing_quality
@@ -1352,9 +1363,6 @@ views:
                     + '</div></div>';
                 ]]]
 
-      # UV EXPOSURE
-      - type: grid
-        cards:
           - type: custom:button-card
             entity: sensor.ws_uv_level
             name: UV Exposure
@@ -1400,8 +1408,9 @@ views:
                     + '</div>';
                 ]]]
 
-      # LAUNDRY DRYING
+      # LAUNDRY DRYING / FIRE RISK
       - type: grid
+        column_span: 2
         cards:
           - type: custom:button-card
             entity: sensor.ws_laundry_drying_score
@@ -1451,12 +1460,9 @@ views:
                     + '</div>';
                 ]]]
 
-      # FIRE WEATHER
-      - type: grid
-        cards:
           - type: custom:button-card
-            entity: sensor.ws_fire_weather_index
-            name: Fire Weather Index
+            entity: sensor.ws_fire_risk_score
+            name: Fire Risk Score
             show_state: false
             show_icon: true
             icon: mdi:fire
@@ -1500,8 +1506,9 @@ views:
                     + '</div></div>';
                 ]]]
 
-      # RAIN ANALYSIS
+      # RAIN ANALYSIS / TEMPERATURE DETAIL
       - type: grid
+        column_span: 2
         cards:
           - type: custom:button-card
             entity: sensor.ws_rain_probability_combined
@@ -1555,9 +1562,6 @@ views:
                     + '</div></div>';
                 ]]]
 
-      # TEMPERATURE DETAIL
-      - type: grid
-        cards:
           - type: custom:button-card
             entity: sensor.ws_temperature
             name: Temperature Detail
@@ -1606,8 +1610,9 @@ views:
                     + '</div></div>';
                 ]]]
 
-      # WIND DETAIL
+      # WIND DETAIL / PRESSURE DETAIL
       - type: grid
+        column_span: 2
         cards:
           - type: custom:button-card
             entity: sensor.ws_wind_beaufort
@@ -1657,9 +1662,6 @@ views:
                     + '</div></div>';
                 ]]]
 
-      # PRESSURE DETAIL
-      - type: grid
-        cards:
           - type: custom:button-card
             entity: sensor.ws_sea_level_pressure
             name: Pressure Detail
