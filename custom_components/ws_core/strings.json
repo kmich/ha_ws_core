@@ -83,7 +83,12 @@
           "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
           "enable_running_score": "Running conditions score",
-          "enable_sea_temp": "Sea surface temperature (Open-Meteo Marine API)"
+          "enable_sea_temp": "Sea surface temperature (Open-Meteo Marine API)",
+          "enable_degree_days": "Heating / Cooling Degree Days",
+          "enable_metar": "METAR cross-validation (compare local sensors vs nearest airport)",
+          "enable_cwop": "CWOP upload (share data with Citizen Weather Observer Program)",
+          "enable_wunderground": "Weather Underground upload (share data with Weather Underground PWS)",
+          "enable_export": "CSV / JSON data export (save observations to file)"
         }
       },
       "sea_temp": {
@@ -92,6 +97,48 @@
         "data": {
           "sea_temp_lat": "Sea temperature latitude",
           "sea_temp_lon": "Sea temperature longitude"
+        }
+      },
+      "degree_days": {
+        "title": "Degree Days — base temperature",
+        "description": "Heating Degree Days (HDD) and Cooling Degree Days (CDD) measure how much heating or cooling a building needs each day. The base temperature is the outdoor temperature at which no heating or cooling is required — typically 18 °C (64 °F) for residential buildings. HDD accumulates when it is colder than the base; CDD when it is warmer. Both reset at midnight.",
+        "data": {
+          "degree_day_base_c": "Base temperature"
+        }
+      },
+      "metar": {
+        "title": "METAR cross-validation",
+        "description": "Fetches the latest aviation METAR report from the nearest airport and compares temperature and pressure against your local sensors. Free data from aviationweather.gov — no API key required. Find your nearest ICAO code at aviationweather.gov/metar. Leave the ICAO field blank to skip setup now and configure later.",
+        "data": {
+          "metar_icao": "Nearest airport ICAO code (e.g. LGAV for Athens)",
+          "metar_interval_min": "Fetch interval"
+        }
+      },
+      "cwop": {
+        "title": "CWOP upload",
+        "description": "Upload observations to the Citizen Weather Observer Program (cwop.aprs.net). You need a free CWOP callsign — register at wxqa.com. Amateur radio operators use their callsign; citizens use a CW or EW callsign. Leave blank to skip and configure later.",
+        "data": {
+          "cwop_callsign": "CWOP callsign (e.g. CW1234 or EW1234) — leave blank to skip",
+          "cwop_passcode": "APRS passcode (-1 for citizen stations)",
+          "cwop_interval_min": "Upload interval"
+        }
+      },
+      "wunderground": {
+        "title": "Weather Underground upload",
+        "description": "Upload observations to your Weather Underground Personal Weather Station. You need a station ID and API key from your Weather Underground account (wunderground.com/member/devices). Leave both fields blank to skip and configure later.",
+        "data": {
+          "wu_station_id": "Station ID (e.g. IATHEN123) — leave blank to skip",
+          "wu_api_key": "API key — leave blank to skip",
+          "wu_interval_min": "Upload interval"
+        }
+      },
+      "export": {
+        "title": "CSV / JSON data export",
+        "description": "Periodically write all sensor readings to a file on your Home Assistant host. Each day gets its own file (e.g. ws_core_20260218.csv). The directory will be created automatically if it does not exist.",
+        "data": {
+          "export_path": "Export directory path (on HA host)",
+          "export_format": "File format",
+          "export_interval_min": "Export interval"
         }
       }
     },
@@ -140,7 +187,24 @@
           "enable_running_score": "Running conditions score",
           "enable_sea_temp": "Sea surface temperature",
           "sea_temp_lat": "Sea temperature latitude",
-          "sea_temp_lon": "Sea temperature longitude"
+          "sea_temp_lon": "Sea temperature longitude",
+          "enable_degree_days": "Heating / Cooling Degree Days",
+          "degree_day_base_c": "Degree day base temperature",
+          "enable_metar": "METAR cross-validation",
+          "metar_icao": "Nearest airport ICAO code",
+          "metar_interval_min": "METAR fetch interval",
+          "enable_cwop": "CWOP upload",
+          "cwop_callsign": "CWOP callsign",
+          "cwop_passcode": "APRS passcode",
+          "cwop_interval_min": "CWOP upload interval",
+          "enable_wunderground": "Weather Underground upload",
+          "wu_station_id": "WU Station ID",
+          "wu_api_key": "WU API key",
+          "wu_interval_min": "WU upload interval",
+          "enable_export": "CSV / JSON data export",
+          "export_path": "Export directory path",
+          "export_format": "Export file format",
+          "export_interval_min": "Export interval"
         }
       }
     }

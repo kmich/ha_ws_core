@@ -666,10 +666,16 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_metar(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
-            self._data[CONF_METAR_ICAO] = str(user_input.get(CONF_METAR_ICAO, "")).upper().strip()
-            self._data[CONF_METAR_INTERVAL_MIN] = int(
-                user_input.get(CONF_METAR_INTERVAL_MIN, DEFAULT_METAR_INTERVAL_MIN)
-            )
+            icao = str(user_input.get(CONF_METAR_ICAO, "")).upper().strip()
+            if not icao:
+                # No ICAO entered — silently disable METAR and skip this step
+                self._data[CONF_ENABLE_METAR] = False
+                self._data[CONF_METAR_ICAO] = ""
+            else:
+                self._data[CONF_METAR_ICAO] = icao
+                self._data[CONF_METAR_INTERVAL_MIN] = int(
+                    user_input.get(CONF_METAR_INTERVAL_MIN, DEFAULT_METAR_INTERVAL_MIN)
+                )
             if self._data.get(CONF_ENABLE_CWOP):
                 return await self.async_step_cwop()
             if self._data.get(CONF_ENABLE_WUNDERGROUND):
@@ -678,19 +684,19 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_export()
             return await self.async_step_alerts()
 
+        existing_icao = self._data.get(CONF_METAR_ICAO, "")
         return self.async_show_form(
             step_id="metar",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_METAR_ICAO): selector.TextSelector(selector.TextSelectorConfig(type="text")),
+                    vol.Optional(CONF_METAR_ICAO, default=existing_icao): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
                     vol.Optional(CONF_METAR_INTERVAL_MIN, default=DEFAULT_METAR_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=180, step=30, mode="box", unit_of_measurement="min")
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "Enter the ICAO code of the nearest airport/METAR station (e.g. LGAV for Athens). Free data from aviationweather.gov."
-            },
         )
 
     # ------------------------------------------------------------------
@@ -698,20 +704,31 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_cwop(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
-            self._data[CONF_CWOP_CALLSIGN] = str(user_input.get(CONF_CWOP_CALLSIGN, "")).upper().strip()
-            self._data[CONF_CWOP_PASSCODE] = str(user_input.get(CONF_CWOP_PASSCODE, "-1")).strip()
-            self._data[CONF_CWOP_INTERVAL_MIN] = int(user_input.get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN))
+            callsign = str(user_input.get(CONF_CWOP_CALLSIGN, "")).upper().strip()
+            if not callsign:
+                # No callsign entered — silently disable CWOP and skip
+                self._data[CONF_ENABLE_CWOP] = False
+                self._data[CONF_CWOP_CALLSIGN] = ""
+            else:
+                self._data[CONF_CWOP_CALLSIGN] = callsign
+                self._data[CONF_CWOP_PASSCODE] = str(user_input.get(CONF_CWOP_PASSCODE, "-1")).strip()
+                self._data[CONF_CWOP_INTERVAL_MIN] = int(
+                    user_input.get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN)
+                )
             if self._data.get(CONF_ENABLE_WUNDERGROUND):
                 return await self.async_step_wunderground()
             if self._data.get(CONF_ENABLE_EXPORT):
                 return await self.async_step_export()
             return await self.async_step_alerts()
 
+        existing_callsign = self._data.get(CONF_CWOP_CALLSIGN, "")
         return self.async_show_form(
             step_id="cwop",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_CWOP_CALLSIGN): selector.TextSelector(selector.TextSelectorConfig(type="text")),
+                    vol.Optional(CONF_CWOP_CALLSIGN, default=existing_callsign): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
                     vol.Optional(CONF_CWOP_PASSCODE, default="-1"): selector.TextSelector(
                         selector.TextSelectorConfig(type="text")
                     ),
@@ -720,9 +737,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "CWOP callsign (e.g. CW1234 or EW1234). Citizens use passcode=-1. Uploads to cwop.aprs.net."
-            },
         )
 
     # ------------------------------------------------------------------
@@ -730,25 +744,37 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_wunderground(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
-            self._data[CONF_WU_STATION_ID] = str(user_input.get(CONF_WU_STATION_ID, "")).strip()
-            self._data[CONF_WU_API_KEY] = str(user_input.get(CONF_WU_API_KEY, "")).strip()
-            self._data[CONF_WU_INTERVAL_MIN] = int(user_input.get(CONF_WU_INTERVAL_MIN, DEFAULT_WU_INTERVAL_MIN))
+            station_id = str(user_input.get(CONF_WU_STATION_ID, "")).strip()
+            api_key = str(user_input.get(CONF_WU_API_KEY, "")).strip()
+            if not station_id or not api_key:
+                # Missing credentials — silently disable WU and skip
+                self._data[CONF_ENABLE_WUNDERGROUND] = False
+                self._data[CONF_WU_STATION_ID] = ""
+                self._data[CONF_WU_API_KEY] = ""
+            else:
+                self._data[CONF_WU_STATION_ID] = station_id
+                self._data[CONF_WU_API_KEY] = api_key
+                self._data[CONF_WU_INTERVAL_MIN] = int(user_input.get(CONF_WU_INTERVAL_MIN, DEFAULT_WU_INTERVAL_MIN))
             if self._data.get(CONF_ENABLE_EXPORT):
                 return await self.async_step_export()
             return await self.async_step_alerts()
 
+        existing_station = self._data.get(CONF_WU_STATION_ID, "")
         return self.async_show_form(
             step_id="wunderground",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_WU_STATION_ID): selector.TextSelector(selector.TextSelectorConfig(type="text")),
-                    vol.Required(CONF_WU_API_KEY): selector.TextSelector(selector.TextSelectorConfig(type="password")),
+                    vol.Optional(CONF_WU_STATION_ID, default=existing_station): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_WU_API_KEY, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
                     vol.Optional(CONF_WU_INTERVAL_MIN, default=DEFAULT_WU_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=30, step=1, mode="box", unit_of_measurement="min")
                     ),
                 }
             ),
-            description_placeholders={"info": "Station ID and API key from your Weather Underground account."},
         )
 
     # ------------------------------------------------------------------
