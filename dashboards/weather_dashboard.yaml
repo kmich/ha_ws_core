@@ -1310,7 +1310,7 @@ views:
                 - color: rgba(255,255,255,0.7)
                 - justify-self: start
 
-      # MOON & STARGAZING / UV EXPOSURE
+      # ALL ADVANCED CARDS (single grid — no gaps between rows)
       - type: grid
         column_span: 2
         cards:
@@ -1402,10 +1402,7 @@ views:
                     + '</div>';
                 ]]]
 
-      # ACTIVITY SCORES & SEA TEMPERATURE (all conditional)
-      - type: grid
-        column_span: 2
-        cards:
+          # ACTIVITY SCORES & SEA TEMPERATURE (conditional, same grid)
           - type: conditional
             conditions:
               - condition: state
@@ -1616,10 +1613,7 @@ views:
                       + '</div>';
                   ]]]
 
-      # RAIN ANALYSIS / TEMPERATURE DETAIL
-      - type: grid
-        column_span: 2
-        cards:
+          # RAIN ANALYSIS / TEMPERATURE DETAIL (same grid)
           - type: custom:button-card
             entity: sensor.ws_rain_probability_combined
             name: Rain Analysis
@@ -1720,10 +1714,7 @@ views:
                     + '</div></div>';
                 ]]]
 
-      # WIND DETAIL / PRESSURE DETAIL
-      - type: grid
-        column_span: 2
-        cards:
+          # WIND DETAIL / PRESSURE DETAIL (same grid)
           - type: custom:button-card
             entity: sensor.ws_wind_beaufort
             name: Wind Detail

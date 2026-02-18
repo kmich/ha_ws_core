@@ -1183,7 +1183,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             lon = self.sea_temp_lon or float(self.hass.config.longitude)
 
             url = (
-                "https://api.open-meteo.com/v1/marine"
+                "https://marine-api.open-meteo.com/v1/marine"
                 f"?latitude={lat}&longitude={lon}"
                 "&current=sea_surface_temperature"
                 "&hourly=sea_surface_temperature"
@@ -1200,10 +1200,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     return
                 js = await resp.json()
 
+            # Try current block first, fall back to first hourly value
             current = js.get("current") or {}
             sst_c = current.get("sea_surface_temperature")
 
-            # Parse hourly SST for chart attributes
+            # Parse hourly SST
             hourly = js.get("hourly") or {}
             h_times = hourly.get("time") or []
             h_sst = hourly.get("sea_surface_temperature") or []
@@ -1213,19 +1214,28 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if i < len(h_sst) and h_sst[i] is not None
             ]
 
+            # Fallback: if current block didn't have SST, use first hourly value
+            if sst_c is None and h_sst:
+                for v in h_sst:
+                    if v is not None:
+                        sst_c = v
+                        break
+
+            if sst_c is None:
+                _LOGGER.warning("Open-Meteo Marine returned no SST data for %.4f,%.4f", lat, lon)
+                return
+
             # Swimming comfort label
-            comfort = "Unknown"
-            if sst_c is not None:
-                if sst_c < 16:
-                    comfort = "Cold"
-                elif sst_c < 20:
-                    comfort = "Cool"
-                elif sst_c < 24:
-                    comfort = "Comfortable"
-                elif sst_c < 28:
-                    comfort = "Warm"
-                else:
-                    comfort = "Hot"
+            if sst_c < 16:
+                comfort = "Cold"
+            elif sst_c < 20:
+                comfort = "Cool"
+            elif sst_c < 24:
+                comfort = "Comfortable"
+            elif sst_c < 28:
+                comfort = "Warm"
+            else:
+                comfort = "Hot"
 
             self._sea_temp_cache = {
                 "current_c": round(sst_c, 1) if sst_c is not None else None,
