@@ -1901,44 +1901,26 @@ views:
       - type: grid
         column_span: 2
         cards:
-          - type: custom:button-card
-            entity: sensor.ws_wind_direction
-            show_state: false
-            show_icon: false
-            show_name: false
+          - type: custom:windrose-card
+            title: Wind Rose (24h)
+            hours_to_show: 24
+            wind_direction_entity:
+              entity: sensor.ws_wind_direction
+            wind_speed_entities:
+              - entity: sensor.ws_wind_speed
+                name: Wind Speed
+            compass:
+              auto_align: true
+            cardinal_direction_letters: NESW
+            current_direction:
+              show: true
             card_mod:
               style: |
                 ha-card {
                   background: rgba(20,20,35,0.95) !important;
                   border: 1px solid rgba(255,255,255,0.08) !important;
                   border-radius: 16px !important;
-                  padding: 12px !important;
-                  min-height: 60px !important;
                 }
-            custom_fields:
-              content: |
-                [[[
-                  const isInstalled = customElements.get('windrose-card') !== undefined;
-                  if (isInstalled) {
-                    return `<windrose-card
-                      style="display:block;width:100%;height:400px;"
-                    ></windrose-card>`;
-                  }
-                  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-                    padding:32px 16px;gap:12px;text-align:center;">
-                    <ha-icon icon="mdi:chart-donut" style="--mdi-icon-size:40px;color:rgba(56,189,248,0.6);"></ha-icon>
-                    <div style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.85);">Wind Rose</div>
-                    <div style="font-size:12px;color:rgba(255,255,255,0.5);max-width:320px;line-height:1.6;">
-                      Install <b style="color:rgba(56,189,248,0.8);">Wind Rose Card</b> from
-                      <b style="color:rgba(56,189,248,0.8);">HACS → Frontend</b>
-                      then restart Home Assistant to enable this widget.
-                    </div>
-                  </div>`;
-                ]]]
-            styles:
-              custom_fields:
-                content:
-                  - width: 100%
 
       # =======================================================================
       # RADAR  (v0.5.0) — RainViewer live radar via iframe
@@ -1947,12 +1929,9 @@ views:
       - type: grid
         column_span: 2
         cards:
-          - type: custom:button-card
-            name: "RADAR"
-            show_state: false
-            show_icon: false
-            show_name: true
-            entity: sensor.ws_station_health
+          - type: iframe
+            url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9/2/1/1/0/1/1
+            aspect_ratio: 75%
             card_mod:
               style: |
                 ha-card {
@@ -1960,43 +1939,7 @@ views:
                   border: 1px solid rgba(255,255,255,0.08) !important;
                   border-radius: 16px !important;
                   overflow: hidden !important;
-                  padding: 0 !important;
-                  height: 420px !important;
                 }
-            styles:
-              card:
-                - padding: 0
-                - height: 420px
-                - overflow: hidden
-                - position: relative
-              name:
-                - position: absolute
-                - top: 10px
-                - left: 16px
-                - font-size: 11px
-                - font-weight: 700
-                - letter-spacing: 1px
-                - color: rgba(255,255,255,0.5)
-                - z-index: 10
-            custom_fields:
-              iframe: |
-                [[[
-                  // RainViewer free viewer — centered on HA lat/lon
-                  // Uses your HA configured lat/lon for centering
-                  const lat = states['zone.home']?.attributes?.latitude 
-                              || 37.9838;  // fallback: Athens
-                  const lon = states['zone.home']?.attributes?.longitude 
-                              || 23.7275;
-                  const zoom = 9;
-                  const url = `https://www.rainviewer.com/map.html?loc=${lat},${lon},${zoom}/2/1/1/0/1/1`;
-                  return `<iframe
-                    src="${url}"
-                    style="width:100%;height:420px;border:none;border-radius:16px;display:block;"
-                    allow="fullscreen"
-                    loading="lazy"
-                    title="RainViewer Radar"
-                  ></iframe>`;
-                ]]]
 
       # =======================================================================
       # DEGREE DAYS, ET₀ & UPLOAD STATUS  (v0.5.1/v0.6.0)
