@@ -1903,17 +1903,19 @@ views:
         cards:
           - type: custom:windrose-card
             title: Wind Rose (24h)
-            hours_to_show: 24
+            data_period:
+              hours_to_show: 24
             wind_direction_entity:
               entity: sensor.ws_wind_direction
-            wind_speed_entities:
+            windspeed_entities:
               - entity: sensor.ws_wind_speed
                 name: Wind Speed
-            compass:
-              auto_align: true
+                speed_range_beaufort: true
+                output_speed_unit: mps
             cardinal_direction_letters: NESW
+            windspeed_bar_location: bottom
             current_direction:
-              show: true
+              show_arrow: true
             card_mod:
               style: |
                 ha-card {
@@ -1930,7 +1932,7 @@ views:
         column_span: 2
         cards:
           - type: iframe
-            url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9/2/1/1/0/1/1
+            url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9&oFa=1&oC=1&oU=1&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=1
             aspect_ratio: 75%
             card_mod:
               style: |
