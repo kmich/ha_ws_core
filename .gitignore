@@ -67,3 +67,7 @@ home-assistant_v2.db
 *.tmp
 *.bak
 *.orig
+
+# Release artifacts (built locally, attached to GitHub releases)
+*.zip
+*.tar.gz

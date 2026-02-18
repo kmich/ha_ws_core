@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION DASHBOARD v2.0.0 (ws_core integration)
+# WEATHER STATION DASHBOARD v3.0.0 (ws_core integration)
 # =============================================================================
 # Two-page dashboard: Weather (main) + Advanced (subview, inline navigation)
 #
@@ -1942,6 +1942,147 @@ views:
                   border-radius: 16px !important;
                   overflow: hidden !important;
                 }
+
+      # =======================================================================
+      # AIR QUALITY & POLLEN  (v0.7.0)
+      # Conditional: only visible when air quality or pollen is enabled
+      # =======================================================================
+      - type: grid
+        column_span: 2
+        cards:
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.ws_air_quality_index
+                state_not: "unavailable"
+            card:
+              type: entities
+              title: Air Quality
+              entities:
+                - entity: sensor.ws_air_quality_index
+                  name: AQI (PM2.5)
+                  icon: mdi:air-filter
+                - entity: sensor.ws_air_quality_level
+                  name: AQI Level
+                  icon: mdi:gauge
+              card_mod:
+                style: |
+                  ha-card {
+                    background: rgba(20,20,35,0.95) !important;
+                    border: 1px solid rgba(255,255,255,0.08) !important;
+                    border-radius: 16px !important;
+                  }
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.ws_pollen_overall
+                state_not: "unavailable"
+            card:
+              type: entities
+              title: Pollen
+              entities:
+                - entity: sensor.ws_pollen_overall
+                  name: Overall Level
+                  icon: mdi:flower-pollen
+                - entity: sensor.ws_pollen_grass
+                  name: Grass
+                  icon: mdi:grass
+                - entity: sensor.ws_pollen_tree
+                  name: Tree
+                  icon: mdi:tree
+                - entity: sensor.ws_pollen_weed
+                  name: Weed
+                  icon: mdi:flower-pollen-outline
+              card_mod:
+                style: |
+                  ha-card {
+                    background: rgba(20,20,35,0.95) !important;
+                    border: 1px solid rgba(255,255,255,0.08) !important;
+                    border-radius: 16px !important;
+                  }
+
+      # =======================================================================
+      # MOON PHASE  (v0.8.0)
+      # Conditional: only visible when moon feature is enabled
+      # =======================================================================
+      - type: conditional
+        column_span: 2
+        conditions:
+          - condition: state
+            entity: sensor.ws_moon_phase
+            state_not: "unavailable"
+        card:
+          type: grid
+          column_span: 2
+          columns: 2
+          cards:
+            - type: entities
+              title: Moon
+              entities:
+                - entity: sensor.ws_moon_display
+                  name: Phase
+                  icon: mdi:moon-waning-crescent
+                - entity: sensor.ws_moon_illumination
+                  name: Illumination
+                  icon: mdi:brightness-percent
+              card_mod:
+                style: |
+                  ha-card {
+                    background: rgba(20,20,35,0.95) !important;
+                    border: 1px solid rgba(255,255,255,0.08) !important;
+                    border-radius: 16px !important;
+                  }
+            - type: entities
+              title: Moon Details
+              entities:
+                - entity: sensor.ws_moon_phase
+                  name: Phase Key
+                  icon: mdi:calendar-moon
+              card_mod:
+                style: |
+                  ha-card {
+                    background: rgba(20,20,35,0.95) !important;
+                    border: 1px solid rgba(255,255,255,0.08) !important;
+                    border-radius: 16px !important;
+                  }
+
+      # =======================================================================
+      # SOLAR FORECAST  (v0.9.0)
+      # Conditional: only visible when solar forecast feature is enabled
+      # =======================================================================
+      - type: conditional
+        column_span: 2
+        conditions:
+          - condition: state
+            entity: sensor.ws_solar_forecast_today_kwh
+            state_not: "unavailable"
+        card:
+          type: grid
+          column_span: 2
+          columns: 2
+          cards:
+            - type: entity
+              entity: sensor.ws_solar_forecast_today_kwh
+              name: Solar Today
+              icon: mdi:solar-power
+              card_mod:
+                style: |
+                  ha-card {
+                    background: rgba(20,20,35,0.95) !important;
+                    border: 1px solid rgba(255,255,255,0.08) !important;
+                    border-radius: 16px !important;
+                  }
+            - type: entity
+              entity: sensor.ws_solar_forecast_tomorrow_kwh
+              name: Solar Tomorrow
+              icon: mdi:solar-power-variant
+              card_mod:
+                style: |
+                  ha-card {
+                    background: rgba(20,20,35,0.95) !important;
+                    border: 1px solid rgba(255,255,255,0.08) !important;
+                    border-radius: 16px !important;
+                  }
 
       # =======================================================================
       # DEGREE DAYS, ET₀ & UPLOAD STATUS  (v0.5.1/v0.6.0)

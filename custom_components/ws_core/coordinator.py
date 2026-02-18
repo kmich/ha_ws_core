@@ -47,12 +47,15 @@ from .algorithms import (
     CONDITION_ICONS,
     MOON_ILLUMINATION,
     KalmanFilter,
+    aqi_level,
     beaufort_description,
     calculate_apparent_temperature,
     calculate_dew_point,
     calculate_frost_point,
+    calculate_moon_illumination,
     calculate_moon_phase,
     calculate_rain_probability,
+    calculate_us_aqi,
     calculate_wet_bulb,
     combine_rain_probability,
     cooling_degree_hours,
@@ -60,6 +63,7 @@ from .algorithms import (
     direction_to_quadrant,
     et0_hargreaves,
     et0_hourly_estimate,
+    et0_penman_monteith,
     fire_danger_level,
     fire_risk_score,
     format_rain_display,
@@ -71,8 +75,14 @@ from .algorithms import (
     laundry_recommendation,
     least_squares_pressure_trend,
     metar_validation_label,
+    moon_display_string,
+    moon_next_phase_days,
+    moon_phase_days,
+    moon_phase_from_age,
     moon_stargazing_impact,
     parse_metar_json,
+    pollen_level,
+    pollen_overall,
     pressure_trend_display,
     running_level,
     running_recommendation,
@@ -86,19 +96,24 @@ from .algorithms import (
     zambretti_forecast,
 )
 from .const import (
+    CONF_AQI_INTERVAL_MIN,
     CONF_CLIMATE_REGION,
     CONF_CWOP_CALLSIGN,
     CONF_CWOP_INTERVAL_MIN,
     CONF_CWOP_PASSCODE,
     CONF_DEGREE_DAY_BASE_C,
     CONF_ELEVATION_M,
+    CONF_ENABLE_AIR_QUALITY,
     # v0.6.0 new
     CONF_ENABLE_CWOP,
     # v0.5.0 new
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_EXPORT,
     CONF_ENABLE_METAR,
+    CONF_ENABLE_MOON,
+    CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
+    CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_WUNDERGROUND,
     CONF_EXPORT_FORMAT,
     CONF_EXPORT_INTERVAL_MIN,
@@ -110,33 +125,52 @@ from .const import (
     CONF_HEMISPHERE,
     CONF_METAR_ICAO,
     CONF_METAR_INTERVAL_MIN,
+    CONF_POLLEN_INTERVAL_MIN,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
+    CONF_SOLAR_INTERVAL_MIN,
+    CONF_SOLAR_PANEL_AZIMUTH,
+    CONF_SOLAR_PANEL_TILT,
+    CONF_SOLAR_PEAK_KW,
     CONF_SOURCES,
     CONF_STALENESS_S,
+    CONF_TOMORROW_IO_KEY,
     CONF_UNITS_MODE,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
+    DEFAULT_AQI_INTERVAL_MIN,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_CWOP_INTERVAL_MIN,
     DEFAULT_DEGREE_DAY_BASE_C,
+    DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_CWOP,
     DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_EXPORT,
     DEFAULT_ENABLE_METAR,
+    DEFAULT_ENABLE_MOON,
+    DEFAULT_ENABLE_POLLEN,
+    DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_EXPORT_FORMAT,
     DEFAULT_EXPORT_INTERVAL_MIN,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_HEMISPHERE,
     DEFAULT_METAR_INTERVAL_MIN,
+    DEFAULT_POLLEN_INTERVAL_MIN,
+    DEFAULT_SOLAR_INTERVAL_MIN,
+    DEFAULT_SOLAR_PANEL_AZIMUTH,
+    DEFAULT_SOLAR_PANEL_TILT,
+    DEFAULT_SOLAR_PEAK_KW,
     DEFAULT_STALENESS_S,
     DEFAULT_WU_INTERVAL_MIN,
     FORECAST_MAX_RETRY_S,
     FORECAST_MIN_RETRY_S,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
+    # v0.7.0
+    KEY_AQI,
+    KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
     KEY_CDD_RATE,
@@ -147,6 +181,7 @@ from .const import (
     KEY_DEW_POINT_C,
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
+    KEY_ET0_PM_DAILY_MM,
     KEY_FEELS_LIKE_C,
     KEY_FIRE_RISK_SCORE,
     KEY_FORECAST,
@@ -168,6 +203,14 @@ from .const import (
     KEY_METAR_VALIDATION,
     KEY_METAR_WIND_DIR,
     KEY_METAR_WIND_MS,
+    KEY_MOON_AGE_DAYS,
+    KEY_MOON_DISPLAY,
+    KEY_MOON_ILLUMINATION_PCT,
+    KEY_MOON_NEXT_FULL,
+    KEY_MOON_NEXT_NEW,
+    # v0.8.0
+    KEY_MOON_PHASE,
+    KEY_NO2,
     KEY_NORM_HUMIDITY,
     KEY_NORM_PRESSURE_HPA,
     KEY_NORM_RAIN_TOTAL_MM,
@@ -175,8 +218,15 @@ from .const import (
     KEY_NORM_WIND_DIR_DEG,
     KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
+    KEY_OZONE,
     KEY_PACKAGE_OK,
     KEY_PACKAGE_STATUS,
+    KEY_PM2_5,
+    KEY_PM10,
+    KEY_POLLEN_GRASS,
+    KEY_POLLEN_OVERALL,
+    KEY_POLLEN_TREE,
+    KEY_POLLEN_WEED,
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
@@ -191,6 +241,10 @@ from .const import (
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_QUALITY_FLAGS,
+    KEY_SOLAR_FORECAST_STATUS,
+    # v0.9.0
+    KEY_SOLAR_FORECAST_TODAY_KWH,
+    KEY_SOLAR_FORECAST_TOMORROW_KWH,
     KEY_STARGAZE_SCORE,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
@@ -278,6 +332,13 @@ class WSStationRuntime:
     # Compute timing (for diagnostics)
     last_compute_ms: float = 0.0
 
+    # v0.7.0 Air Quality / Pollen fetch tracking
+    last_aqi_fetch: Any | None = None
+    last_pollen_fetch: Any | None = None
+
+    # v0.9.0 Solar forecast fetch tracking
+    last_solar_fetch: Any | None = None
+
 
 # ---------------------------------------------------------------------------
 # Coordinator
@@ -357,6 +418,28 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.export_interval_min = int(_get(CONF_EXPORT_INTERVAL_MIN, DEFAULT_EXPORT_INTERVAL_MIN))
         self._export_last_time: Any = None
 
+        # v0.7.0 Air Quality (Open-Meteo AQI, free)
+        self.aqi_enabled = bool(_get(CONF_ENABLE_AIR_QUALITY, DEFAULT_ENABLE_AIR_QUALITY))
+        self.aqi_interval_min = int(_get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
+        self._aqi_cache: dict[str, Any] | None = None
+
+        # v0.7.0 Pollen (Tomorrow.io)
+        self.pollen_enabled = bool(_get(CONF_ENABLE_POLLEN, DEFAULT_ENABLE_POLLEN))
+        self.tomorrow_io_key: str = str(_get(CONF_TOMORROW_IO_KEY, "") or "")
+        self.pollen_interval_min = int(_get(CONF_POLLEN_INTERVAL_MIN, DEFAULT_POLLEN_INTERVAL_MIN))
+        self._pollen_cache: dict[str, Any] | None = None
+
+        # v0.8.0 Moon (calculated, no external API)
+        self.moon_enabled = bool(_get(CONF_ENABLE_MOON, DEFAULT_ENABLE_MOON))
+
+        # v0.9.0 Solar forecast (forecast.solar, free)
+        self.solar_forecast_enabled = bool(_get(CONF_ENABLE_SOLAR_FORECAST, DEFAULT_ENABLE_SOLAR_FORECAST))
+        self.solar_peak_kw = float(_get(CONF_SOLAR_PEAK_KW, DEFAULT_SOLAR_PEAK_KW))
+        self.solar_panel_azimuth = int(_get(CONF_SOLAR_PANEL_AZIMUTH, DEFAULT_SOLAR_PANEL_AZIMUTH))
+        self.solar_panel_tilt = int(_get(CONF_SOLAR_PANEL_TILT, DEFAULT_SOLAR_PANEL_TILT))
+        self.solar_interval_min = int(_get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN))
+        self._solar_cache: dict[str, Any] | None = None
+
         super().__init__(
             hass,
             logger=_LOGGER,
@@ -415,6 +498,39 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     timedelta(minutes=self.export_interval_min),
                 )
             )
+
+        # Air quality periodic fetch (v0.7.0)
+        if self.aqi_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_aqi()),
+                    timedelta(minutes=self.aqi_interval_min),
+                )
+            )
+            self.hass.async_create_task(self._async_fetch_aqi())
+
+        # Pollen periodic fetch (v0.7.0)
+        if self.pollen_enabled and self.tomorrow_io_key and self.forecast_lat is not None:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_pollen()),
+                    timedelta(minutes=self.pollen_interval_min),
+                )
+            )
+            self.hass.async_create_task(self._async_fetch_pollen())
+
+        # Solar forecast periodic fetch (v0.9.0)
+        if self.solar_forecast_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_solar_forecast()),
+                    timedelta(minutes=self.solar_interval_min),
+                )
+            )
+            self.hass.async_create_task(self._async_fetch_solar_forecast())
 
         await self.async_refresh()
 
@@ -1238,6 +1354,68 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_WU_STATUS] = self._wu_status
         data[KEY_LAST_EXPORT_TIME] = self._export_last_time.isoformat() if self._export_last_time else None
 
+        # Air Quality (v0.7.0)
+        if self.aqi_enabled and self._aqi_cache:
+            aq = self._aqi_cache
+            data[KEY_AQI] = aq.get("aqi")
+            data[KEY_AQI_LEVEL] = aq.get("aqi_level")
+            data[KEY_PM2_5] = aq.get("pm2_5")
+            data[KEY_PM10] = aq.get("pm10")
+            data[KEY_NO2] = aq.get("no2")
+            data[KEY_OZONE] = aq.get("ozone")
+
+        # Pollen (v0.7.0)
+        if self.pollen_enabled and self._pollen_cache:
+            pol = self._pollen_cache
+            data[KEY_POLLEN_GRASS] = pol.get("grass_index")
+            data[KEY_POLLEN_TREE] = pol.get("tree_index")
+            data[KEY_POLLEN_WEED] = pol.get("weed_index")
+            data[KEY_POLLEN_OVERALL] = pol.get("overall_level")
+
+        # Moon (v0.8.0) — pure calculation, no external API
+        if self.moon_enabled:
+            local_now = dt_util.now()
+            age = moon_phase_days(local_now.year, local_now.month, local_now.day)
+            phase_key = moon_phase_from_age(age)
+            illum_frac = calculate_moon_illumination(local_now.year, local_now.month, local_now.day)
+            illum_pct = round(illum_frac * 100)
+            data[KEY_MOON_PHASE] = phase_key
+            data[KEY_MOON_ILLUMINATION_PCT] = illum_pct
+            data[KEY_MOON_DISPLAY] = moon_display_string(phase_key, illum_pct)
+            data[KEY_MOON_AGE_DAYS] = age
+            data[KEY_MOON_NEXT_FULL] = moon_next_phase_days(local_now.year, local_now.month, local_now.day, 14.77)
+            data[KEY_MOON_NEXT_NEW] = moon_next_phase_days(local_now.year, local_now.month, local_now.day, 0.0)
+
+        # Solar forecast (v0.9.0)
+        if self.solar_forecast_enabled and self._solar_cache:
+            sol = self._solar_cache
+            data[KEY_SOLAR_FORECAST_TODAY_KWH] = sol.get("today_kwh")
+            data[KEY_SOLAR_FORECAST_TOMORROW_KWH] = sol.get("tomorrow_kwh")
+            data[KEY_SOLAR_FORECAST_STATUS] = sol.get("status", "OK")
+
+        # Penman-Monteith ET₀ (v0.9.0) — uses solar radiation sensor if configured
+        if self.degree_days_enabled and self.forecast_lat is not None:
+            tc = data.get(KEY_NORM_TEMP_C)
+            rh = data.get(KEY_NORM_HUMIDITY)
+            ws = data.get(KEY_NORM_WIND_SPEED_MS)
+            # Try to read solar radiation source if wired
+            sol_rad = self._get_solar_radiation()
+            if tc is not None and rh is not None and ws is not None and sol_rad is not None:
+                high = data.get(KEY_TEMP_HIGH_24H) or tc
+                low = data.get(KEY_TEMP_LOW_24H) or tc
+                doy = dt_util.now().timetuple().tm_yday
+                et0_pm = et0_penman_monteith(
+                    temp_mean_c=float(tc),
+                    temp_max_c=float(high),
+                    temp_min_c=float(low),
+                    humidity=float(rh),
+                    wind_speed_ms=float(ws),
+                    solar_radiation_wm2=float(sol_rad),
+                    elevation_m=self.elevation_m,
+                    day_of_year=doy,
+                )
+                data[KEY_ET0_PM_DAILY_MM] = et0_pm
+
         self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
         return data
 
@@ -1766,3 +1944,175 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("ws_core data exported to %s", self.export_path)
         except Exception as exc:
             _LOGGER.warning("ws_core export failed: %s", exc)
+
+    # ------------------------------------------------------------------
+    # v0.9.0 — Solar radiation source helper
+    # ------------------------------------------------------------------
+
+    def _get_solar_radiation(self) -> float | None:
+        """Read optional solar radiation sensor (W/m²) from sources."""
+        from .const import SRC_SOLAR_RADIATION
+
+        eid = self.sources.get(SRC_SOLAR_RADIATION)
+        if not eid:
+            return None
+        return self._num(self.hass, eid)
+
+    # ------------------------------------------------------------------
+    # v0.7.0 — Air Quality fetch (Open-Meteo AQI API, free, no key)
+    # ------------------------------------------------------------------
+
+    async def _async_fetch_aqi(self) -> None:
+        """Fetch air quality data from Open-Meteo AQI API."""
+        if not (self.forecast_lat is not None and self.forecast_lon is not None):
+            return
+        import aiohttp
+
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+        url = (
+            "https://air-quality-api.open-meteo.com/v1/air-quality"
+            f"?latitude={lat}&longitude={lon}"
+            "&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone"
+            "&timezone=auto"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        _LOGGER.warning("ws_core AQI fetch failed: HTTP %s", resp.status)
+                        return
+                    raw = await resp.json()
+            cur = raw.get("current", {})
+            pm25 = cur.get("pm2_5")
+            pm10 = cur.get("pm10")
+            no2 = cur.get("nitrogen_dioxide")
+            ozone = cur.get("ozone")
+            co = cur.get("carbon_monoxide")
+            aqi_val = calculate_us_aqi(pm25, pm10)
+            self._aqi_cache = {
+                "pm2_5": pm25,
+                "pm10": pm10,
+                "no2": no2,
+                "ozone": ozone,
+                "co": co,
+                "aqi": aqi_val,
+                "aqi_level": aqi_level(aqi_val) if aqi_val is not None else None,
+                "fetched_at": dt_util.utcnow().isoformat(),
+            }
+            self.runtime.last_aqi_fetch = dt_util.utcnow()
+            _LOGGER.debug("ws_core AQI fetched: AQI=%s (%s)", aqi_val, self._aqi_cache.get("aqi_level"))
+            await self.async_request_refresh()
+        except Exception as exc:
+            _LOGGER.warning("ws_core AQI fetch error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # v0.7.0 — Pollen fetch (Tomorrow.io, free API key)
+    # ------------------------------------------------------------------
+
+    async def _async_fetch_pollen(self) -> None:
+        """Fetch pollen data from Tomorrow.io Pollen API (v4)."""
+        if not (self.tomorrow_io_key and self.forecast_lat is not None and self.forecast_lon is not None):
+            return
+        import aiohttp
+
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+        url = (
+            "https://data.tomorrow.io/v4/weather/realtime"
+            f"?location={lat},{lon}"
+            "&fields=grassIndex,treeIndex,weedIndex"
+            f"&apikey={self.tomorrow_io_key}"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status == 429:
+                        _LOGGER.warning("ws_core pollen: Tomorrow.io rate limit hit")
+                        return
+                    if resp.status != 200:
+                        _LOGGER.warning("ws_core pollen fetch failed: HTTP %s", resp.status)
+                        return
+                    raw = await resp.json()
+            values = raw.get("data", {}).get("values", {})
+            grass = values.get("grassIndex")
+            tree = values.get("treeIndex")
+            weed = values.get("weedIndex")
+            self._pollen_cache = {
+                "grass_index": grass,
+                "tree_index": tree,
+                "weed_index": weed,
+                "grass_level": pollen_level(grass),
+                "tree_level": pollen_level(tree),
+                "weed_level": pollen_level(weed),
+                "overall_level": pollen_overall(grass, tree, weed),
+                "fetched_at": dt_util.utcnow().isoformat(),
+            }
+            self.runtime.last_pollen_fetch = dt_util.utcnow()
+            _LOGGER.debug("ws_core pollen fetched: overall=%s", self._pollen_cache.get("overall_level"))
+            await self.async_request_refresh()
+        except Exception as exc:
+            _LOGGER.warning("ws_core pollen fetch error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # v0.9.0 — Solar forecast fetch (forecast.solar, free, no key)
+    # ------------------------------------------------------------------
+
+    async def _async_fetch_solar_forecast(self) -> None:
+        """Fetch PV generation forecast from forecast.solar API."""
+        if not (self.forecast_lat is not None and self.forecast_lon is not None):
+            return
+        import aiohttp
+
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+        declination = self.solar_panel_tilt
+        azimuth = self.solar_panel_azimuth - 180  # forecast.solar uses -180..180 (0=south)
+        kwp = self.solar_peak_kw
+
+        # API endpoint: /estimate/<lat>/<lon>/<declination>/<azimuth>/<kwp>
+        url = f"https://api.forecast.solar/estimate/{lat}/{lon}/{declination}/{azimuth}/{kwp}"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status == 429:
+                        _LOGGER.warning("ws_core solar forecast: forecast.solar rate limit hit")
+                        return
+                    if resp.status != 200:
+                        _LOGGER.warning("ws_core solar forecast fetch failed: HTTP %s", resp.status)
+                        return
+                    raw = await resp.json()
+
+            result = raw.get("result", {})
+            # watt_hours_day: {"YYYY-MM-DD": wh, ...}
+            wh_day = result.get("watt_hours_day", {})
+            days = sorted(wh_day.keys())
+            local_today = dt_util.now().date().isoformat()
+
+            today_kwh = None
+            tomorrow_kwh = None
+            for _i, d in enumerate(days):
+                if d >= local_today:
+                    if today_kwh is None:
+                        today_kwh = round(wh_day[d] / 1000, 2)
+                    elif tomorrow_kwh is None:
+                        tomorrow_kwh = round(wh_day[d] / 1000, 2)
+                        break
+
+            self._solar_cache = {
+                "today_kwh": today_kwh,
+                "tomorrow_kwh": tomorrow_kwh,
+                "watt_hours_day": wh_day,
+                "status": "OK",
+                "fetched_at": dt_util.utcnow().isoformat(),
+            }
+            self.runtime.last_solar_fetch = dt_util.utcnow()
+            _LOGGER.debug(
+                "ws_core solar forecast: today=%.2f kWh, tomorrow=%.2f kWh", today_kwh or 0, tomorrow_kwh or 0
+            )
+            await self.async_request_refresh()
+        except Exception as exc:
+            _LOGGER.warning("ws_core solar forecast fetch error: %s", exc)
+            if self._solar_cache:
+                self._solar_cache["status"] = f"Error: {exc}"

@@ -88,7 +88,11 @@
           "enable_metar": "METAR cross-validation (compare local sensors vs nearest airport)",
           "enable_cwop": "CWOP upload (share data with Citizen Weather Observer Program)",
           "enable_wunderground": "Weather Underground upload (share data with Weather Underground PWS)",
-          "enable_export": "CSV / JSON data export (save observations to file)"
+          "enable_export": "CSV / JSON data export (save observations to file)",
+          "enable_air_quality": "Air quality index (Open-Meteo, free, no API key)",
+          "enable_pollen": "Pollen levels (Tomorrow.io, free API key required)",
+          "enable_moon": "Moon phase & illumination",
+          "enable_solar_forecast": "Solar PV generation forecast (forecast.solar, free)"
         }
       },
       "sea_temp": {
@@ -140,6 +144,31 @@
           "export_format": "File format",
           "export_interval_min": "Export interval"
         }
+      },
+      "air_quality": {
+        "title": "Air Quality",
+        "description": "{info}",
+        "data": {
+          "aqi_interval_min": "Refresh interval"
+        }
+      },
+      "pollen": {
+        "title": "Pollen Data",
+        "description": "{info}",
+        "data": {
+          "tomorrow_io_key": "Tomorrow.io API key",
+          "pollen_interval_min": "Refresh interval"
+        }
+      },
+      "solar_forecast": {
+        "title": "Solar Forecast",
+        "description": "{info}",
+        "data": {
+          "solar_peak_kw": "Solar system peak power (kWp)",
+          "solar_panel_azimuth": "Panel azimuth",
+          "solar_panel_tilt": "Panel tilt",
+          "solar_interval_min": "Refresh interval"
+        }
       }
     },
     "error": {
@@ -148,14 +177,17 @@
       "required": "This field is required.",
       "elevation_out_of_range": "Elevation must be between -500 m and 9000 m.",
       "wind_gust_too_high": "Wind gust threshold exceeds the physical world record.",
-      "temp_out_of_range": "Temperature is outside the physically possible range."
+      "temp_out_of_range": "Temperature is outside the physically possible range.",
+      "invalid_api_key": "Invalid API key or credentials rejected",
+      "cannot_connect": "Could not connect to API — check network and try again",
+      "station_not_found": "Weather Underground station ID not found"
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Weather Station Core -- Options",
-        "description": "Update settings, units, location, forecast, and alert thresholds.",
+        "title": "Core Settings",
+        "description": "Identity, units, forecast, alerts and calibration.",
         "data": {
           "prefix": "Entity prefix",
           "hemisphere": "Hemisphere",
@@ -205,6 +237,99 @@
           "export_path": "Export directory path",
           "export_format": "Export file format",
           "export_interval_min": "Export interval"
+        }
+      },
+      "features_opt": {
+        "title": "Features",
+        "description": "Toggle sensors and enable external data sources. Sub-steps will appear for each enabled feature.",
+        "data": {
+          "enable_zambretti": "Zambretti forecast & classifier",
+          "enable_display_sensors": "Display sensors (levels, trends, health)",
+          "enable_laundry_score": "Laundry drying score",
+          "enable_stargazing_score": "Stargazing quality",
+          "enable_fire_risk_score": "Fire risk score",
+          "enable_running_score": "Running conditions score",
+          "enable_sea_temp": "Sea surface temperature",
+          "enable_degree_days": "Heating / Cooling Degree Days",
+          "enable_metar": "METAR cross-validation",
+          "enable_cwop": "CWOP upload",
+          "enable_wunderground": "Weather Underground upload",
+          "enable_export": "CSV / JSON data export",
+          "enable_air_quality": "Air quality index (Open-Meteo)",
+          "enable_pollen": "Pollen levels (Tomorrow.io)",
+          "enable_moon": "Moon phase & illumination",
+          "enable_solar_forecast": "Solar PV forecast (forecast.solar)"
+        }
+      },
+      "sea_temp_opt": {
+        "title": "Sea Surface Temperature",
+        "data": {
+          "sea_temp_lat": "Sea temperature latitude",
+          "sea_temp_lon": "Sea temperature longitude"
+        }
+      },
+      "degree_days_opt": {
+        "title": "Degree Days",
+        "data": {
+          "degree_day_base_c": "Degree day base temperature"
+        }
+      },
+      "metar_opt": {
+        "title": "METAR Cross-Validation",
+        "description": "{info}",
+        "data": {
+          "metar_icao": "Airport ICAO code",
+          "metar_interval_min": "Fetch interval"
+        }
+      },
+      "cwop_opt": {
+        "title": "CWOP Upload",
+        "data": {
+          "cwop_callsign": "CWOP callsign",
+          "cwop_passcode": "APRS passcode",
+          "cwop_interval_min": "Upload interval"
+        }
+      },
+      "wunderground_opt": {
+        "title": "Weather Underground",
+        "description": "{info}",
+        "data": {
+          "wu_station_id": "Station ID",
+          "wu_api_key": "API key",
+          "wu_interval_min": "Upload interval"
+        }
+      },
+      "export_opt": {
+        "title": "Data Export",
+        "data": {
+          "export_path": "Export directory",
+          "export_format": "Format",
+          "export_interval_min": "Interval"
+        }
+      },
+      "air_quality_opt": {
+        "title": "Air Quality Settings",
+        "description": "{info}",
+        "data": {
+          "aqi_interval_min": "Refresh interval"
+        }
+      },
+      "pollen_opt": {
+        "title": "Pollen Settings",
+        "description": "{info}",
+        "data": {
+          "tomorrow_io_key": "Tomorrow.io API key",
+          "pollen_interval_min": "Refresh interval"
+        }
+      },
+      "solar_forecast_opt": {
+        "title": "Solar Forecast Settings",
+        "description": "{info}",
+        "data": {
+          "solar_peak_kw": "Peak power (kWp)",
+          "solar_panel_azimuth": "Panel azimuth",
+          "solar_panel_tilt": "Panel tilt",
+          "solar_interval_min": "Refresh interval"
         }
       }
     }

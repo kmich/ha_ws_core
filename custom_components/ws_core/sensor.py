@@ -15,13 +15,20 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    # v0.7.0
+    CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_LAUNDRY,
     CONF_ENABLE_METAR,
+    # v0.8.0
+    CONF_ENABLE_MOON,
+    CONF_ENABLE_POLLEN,
     CONF_ENABLE_RUNNING,
     CONF_ENABLE_SEA_TEMP,
+    # v0.9.0
+    CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_STARGAZING,
     CONF_ENABLE_ZAMBRETTI,
     CONF_PREFIX,
@@ -29,6 +36,9 @@ from .const import (
     DOMAIN,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
+    # v0.7.0
+    KEY_AQI,
+    KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
     KEY_CDD_RATE,
@@ -40,6 +50,7 @@ from .const import (
     # v0.6.0
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
+    KEY_ET0_PM_DAILY_MM,
     KEY_FEELS_LIKE_C,
     KEY_FIRE_RISK_SCORE,
     KEY_FORECAST,
@@ -62,6 +73,14 @@ from .const import (
     KEY_METAR_VALIDATION,
     KEY_METAR_WIND_DIR,
     KEY_METAR_WIND_MS,
+    KEY_MOON_AGE_DAYS,
+    KEY_MOON_DISPLAY,
+    KEY_MOON_ILLUMINATION_PCT,
+    KEY_MOON_NEXT_FULL,
+    KEY_MOON_NEXT_NEW,
+    # v0.8.0
+    KEY_MOON_PHASE,
+    KEY_NO2,
     KEY_NORM_HUMIDITY,
     KEY_NORM_PRESSURE_HPA,
     KEY_NORM_RAIN_TOTAL_MM,
@@ -69,7 +88,14 @@ from .const import (
     KEY_NORM_WIND_DIR_DEG,
     KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
+    KEY_OZONE,
     KEY_PACKAGE_STATUS,
+    KEY_PM2_5,
+    KEY_PM10,
+    KEY_POLLEN_GRASS,
+    KEY_POLLEN_OVERALL,
+    KEY_POLLEN_TREE,
+    KEY_POLLEN_WEED,
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
@@ -84,6 +110,10 @@ from .const import (
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_QUALITY_FLAGS,
+    KEY_SOLAR_FORECAST_STATUS,
+    # v0.9.0
+    KEY_SOLAR_FORECAST_TODAY_KWH,
+    KEY_SOLAR_FORECAST_TOMORROW_KWH,
     KEY_STARGAZE_SCORE,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
@@ -787,6 +817,160 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # ---------------------------------------------------------------
+    # Air Quality  (v0.7.0, Open-Meteo AQI API)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_AQI,
+        name="WS Air Quality Index",
+        icon="mdi:air-filter",
+        native_unit="AQI",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "level": d.get(KEY_AQI_LEVEL),
+            "pm2_5_ug_m3": d.get(KEY_PM2_5),
+            "pm10_ug_m3": d.get(KEY_PM10),
+            "no2_ug_m3": d.get(KEY_NO2),
+            "ozone_ug_m3": d.get(KEY_OZONE),
+            "scale": "US EPA (0-50 Good, 51-100 Moderate, 101-150 Unhealthy for Sensitive, 151-200 Unhealthy, 201-300 Very Unhealthy, 300+ Hazardous)",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_AQI_LEVEL,
+        name="WS Air Quality Level",
+        icon="mdi:air-filter",
+        attrs_fn=lambda d: {
+            "aqi": d.get(KEY_AQI),
+            "pm2_5_ug_m3": d.get(KEY_PM2_5),
+            "pm10_ug_m3": d.get(KEY_PM10),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_PM2_5,
+        name="WS PM2.5",
+        icon="mdi:smoke",
+        native_unit="µg/m³",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_PM10,
+        name="WS PM10",
+        icon="mdi:smoke",
+        native_unit="µg/m³",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # ---------------------------------------------------------------
+    # Pollen  (v0.7.0, Tomorrow.io)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_POLLEN_OVERALL,
+        name="WS Pollen Level",
+        icon="mdi:flower-pollen",
+        attrs_fn=lambda d: {
+            "grass_index": d.get(KEY_POLLEN_GRASS),
+            "grass_level": "None" if d.get(KEY_POLLEN_GRASS) == 0 else d.get("_pollen_grass_level"),
+            "tree_index": d.get(KEY_POLLEN_TREE),
+            "tree_level": "None" if d.get(KEY_POLLEN_TREE) == 0 else d.get("_pollen_tree_level"),
+            "weed_index": d.get(KEY_POLLEN_WEED),
+            "weed_level": "None" if d.get(KEY_POLLEN_WEED) == 0 else d.get("_pollen_weed_level"),
+            "scale": "0=None, 1=Very Low, 2=Low, 3=Medium, 4=High, 5=Very High",
+            "source": "Tomorrow.io",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_POLLEN_GRASS,
+        name="WS Pollen Grass",
+        icon="mdi:flower-pollen-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_POLLEN_TREE,
+        name="WS Pollen Tree",
+        icon="mdi:tree",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_POLLEN_WEED,
+        name="WS Pollen Weed",
+        icon="mdi:flower-pollen-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # ---------------------------------------------------------------
+    # Moon  (v0.8.0, calculated)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_MOON_DISPLAY,
+        name="WS Moon",
+        icon="mdi:moon-waxing-crescent",
+        attrs_fn=lambda d: {
+            "phase": d.get(KEY_MOON_PHASE),
+            "illumination_pct": d.get(KEY_MOON_ILLUMINATION_PCT),
+            "age_days": d.get(KEY_MOON_AGE_DAYS),
+            "days_to_full_moon": d.get(KEY_MOON_NEXT_FULL),
+            "days_to_new_moon": d.get(KEY_MOON_NEXT_NEW),
+            "method": "Meeus 1998, Astronomical Algorithms Ch. 48 (simplified)",
+            "accuracy": "±1% illumination, ±0.5 day phase timing",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_MOON_PHASE,
+        name="WS Moon Phase",
+        icon="mdi:moon-full",
+        attrs_fn=lambda d: {
+            "illumination_pct": d.get(KEY_MOON_ILLUMINATION_PCT),
+            "age_days": d.get(KEY_MOON_AGE_DAYS),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_MOON_ILLUMINATION_PCT,
+        name="WS Moon Illumination",
+        icon="mdi:moon-full",
+        native_unit="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # ---------------------------------------------------------------
+    # Solar forecast  (v0.9.0, forecast.solar)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_SOLAR_FORECAST_TODAY_KWH,
+        name="WS Solar Forecast Today",
+        icon="mdi:solar-power",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "tomorrow_kwh": d.get(KEY_SOLAR_FORECAST_TOMORROW_KWH),
+            "status": d.get(KEY_SOLAR_FORECAST_STATUS),
+            "source": "forecast.solar",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_SOLAR_FORECAST_TOMORROW_KWH,
+        name="WS Solar Forecast Tomorrow",
+        icon="mdi:solar-power-variant",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # Penman-Monteith ET₀ (v0.9.0, when solar radiation sensor available)
+    WSSensorDescription(
+        key=KEY_ET0_PM_DAILY_MM,
+        name="WS ET₀ Penman-Monteith (Daily)",
+        icon="mdi:water-pump",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit="mm",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "method": "FAO-56 Penman-Monteith (Allen et al. 1998)",
+            "accuracy_note": "±5-10% vs lysimeter; requires solar radiation sensor",
+            "hargreaves_et0": d.get(KEY_ET0_DAILY_MM),
+        },
+    ),
 ]
 
 # Sensor-to-feature-toggle mapping for granular control
@@ -822,6 +1006,26 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_METAR_PRESSURE_HPA: CONF_ENABLE_METAR,
     KEY_METAR_DELTA_TEMP: CONF_ENABLE_METAR,
     KEY_METAR_DELTA_PRESSURE: CONF_ENABLE_METAR,
+    # Air Quality  (v0.7.0)
+    KEY_AQI: CONF_ENABLE_AIR_QUALITY,
+    KEY_AQI_LEVEL: CONF_ENABLE_AIR_QUALITY,
+    KEY_PM2_5: CONF_ENABLE_AIR_QUALITY,
+    KEY_PM10: CONF_ENABLE_AIR_QUALITY,
+    KEY_NO2: CONF_ENABLE_AIR_QUALITY,
+    KEY_OZONE: CONF_ENABLE_AIR_QUALITY,
+    # Pollen  (v0.7.0)
+    KEY_POLLEN_OVERALL: CONF_ENABLE_POLLEN,
+    KEY_POLLEN_GRASS: CONF_ENABLE_POLLEN,
+    KEY_POLLEN_TREE: CONF_ENABLE_POLLEN,
+    KEY_POLLEN_WEED: CONF_ENABLE_POLLEN,
+    # Moon  (v0.8.0)
+    KEY_MOON_DISPLAY: CONF_ENABLE_MOON,
+    KEY_MOON_PHASE: CONF_ENABLE_MOON,
+    KEY_MOON_ILLUMINATION_PCT: CONF_ENABLE_MOON,
+    # Solar forecast  (v0.9.0)
+    KEY_SOLAR_FORECAST_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_SOLAR_FORECAST_TOMORROW_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_ET0_PM_DAILY_MM: CONF_ENABLE_SOLAR_FORECAST,
 }
 
 
@@ -883,6 +1087,19 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_ET0_HOURLY_MM,
         KEY_METAR_TEMP_C,
         KEY_METAR_PRESSURE_HPA,
+        # v0.7.0 diagnostic sub-pollutants
+        KEY_PM2_5,
+        KEY_PM10,
+        KEY_NO2,
+        KEY_OZONE,
+        KEY_POLLEN_GRASS,
+        KEY_POLLEN_TREE,
+        KEY_POLLEN_WEED,
+        # v0.8.0
+        KEY_MOON_ILLUMINATION_PCT,
+        # v0.9.0
+        KEY_SOLAR_FORECAST_TOMORROW_KWH,
+        KEY_ET0_PM_DAILY_MM,
     }
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
@@ -1003,6 +1220,25 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_CWOP_STATUS: "cwop_upload_status",
             KEY_WU_STATUS: "wu_upload_status",
             KEY_LAST_EXPORT_TIME: "last_export_time",
+            # v0.7.0
+            KEY_AQI: "air_quality_index",
+            KEY_AQI_LEVEL: "air_quality_level",
+            KEY_PM2_5: "pm2_5",
+            KEY_PM10: "pm10",
+            KEY_NO2: "no2",
+            KEY_OZONE: "ozone",
+            KEY_POLLEN_OVERALL: "pollen_level",
+            KEY_POLLEN_GRASS: "pollen_grass",
+            KEY_POLLEN_TREE: "pollen_tree",
+            KEY_POLLEN_WEED: "pollen_weed",
+            # v0.8.0
+            KEY_MOON_DISPLAY: "moon",
+            KEY_MOON_PHASE: "moon_phase",
+            KEY_MOON_ILLUMINATION_PCT: "moon_illumination",
+            # v0.9.0
+            KEY_SOLAR_FORECAST_TODAY_KWH: "solar_forecast_today",
+            KEY_SOLAR_FORECAST_TOMORROW_KWH: "solar_forecast_tomorrow",
+            KEY_ET0_PM_DAILY_MM: "et0_penman_monteith",
         }
         if key in overrides:
             return overrides[key]

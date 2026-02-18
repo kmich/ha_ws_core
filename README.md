@@ -18,14 +18,21 @@ Weather Station Core reads raw sensor data from your existing weather station �
 
 ## Features
 
-- **Real Zambretti barometric forecaster** — Negretti & Zambra lookup table (Z-numbers 1–26), climate-region-aware wind corrections, seasonal adjustment
-- **Wet-bulb temperature** (Stull 2011, ±0.3 °C) and **frost point** (Buck 1981 ice constants)
+- **Real Zambretti barometric forecaster** -- Negretti & Zambra lookup table (Z-numbers 1-26), climate-region-aware wind corrections, seasonal adjustment
+- **Wet-bulb temperature** (Stull 2011, +-0.3 C) and **frost point** (Buck 1981 ice constants)
 - **Climate-region-aware rain probability** with Open-Meteo NWP blending
 - **Kalman-filtered rain rate** for de-noised precipitation readings
 - **36-condition weather classifier** with severity levels and MDI icons
 - **Activity scores**: laundry drying, stargazing quality, running conditions, fire risk
+- **Air Quality Index** via Open-Meteo (free, no API key) -- PM2.5, PM10, NO2, ozone
+- **Pollen levels** (grass, tree, weed) via Tomorrow.io (free API key required)
+- **Moon phase & illumination** -- calculated astronomically, no API key required
+- **Solar PV forecast** (today + tomorrow kWh) via forecast.solar (free, no API key)
+- **Penman-Monteith ET0** -- automatically activates when a solar radiation sensor is available
 - **7-day daily forecast** via Open-Meteo (free, no API key required)
-- **Proper HA integration**: 7-step config flow, options flow, diagnostics, device registry, HA Repairs
+- **METAR cross-validation** -- auto-detects nearest ICAO airport from your coordinates
+- **CWOP & Weather Underground uploads** with credential validation at setup
+- **Full options flow** -- every setting reconfigurable post-install via the Configure button, no reinstall needed
 
 ---
 
@@ -75,13 +82,15 @@ The 7-step wizard walks you through:
 |---|---|
 | 1. Name & prefix | Station name and entity ID prefix (e.g. `ws` → `sensor.ws_temperature`) |
 | 2. Required sensors | Map your 7 mandatory sensor entities |
-| 3. Optional sensors | Map illuminance, UV, dew point, battery (leave blank to skip) |
+| 3. Optional sensors | Map illuminance, UV, dew point, battery, solar radiation (leave blank to skip) |
 | 4. Location & climate | Hemisphere, climate region, elevation (auto-detected from HA) |
 | 5. Display units | Temperature, wind, rain, pressure unit preferences |
-| 6. Forecast | Enable/disable Open-Meteo 7-day forecast |
-| 7. Alerts & advanced | Wind/rain/freeze thresholds, Kalman filter, activity scores toggle |
+| 6. Forecast | Enable/disable Open-Meteo 7-day forecast, coordinates |
+| 7. Alerts | Wind/rain/freeze thresholds |
+| 8. Features | Toggle all feature groups: activity scores, sea temp, degree days, METAR, CWOP, WU, export, air quality, pollen, moon, solar forecast |
+| 8a-8n | Per-feature sub-steps for each enabled feature (ICAO code, API keys, panel config, etc.) |
 
-All settings can be changed later via the **Configure** button.
+All settings can be changed later via **Configure** (Settings → Devices & Services → Weather Station Core → Configure). The options flow mirrors the full config flow.
 
 ---
 
@@ -136,6 +145,37 @@ All settings can be changed later via the **Configure** button.
 | `sensor.ws_stargazing_quality` | text | Stargazing quality (Excellent/Good/Fair/Poor) |
 | `sensor.ws_fire_risk_score` | 0–50 | Simplified fire risk heuristic |
 | `sensor.ws_running_score` | 0–100 | Running conditions score |
+
+### Air Quality (optional, enable_air_quality)
+
+| Entity | Unit | Description |
+|---|---|---|
+| `sensor.ws_air_quality_index` | AQI | US EPA AQI from Open-Meteo (PM2.5-based) |
+| `sensor.ws_air_quality_level` | — | Level label: Good / Moderate / Unhealthy / etc. |
+
+### Pollen (optional, enable_pollen + Tomorrow.io API key)
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_pollen_overall` | Highest of grass/tree/weed (None/Low/Medium/High/Very High) |
+| `sensor.ws_pollen_grass` | Grass pollen IQLA index |
+| `sensor.ws_pollen_tree` | Tree pollen IQLA index |
+| `sensor.ws_pollen_weed` | Weed pollen IQLA index |
+
+### Moon (optional, enable_moon)
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_moon_display` | Human-readable phase name with emoji |
+| `sensor.ws_moon_phase` | Phase key (new/waxing_crescent/first_quarter/etc.) |
+| `sensor.ws_moon_illumination` | Illumination percentage |
+
+### Solar PV Forecast (optional, enable_solar_forecast)
+
+| Entity | Unit | Description |
+|---|---|---|
+| `sensor.ws_solar_forecast_today_kwh` | kWh | Estimated PV generation today |
+| `sensor.ws_solar_forecast_tomorrow_kwh` | kWh | Estimated PV generation tomorrow |
 
 ### Other Entities
 

@@ -2,6 +2,26 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [1.0.0] - 2026-02-18
+
+### Added
+- **Air Quality Index** (v0.7.0): PM2.5, PM10, NO₂, ozone via Open-Meteo AQI API. Free, no API key. Uses forecast lat/lon. Enable with `enable_air_quality`. Sensors: `sensor.ws_air_quality_index`, `sensor.ws_air_quality_level`.
+- **Pollen levels** (v0.7.0): Grass, tree, and weed pollen indices via Tomorrow.io. Free API key required. Enable with `enable_pollen`. Sensors: `sensor.ws_pollen_overall`, `sensor.ws_pollen_grass`, `sensor.ws_pollen_tree`, `sensor.ws_pollen_weed`. Interval: 6h default (free tier: 500 calls/day).
+- **Moon phase & illumination** (v0.8.0): Calculated from astronomical algorithms, no external API. Enable with `enable_moon`. Sensors: `sensor.ws_moon_display`, `sensor.ws_moon_phase`, `sensor.ws_moon_illumination_pct`. Attributes include age, days to next full/new moon.
+- **Solar PV forecast** (v0.9.0): Daily generation forecast (kWh) via forecast.solar. Free, no API key. Configurable peak kWp, panel azimuth, and tilt. Enable with `enable_solar_forecast`. Sensors: `sensor.ws_solar_forecast_today_kwh`, `sensor.ws_solar_forecast_tomorrow_kwh`.
+- **Penman-Monteith ET₀** (v0.9.0): Higher-accuracy evapotranspiration when a solar radiation sensor (`solar_radiation` source, W/m²) is configured. Activates automatically. Sensor: `sensor.ws_et0_pm_daily_mm`. Replaces Hargreaves-Samani when available.
+- **Multi-step options flow** (v1.0.0): The Configure button now guides through all settings in discrete steps (Core → Features → per-feature sub-steps), matching the initial config flow. Every option from the config flow is now accessible post-install without reinstalling.
+- **METAR ICAO auto-detection** (v1.0.0): Leave the ICAO field blank during setup to automatically find the nearest airport from your forecast lat/lon via aviationweather.gov.
+- **Weather Underground credential validation** (v1.0.0): Station ID and API key are validated against the WU API before saving; setup shows an error immediately if the credentials are invalid.
+- **Tomorrow.io pollen key validation** (v1.0.0): API key is validated at setup time and in the options flow.
+- **Unit tests** (v1.0.0): 44 algorithm tests covering dew point, sea-level pressure, apparent temperature, Beaufort, Zambretti, UV, laundry, AQI, pollen, moon phases, ET₀, Kalman filtering. All pass. Run with `pytest tests/`.
+- **GitHub Actions CI** (v1.0.0): Automatically runs ruff linting, ruff format check, unit tests, and hassfest on every push and pull request.
+
+### Changed
+- Config flow features step now includes all v0.7–0.9 toggles: air quality, pollen, moon, solar forecast.
+- `_autodetect_metar_icao` helper falls back to aviationweather.gov when ICAO field is left blank.
+
+
 ## [0.5.1] - 2026-02-18
 
 ### Added (v0.5.0 completion)

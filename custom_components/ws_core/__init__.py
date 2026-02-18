@@ -83,7 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         name=entry.title,
         manufacturer="Weather Station Core",
         model="Derived Weather Package",
-        sw_version="0.5.1",
+        sw_version="1.0.0",
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

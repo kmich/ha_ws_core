@@ -330,3 +330,72 @@ FORECAST_MIN_RETRY_S: int = 300
 FORECAST_MAX_RETRY_S: int = 3600
 
 CONFIG_VERSION = 2
+
+# ---------------------------------------------------------------------------
+# v0.7.0 — Air Quality (Open-Meteo AQI, free/no key)
+# ---------------------------------------------------------------------------
+CONF_ENABLE_AIR_QUALITY = "enable_air_quality"
+CONF_AQI_INTERVAL_MIN = "aqi_interval_min"
+DEFAULT_ENABLE_AIR_QUALITY = False
+DEFAULT_AQI_INTERVAL_MIN = 60
+
+# v0.7.0 — Pollen (Tomorrow.io, free API key required)
+CONF_ENABLE_POLLEN = "enable_pollen"
+CONF_TOMORROW_IO_KEY = "tomorrow_io_key"
+CONF_POLLEN_INTERVAL_MIN = "pollen_interval_min"
+DEFAULT_ENABLE_POLLEN = False
+DEFAULT_POLLEN_INTERVAL_MIN = 360  # 6 h; Tomorrow.io free tier: 500 calls/day
+
+# ---------------------------------------------------------------------------
+# v0.8.0 — Astronomical (Moon)
+# ---------------------------------------------------------------------------
+CONF_ENABLE_MOON = "enable_moon"
+DEFAULT_ENABLE_MOON = False
+
+# ---------------------------------------------------------------------------
+# v0.9.0 — Solar forecast (forecast.solar, free/no key) + Penman-Monteith ET₀
+# ---------------------------------------------------------------------------
+CONF_ENABLE_SOLAR_FORECAST = "enable_solar_forecast"
+CONF_SOLAR_PEAK_KW = "solar_peak_kw"
+CONF_SOLAR_PANEL_AZIMUTH = "solar_panel_azimuth"
+CONF_SOLAR_PANEL_TILT = "solar_panel_tilt"
+CONF_SOLAR_INTERVAL_MIN = "solar_interval_min"
+DEFAULT_ENABLE_SOLAR_FORECAST = False
+DEFAULT_SOLAR_PEAK_KW = 5.0
+DEFAULT_SOLAR_PANEL_AZIMUTH = 180  # south-facing
+DEFAULT_SOLAR_PANEL_TILT = 30  # degrees from horizontal
+DEFAULT_SOLAR_INTERVAL_MIN = 60
+
+# v0.9.0 — Penman-Monteith ET₀ optional solar radiation source
+SRC_SOLAR_RADIATION = "solar_radiation"  # W/m², optional
+
+# ---------------------------------------------------------------------------
+# Data keys — v0.7.0 Air Quality
+# ---------------------------------------------------------------------------
+KEY_AQI = "air_quality_index"
+KEY_AQI_LEVEL = "air_quality_level"
+KEY_PM2_5 = "pm2_5_ug_m3"
+KEY_PM10 = "pm10_ug_m3"
+KEY_NO2 = "no2_ug_m3"
+KEY_OZONE = "ozone_ug_m3"
+KEY_CO = "co_ug_m3"
+
+# Data keys — v0.7.0 Pollen
+KEY_POLLEN_GRASS = "pollen_grass_index"
+KEY_POLLEN_TREE = "pollen_tree_index"
+KEY_POLLEN_WEED = "pollen_weed_index"
+KEY_POLLEN_OVERALL = "pollen_overall_level"
+
+# Data keys — v0.8.0 Moon
+KEY_MOON_PHASE = "moon_phase"
+KEY_MOON_ILLUMINATION_PCT = "moon_illumination_pct"
+KEY_MOON_DISPLAY = "moon_display"
+KEY_MOON_AGE_DAYS = "moon_age_days"
+KEY_MOON_NEXT_FULL = "moon_next_full_days"
+KEY_MOON_NEXT_NEW = "moon_next_new_days"
+
+# Data keys — v0.9.0 Solar forecast
+KEY_SOLAR_FORECAST_TODAY_KWH = "solar_forecast_today_kwh"
+KEY_SOLAR_FORECAST_TOMORROW_KWH = "solar_forecast_tomorrow_kwh"
+KEY_SOLAR_FORECAST_STATUS = "solar_forecast_status"
+KEY_ET0_PM_DAILY_MM = "et0_pm_daily_mm"  # Penman-Monteith (when solar available)
