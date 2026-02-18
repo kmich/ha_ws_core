@@ -556,6 +556,9 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "danger_level": d.get("_fire_danger_level"),
             "rain_24h_mm": d.get("_fire_rain_24h_mm"),
+            "temperature_c": d.get(KEY_NORM_TEMP_C),
+            "humidity_pct": d.get(KEY_NORM_HUMIDITY),
+            "wind_ms": d.get(KEY_NORM_WIND_SPEED_MS),
             "disclaimer": (
                 "Simplified heuristic (0-50 scale). NOT suitable for operational "
                 "fire weather decisions. Consult official fire services."

@@ -139,5 +139,22 @@
       "title": "Open-Meteo forecast API failures",
       "description": "The Open-Meteo forecast API has failed {failures} consecutive times. Forecast data may be stale. Check your internet connection. The integration will retry automatically with exponential backoff."
     }
+  },
+  "entity": {
+    "select": {
+      "ws_graph_range": {
+        "name": "Graph Range",
+        "state": {
+          "6h": "6 hours",
+          "24h": "24 hours",
+          "3d": "3 days"
+        }
+      }
+    },
+    "switch": {
+      "ws_enable_animations": {
+        "name": "Dashboard Animations"
+      }
+    }
   }
 }

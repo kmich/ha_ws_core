@@ -2,6 +2,22 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [0.4.5] - 2026-02-18
+
+### Added
+- **`select.ws_graph_range`**: Integration-owned select entity for dashboard graph time range (6h/24h/3d). Replaces manual `input_select` helper — auto-created, state restored on restart.
+- **`switch.ws_enable_animations`**: Integration-owned switch for dashboard animation toggle. Replaces manual `input_boolean` helper — auto-created, state restored on restart.
+- **New platforms**: `select` and `switch` added to integration platforms.
+
+### Fixed
+- **Fire Risk Score attributes**: Added `temperature_c`, `humidity_pct`, `wind_ms` to fire risk sensor attributes (dashboard card showed N/A).
+- **Dashboard: zero manual helpers**: All `input_select.*` and `input_boolean.*` references replaced with integration-owned entities. Users no longer need to create any helpers manually.
+- **Dashboard: advanced features boolean removed**: Nav button always shows active (feature visibility is now controlled by config flow toggles).
+- **Dashboard: wildfire risk boolean removed**: Fire risk card visibility now checks if `sensor.ws_fire_risk_score` entity exists (controlled by Activity Scores toggle in config).
+
+### Changed
+- `PLATFORMS` expanded to `["sensor", "binary_sensor", "weather", "select", "switch"]`.
+
 ## [0.4.4] - 2026-02-18
 
 ### Added

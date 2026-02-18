@@ -11,15 +11,9 @@
 #   - card-mod (for CSS styling)
 #   - kiosk-mode (for clean fullscreen look)
 #
-# Required Helpers (Settings → Devices & Services → Helpers → + Create):
-#   - input_select.weather_graph_range
-#       Options: 6h, 24h, 3d   (initial: 24h)
-#   - input_boolean.ws_advanced_features_enabled
-#       (default: on)
-#   - input_boolean.weather_enable_animations
-#       (default: on, controls weather animation effects)
-#   - input_boolean.weather_enable_wildfire_risk
-#       (default: off, shows/hides wildfire risk card)
+# Required Helpers: NONE — all entities are auto-created by the integration.
+#   - select.ws_graph_range (graph time range: 6h/24h/3d)
+#   - switch.ws_enable_animations (dashboard animation toggle)
 #
 # https://github.com/kmich/ha-weather-station
 # =============================================================================
@@ -165,7 +159,7 @@ views:
                 }
             cards:
               - type: custom:button-card
-                icon: "[[[ return states['input_boolean.ws_advanced_features_enabled']?.state === 'on' ? 'mdi:flask-outline' : 'mdi:flask-off-outline'; ]]]"
+                icon: "[[[ return true ? 'mdi:flask-outline' : 'mdi:flask-off-outline'; ]]]"
                 show_name: false
                 show_state: false
                 show_icon: true
@@ -187,9 +181,9 @@ views:
                     - height: 100%
                     - padding: 0
                     - margin: 0
-                    - opacity: "[[[ return states['input_boolean.ws_advanced_features_enabled']?.state === 'on' ? '1' : '0.55'; ]]]"
+                    - opacity: "[[[ return true ? '1' : '0.55'; ]]]"
                   icon:
-                    - color: "[[[ return states['input_boolean.ws_advanced_features_enabled']?.state === 'on' ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.35)'; ]]]"
+                    - color: "[[[ return true ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.35)'; ]]]"
                     - width: 22px
                     - height: 22px
               - type: custom:button-card
@@ -451,7 +445,7 @@ views:
                         moonHtml = `<ha-icon icon="${moonIcon}" style="--mdc-icon-size:16px; color:#FEF3C7; margin-left:4px;"></ha-icon>`;
                       }
 
-                      const animationsEnabled = states['input_boolean.weather_enable_animations']?.state === 'on';
+                      const animationsEnabled = states['switch.ws_enable_animations']?.state === 'on';
                       const floatAnimation = animationsEnabled ? 'animation: float 5s ease-in-out infinite;' : '';
 
 
@@ -828,7 +822,7 @@ views:
                           const quakeActive = quake?.state === 'alert';
 
                           // --- Wildfire risk ---
-                          const wildfireEnabled = states['input_boolean.weather_enable_wildfire_risk']?.state === 'on';
+                          const wildfireEnabled = states['sensor.ws_fire_risk_score'] !== undefined;
                           const t = parseFloat(states['sensor.ws_temperature']?.state);
                           const h = parseFloat(states['sensor.ws_humidity']?.state);
                           const w = parseFloat(states['sensor.ws_wind_beaufort']?.attributes?.speed_ms);
@@ -903,7 +897,7 @@ views:
                         - background: |
                             [[[ 
                               const quake = states['sensor.ws_alert_state']?.state === 'alert';
-                              const wildfireEnabled = states['input_boolean.weather_enable_wildfire_risk']?.state === 'on';
+                              const wildfireEnabled = states['sensor.ws_fire_risk_score'] !== undefined;
                               const t = parseFloat(states['sensor.ws_temperature']?.state);
                               const h = parseFloat(states['sensor.ws_humidity']?.state);
                               const w = parseFloat(states['sensor.ws_wind_beaufort']?.attributes?.speed_ms);
@@ -1128,14 +1122,14 @@ views:
               - type: horizontal-stack
                 cards:
                   - type: custom:button-card
-                    entity: input_select.weather_graph_range
+                    entity: select.ws_graph_range
                     name: 6h
                     show_icon: false
                     tap_action:
                       action: call-service
-                      service: input_select.select_option
+                      service: select.select_option
                       service_data:
-                        entity_id: input_select.weather_graph_range
+                        entity_id: select.ws_graph_range
                         option: 6h
                     styles:
                       card:
@@ -1160,14 +1154,14 @@ views:
                             [[[ return (entity && entity.state === '6h') ? '600'
                             : '400' ]]]
                   - type: custom:button-card
-                    entity: input_select.weather_graph_range
+                    entity: select.ws_graph_range
                     name: 24h
                     show_icon: false
                     tap_action:
                       action: call-service
-                      service: input_select.select_option
+                      service: select.select_option
                       service_data:
-                        entity_id: input_select.weather_graph_range
+                        entity_id: select.ws_graph_range
                         option: 24h
                     styles:
                       card:
@@ -1192,14 +1186,14 @@ views:
                             [[[ return (entity && entity.state === '24h') ?
                             '600' : '400' ]]]
                   - type: custom:button-card
-                    entity: input_select.weather_graph_range
+                    entity: select.ws_graph_range
                     name: 3d
                     show_icon: false
                     tap_action:
                       action: call-service
-                      service: input_select.select_option
+                      service: select.select_option
                       service_data:
-                        entity_id: input_select.weather_graph_range
+                        entity_id: select.ws_graph_range
                         option: 3d
                     styles:
                       card:
@@ -1225,19 +1219,19 @@ views:
                             : '400' ]]]
               - type: custom:config-template-card
                 entities:
-                  - input_select.weather_graph_range
+                  - select.ws_graph_range
                 variables:
                   HOURS: >
-                    states['input_select.weather_graph_range']?.state === '6h' ?
+                    states['select.ws_graph_range']?.state === '6h' ?
                     6 :
 
-                    states['input_select.weather_graph_range']?.state === '3d' ?
+                    states['select.ws_graph_range']?.state === '3d' ?
                     72 : 24
                   PPH: >
-                    states['input_select.weather_graph_range']?.state === '6h' ?
+                    states['select.ws_graph_range']?.state === '6h' ?
                     12 :
 
-                    states['input_select.weather_graph_range']?.state === '3d' ?
+                    states['select.ws_graph_range']?.state === '3d' ?
                     1 : 4
                 card:
                   type: custom:mini-graph-card
