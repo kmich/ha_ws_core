@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION DASHBOARD v3.0.0 (ws_core integration)
+# WEATHER STATION DASHBOARD v3.1.0 (ws_core integration)
 # =============================================================================
 # Two-page dashboard: Weather (main) + Advanced (subview, inline navigation)
 #
@@ -1494,8 +1494,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_laundry_drying_score
-                state_not: unavailable
+                entity: switch.ws_enable_laundry_score
+                state: "on"
             card:
               type: custom:button-card
               entity: sensor.ws_laundry_drying_score
@@ -1541,8 +1541,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_fire_risk_score
-                state_not: unavailable
+                entity: switch.ws_enable_fire_risk_score
+                state: "on"
             card:
               type: custom:button-card
               entity: sensor.ws_fire_risk_score
@@ -1593,8 +1593,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_sea_surface_temperature
-                state_not: unavailable
+                entity: switch.ws_enable_sea_temp
+                state: "on"
             card:
               type: custom:button-card
               entity: sensor.ws_sea_surface_temperature
@@ -1652,8 +1652,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_running_score
-                state_not: unavailable
+                entity: switch.ws_enable_running_score
+                state: "on"
             card:
               type: custom:button-card
               entity: sensor.ws_running_score
@@ -1953,8 +1953,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_air_quality_index
-                state_not: "unavailable"
+                entity: switch.ws_enable_air_quality
+                state: "on"
             card:
               type: entities
               title: Air Quality
@@ -1975,8 +1975,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_pollen_overall
-                state_not: "unavailable"
+                entity: switch.ws_enable_pollen
+                state: "on"
             card:
               type: entities
               title: Pollen
@@ -2009,8 +2009,8 @@ views:
         column_span: 2
         conditions:
           - condition: state
-            entity: sensor.ws_moon_phase
-            state_not: "unavailable"
+            entity: switch.ws_enable_moon
+            state: "on"
         card:
           type: grid
           column_span: 2
@@ -2054,8 +2054,8 @@ views:
         column_span: 2
         conditions:
           - condition: state
-            entity: sensor.ws_solar_forecast_today_kwh
-            state_not: "unavailable"
+            entity: switch.ws_enable_solar_forecast
+            state: "on"
         card:
           type: grid
           column_span: 2
@@ -2096,8 +2096,8 @@ views:
               - type: conditional
                 conditions:
                   - condition: state
-                    entity: sensor.ws_heating_degree_days_today
-                    state_not: "unavailable"
+                    entity: switch.ws_enable_degree_days
+                    state: "on"
                 card:
                   type: entities
                   title: Degree Days & Evapotranspiration
@@ -2121,8 +2121,8 @@ views:
               - type: conditional
                 conditions:
                   - condition: state
-                    entity: sensor.ws_metar_validation
-                    state_not: "unavailable"
+                    entity: switch.ws_enable_metar
+                    state: "on"
                 card:
                   type: entities
                   title: External Data & Uploads

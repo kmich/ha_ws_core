@@ -2,7 +2,7 @@
 
 DOMAIN = "ws_core"
 
-PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch"]
+PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number"]
 
 # ---------------------------------------------------------------------------
 # Configuration keys

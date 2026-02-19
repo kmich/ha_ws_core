@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION VANILLA DASHBOARD v1.2.0
+# WEATHER STATION VANILLA DASHBOARD v1.3.0
 # =============================================================================
 # Uses ONLY native Home Assistant cards. No HACS frontend dependencies.
 #
@@ -238,8 +238,8 @@ views:
       - type: conditional
         conditions:
           - condition: state
-            entity: sensor.ws_zambretti_forecast
-            state_not: unavailable
+            entity: switch.ws_enable_zambretti
+            state: "on"
         card:
           type: entities
           title: Zambretti Forecast
@@ -253,8 +253,8 @@ views:
       - type: conditional
         conditions:
           - condition: state
-            entity: sensor.ws_pressure_trend
-            state_not: unavailable
+            entity: switch.ws_enable_display_sensors
+            state: "on"
         card:
           type: entities
           title: Display Sensors
@@ -330,8 +330,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_laundry_drying_score
-                state_not: unavailable
+                entity: switch.ws_enable_laundry_score
+                state: "on"
             card:
               type: entity
               entity: sensor.ws_laundry_drying_score
@@ -340,8 +340,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_running_score
-                state_not: unavailable
+                entity: switch.ws_enable_running_score
+                state: "on"
             card:
               type: entity
               entity: sensor.ws_running_score
@@ -350,8 +350,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_stargazing_quality
-                state_not: unavailable
+                entity: switch.ws_enable_stargazing_score
+                state: "on"
             card:
               type: entity
               entity: sensor.ws_stargazing_quality
@@ -360,8 +360,8 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: sensor.ws_fire_risk_score
-                state_not: unavailable
+                entity: switch.ws_enable_fire_risk_score
+                state: "on"
             card:
               type: entity
               entity: sensor.ws_fire_risk_score

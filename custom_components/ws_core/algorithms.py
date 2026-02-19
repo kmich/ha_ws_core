@@ -2,7 +2,7 @@
 
 All algorithms are documented with source references, input ranges,
 and typical error bounds. Ported from the original ws_station YAML
-package (v1.0.0) by Konstantinos, with corrections and additions.
+package (v1.0.1) by Konstantinos, with corrections and additions.
 
 References:
   - Alduchov & Eskridge 1996: Magnus-form dew point constants

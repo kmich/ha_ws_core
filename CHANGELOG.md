@@ -2,6 +2,19 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [1.0.1] - 2026-02-19
+
+### Fixed
+- **Options flow labels**: The `features_opt` step displayed raw config keys (`enable_degree_days`, `enable_metar`, etc.) instead of human-readable labels. Added missing `options.error` section and `data_description` entries to `strings.json` / `en.json` so HA's frontend parser fully loads the options translation block.
+- **Dashboard "Entity not found" errors**: Air Quality, Pollen, Moon, Solar Forecast, Laundry, Fire Risk, Sea Temperature, Running, Degree Days, and METAR sections showed errors when their features were disabled. Changed all `conditional` wrappers from `state_not: unavailable` (checking sensor entities that don't exist when disabled) to `state: on` (checking feature toggle switch entities that always exist). Fixed in both enhanced and vanilla dashboards.
+
+### Added
+- **Config entities on device page**: All configurable parameters now appear as proper HA entities on the device page, eliminating the need to enter the config flow for routine adjustments:
+  - 12 `number` entities for thresholds (`thresh_wind_gust`, `thresh_rain_rate`, `thresh_freeze`), calibration offsets (`cal_temp`, `cal_humidity`, `cal_pressure`, `cal_wind`), and algorithm parameters (`staleness_timeout`, `rain_filter_alpha`, `pressure_trend_window`, `rain_penalty_light`, `rain_penalty_heavy`).
+  - 16 `switch` entities for feature toggles (`enable_zambretti` through `enable_solar_forecast`).
+  - All entities are `EntityCategory.CONFIG`, read from `entry.options`/`entry.data`, and write back via `async_update_entry` which triggers a coordinator reload.
+- New `number` platform (`number.py`) added to PLATFORMS.
+
 ## [1.0.0] - 2026-02-18
 
 ### Added

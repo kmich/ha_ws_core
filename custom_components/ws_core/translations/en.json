@@ -237,12 +237,80 @@
           "export_path": "Export directory path",
           "export_format": "Export file format",
           "export_interval_min": "Export interval"
+        },
+        "data_description": {
+          "prefix": "Entity prefix",
+          "hemisphere": "Hemisphere",
+          "climate_region": "Climate region",
+          "elevation_m": "Station elevation",
+          "units_mode": "Wind / rain / pressure units",
+          "temp_unit": "Temperature unit",
+          "forecast_enabled": "Enable forecast",
+          "forecast_interval_min": "Forecast refresh interval",
+          "forecast_lat": "Forecast latitude",
+          "forecast_lon": "Forecast longitude",
+          "thresh_wind_gust_ms": "Wind gust alert threshold",
+          "thresh_rain_rate_mmph": "Rain rate alert threshold",
+          "thresh_freeze_c": "Freeze warning threshold",
+          "staleness_s": "Sensor staleness timeout",
+          "rain_filter_alpha": "Rain-rate filter smoothing",
+          "pressure_trend_window_h": "Pressure trend window",
+          "rain_penalty_light_mmph": "Rain penalty start",
+          "rain_penalty_heavy_mmph": "Rain penalty maximum",
+          "cal_temp_c": "Temperature calibration offset",
+          "cal_humidity": "Humidity calibration offset",
+          "cal_pressure_hpa": "Pressure calibration offset",
+          "cal_wind_ms": "Wind speed calibration offset",
+          "enable_zambretti": "Zambretti forecast & classifier",
+          "enable_display_sensors": "Display sensors (levels, trends, health)",
+          "enable_laundry_score": "Laundry drying score",
+          "enable_stargazing_score": "Stargazing quality",
+          "enable_fire_risk_score": "Fire risk score",
+          "enable_running_score": "Running conditions score",
+          "enable_sea_temp": "Sea surface temperature",
+          "sea_temp_lat": "Sea temperature latitude",
+          "sea_temp_lon": "Sea temperature longitude",
+          "enable_degree_days": "Heating / Cooling Degree Days",
+          "degree_day_base_c": "Degree day base temperature",
+          "enable_metar": "METAR cross-validation",
+          "metar_icao": "Nearest airport ICAO code",
+          "metar_interval_min": "METAR fetch interval",
+          "enable_cwop": "CWOP upload",
+          "cwop_callsign": "CWOP callsign",
+          "cwop_passcode": "APRS passcode",
+          "cwop_interval_min": "CWOP upload interval",
+          "enable_wunderground": "Weather Underground upload",
+          "wu_station_id": "WU Station ID",
+          "wu_api_key": "WU API key",
+          "wu_interval_min": "WU upload interval",
+          "enable_export": "CSV / JSON data export",
+          "export_path": "Export directory path",
+          "export_format": "Export file format",
+          "export_interval_min": "Export interval"
         }
       },
       "features_opt": {
         "title": "Features",
         "description": "Toggle sensors and enable external data sources. Sub-steps will appear for each enabled feature.",
         "data": {
+          "enable_zambretti": "Zambretti forecast & classifier",
+          "enable_display_sensors": "Display sensors (levels, trends, health)",
+          "enable_laundry_score": "Laundry drying score",
+          "enable_stargazing_score": "Stargazing quality",
+          "enable_fire_risk_score": "Fire risk score",
+          "enable_running_score": "Running conditions score",
+          "enable_sea_temp": "Sea surface temperature",
+          "enable_degree_days": "Heating / Cooling Degree Days",
+          "enable_metar": "METAR cross-validation",
+          "enable_cwop": "CWOP upload",
+          "enable_wunderground": "Weather Underground upload",
+          "enable_export": "CSV / JSON data export",
+          "enable_air_quality": "Air quality index (Open-Meteo)",
+          "enable_pollen": "Pollen levels (Tomorrow.io)",
+          "enable_moon": "Moon phase & illumination",
+          "enable_solar_forecast": "Solar PV forecast (forecast.solar)"
+        },
+        "data_description": {
           "enable_zambretti": "Zambretti forecast & classifier",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
           "enable_laundry_score": "Laundry drying score",
@@ -332,6 +400,17 @@
           "solar_interval_min": "Refresh interval"
         }
       }
+    },
+    "error": {
+      "entity_not_found": "Entity not found in Home Assistant.",
+      "not_numeric": "Entity state is not a numeric value.",
+      "required": "This field is required.",
+      "elevation_out_of_range": "Elevation must be between -500 m and 9000 m.",
+      "wind_gust_too_high": "Wind gust threshold exceeds the physical world record.",
+      "temp_out_of_range": "Temperature is outside the physically possible range.",
+      "invalid_api_key": "Invalid API key or credentials rejected",
+      "cannot_connect": "Could not connect to API — check network and try again",
+      "station_not_found": "Weather Underground station ID not found"
     }
   },
   "issues": {
@@ -362,6 +441,92 @@
     "switch": {
       "ws_enable_animations": {
         "name": "Dashboard Animations"
+      },
+      "ws_enable_zambretti": {
+        "name": "Zambretti Forecast"
+      },
+      "ws_enable_display_sensors": {
+        "name": "Display Sensors"
+      },
+      "ws_enable_laundry_score": {
+        "name": "Laundry Drying Score"
+      },
+      "ws_enable_stargazing_score": {
+        "name": "Stargazing Quality"
+      },
+      "ws_enable_fire_risk_score": {
+        "name": "Fire Risk Score"
+      },
+      "ws_enable_running_score": {
+        "name": "Running Conditions Score"
+      },
+      "ws_enable_sea_temp": {
+        "name": "Sea Surface Temperature"
+      },
+      "ws_enable_degree_days": {
+        "name": "Degree Days"
+      },
+      "ws_enable_metar": {
+        "name": "METAR Cross-Validation"
+      },
+      "ws_enable_cwop": {
+        "name": "CWOP Upload"
+      },
+      "ws_enable_wunderground": {
+        "name": "Weather Underground Upload"
+      },
+      "ws_enable_export": {
+        "name": "CSV/JSON Data Export"
+      },
+      "ws_enable_air_quality": {
+        "name": "Air Quality Index"
+      },
+      "ws_enable_pollen": {
+        "name": "Pollen Levels"
+      },
+      "ws_enable_moon": {
+        "name": "Moon Phase & Illumination"
+      },
+      "ws_enable_solar_forecast": {
+        "name": "Solar PV Forecast"
+      }
+    },
+    "number": {
+      "ws_thresh_wind_gust": {
+        "name": "Wind Gust Alert Threshold"
+      },
+      "ws_thresh_rain_rate": {
+        "name": "Rain Rate Alert Threshold"
+      },
+      "ws_thresh_freeze": {
+        "name": "Freeze Warning Threshold"
+      },
+      "ws_cal_temp": {
+        "name": "Temperature Calibration Offset"
+      },
+      "ws_cal_humidity": {
+        "name": "Humidity Calibration Offset"
+      },
+      "ws_cal_pressure": {
+        "name": "Pressure Calibration Offset"
+      },
+      "ws_cal_wind": {
+        "name": "Wind Speed Calibration Offset"
+      },
+      "ws_staleness_timeout": {
+        "name": "Sensor Staleness Timeout"
+      },
+      "ws_rain_filter_alpha": {
+        "name": "Rain-rate Filter Smoothing"
+      },
+      "ws_pressure_trend_window": {
+        "name": "Pressure Trend Window"
+      },
+      "ws_rain_penalty_light": {
+        "name": "Rain Penalty Start Threshold"
+      },
+      "ws_rain_penalty_heavy": {
+        "name": "Rain Penalty Maximum Threshold"
       }
     }
   }

@@ -1,6 +1,6 @@
 [project]
 name = "ha_ws_core"
-version = "1.0.0"
+version = "1.0.1"
 description = "Weather Station Core - Home Assistant integration for personal weather stations"
 requires-python = ">=3.12"
 

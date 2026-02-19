@@ -183,6 +183,50 @@ All settings can be changed later via **Configure** (Settings → Devices & Serv
 |---|---|---|
 | `weather.ws` | weather | Standard HA weather entity with daily forecast |
 | `binary_sensor.ws_package_ok` | binary_sensor | True when all required sources are mapped and available |
+| `select.ws_graph_range` | select | Dashboard graph time range (6h/24h/3d) |
+| `switch.ws_enable_animations` | switch | Dashboard animation toggle |
+
+### Configuration Entities (device page)
+
+All configurable parameters are exposed as entities on the device page so users can adjust them directly without entering the config flow. Changes trigger a coordinator reload automatically.
+
+**Number entities** (thresholds, calibration offsets, algorithm parameters):
+
+| Entity | Unit | Description |
+|---|---|---|
+| `number.ws_thresh_wind_gust` | m/s | Wind gust alert threshold |
+| `number.ws_thresh_rain_rate` | mm/h | Rain rate alert threshold |
+| `number.ws_thresh_freeze` | C | Freeze warning threshold |
+| `number.ws_cal_temp` | C | Temperature calibration offset |
+| `number.ws_cal_humidity` | % | Humidity calibration offset |
+| `number.ws_cal_pressure` | hPa | Pressure calibration offset |
+| `number.ws_cal_wind` | m/s | Wind speed calibration offset |
+| `number.ws_staleness_timeout` | s | Sensor staleness timeout |
+| `number.ws_rain_filter_alpha` | -- | Rain-rate Kalman filter smoothing |
+| `number.ws_pressure_trend_window` | h | Pressure trend window |
+| `number.ws_rain_penalty_light` | mm/h | Rain penalty start threshold |
+| `number.ws_rain_penalty_heavy` | mm/h | Rain penalty maximum threshold |
+
+**Switch entities** (feature toggles):
+
+| Entity | Description |
+|---|---|
+| `switch.ws_enable_zambretti` | Zambretti forecast & classifier |
+| `switch.ws_enable_display_sensors` | Display sensors (levels, trends, health) |
+| `switch.ws_enable_laundry_score` | Laundry drying score |
+| `switch.ws_enable_stargazing_score` | Stargazing quality |
+| `switch.ws_enable_fire_risk_score` | Fire risk score |
+| `switch.ws_enable_running_score` | Running conditions score |
+| `switch.ws_enable_sea_temp` | Sea surface temperature |
+| `switch.ws_enable_degree_days` | Degree days |
+| `switch.ws_enable_metar` | METAR cross-validation |
+| `switch.ws_enable_cwop` | CWOP upload |
+| `switch.ws_enable_wunderground` | Weather Underground upload |
+| `switch.ws_enable_export` | CSV/JSON data export |
+| `switch.ws_enable_air_quality` | Air quality index |
+| `switch.ws_enable_pollen` | Pollen levels |
+| `switch.ws_enable_moon` | Moon phase & illumination |
+| `switch.ws_enable_solar_forecast` | Solar PV forecast |
 
 ---
 
