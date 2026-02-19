@@ -186,11 +186,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up switch entities."""
-    prefix = (
-        entry.options.get(CONF_PREFIX)
-        or entry.data.get(CONF_PREFIX)
-        or DEFAULT_PREFIX
-    ).strip().lower()
+    prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
 
     entities: list[SwitchEntity] = [
         # Existing dashboard toggle (restore-state)
@@ -311,6 +307,4 @@ class WSFeatureSwitch(SwitchEntity):
         """Persist value to entry.options (triggers reload via update listener)."""
         new_options = dict(self._entry.options)
         new_options[self._desc.conf_key] = value
-        self.hass.config_entries.async_update_entry(
-            self._entry, options=new_options
-        )
+        self.hass.config_entries.async_update_entry(self._entry, options=new_options)

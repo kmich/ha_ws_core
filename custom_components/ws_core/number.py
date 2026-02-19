@@ -209,15 +209,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up config-backed number entities."""
-    prefix = (
-        entry.options.get(CONF_PREFIX)
-        or entry.data.get(CONF_PREFIX)
-        or DEFAULT_PREFIX
-    ).strip().lower()
+    prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
 
-    entities: list[WSConfigNumber] = [
-        WSConfigNumber(entry, prefix, desc) for desc in PARAM_NUMBERS
-    ]
+    entities: list[WSConfigNumber] = [WSConfigNumber(entry, prefix, desc) for desc in PARAM_NUMBERS]
     async_add_entities(entities)
 
 
@@ -262,6 +256,4 @@ class WSConfigNumber(NumberEntity):
         """Write the new value to entry.options and reload."""
         new_options = dict(self._entry.options)
         new_options[self._desc.conf_key] = value
-        self.hass.config_entries.async_update_entry(
-            self._entry, options=new_options
-        )
+        self.hass.config_entries.async_update_entry(self._entry, options=new_options)
