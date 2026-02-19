@@ -32,15 +32,17 @@ views:
         card:
           type: markdown
           content: >-
-            ## ⚠️ Weather Alert Active
+            ## {% if states('sensor.ws_alert_state') == 'warning' %}🔴{% else %}🟡{% endif %} Weather {{ states('sensor.ws_alert_state') | title }}
 
             **{{ states('sensor.ws_alert_message') }}**
 
-            Rain rate: {{ states('sensor.ws_rain_rate') }} mm/h
+            Active alerts: {{ state_attr('sensor.ws_alert_state', 'alert_count') }}
+            · Rain rate: {{ states('sensor.ws_rain_rate') }} mm/h
             · Wind gust: {{ states('sensor.ws_wind_gust') }}
-            · Condition: {{ states('sensor.ws_current_condition') }}
           style: |
-            ha-card { background: rgba(255, 152, 0, 0.15); }
+            ha-card {
+              background: {% if states('sensor.ws_alert_state') == 'warning' %}rgba(239, 68, 68, 0.15){% else %}rgba(255, 191, 36, 0.15){% endif %};
+            }
 
       # --- Weather entity card (built-in) ---
       - type: weather-forecast
@@ -235,20 +237,14 @@ views:
           Extended analysis sensors below require **Extended analysis** enabled
           in Configure.
 
-      - type: conditional
-        conditions:
-          - condition: state
-            entity: switch.ws_enable_zambretti
-            state: "on"
-        card:
-          type: entities
-          title: Zambretti Forecast
-          icon: mdi:crystal-ball
-          entities:
-            - entity: sensor.ws_zambretti_forecast
-              name: Forecast
-            - entity: sensor.ws_current_condition
-              name: Current Condition
+      - type: entities
+        title: Zambretti Forecast
+        icon: mdi:crystal-ball
+        entities:
+          - entity: sensor.ws_zambretti_forecast
+            name: Forecast
+          - entity: sensor.ws_current_condition
+            name: Current Condition
 
       - type: conditional
         conditions:

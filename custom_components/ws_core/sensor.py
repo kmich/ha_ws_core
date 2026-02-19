@@ -30,7 +30,6 @@ from .const import (
     # v0.9.0
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_STARGAZING,
-    CONF_ENABLE_ZAMBRETTI,
     CONF_PREFIX,
     DEFAULT_PREFIX,
     DOMAIN,
@@ -975,10 +974,6 @@ SENSORS: list[WSSensorDescription] = [
 
 # Sensor-to-feature-toggle mapping for granular control
 _FEATURE_TOGGLE_MAP: dict[str, str] = {
-    # Zambretti / condition classifier
-    KEY_ZAMBRETTI_FORECAST: CONF_ENABLE_ZAMBRETTI,
-    KEY_ZAMBRETTI_NUMBER: CONF_ENABLE_ZAMBRETTI,
-    KEY_CURRENT_CONDITION: CONF_ENABLE_ZAMBRETTI,
     # Display sensors
     KEY_HUMIDITY_LEVEL_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_UV_LEVEL_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
@@ -1244,10 +1239,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             return overrides[key]
         # Fallback: strip common prefixes/suffixes for a clean slug
         return key.replace("_mmph", "").replace("_ms", "").replace("_hpa", "").replace("_c", "")
-        k = key.replace("_c", "").replace("_hpah", "").replace("_hpa", "")
-        k = k.replace("_mm", "").replace("_ms", "").replace("_deg", "")
-        k = k.replace("_mmph_", "_").replace("_mmph", "").replace("_pct", "").replace("_lx", "")
-        return k
 
     @property
     def native_value(self):
@@ -1278,7 +1269,22 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
                 return {k: v for k, v in (self._desc.attrs_fn(d) or {}).items() if v is not None}
             except Exception:
                 return {}
-        if self._desc.key in (KEY_DATA_QUALITY, KEY_PACKAGE_STATUS, KEY_ALERT_STATE, KEY_ALERT_MESSAGE):
+        if self._desc.key == KEY_ALERT_STATE:
+            alerts = d.get("_active_alerts", [])
+            return {
+                "message": d.get(KEY_ALERT_MESSAGE, "All clear"),
+                "icon": d.get("_alert_icon", "mdi:check-circle-outline"),
+                "color": d.get("_alert_color", "rgba(74,222,128,0.8)"),
+                "active_alerts": alerts,
+                "alert_count": len(alerts),
+            }
+        if self._desc.key == KEY_ALERT_MESSAGE:
+            return {
+                "alert_state": d.get(KEY_ALERT_STATE, "clear"),
+                "icon": d.get("_alert_icon", "mdi:check-circle-outline"),
+                "color": d.get("_alert_color", "rgba(74,222,128,0.8)"),
+            }
+        if self._desc.key in (KEY_DATA_QUALITY, KEY_PACKAGE_STATUS):
             return {
                 "package_ok": d.get("package_ok"),
                 "data_quality": d.get(KEY_DATA_QUALITY),

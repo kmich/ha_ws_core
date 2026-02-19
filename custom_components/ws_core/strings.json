@@ -19,7 +19,8 @@
           "wind_speed": "Wind speed sensor",
           "wind_gust": "Wind gust sensor",
           "wind_direction": "Wind direction sensor (degrees)",
-          "rain_total": "Cumulative precipitation sensor"
+          "rain_total": "Cumulative precipitation sensor",
+          "_go_back": "← Go back to previous step"
         }
       },
       "optional_sources": {
@@ -29,7 +30,9 @@
           "illuminance": "Illuminance / solar radiation (lux)",
           "uv_index": "UV index",
           "dew_point": "Dew point (if your station provides it; otherwise it is calculated)",
-          "battery": "Station battery level (%)"
+          "battery": "Station battery level (%)",
+          "solar_radiation": "Solar radiation (W/m², for Penman-Monteith ET₀)",
+          "_go_back": "← Go back to previous step"
         }
       },
       "location": {
@@ -38,7 +41,8 @@
         "data": {
           "hemisphere": "Hemisphere",
           "climate_region": "Climate region (for Zambretti wind pattern weighting)",
-          "elevation_m": "Station elevation above sea level"
+          "elevation_m": "Station elevation above sea level",
+          "_go_back": "← Go back to previous step"
         }
       },
       "display": {
@@ -46,7 +50,8 @@
         "description": "Choose how values are displayed. 'Auto' follows your Home Assistant unit system setting.",
         "data": {
           "units_mode": "Wind / rain / pressure units",
-          "temp_unit": "Temperature unit"
+          "temp_unit": "Temperature unit",
+          "_go_back": "← Go back to previous step"
         }
       },
       "forecast": {
@@ -56,7 +61,8 @@
           "forecast_enabled": "Enable forecast (Open-Meteo)",
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
-          "forecast_lon": "Forecast longitude"
+          "forecast_lon": "Forecast longitude",
+          "_go_back": "← Go back to previous step"
         }
       },
       "alerts": {
@@ -70,14 +76,14 @@
           "rain_filter_alpha": "Rain-rate Kalman filter smoothing",
           "pressure_trend_window_h": "Pressure trend window",
           "rain_penalty_light_mmph": "Rain penalty start threshold",
-          "rain_penalty_heavy_mmph": "Rain penalty maximum threshold"
+          "rain_penalty_heavy_mmph": "Rain penalty maximum threshold",
+          "_go_back": "← Go back to previous step"
         }
       },
       "features": {
         "title": "Features",
         "description": "Choose which sensors to enable. Each can be toggled independently. You can change these later in Configure.",
         "data": {
-          "enable_zambretti": "Zambretti barometric forecast & weather classifier",
           "enable_display_sensors": "Display sensors (humidity level, UV level, pressure trend, station health)",
           "enable_laundry_score": "Laundry drying score",
           "enable_stargazing_score": "Stargazing quality",
@@ -92,7 +98,8 @@
           "enable_air_quality": "Air quality index (Open-Meteo, free, no API key)",
           "enable_pollen": "Pollen levels (Tomorrow.io, free API key required)",
           "enable_moon": "Moon phase & illumination",
-          "enable_solar_forecast": "Solar PV generation forecast (forecast.solar, free)"
+          "enable_solar_forecast": "Solar PV generation forecast (forecast.solar, free)",
+          "_go_back": "← Go back to previous step"
         }
       },
       "sea_temp": {
@@ -100,14 +107,16 @@
         "description": "Coordinates for sea surface temperature lookup. Defaults to your Home Assistant location. Override if your home is inland or you want a specific coastal point.",
         "data": {
           "sea_temp_lat": "Sea temperature latitude",
-          "sea_temp_lon": "Sea temperature longitude"
+          "sea_temp_lon": "Sea temperature longitude",
+          "_go_back": "← Go back to previous step"
         }
       },
       "degree_days": {
         "title": "Degree Days — base temperature",
         "description": "Heating Degree Days (HDD) and Cooling Degree Days (CDD) measure how much heating or cooling a building needs each day. The base temperature is the outdoor temperature at which no heating or cooling is required — typically 18 °C (64 °F) for residential buildings. HDD accumulates when it is colder than the base; CDD when it is warmer. Both reset at midnight.",
         "data": {
-          "degree_day_base_c": "Base temperature"
+          "degree_day_base_c": "Base temperature",
+          "_go_back": "← Go back to previous step"
         }
       },
       "metar": {
@@ -115,7 +124,8 @@
         "description": "Fetches the latest aviation METAR report from the nearest airport and compares temperature and pressure against your local sensors. Free data from aviationweather.gov — no API key required. Find your nearest ICAO code at aviationweather.gov/metar. Leave the ICAO field blank to skip setup now and configure later.",
         "data": {
           "metar_icao": "Nearest airport ICAO code (e.g. LGAV for Athens)",
-          "metar_interval_min": "Fetch interval"
+          "metar_interval_min": "Fetch interval",
+          "_go_back": "← Go back to previous step"
         }
       },
       "cwop": {
@@ -124,7 +134,8 @@
         "data": {
           "cwop_callsign": "CWOP callsign (e.g. CW1234 or EW1234) — leave blank to skip",
           "cwop_passcode": "APRS passcode (-1 for citizen stations)",
-          "cwop_interval_min": "Upload interval"
+          "cwop_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
         }
       },
       "wunderground": {
@@ -133,7 +144,8 @@
         "data": {
           "wu_station_id": "Station ID (e.g. IATHEN123) — leave blank to skip",
           "wu_api_key": "API key — leave blank to skip",
-          "wu_interval_min": "Upload interval"
+          "wu_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
         }
       },
       "export": {
@@ -142,14 +154,16 @@
         "data": {
           "export_path": "Export directory path (on HA host)",
           "export_format": "File format",
-          "export_interval_min": "Export interval"
+          "export_interval_min": "Export interval",
+          "_go_back": "← Go back to previous step"
         }
       },
       "air_quality": {
         "title": "Air Quality",
         "description": "{info}",
         "data": {
-          "aqi_interval_min": "Refresh interval"
+          "aqi_interval_min": "Refresh interval",
+          "_go_back": "← Go back to previous step"
         }
       },
       "pollen": {
@@ -157,7 +171,8 @@
         "description": "{info}",
         "data": {
           "tomorrow_io_key": "Tomorrow.io API key",
-          "pollen_interval_min": "Refresh interval"
+          "pollen_interval_min": "Refresh interval",
+          "_go_back": "← Go back to previous step"
         }
       },
       "solar_forecast": {
@@ -167,7 +182,8 @@
           "solar_peak_kw": "Solar system peak power (kWp)",
           "solar_panel_azimuth": "Panel azimuth",
           "solar_panel_tilt": "Panel tilt",
-          "solar_interval_min": "Refresh interval"
+          "solar_interval_min": "Refresh interval",
+          "_go_back": "← Go back to previous step"
         }
       }
     },
@@ -261,7 +277,6 @@
           "cal_humidity": "Humidity calibration offset",
           "cal_pressure_hpa": "Pressure calibration offset",
           "cal_wind_ms": "Wind speed calibration offset",
-          "enable_zambretti": "Zambretti forecast & classifier",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
           "enable_laundry_score": "Laundry drying score",
           "enable_stargazing_score": "Stargazing quality",
@@ -293,7 +308,6 @@
         "title": "Features",
         "description": "Toggle sensors and enable external data sources. Sub-steps will appear for each enabled feature.",
         "data": {
-          "enable_zambretti": "Zambretti forecast & classifier",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
           "enable_laundry_score": "Laundry drying score",
           "enable_stargazing_score": "Stargazing quality",
@@ -311,7 +325,6 @@
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)"
         },
         "data_description": {
-          "enable_zambretti": "Zambretti forecast & classifier",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
           "enable_laundry_score": "Laundry drying score",
           "enable_stargazing_score": "Stargazing quality",
@@ -440,93 +453,93 @@
     },
     "switch": {
       "ws_enable_animations": {
-        "name": "Dashboard Animations"
+        "name": "Dashboard: Animations"
       },
       "ws_enable_zambretti": {
-        "name": "Zambretti Forecast"
+        "name": "Feature: Zambretti Forecast"
       },
       "ws_enable_display_sensors": {
-        "name": "Display Sensors"
+        "name": "Feature: Display Sensors"
       },
       "ws_enable_laundry_score": {
-        "name": "Laundry Drying Score"
+        "name": "Feature: Laundry Drying Score"
       },
       "ws_enable_stargazing_score": {
-        "name": "Stargazing Quality"
+        "name": "Feature: Stargazing Quality"
       },
       "ws_enable_fire_risk_score": {
-        "name": "Fire Risk Score"
+        "name": "Feature: Fire Risk Score"
       },
       "ws_enable_running_score": {
-        "name": "Running Conditions Score"
+        "name": "Feature: Running Score"
       },
       "ws_enable_sea_temp": {
-        "name": "Sea Surface Temperature"
+        "name": "Feature: Sea Surface Temperature"
       },
       "ws_enable_degree_days": {
-        "name": "Degree Days"
+        "name": "Feature: Degree Days"
       },
       "ws_enable_metar": {
-        "name": "METAR Cross-Validation"
+        "name": "Feature: METAR Validation"
       },
       "ws_enable_cwop": {
-        "name": "CWOP Upload"
+        "name": "Feature: CWOP Upload"
       },
       "ws_enable_wunderground": {
-        "name": "Weather Underground Upload"
+        "name": "Feature: Weather Underground"
       },
       "ws_enable_export": {
-        "name": "CSV/JSON Data Export"
+        "name": "Feature: Data Export"
       },
       "ws_enable_air_quality": {
-        "name": "Air Quality Index"
+        "name": "Feature: Air Quality Index"
       },
       "ws_enable_pollen": {
-        "name": "Pollen Levels"
+        "name": "Feature: Pollen Levels"
       },
       "ws_enable_moon": {
-        "name": "Moon Phase & Illumination"
+        "name": "Feature: Moon Phase"
       },
       "ws_enable_solar_forecast": {
-        "name": "Solar PV Forecast"
+        "name": "Feature: Solar PV Forecast"
       }
     },
     "number": {
       "ws_thresh_wind_gust": {
-        "name": "Wind Gust Alert Threshold"
+        "name": "Alert: Wind Gust Threshold"
       },
       "ws_thresh_rain_rate": {
-        "name": "Rain Rate Alert Threshold"
+        "name": "Alert: Rain Rate Threshold"
       },
       "ws_thresh_freeze": {
-        "name": "Freeze Warning Threshold"
+        "name": "Alert: Freeze Threshold"
       },
       "ws_cal_temp": {
-        "name": "Temperature Calibration Offset"
+        "name": "Calibration: Temperature"
       },
       "ws_cal_humidity": {
-        "name": "Humidity Calibration Offset"
+        "name": "Calibration: Humidity"
       },
       "ws_cal_pressure": {
-        "name": "Pressure Calibration Offset"
+        "name": "Calibration: Pressure"
       },
       "ws_cal_wind": {
-        "name": "Wind Speed Calibration Offset"
+        "name": "Calibration: Wind Speed"
       },
       "ws_staleness_timeout": {
-        "name": "Sensor Staleness Timeout"
+        "name": "Tuning: Staleness Timeout"
       },
       "ws_rain_filter_alpha": {
-        "name": "Rain-rate Filter Smoothing"
+        "name": "Tuning: Rain Filter Smoothing"
       },
       "ws_pressure_trend_window": {
-        "name": "Pressure Trend Window"
+        "name": "Tuning: Pressure Trend Window"
       },
       "ws_rain_penalty_light": {
-        "name": "Rain Penalty Start Threshold"
+        "name": "Tuning: Rain Penalty Start"
       },
       "ws_rain_penalty_heavy": {
-        "name": "Rain Penalty Maximum Threshold"
+        "name": "Tuning: Rain Penalty Maximum"
       }
     }
   }

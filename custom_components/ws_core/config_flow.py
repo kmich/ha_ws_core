@@ -115,7 +115,6 @@ from .const import (
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_STARGAZING,
     DEFAULT_ENABLE_WUNDERGROUND,
-    DEFAULT_ENABLE_ZAMBRETTI,
     DEFAULT_EXPORT_FORMAT,
     DEFAULT_EXPORT_INTERVAL_MIN,
     DEFAULT_FORECAST_ENABLED,
@@ -151,7 +150,6 @@ from .const import (
     SRC_LUX,
     SRC_PRESS,
     SRC_RAIN_TOTAL,
-    SRC_SOLAR_RADIATION,
     SRC_TEMP,
     SRC_UV,
     SRC_WIND,
@@ -204,12 +202,12 @@ async def _validate_tomorrow_io_key(api_key: str, lat: float, lon: float) -> tup
     try:
         import aiohttp
 
-        url = f"https://data.tomorrow.io/v4/weather/realtime?location={lat},{lon}&fields=grassIndex&apikey={api_key}"
+        url = f"https://api.tomorrow.io/v4/weather/realtime?location={lat},{lon}&fields=temperature&apikey={api_key}"
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status == 200:
                     return True, ""
-                if resp.status == 401 or resp.status == 403:
+                if resp.status in (401, 403):
                     return False, "invalid_api_key"
                 if resp.status == 429:
                     # Rate limited but key is valid
@@ -473,6 +471,42 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         self._data: dict[str, Any] = {}
+        self._step_history: list[str] = []
+
+    def _show_step(
+        self,
+        step_id: str,
+        data_schema: vol.Schema,
+        errors: dict | None = None,
+        last_step: bool = False,
+        description_placeholders: dict | None = None,
+    ):
+        """Wrapper around async_show_form that adds back-button and tracks history."""
+        self._step_history.append(step_id)
+        # Add go-back toggle to every step except the first one
+        if step_id != "user" and len(self._step_history) > 1:
+            schema_dict = dict(data_schema.schema)
+            schema_dict[vol.Optional("_go_back", default=False)] = bool
+            data_schema = vol.Schema(schema_dict)
+        return self._show_step(
+            step_id=step_id,
+            data_schema=data_schema,
+            errors=errors or {},
+            last_step=last_step,
+            description_placeholders=description_placeholders,
+        )
+
+    async def _handle_back(self, user_input: dict[str, Any]) -> dict | None:
+        """If user toggled _go_back, navigate to previous step. Returns None if not going back."""
+        if not user_input.pop("_go_back", False):
+            return None
+        if len(self._step_history) >= 2:
+            self._step_history.pop()  # remove current step
+            prev = self._step_history.pop()  # pop previous (it will re-push itself via _show_step)
+            handler = getattr(self, f"async_step_{prev}", None)
+            if handler:
+                return await handler()
+        return None
 
     def _validate_numeric_sensor(self, eid: str) -> bool:
         st = self.hass.states.get(eid)
@@ -493,7 +527,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_PREFIX] = _sanitize_prefix(str(user_input.get(CONF_PREFIX) or DEFAULT_PREFIX))
             return await self.async_step_required_sources()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="user",
             data_schema=vol.Schema(
                 {
@@ -501,6 +535,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PREFIX, default=DEFAULT_PREFIX): str,
                 }
             ),
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -511,6 +546,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             for k in REQUIRED_SOURCES:
                 eid = user_input.get(k)
                 if not eid:
@@ -530,7 +568,12 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             for k in REQUIRED_SOURCES
         }
-        return self.async_show_form(step_id="required_sources", data_schema=vol.Schema(fields), errors=errors)
+        return self._show_step(
+            step_id="required_sources",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            last_step=False,
+        )
 
     # ------------------------------------------------------------------
     # Step 3: Optional sensor mapping
@@ -540,6 +583,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             sources = dict(self._data.get(CONF_SOURCES, {}))
             for k in OPTIONAL_SOURCES:
                 eid = user_input.get(k)
@@ -557,15 +603,16 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         fields = {
             vol.Optional(k, default=defaults.get(k)): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
+                selector.EntitySelectorConfig(domain="sensor"),
             )
             for k in OPTIONAL_SOURCES
         }
-        # v0.9.0: solar radiation (W/m²) for Penman-Monteith ET₀
-        fields[vol.Optional(SRC_SOLAR_RADIATION)] = selector.EntitySelector(
-            selector.EntitySelectorConfig(domain="sensor")
+        return self._show_step(
+            step_id="optional_sources",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            last_step=False,
         )
-        return self.async_show_form(step_id="optional_sources", data_schema=vol.Schema(fields), errors=errors)
 
     # ------------------------------------------------------------------
     # Step 4: Location — hemisphere, climate region, elevation
@@ -578,6 +625,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         auto_region = _guess_climate_region(self.hass)
 
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             elev = float(user_input.get(CONF_ELEVATION_M, auto_elev))
             if not (VALID_ELEVATION_MIN_M <= elev <= VALID_ELEVATION_MAX_M):
                 errors[CONF_ELEVATION_M] = "elevation_out_of_range"
@@ -588,7 +638,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_ELEVATION_M] = elev
                 return await self.async_step_display()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="location",
             data_schema=vol.Schema(
                 {
@@ -618,6 +668,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -625,6 +676,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_display(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             self._data[CONF_UNITS_MODE] = user_input[CONF_UNITS_MODE]
             self._data[CONF_TEMP_UNIT] = user_input[CONF_TEMP_UNIT]
             return await self.async_step_forecast()
@@ -638,7 +692,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default_units = DEFAULT_UNITS_MODE
             default_temp = DEFAULT_TEMP_UNIT
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="display",
             data_schema=vol.Schema(
                 {
@@ -664,6 +718,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -671,13 +726,16 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_forecast(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             self._data.update(user_input)
             return await self.async_step_features()
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
         default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="forecast",
             data_schema=vol.Schema(
                 {
@@ -695,6 +753,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -702,7 +761,10 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_features(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
-            self._data[CONF_ENABLE_ZAMBRETTI] = bool(user_input.get(CONF_ENABLE_ZAMBRETTI, True))
+            back = await self._handle_back(user_input)
+            if back:
+                return back
+            self._data[CONF_ENABLE_ZAMBRETTI] = True  # always enabled (non-disableable)
             self._data[CONF_ENABLE_DISPLAY_SENSORS] = bool(user_input.get(CONF_ENABLE_DISPLAY_SENSORS, True))
             self._data[CONF_ENABLE_LAUNDRY] = bool(user_input.get(CONF_ENABLE_LAUNDRY, False))
             self._data[CONF_ENABLE_STARGAZING] = bool(user_input.get(CONF_ENABLE_STARGAZING, False))
@@ -739,11 +801,10 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="features",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(CONF_ENABLE_ZAMBRETTI, default=DEFAULT_ENABLE_ZAMBRETTI): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_DISPLAY_SENSORS, default=DEFAULT_ENABLE_DISPLAY_SENSORS
                     ): selector.BooleanSelector(),
@@ -774,6 +835,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ): selector.BooleanSelector(),
                 }
             ),
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -781,6 +843,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_sea_temp(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             self._data[CONF_SEA_TEMP_LAT] = user_input.get(CONF_SEA_TEMP_LAT)
             self._data[CONF_SEA_TEMP_LON] = user_input.get(CONF_SEA_TEMP_LON)
             if self._data.get(CONF_ENABLE_DEGREE_DAYS):
@@ -804,7 +869,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
         default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="sea_temp",
             data_schema=vol.Schema(
                 {
@@ -816,6 +881,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -823,6 +889,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_degree_days(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             self._data[CONF_DEGREE_DAY_BASE_C] = float(
                 user_input.get(CONF_DEGREE_DAY_BASE_C, DEFAULT_DEGREE_DAY_BASE_C)
             )
@@ -842,7 +911,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="degree_days",
             data_schema=vol.Schema(
                 {
@@ -854,6 +923,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": "Base temperature for heating/cooling degree day calculations. Standard: 18°C (64°F)."
             },
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -861,6 +931,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_metar(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             icao = str(user_input.get(CONF_METAR_ICAO, "")).upper().strip()
             if not icao:
                 # Auto-detect nearest ICAO from forecast lat/lon
@@ -894,7 +967,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         existing_icao = self._data.get(CONF_METAR_ICAO, "")
         lat = self._data.get(CONF_FORECAST_LAT)
         lat_hint = " (will auto-detect from lat/lon if blank)" if lat is not None else ""
-        return self.async_show_form(
+        return self._show_step(
             step_id="metar",
             data_schema=vol.Schema(
                 {
@@ -909,6 +982,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": f"4-letter ICAO code e.g. LGAV for Athens.{lat_hint} Leave blank to auto-detect or disable."
             },
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -916,6 +990,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_cwop(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             callsign = str(user_input.get(CONF_CWOP_CALLSIGN, "")).upper().strip()
             if not callsign:
                 # No callsign entered — silently disable CWOP and skip
@@ -940,7 +1017,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_alerts()
 
         existing_callsign = self._data.get(CONF_CWOP_CALLSIGN, "")
-        return self.async_show_form(
+        return self._show_step(
             step_id="cwop",
             data_schema=vol.Schema(
                 {
@@ -955,6 +1032,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -963,6 +1041,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_wunderground(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             station_id = str(user_input.get(CONF_WU_STATION_ID, "")).strip()
             api_key = str(user_input.get(CONF_WU_API_KEY, "")).strip()
             if not station_id or not api_key:
@@ -993,7 +1074,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_alerts()
 
         existing_station = self._data.get(CONF_WU_STATION_ID, "")
-        return self.async_show_form(
+        return self._show_step(
             step_id="wunderground",
             data_schema=vol.Schema(
                 {
@@ -1012,6 +1093,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": "Weather Underground PWS. Leave blank to skip. Credentials will be validated."
             },
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -1029,6 +1111,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_export(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             self._data[CONF_EXPORT_PATH] = str(user_input.get(CONF_EXPORT_PATH, "/config/ws_core_export")).strip()
             self._data[CONF_EXPORT_FORMAT] = str(user_input.get(CONF_EXPORT_FORMAT, DEFAULT_EXPORT_FORMAT))
             self._data[CONF_EXPORT_INTERVAL_MIN] = int(
@@ -1036,7 +1121,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             return await self._next_after_export()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="export",
             data_schema=vol.Schema(
                 {
@@ -1056,6 +1141,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": "Directory path (on HA host) and interval for periodic observation exports."
             },
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -1063,6 +1149,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_air_quality(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             self._data[CONF_AQI_INTERVAL_MIN] = int(user_input.get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
             if self._data.get(CONF_ENABLE_POLLEN):
                 return await self.async_step_pollen()
@@ -1070,7 +1159,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="air_quality",
             data_schema=vol.Schema(
                 {
@@ -1082,6 +1171,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": "Air quality data (PM2.5, PM10, NO₂, ozone) from Open-Meteo. Free, no API key required. Uses forecast lat/lon."
             },
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -1090,6 +1180,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_pollen(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             api_key = str(user_input.get(CONF_TOMORROW_IO_KEY, "")).strip()
             if not api_key:
                 # No key — silently disable pollen and skip
@@ -1112,7 +1205,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return await self.async_step_solar_forecast()
                 return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="pollen",
             data_schema=vol.Schema(
                 {
@@ -1130,6 +1223,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": "Tomorrow.io free tier: up to 500 API calls/day. Leave blank to skip pollen sensors."
             },
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -1137,6 +1231,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # ------------------------------------------------------------------
     async def async_step_solar_forecast(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             self._data[CONF_SOLAR_PEAK_KW] = float(user_input.get(CONF_SOLAR_PEAK_KW, DEFAULT_SOLAR_PEAK_KW))
             self._data[CONF_SOLAR_PANEL_AZIMUTH] = int(
                 user_input.get(CONF_SOLAR_PANEL_AZIMUTH, DEFAULT_SOLAR_PANEL_AZIMUTH)
@@ -1147,13 +1244,17 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="solar_forecast",
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_SOLAR_PEAK_KW, default=DEFAULT_SOLAR_PEAK_KW): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=0.1, max=100.0, step=0.1, mode="box", unit_of_measurement="kWp"
+                            min=0.1,
+                            max=100.0,
+                            step=0.1,
+                            mode="box",
+                            unit_of_measurement="kWp",
                         )
                     ),
                     vol.Optional(
@@ -1172,6 +1273,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": "Free solar PV generation forecast from forecast.solar. Uses forecast lat/lon. Azimuth: 0=N, 90=E, 180=S, 270=W."
             },
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -1183,6 +1285,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         temp_u = "°F" if imperial else "°C"
 
         if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
             errors = self._validate_alert_inputs(user_input, imperial)
             if not errors:
                 self._data[CONF_THRESH_WIND_GUST_MS] = _convert_gust_to_ms(
@@ -1207,7 +1312,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         gust_max = round(_convert_gust_to_display(VALID_WIND_GUST_MAX_MS, imperial), 1)
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="alerts",
             data_schema=vol.Schema(
                 {
@@ -1216,7 +1321,11 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         default=round(_convert_gust_to_display(DEFAULT_THRESH_WIND_GUST_MS, imperial), 1),
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=0, max=gust_max, step=0.1, mode="box", unit_of_measurement=gust_u
+                            min=0,
+                            max=gust_max,
+                            step=0.1,
+                            mode="box",
+                            unit_of_measurement=gust_u,
                         )
                     ),
                     vol.Optional(
@@ -1256,6 +1365,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
+            last_step=True,
         )
 
     @staticmethod
@@ -1302,6 +1412,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         step_id="init",
                         data_schema=self._build_core_schema(imperial, gust_u, rain_u, temp_u),
                         errors={CONF_ELEVATION_M: "elevation_out_of_range"},
+                        last_step=False,
                     )
             except (TypeError, ValueError):
                 pass
@@ -1328,6 +1439,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=self._build_core_schema(imperial, gust_u, rain_u, temp_u),
+            last_step=False,
         )
 
     def _build_core_schema(self, imperial: bool, gust_u: str, rain_u: str, temp_u: str) -> vol.Schema:
@@ -1474,10 +1586,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        CONF_ENABLE_ZAMBRETTI,
-                        default=g(CONF_ENABLE_ZAMBRETTI, g(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_ZAMBRETTI)),
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
                         CONF_ENABLE_DISPLAY_SENSORS,
                         default=g(
                             CONF_ENABLE_DISPLAY_SENSORS, g(CONF_ENABLE_EXTENDED_SENSORS, DEFAULT_ENABLE_DISPLAY_SENSORS)
@@ -1532,6 +1640,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ): selector.BooleanSelector(),
                 }
             ),
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -1586,6 +1695,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     async def async_step_degree_days_opt(self, user_input: dict[str, Any] | None = None):
@@ -1604,6 +1714,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     async def async_step_metar_opt(self, user_input: dict[str, Any] | None = None):
@@ -1638,6 +1749,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             ),
             errors=errors,
             description_placeholders={"info": "Leave ICAO blank to auto-detect nearest airport."},
+            last_step=False,
         )
 
     async def async_step_cwop_opt(self, user_input: dict[str, Any] | None = None):
@@ -1664,6 +1776,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     async def async_step_wunderground_opt(self, user_input: dict[str, Any] | None = None):
@@ -1707,6 +1820,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             ),
             errors=errors,
             description_placeholders={"info": "Leave API key blank to keep existing key. Will validate."},
+            last_step=False,
         )
 
     async def async_step_export_opt(self, user_input: dict[str, Any] | None = None):
@@ -1735,6 +1849,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             ),
+            last_step=False,
         )
 
     async def async_step_air_quality_opt(self, user_input: dict[str, Any] | None = None):
@@ -1754,6 +1869,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             description_placeholders={"info": "Open-Meteo Air Quality API. Free, no key required."},
+            last_step=False,
         )
 
     async def async_step_pollen_opt(self, user_input: dict[str, Any] | None = None):
@@ -1792,6 +1908,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             ),
             errors=errors,
             description_placeholders={"info": "Leave API key blank to keep existing key."},
+            last_step=False,
         )
 
     async def async_step_solar_forecast_opt(self, user_input: dict[str, Any] | None = None):
@@ -1814,7 +1931,11 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_SOLAR_PEAK_KW, default=g(CONF_SOLAR_PEAK_KW, DEFAULT_SOLAR_PEAK_KW)
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=0.1, max=100.0, step=0.1, mode="box", unit_of_measurement="kWp"
+                            min=0.1,
+                            max=100.0,
+                            step=0.1,
+                            mode="box",
+                            unit_of_measurement="kWp",
                         )
                     ),
                     vol.Optional(
@@ -1835,4 +1956,5 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             description_placeholders={"info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal."},
+            last_step=False,
         )

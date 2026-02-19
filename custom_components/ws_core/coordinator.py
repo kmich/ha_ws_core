@@ -1206,23 +1206,60 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         freeze_thr = float(self.entry_options.get("thresh_freeze_c", 0.0))
 
         gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
-        rain_rate = data.get(KEY_RAIN_RATE_FILT, 0.0)
+        rain_rate = data.get(KEY_RAIN_RATE_FILT) or 0.0
         tc = data.get(KEY_NORM_TEMP_C)
 
-        alert_state = "clear"
-        alert_msg = "All clear"
+        active_alerts: list[dict] = []
+
         if gust_ms is not None and float(gust_ms) >= gust_thr:
-            alert_state = "warning"
-            alert_msg = f"Extreme wind: {gust_ms:.1f} m/s"
+            active_alerts.append(
+                {
+                    "type": "wind",
+                    "severity": "warning",
+                    "message": f"Extreme wind: {float(gust_ms):.1f} m/s",
+                    "icon": "mdi:weather-windy",
+                    "color": "rgba(239,68,68,0.9)",
+                }
+            )
         if float(rain_rate) >= rain_thr:
-            alert_state = "warning"
-            alert_msg = f"Heavy rain: {rain_rate:.1f} mm/h"
+            active_alerts.append(
+                {
+                    "type": "rain",
+                    "severity": "warning",
+                    "message": f"Heavy rain: {float(rain_rate):.1f} mm/h",
+                    "icon": "mdi:weather-pouring",
+                    "color": "rgba(59,130,246,0.9)",
+                }
+            )
         if tc is not None and float(tc) <= freeze_thr:
-            alert_state = "advisory" if alert_state == "clear" else alert_state
-            alert_msg = f"Freeze risk: {tc:.1f}\u00b0C"
+            active_alerts.append(
+                {
+                    "type": "freeze",
+                    "severity": "advisory",
+                    "message": f"Freeze risk: {float(tc):.1f}\u00b0C",
+                    "icon": "mdi:snowflake-alert",
+                    "color": "rgba(147,197,253,0.9)",
+                }
+            )
+
+        if active_alerts:
+            # Highest severity wins for state; warnings > advisories
+            has_warning = any(a["severity"] == "warning" for a in active_alerts)
+            alert_state = "warning" if has_warning else "advisory"
+            alert_msg = " | ".join(a["message"] for a in active_alerts)
+            # Use the highest-severity alert for icon/color
+            primary = next((a for a in active_alerts if a["severity"] == "warning"), active_alerts[0])
+            data["_alert_icon"] = primary["icon"]
+            data["_alert_color"] = primary["color"]
+        else:
+            alert_state = "clear"
+            alert_msg = "All clear"
+            data["_alert_icon"] = "mdi:check-circle-outline"
+            data["_alert_color"] = "rgba(74,222,128,0.8)"
 
         data[KEY_ALERT_STATE] = alert_state
         data[KEY_ALERT_MESSAGE] = alert_msg
+        data["_active_alerts"] = active_alerts
 
         # HA Repairs integration: create/clear issues for missing sources
         if HAS_REPAIRS:
@@ -2019,7 +2056,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         lat = self.forecast_lat
         lon = self.forecast_lon
         url = (
-            "https://data.tomorrow.io/v4/weather/realtime"
+            "https://api.tomorrow.io/v4/weather/realtime"
             f"?location={lat},{lon}"
             "&fields=grassIndex,treeIndex,weedIndex"
             f"&apikey={self.tomorrow_io_key}"

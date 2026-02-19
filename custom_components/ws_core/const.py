@@ -291,9 +291,10 @@ SRC_LUX = "illuminance"
 SRC_UV = "uv_index"
 SRC_DEW_POINT = "dew_point"
 SRC_BATTERY = "battery"
+SRC_SOLAR_RADIATION = "solar_radiation"  # W/m², optional
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
-OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY]
+OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY, SRC_SOLAR_RADIATION]
 
 # Only these sources trigger staleness warnings. Excluded: rain_total (static
 # when dry), lux/uv (zero at night), dew_point, battery (slow-reporting).
@@ -365,9 +366,6 @@ DEFAULT_SOLAR_PEAK_KW = 5.0
 DEFAULT_SOLAR_PANEL_AZIMUTH = 180  # south-facing
 DEFAULT_SOLAR_PANEL_TILT = 30  # degrees from horizontal
 DEFAULT_SOLAR_INTERVAL_MIN = 60
-
-# v0.9.0 — Penman-Monteith ET₀ optional solar radiation source
-SRC_SOLAR_RADIATION = "solar_radiation"  # W/m², optional
 
 # ---------------------------------------------------------------------------
 # Data keys — v0.7.0 Air Quality

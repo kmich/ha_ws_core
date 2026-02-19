@@ -905,9 +905,10 @@ views:
                           const strikes = parseInt(lCounter?.state);
                           const lightningActive = !isNaN(strikes) && strikes > 0;
 
-                          // --- Earthquake ---
-                          const quake = states['sensor.ws_alert_state'];
-                          const quakeActive = quake?.state === 'alert';
+                          // --- Weather Alert ---
+                          const alertEntity = states['sensor.ws_alert_state'];
+                          const alertActive = alertEntity?.state === 'warning' || alertEntity?.state === 'advisory';
+                          const alertCount = parseInt(alertEntity?.attributes?.alert_count) || 0;
 
                           // --- Wildfire risk ---
                           const wildfireEnabled = states['sensor.ws_fire_risk_score'] !== undefined;
@@ -923,16 +924,17 @@ views:
                           const isRaining = display?.attributes?.is_raining === true || display?.attributes?.is_raining === 'True';
 
                           // --- Choose what to show (priority) ---
-                          if (quakeActive) {
-                            const dist = quake.attributes?.nearest_distance_km || 0;
-                            const mag = quake.attributes?.nearest_magnitude || 0;
-                            const place = quake.attributes?.nearest_place || 'Nearby';
+                          if (alertActive && alertCount > 0) {
+                            const msg = alertEntity?.attributes?.message || 'Alert';
+                            const ico = alertEntity?.attributes?.icon || 'mdi:alert-circle';
+                            const severity = alertEntity?.state || 'warning';
+                            const sColor = severity === 'warning' ? '#F87171' : '#FBBF24';
                             return `
                               <div style="display:flex; align-items:center; gap:10px; height:100%;">
-                                <ha-icon icon="mdi:pulse" style="--mdc-icon-size:clamp(22px, 3.5vw, 28px); color:#F87171;"></ha-icon>
+                                <ha-icon icon="${ico}" style="--mdc-icon-size:clamp(22px, 3.5vw, 28px); color:${sColor};"></ha-icon>
                                 <div style="line-height:1.05;">
-                                  <div style="font-size:clamp(13px, 2.2vw, 16px); font-weight:700; color:white;">QUAKE M${parseFloat(mag).toFixed(1)}</div>
-                                  <div style="font-size:clamp(8px, 1.3vw, 10px); color:rgba(255,255,255,0.8);">${parseInt(dist)} km · ${place}</div>
+                                  <div style="font-size:clamp(11px, 1.8vw, 14px); font-weight:700; color:white;">${msg}</div>
+                                  <div style="font-size:clamp(8px, 1.3vw, 10px); color:${sColor};">${alertCount} active alert${alertCount > 1 ? 's' : ''}</div>
                                 </div>
                               </div>`;
                           }
@@ -984,7 +986,8 @@ views:
                         - box-shadow: 0 4px 20px rgba(0,0,0,0.3)
                         - background: |
                             [[[ 
-                              const quake = states['sensor.ws_alert_state']?.state === 'alert';
+                              const alertState = states['sensor.ws_alert_state']?.state;
+                              const weatherAlert = alertState === 'warning' || alertState === 'advisory';
                               const wildfireEnabled = states['sensor.ws_fire_risk_score'] !== undefined;
                               const t = parseFloat(states['sensor.ws_temperature']?.state);
                               const h = parseFloat(states['sensor.ws_humidity']?.state);
@@ -994,7 +997,7 @@ views:
                               const lCounter = (prefix && prefix !== 'none') ? states[`sensor.${prefix}_lightning_counter`] : null;
                               const strikes = parseInt(lCounter?.state);
                               const lightning = !isNaN(strikes) && strikes > 0;
-                              if (quake) return 'linear-gradient(145deg, rgba(185,28,28,0.22) 0%, rgba(25,28,38,0.98) 100%)';
+                              if (weatherAlert) return alertState === 'warning' ? 'linear-gradient(145deg, rgba(185,28,28,0.22) 0%, rgba(25,28,38,0.98) 100%)' : 'linear-gradient(145deg, rgba(245,158,11,0.15) 0%, rgba(25,28,38,0.98) 100%)';
                               if (lightning) return 'linear-gradient(145deg, rgba(245,158,11,0.22) 0%, rgba(25,28,38,0.98) 100%)';
                               if (fire) return 'linear-gradient(145deg, rgba(234,88,12,0.22) 0%, rgba(25,28,38,0.98) 100%)';
                               return 'linear-gradient(145deg, rgba(59,130,246,0.12) 0%, rgba(25,28,38,0.98) 100%)';
@@ -1981,7 +1984,7 @@ views:
               type: entities
               title: Pollen
               entities:
-                - entity: sensor.ws_pollen_overall
+                - entity: sensor.ws_pollen_level
                   name: Overall Level
                   icon: mdi:flower-pollen
                 - entity: sensor.ws_pollen_grass
@@ -2019,7 +2022,7 @@ views:
             - type: entities
               title: Moon
               entities:
-                - entity: sensor.ws_moon_display
+                - entity: sensor.ws_moon
                   name: Phase
                   icon: mdi:moon-waning-crescent
                 - entity: sensor.ws_moon_illumination
@@ -2062,7 +2065,7 @@ views:
           columns: 2
           cards:
             - type: entity
-              entity: sensor.ws_solar_forecast_today_kwh
+              entity: sensor.ws_solar_forecast_today
               name: Solar Today
               icon: mdi:solar-power
               card_mod:
@@ -2073,7 +2076,7 @@ views:
                     border-radius: 16px !important;
                   }
             - type: entity
-              entity: sensor.ws_solar_forecast_tomorrow_kwh
+              entity: sensor.ws_solar_forecast_tomorrow
               name: Solar Tomorrow
               icon: mdi:solar-power-variant
               card_mod:
@@ -2125,20 +2128,71 @@ views:
                     state: "on"
                 card:
                   type: entities
-                  title: External Data & Uploads
+                  title: METAR Validation
                   entities:
                     - entity: sensor.ws_metar_validation
-                      name: METAR Validation
+                      name: METAR Status
                       icon: mdi:shield-check
-                    - entity: sensor.ws_cwop_upload_status
-                      name: CWOP Upload
-                      icon: mdi:broadcast
-                    - entity: sensor.ws_wu_upload_status
-                      name: Weather Underground
-                      icon: mdi:weather-cloudy-clock
-                    - entity: sensor.ws_last_export_time
-                      name: Last Export
-                      icon: mdi:file-export
+                    - entity: sensor.ws_temp_vs_metar_delta
+                      name: Temp vs METAR
+                      icon: mdi:thermometer-alert
+                    - entity: sensor.ws_pressure_vs_metar_delta
+                      name: Pressure vs METAR
+                      icon: mdi:gauge-low
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: rgba(20,20,35,0.95) !important;
+                        border: 1px solid rgba(255,255,255,0.08) !important;
+                        border-radius: 16px !important;
+                        margin-top: 8px !important;
+                      }
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_cwop
+                    state: "on"
+                card:
+                  type: entity
+                  entity: sensor.ws_cwop_upload_status
+                  name: CWOP Upload
+                  icon: mdi:broadcast
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: rgba(20,20,35,0.95) !important;
+                        border: 1px solid rgba(255,255,255,0.08) !important;
+                        border-radius: 16px !important;
+                        margin-top: 8px !important;
+                      }
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_wunderground
+                    state: "on"
+                card:
+                  type: entity
+                  entity: sensor.ws_wu_upload_status
+                  name: Weather Underground
+                  icon: mdi:weather-cloudy-clock
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: rgba(20,20,35,0.95) !important;
+                        border: 1px solid rgba(255,255,255,0.08) !important;
+                        border-radius: 16px !important;
+                        margin-top: 8px !important;
+                      }
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_export
+                    state: "on"
+                card:
+                  type: entity
+                  entity: sensor.ws_last_export_time
+                  name: Last Export
+                  icon: mdi:file-export
                   card_mod:
                     style: |
                       ha-card {

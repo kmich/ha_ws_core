@@ -2,6 +2,28 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [1.0.2] - 2026-02-19
+
+### Fixed
+- **Alert system overwrite bug**: When multiple alert conditions triggered simultaneously (e.g. high wind + heavy rain + freeze), each condition overwrote the previous one, so only the last alert was shown. Now all active alerts accumulate and display together with pipe-separated messages ("Extreme wind: 20.0 m/s | Heavy rain: 25.0 mm/h | Freeze risk: -2.0C"). The highest severity ("warning" > "advisory") determines the overall state, and the primary alert's icon/color is used for the banner.
+- **Alert sensor attributes**: The alert_state sensor now exposes `message`, `icon`, `color`, `active_alerts` (list), and `alert_count` as attributes. Previously these were missing, causing the dashboard alert banner to show a generic "Alert" instead of the actual alert message. The alert_message sensor also exposes `alert_state`, `icon`, and `color` as attributes.
+- **Solar radiation label and processing**: The `solar_radiation` field in Optional Sources showed a raw key and was never saved on submit. Root cause: it was manually appended to the form but not included in `OPTIONAL_SOURCES`. Now properly included in the list, fixing both the translation label and data persistence.
+- **Tomorrow.io API validation**: Key validation used the wrong domain (`data.tomorrow.io` instead of `api.tomorrow.io`) and was missing the required `fields` parameter, causing all validation attempts to return "cannot connect". Fixed domain and added `fields=temperature` for the lightweight check. Also fixed in the coordinator's pollen data fetch.
+- **Config flow Next/Finish buttons**: All config steps now show "Next" (via `last_step=False`), with only the final Alerts step showing "Submit" (`last_step=True`). HA provides the Back button automatically.
+- **Dashboard config errors on Advanced page**: The "External Data & Uploads" card bundled CWOP, Weather Underground, and Export entities inside a METAR-only conditional. When those features were disabled, HA showed "Configuration error" for each missing entity. Split into separate conditionals: METAR, CWOP, WU, and Export each gated by their own feature switch.
+- **Dashboard entity ID mismatches**: Fixed 4 entity references in the enhanced dashboard that did not match the sensor slug map: `ws_moon_display` -> `ws_moon`, `ws_pollen_overall` -> `ws_pollen_level`, `ws_solar_forecast_today_kwh` -> `ws_solar_forecast_today`, `ws_solar_forecast_tomorrow_kwh` -> `ws_solar_forecast_tomorrow`.
+- **Dead code in sensor.py**: Removed unreachable fallback code after the return statement in `_slug_for_key`.
+- **Diagnostics version**: Fixed hardcoded version string from "0.4.0" to "1.0.2".
+
+### Added
+- **Config flow back button**: Every config step (except the first) now shows a "Go back to previous step" toggle. When checked, the form navigates to the previous step with full history tracking. Works through the entire wizard, including branching feature configuration steps.
+- **Integration tests**: Added 29 integration tests covering config flow structure, back button logic, alert accumulation (9 scenarios), API response error handling, sensor entity creation, diagnostics output, and version consistency. Total test count: 103.
+
+### Changed
+- **Zambretti forecast is now always enabled**: Removed the `switch.ws_enable_zambretti` toggle. Zambretti forecasting and the weather condition classifier are core functionality that the dashboards depend on, so they can no longer be disabled. Existing config entries are unaffected (the constant is forced to True).
+- **Device page entity grouping**: Config entities now use grouped name prefixes so they cluster logically on the device page instead of a flat list: "Alert:" (thresholds), "Calibration:" (offsets), "Tuning:" (algorithm parameters), "Feature:" (toggles), "Dashboard:" (animations).
+- **README accuracy**: Fixed 4 entity ID mismatches (moon, pollen, solar forecast), removed dead Zambretti switch from entity table, added `custom:windrose-card` to dashboard dependencies, corrected config flow step numbering, replaced em dashes per style guide.
+
 ## [1.0.1] - 2026-02-19
 
 ### Fixed
@@ -46,7 +68,7 @@ All notable changes to Weather Station Core are documented in this file.
 - **Wind rose** (dashboard): New section on the Advanced page using `custom:windrose-card` (HACS card). Displays 24h wind direction/speed distribution. Requires `custom:windrose-card` to be installed from HACS.
 - **Radar** (dashboard): New section on the Advanced page showing RainViewer live radar iframe, auto-centred on your HA home location. Free, no API key required.
 
-### Added (v0.6.0 preview — sensors available, upload activated via config)
+### Added (v0.6.0 preview  --  sensors available, upload activated via config)
 
 - **ET₀ reference evapotranspiration** (`sensor.ws_et0_daily`, `sensor.ws_et0_hourly`): Hargreaves-Samani 1985 method using daily temp high/low and latitude. Accuracy ±15-20% vs Penman-Monteith; improves with a solar radiation sensor (future enhancement). Activates automatically when forecast lat/lon is configured.
 - **CWOP upload** (`sensor.ws_cwop_upload_status`): Uploads observations to cwop.aprs.net via APRS-IS TCP. Configure callsign, passcode (-1 for citizens), and interval. Toggle: `enable_cwop`.
@@ -85,8 +107,8 @@ All notable changes to Weather Station Core are documented in this file.
 ## [0.4.5] - 2026-02-18
 
 ### Added
-- **`select.ws_graph_range`**: Integration-owned select entity for dashboard graph time range (6h/24h/3d). Replaces manual `input_select` helper — auto-created, state restored on restart.
-- **`switch.ws_enable_animations`**: Integration-owned switch for dashboard animation toggle. Replaces manual `input_boolean` helper — auto-created, state restored on restart.
+- **`select.ws_graph_range`**: Integration-owned select entity for dashboard graph time range (6h/24h/3d). Replaces manual `input_select` helper  --  auto-created, state restored on restart.
+- **`switch.ws_enable_animations`**: Integration-owned switch for dashboard animation toggle. Replaces manual `input_boolean` helper  --  auto-created, state restored on restart.
 - **New platforms**: `select` and `switch` added to integration platforms.
 
 ### Fixed
@@ -104,7 +126,7 @@ All notable changes to Weather Station Core are documented in this file.
 - **Rain nowcasting sensors**: `rain_last_1h`, `rain_last_24h` (precipitation device class), `time_since_rain` (human-readable "3h ago" / "No rain recorded").
 
 ### Fixed
-- **7 entities had broken slugs**: `_slug_for_key()` had no fallback return — `KEY_LUX`, `KEY_UV`, `KEY_ALERT_STATE`, `KEY_ALERT_MESSAGE`, `KEY_PACKAGE_STATUS`, `KEY_PRESSURE_CHANGE_WINDOW_HPA`, `KEY_PRESSURE_TREND_HPAH` all generated `sensor.ws_None`. Added missing overrides + fallback.
+- **7 entities had broken slugs**: `_slug_for_key()` had no fallback return  --  `KEY_LUX`, `KEY_UV`, `KEY_ALERT_STATE`, `KEY_ALERT_MESSAGE`, `KEY_PACKAGE_STATUS`, `KEY_PRESSURE_CHANGE_WINDOW_HPA`, `KEY_PRESSURE_TREND_HPAH` all generated `sensor.ws_None`. Added missing overrides + fallback.
 - **Activity scores no longer disabled by default**: When the user enables "Activity scores" in Features, the 4 entities appear enabled immediately (removed double-gating from `_DISABLED_BY_DEFAULT`).
 - **Dashboard entity references**: Fixed stale `ws_01_*` entity names → current `ws_*` names; `ws_fire_weather_index` → `ws_fire_risk_score`.
 - **Dashboard advanced page alignment**: Paired cards into `column_span: 2` row sections (Moon+UV, Laundry+Fire, Rain+Temp, Wind+Pressure align side-by-side).
@@ -118,8 +140,8 @@ After upgrading, remove and re-add the integration to clear stale entity registr
 ### Added
 - **Features step in config flow**: New dedicated step during initial setup with clear toggles for "Extended analysis" (Zambretti, classifier, display sensors) and "Activity scores" (laundry, stargazing, fire, running). Both also available in Options flow (Configure button).
 - **Sensor group filtering**: Sensors are now only created when their feature group is enabled. Disabling a group removes its entities entirely instead of just hiding them.
-- **Weather entity: apparent temperature, dew point, wind gust, UV index** — standard HA weather entity attributes now properly exposed.
-- **Forecast: precipitation probability** (daily), **wind gust, apparent temp, dew point, cloud coverage** (hourly) — expanded Open-Meteo API request.
+- **Weather entity: apparent temperature, dew point, wind gust, UV index**  --  standard HA weather entity attributes now properly exposed.
+- **Forecast: precipitation probability** (daily), **wind gust, apparent temp, dew point, cloud coverage** (hourly)  --  expanded Open-Meteo API request.
 - **Calibration offsets**: Temperature, humidity, pressure, and wind speed offsets in Options flow.
 
 ### Fixed
@@ -140,10 +162,10 @@ If you see "no unique ID" warnings on rain rate or other sensors after upgrading
 ## [0.4.2] - 2026-02-18
 
 ### Added
-- **Weather entity: apparent temperature, dew point, wind gust, UV index** — standard HA weather entity attributes now properly exposed (were only available as separate sensors before).
-- **Daily forecast: precipitation probability** — already fetched from Open-Meteo but was not included in forecast output.
-- **Hourly forecast: apparent temperature, dew point, wind gust, cloud coverage** — expanded Open-Meteo API request to provide richer hourly data.
-- **Daily forecast: wind gust** — added `windgusts_10m_max` from Open-Meteo.
+- **Weather entity: apparent temperature, dew point, wind gust, UV index**  --  standard HA weather entity attributes now properly exposed (were only available as separate sensors before).
+- **Daily forecast: precipitation probability**  --  already fetched from Open-Meteo but was not included in forecast output.
+- **Hourly forecast: apparent temperature, dew point, wind gust, cloud coverage**  --  expanded Open-Meteo API request to provide richer hourly data.
+- **Daily forecast: wind gust**  --  added `windgusts_10m_max` from Open-Meteo.
 - **Calibration offsets**: Temperature, humidity, pressure, and wind speed offsets in Options flow. Applied after unit conversion, before all derived calculations.
 - **HACS `ignore: brands`** in validate.yml to prevent false CI failures before brands PR is merged.
 
