@@ -412,7 +412,7 @@ class TestDiagnostics:
 
         assert isinstance(result, dict)
         assert result["title"] == "My Weather Station"
-        assert result["version"] == "1.0.2"
+        assert result["version"] == "1.0.3"
         assert "entry_data" in result
         assert "sensor_stats" in result
         assert "runtime" in result
@@ -453,14 +453,14 @@ class TestVersionConsistency:
     def test_manifest_version(self):
         with open("custom_components/ws_core/manifest.json") as f:
             m = json.load(f)
-        assert m["version"] == "1.0.2"
+        assert m["version"] == "1.0.3"
 
     def test_diagnostics_version(self):
         with open("custom_components/ws_core/diagnostics.py") as f:
             content = f.read()
-        assert '"1.0.2"' in content
+        assert '"1.0.3"' in content
 
     def test_pyproject_version(self):
         with open("pyproject.toml") as f:
             content = f.read()
-        assert 'version = "1.0.2"' in content
+        assert 'version = "1.0.3"' in content

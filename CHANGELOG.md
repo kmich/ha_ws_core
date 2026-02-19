@@ -2,6 +2,14 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [1.0.3] - 2026-02-19
+
+### Fixed
+- **Config flow 500 Internal Server Error**: Fixed an infinite recursion bug in the config flow form renderer (`_show_step`) that caused Home Assistant to crash the flow with a 500 error.
+- **Options flow crash**: Fixed options flow initialization to correctly receive and store the `config_entry` (Configure button works again).
+- **Back-toggle history stability**: Prevented duplicate step IDs from being appended to history when a step re-renders due to validation errors.
+
+
 ## [1.0.2] - 2026-02-19
 
 ### Fixed
