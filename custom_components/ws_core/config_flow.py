@@ -649,7 +649,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             options=HEMISPHERE_OPTIONS,
                             mode="list",
                             translation_key="hemisphere",
-        )
+                        )
                     ),
                     vol.Required(CONF_CLIMATE_REGION, default=auto_region): selector.SelectSelector(
                         selector.SelectSelectorConfig(
@@ -706,7 +706,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 {"value": "imperial", "label": "Imperial (mph, in, inHg)"},
                             ],
                             mode="list",
-        )
+                        )
                     ),
                     vol.Required(CONF_TEMP_UNIT, default=default_temp): selector.SelectSelector(
                         selector.SelectSelectorConfig(
@@ -1257,7 +1257,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             step=0.1,
                             mode="box",
                             unit_of_measurement="kWp",
-        )
+                        )
                     ),
                     vol.Optional(
                         CONF_SOLAR_PANEL_AZIMUTH, default=DEFAULT_SOLAR_PANEL_AZIMUTH
@@ -1328,7 +1328,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             step=0.1,
                             mode="box",
                             unit_of_measurement=gust_u,
-        )
+                        )
                     ),
                     vol.Optional(
                         CONF_THRESH_RAIN_RATE_MMPH,
