@@ -450,17 +450,25 @@ class TestDiagnostics:
 # ===========================================================================
 
 class TestVersionConsistency:
-    def test_manifest_version(self):
+    def _manifest_version(self):
         with open("custom_components/ws_core/manifest.json") as f:
-            m = json.load(f)
-        assert m["version"] == "1.0.3"
+            return json.load(f)["version"]
+
+    def test_manifest_version(self):
+        """Manifest version must be a valid semver string."""
+        v = self._manifest_version()
+        assert v and len(v.split(".")) == 3, f"Invalid manifest version: {v!r}"
 
     def test_diagnostics_version(self):
+        """diagnostics.py must embed the same version as manifest.json."""
+        v = self._manifest_version()
         with open("custom_components/ws_core/diagnostics.py") as f:
             content = f.read()
-        assert '"1.0.3"' in content
+        assert f'"{v}"' in content, f"diagnostics.py does not contain version {v!r}"
 
     def test_pyproject_version(self):
+        """pyproject.toml must match manifest.json version."""
+        v = self._manifest_version()
         with open("pyproject.toml") as f:
             content = f.read()
-        assert 'version = "1.0.3"' in content
+        assert f'version = "{v}"' in content, f"pyproject.toml does not contain version {v!r}"
