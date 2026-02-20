@@ -608,11 +608,11 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default = defaults.get(k)
             if default is not None:
                 fields[vol.Optional(k, default=default)] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor"),
+                    selector.EntitySelectorConfig(domain="sensor")
                 )
             else:
                 fields[vol.Optional(k)] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor"),
+                    selector.EntitySelectorConfig(domain="sensor")
                 )
         return self.async_show_form(
             step_id="optional_sources",

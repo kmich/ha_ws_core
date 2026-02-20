@@ -802,15 +802,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_temp_bar_percent"] = round(_pct, 1)
             # color ramp: cold → cool → comfortable → warm → hot
             if _t <= 0:
-                data["_temp_color"] = "#60A5FA"   # cold – blue
+                data["_temp_color"] = "#60A5FA"  # cold – blue
             elif _t <= 10:
-                data["_temp_color"] = "#34D399"   # cool – teal
+                data["_temp_color"] = "#34D399"  # cool – teal
             elif _t <= 20:
-                data["_temp_color"] = "#4ADE80"   # comfortable – green
+                data["_temp_color"] = "#4ADE80"  # comfortable – green
             elif _t <= 30:
-                data["_temp_color"] = "#FBBF24"   # warm – amber
+                data["_temp_color"] = "#FBBF24"  # warm – amber
             else:
-                data["_temp_color"] = "#EF4444"   # hot – red
+                data["_temp_color"] = "#EF4444"  # hot – red
         if rh is not None:
             data[KEY_HUMIDITY_LEVEL_DISPLAY] = humidity_level(float(rh))
         if uv := data.get(KEY_UV):
