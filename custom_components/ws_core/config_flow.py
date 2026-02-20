@@ -604,10 +604,12 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_location()
 
         entity_sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+        # fmt: off
         fields = {
             (vol.Optional(k, default=defaults[k]) if k in defaults else vol.Optional(k)): entity_sel
             for k in OPTIONAL_SOURCES
         }
+        # fmt: on
         return self.async_show_form(
             step_id="optional_sources",
             data_schema=vol.Schema(fields),
