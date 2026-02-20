@@ -410,9 +410,14 @@ class TestDiagnostics:
 
         result = asyncio.run(async_get_config_entry_diagnostics(hass, entry))
 
+        import json
+
+        with open("custom_components/ws_core/manifest.json") as f:
+            expected_version = json.load(f)["version"]
+
         assert isinstance(result, dict)
         assert result["title"] == "My Weather Station"
-        assert result["version"] == "1.0.3"
+        assert result["version"] == expected_version
         assert "entry_data" in result
         assert "sensor_stats" in result
         assert "runtime" in result
