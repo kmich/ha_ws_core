@@ -611,9 +611,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     selector.EntitySelectorConfig(domain="sensor")
                 )
             else:
-                fields[vol.Optional(k)] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
-                )
+                fields[vol.Optional(k)] = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
         return self.async_show_form(
             step_id="optional_sources",
             data_schema=vol.Schema(fields),
