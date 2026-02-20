@@ -583,6 +583,10 @@ SENSORS: list[WSSensorDescription] = [
         name="WS Temperature Display",
         icon="mdi:thermometer",
         entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "bar_percent": d.get("_temp_bar_percent", 50),
+            "color": d.get("_temp_color", "#4ADE80"),
+        },
     ),
     # =========================================================================
     # ACTIVITY OPTIMIZATION SENSORS (disabled by default)

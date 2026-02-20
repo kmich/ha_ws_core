@@ -522,9 +522,10 @@ views:
                       const cardinal = states['sensor.ws_wind_quadrant']?.attributes?.cardinal || '—';
 
                       const sunAttrs = states['sun.sun']?.attributes || {};
-                      const sunrise = sunAttrs.sunrise || '--:--';
-                      const sunset = sunAttrs.sunset || '--:--';
-                      const isDay = sunAttrs.is_day === 'True' || sunAttrs.is_day === true;
+                      const _toHHMM = iso => { try { return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false}); } catch(e) { return '--:--'; } };
+                      const sunrise = sunAttrs.next_rising ? _toHHMM(sunAttrs.next_rising) : '--:--';
+                      const sunset = sunAttrs.next_setting ? _toHHMM(sunAttrs.next_setting) : '--:--';
+                      const isDay = states['sun.sun']?.state === 'above_horizon';
 
                       const moonAttrs = states['sensor.ws_stargazing_quality']?.attributes || {};
                       let moonHtml = '';
@@ -1339,6 +1340,11 @@ views:
                   line_width: 2
                   height: 68
                   animate: true
+                  lower_bound: ~-5
+                  upper_bound: ~40
+                  lower_bound_secondary: ~0
+                  upper_bound_secondary: ~100
+                  smoothing: true
                   show:
                     name: false
                     icon: false
@@ -2008,84 +2014,88 @@ views:
       # MOON PHASE  (v0.8.0)
       # Conditional: only visible when moon feature is enabled
       # =======================================================================
-      - type: conditional
+      - type: grid
         column_span: 2
-        conditions:
-          - condition: state
-            entity: switch.ws_enable_moon
-            state: "on"
-        card:
-          type: grid
-          column_span: 2
-          columns: 2
-          cards:
-            - type: entities
-              title: Moon
-              entities:
-                - entity: sensor.ws_moon
-                  name: Phase
-                  icon: mdi:moon-waning-crescent
-                - entity: sensor.ws_moon_illumination
-                  name: Illumination
-                  icon: mdi:brightness-percent
-              card_mod:
-                style: |
-                  ha-card {
-                    background: rgba(20,20,35,0.95) !important;
-                    border: 1px solid rgba(255,255,255,0.08) !important;
-                    border-radius: 16px !important;
-                  }
-            - type: entities
-              title: Moon Details
-              entities:
-                - entity: sensor.ws_moon_phase
-                  name: Phase Key
-                  icon: mdi:calendar-moon
-              card_mod:
-                style: |
-                  ha-card {
-                    background: rgba(20,20,35,0.95) !important;
-                    border: 1px solid rgba(255,255,255,0.08) !important;
-                    border-radius: 16px !important;
-                  }
+        cards:
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_moon
+                state: "on"
+            card:
+              type: grid
+              column_span: 2
+              columns: 2
+              cards:
+                - type: entities
+                  title: Moon
+                  entities:
+                    - entity: sensor.ws_moon
+                      name: Phase
+                      icon: mdi:moon-waning-crescent
+                    - entity: sensor.ws_moon_illumination
+                      name: Illumination
+                      icon: mdi:brightness-percent
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: rgba(20,20,35,0.95) !important;
+                        border: 1px solid rgba(255,255,255,0.08) !important;
+                        border-radius: 16px !important;
+                      }
+                - type: entities
+                  title: Moon Details
+                  entities:
+                    - entity: sensor.ws_moon_phase
+                      name: Phase Key
+                      icon: mdi:calendar-moon
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: rgba(20,20,35,0.95) !important;
+                        border: 1px solid rgba(255,255,255,0.08) !important;
+                        border-radius: 16px !important;
+                      }
 
       # =======================================================================
       # SOLAR FORECAST  (v0.9.0)
       # Conditional: only visible when solar forecast feature is enabled
       # =======================================================================
-      - type: conditional
+      - type: grid
         column_span: 2
-        conditions:
-          - condition: state
-            entity: switch.ws_enable_solar_forecast
-            state: "on"
-        card:
-          type: grid
-          column_span: 2
-          columns: 2
-          cards:
-            - type: entity
-              entity: sensor.ws_solar_forecast_today
-              name: Solar Today
-              icon: mdi:solar-power
-              card_mod:
-                style: |
-                  ha-card {
-                    background: rgba(20,20,35,0.95) !important;
-                    border: 1px solid rgba(255,255,255,0.08) !important;
-                    border-radius: 16px !important;
-                  }
-            - type: entity
-              entity: sensor.ws_solar_forecast_tomorrow
-              name: Solar Tomorrow
-              icon: mdi:solar-power-variant
-              card_mod:
-                style: |
-                  ha-card {
-                    background: rgba(20,20,35,0.95) !important;
-                    border: 1px solid rgba(255,255,255,0.08) !important;
-                    border-radius: 16px !important;
-                  }
+        cards:
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_solar_forecast
+                state: "on"
+            card:
+              type: grid
+              column_span: 2
+              columns: 2
+              cards:
+                - type: entity
+                  entity: sensor.ws_solar_forecast_today
+                  name: Solar Today
+                  icon: mdi:solar-power
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: rgba(20,20,35,0.95) !important;
+                        border: 1px solid rgba(255,255,255,0.08) !important;
+                        border-radius: 16px !important;
+                      }
+                - type: entity
+                  entity: sensor.ws_solar_forecast_tomorrow
+                  name: Solar Tomorrow
+                  icon: mdi:solar-power-variant
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: rgba(20,20,35,0.95) !important;
+                        border: 1px solid rgba(255,255,255,0.08) !important;
+                        border-radius: 16px !important;
+                      }
 
       # =======================================================================
       # DEGREE DAYS, ET₀ & UPLOAD STATUS  (v0.5.1/v0.6.0)
