@@ -476,7 +476,16 @@ SENSORS: list[WSSensorDescription] = [
         },
     ),
     # Rain / pressure display
-    WSSensorDescription(key=KEY_RAIN_DISPLAY, name="WS Rain Display", icon="mdi:weather-rainy"),
+    WSSensorDescription(
+        key=KEY_RAIN_DISPLAY,
+        name="WS Rain Display",
+        icon="mdi:weather-rainy",
+        attrs_fn=lambda d: {
+            "rain_rate": d.get(KEY_RAIN_RATE_FILT, 0.0),
+            "rain_today": d.get(KEY_RAIN_ACCUM_24H, 0.0),
+            "is_raining": (d.get(KEY_RAIN_RATE_FILT) or 0.0) > 0,
+        },
+    ),
     WSSensorDescription(
         key=KEY_RAIN_ACCUM_1H,
         name="WS Rain Last 1h",
