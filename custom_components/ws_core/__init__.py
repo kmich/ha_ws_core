@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import pathlib
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
@@ -71,19 +73,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WSStationCoordinator
 
     coordinator = WSStationCoordinator(hass, entry.data, entry.options)
+    # Register before async_start so that async_forward_entry_setups can
+    # find it; clean up on failure so no ghost entry remains.
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    await coordinator.async_start()
+    try:
+        await coordinator.async_start()
+    except Exception:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+        raise
 
     # Create a device for the station
     dev_reg = dr.async_get(hass)
+    _manifest = json.loads(
+        (pathlib.Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+    )
     dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
         manufacturer="Weather Station Core",
         model="Derived Weather Package",
-        sw_version="1.0.3",
+        sw_version=_manifest.get("version", "unknown"),
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -105,6 +116,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             coord.runtime.last_rain_total_mm = None
             coord.runtime.last_rain_ts = None
             coord.runtime.last_rain_rate_filt = 0.0
+            # Reset the Kalman filter so stale estimates don't bleed into the new baseline.
+            # Preserve measurement_noise so user tuning via rain_filter_alpha is retained.
+            coord.runtime.kalman = type(coord.runtime.kalman)(
+                measurement_noise=coord.runtime.kalman.measurement_noise
+            )
             await coord.async_refresh()
 
     # Register services once per integration domain (idempotent)
