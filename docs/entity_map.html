@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WS Core 1.0.10 — Entity Map</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f1117;color:#e2e8f0;font-family:system-ui,sans-serif;padding:24px 20px;max-width:1050px;margin:0 auto}
+header{border-bottom:1px solid #2d3748;padding-bottom:18px;margin-bottom:24px}
+h1{font-size:21px;font-weight:700;color:#f8fafc}
+.meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:#64748b;margin-top:8px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-bottom:20px}
+section{margin-bottom:24px}
+h2{font-size:14px;font-weight:600;color:#94a3b8;background:#1e2533;padding:6px 12px;border-radius:8px;border-left:3px solid #3b82f6;margin-bottom:6px}
+.sec-icon{margin-right:4px}
+.count{font-size:11px;font-weight:400;color:#64748b}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:5px 10px;color:#4b5563;font-weight:600;border-bottom:1px solid #1e2533}
+td{padding:4px 10px;border-bottom:1px solid #1a1f2e;vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.025)}
+code{font-family:'Courier New',monospace;color:#93c5fd;font-size:11px}
+small{font-size:10px}
+.badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;font-weight:600;margin-right:2px;white-space:nowrap}
+.badge.ok{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3)}
+.badge.diag{background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.3)}
+.badge.cond{background:rgba(20,184,166,.15);color:#5eead4;border:1px solid rgba(20,184,166,.3)}
+.badge.attrs{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
+.badge.off{background:rgba(100,116,139,.12);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⛅ Weather Station Core — Entity Map</h1>
+  <div class="meta">
+    <span>🔖 v1.0.10</span>
+    <span>📦 79 sensor entities + 16 switches</span>
+    <span>🕐 Generated 2026-02-23T07:20:56Z</span>
+  </div>
+</header>
+<div class="legend">
+  <span class="badge ok">always-on</span> Always registered
+  <span class="badge diag">diagnostic</span> EntityCategory.DIAGNOSTIC
+  <span class="badge cond">gated:*</span> Requires feature switch ON
+  <span class="badge attrs">attrs</span> Exposes extra_state_attributes
+  <span class="badge off">off-default</span> Disabled by default in entity registry
+</div>
+
+  <section>
+    <h2><span class="sec-icon">🌡️</span> Core Measurements <span class="count">(14)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_temperature</code></td>
+          <td>WS Temperature</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_dew_point</code></td>
+          <td>WS Dew Point</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_humidity</code></td>
+          <td>WS Humidity <small style='color:#64748b'>· %</small></td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_station_pressure</code></td>
+          <td>WS Station Pressure</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_sea_level_pressure</code></td>
+          <td>WS Sea-Level Pressure</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wind_speed</code></td>
+          <td>WS Wind Speed</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wind_gust</code></td>
+          <td>WS Wind Gust</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wind_direction</code></td>
+          <td>WS Wind Direction <small style='color:#64748b'>· \u00b0</small></td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_total</code></td>
+          <td>WS Rain Total</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_rate_raw</code></td>
+          <td>WS Rain Rate Raw <small style='color:#64748b'>· mm/h</small></td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_rate</code></td>
+          <td>WS Rain Rate <small style='color:#64748b'>· mm/h</small></td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_illuminance</code></td>
+          <td>WS Illuminance <small style='color:#64748b'>· lx</small></td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_uv_index</code></td>
+          <td>WS UV Index</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_battery</code></td>
+          <td>WS Battery <small style='color:#64748b'>· %</small></td>
+          <td><span class="badge diag">diagnostic</span> <span class="badge attrs">attrs</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🔧</span> Diagnostics <span class="count">(10)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_pressure_trend_raw</code></td>
+          <td>WS Pressure Trend Raw <small style='color:#64748b'>· hPa/h</small></td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pressure_change_window</code></td>
+          <td>WS Pressure Change (window) <small style='color:#64748b'>· hPa</small></td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_data_quality_banner</code></td>
+          <td>WS Data Quality Banner</td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_package_status</code></td>
+          <td>WS Package Status</td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_sensor_quality_flags</code></td>
+          <td>WS Sensor Quality Flags</td>
+          <td><span class="badge diag">diagnostic</span> <span class="badge attrs">attrs</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_alert_state</code></td>
+          <td>WS Alert State</td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_alert_message</code></td>
+          <td>WS Alert Message</td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_forecast_daily</code></td>
+          <td>WS Forecast Daily</td>
+          <td><span class="badge diag">diagnostic</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_zambretti_number</code></td>
+          <td>WS Zambretti Number</td>
+          <td><span class="badge diag">diagnostic</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wind_direction_smooth</code></td>
+          <td>WS Wind Direction Smoothed <small style='color:#64748b'>· \u00b0</small></td>
+          <td><span class="badge diag">diagnostic</span> <span class="badge off">off-default</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">⚡</span> Advanced Meteorological <span class="count">(16)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_feels_like</code></td>
+          <td>WS Feels Like</td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wet_bulb</code></td>
+          <td>WS Wet-Bulb Temperature</td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_frost_point</code></td>
+          <td>WS Frost Point</td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_zambretti_forecast</code></td>
+          <td>WS Zambretti Forecast</td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wind_beaufort</code></td>
+          <td>WS Wind Beaufort</td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wind_quadrant</code></td>
+          <td>WS Wind Quadrant</td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_current_condition</code></td>
+          <td>WS Current Condition</td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_probability</code></td>
+          <td>WS Rain Probability <small style='color:#64748b'>· %</small></td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_probability_combined</code></td>
+          <td>WS Rain Probability Combined <small style='color:#64748b'>· %</small></td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_display</code></td>
+          <td>WS Rain Display</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DISPLAY_SENSORS = on">gated:display-sensors</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_last_1h</code></td>
+          <td>WS Rain Last 1h</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_rain_last_24h</code></td>
+          <td>WS Rain Last 24h</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_time_since_rain</code></td>
+          <td>WS Time Since Rain</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pressure_trend</code></td>
+          <td>WS Pressure Trend</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DISPLAY_SENSORS = on">gated:display-sensors</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_station_health</code></td>
+          <td>WS Station Health</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DISPLAY_SENSORS = on">gated:display-sensors</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_forecast_tiles</code></td>
+          <td>WS Forecast Tiles</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DISPLAY_SENSORS = on">gated:display-sensors</span> <span class="badge attrs">attrs</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">📊</span> 24h Statistics <span class="count">(4)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_temperature_high_24h</code></td>
+          <td>WS Temperature High 24h</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_temperature_low_24h</code></td>
+          <td>WS Temperature Low 24h</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_temperature_avg_24h</code></td>
+          <td>WS Temperature Average 24h</td>
+          <td><span class="badge diag">diagnostic</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wind_gust_max_24h</code></td>
+          <td>WS Wind Gust Max 24h</td>
+          <td><span class="badge ok">always-on</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🖥️</span> Display Sensors <span class="count">(2)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_humidity_level</code></td>
+          <td>WS Humidity Level</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DISPLAY_SENSORS = on">gated:display-sensors</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_temperature_display</code></td>
+          <td>WS Temperature Display</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DISPLAY_SENSORS = on">gated:display-sensors</span> <span class="badge attrs">attrs</span> <span class="badge off">off-default</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🏃</span> Activity Scores <span class="count">(4)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_laundry_drying_score</code></td>
+          <td>WS Laundry Drying Score <small style='color:#64748b'>· score</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_LAUNDRY = on">gated:laundry</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_stargazing_quality</code></td>
+          <td>WS Stargazing Quality</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_STARGAZING = on">gated:stargazing</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_fire_risk_score</code></td>
+          <td>WS Fire Risk Score <small style='color:#64748b'>· score</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_FIRE_RISK = on">gated:fire-risk</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_running_score</code></td>
+          <td>WS Running Score <small style='color:#64748b'>· score</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_RUNNING = on">gated:running</span> <span class="badge attrs">attrs</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🌊</span> Sea Temperature <span class="count">(1)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_sea_surface_temperature</code></td>
+          <td>WS Sea Surface Temperature</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_SEA_TEMP = on">gated:sea-temp</span> <span class="badge attrs">attrs</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🌱</span> Degree Days & ET₀ <span class="count">(7)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_heating_degree_days_today</code></td>
+          <td>WS Heating Degree Days (Today) <small style='color:#64748b'>· °C·d</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DEGREE_DAYS = on">gated:degree-days</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_cooling_degree_days_today</code></td>
+          <td>WS Cooling Degree Days (Today) <small style='color:#64748b'>· °C·d</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DEGREE_DAYS = on">gated:degree-days</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_hdd_rate</code></td>
+          <td>WS HDD Rate <small style='color:#64748b'>· °C</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DEGREE_DAYS = on">gated:degree-days</span> <span class="badge attrs">attrs</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_cdd_rate</code></td>
+          <td>WS CDD Rate <small style='color:#64748b'>· °C</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_DEGREE_DAYS = on">gated:degree-days</span> <span class="badge attrs">attrs</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_et0_daily</code></td>
+          <td>WS ET₀ (Daily) <small style='color:#64748b'>· mm</small></td>
+          <td><span class="badge ok">always-on</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_et0_hourly</code></td>
+          <td>WS ET₀ (Hourly) <small style='color:#64748b'>· mm</small></td>
+          <td><span class="badge diag">diagnostic</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_et0_penman_monteith</code></td>
+          <td>WS ET₀ Penman-Monteith (Daily) <small style='color:#64748b'>· mm</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_SOLAR_FORECAST = on">gated:solar-forecast</span> <span class="badge attrs">attrs</span> <span class="badge off">off-default</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">✈️</span> METAR <span class="count">(5)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_metar_validation</code></td>
+          <td>WS METAR Validation</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_METAR = on">gated:metar</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_metar_temperature</code></td>
+          <td>WS METAR Temperature</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_METAR = on">gated:metar</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_metar_pressure</code></td>
+          <td>WS METAR Pressure</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_METAR = on">gated:metar</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_temp_vs_metar_delta</code></td>
+          <td>WS Temp vs METAR Delta</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_METAR = on">gated:metar</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pressure_vs_metar_delta</code></td>
+          <td>WS Pressure vs METAR Delta</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_METAR = on">gated:metar</span> <span class="badge attrs">attrs</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">📡</span> Upload / Export <span class="count">(3)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_cwop_upload_status</code></td>
+          <td>WS CWOP Upload Status</td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_wu_upload_status</code></td>
+          <td>WS Weather Underground Status</td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_last_export_time</code></td>
+          <td>WS Last Export Time</td>
+          <td><span class="badge diag">diagnostic</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">💨</span> Air Quality <span class="count">(4)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_air_quality_index</code></td>
+          <td>WS Air Quality Index <small style='color:#64748b'>· AQI</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_AIR_QUALITY = on">gated:air-quality</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_air_quality_level</code></td>
+          <td>WS Air Quality Level</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_AIR_QUALITY = on">gated:air-quality</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pm2_5</code></td>
+          <td>WS PM2.5 <small style='color:#64748b'>· µg/m³</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_AIR_QUALITY = on">gated:air-quality</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pm10</code></td>
+          <td>WS PM10 <small style='color:#64748b'>· µg/m³</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_AIR_QUALITY = on">gated:air-quality</span> <span class="badge off">off-default</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🌸</span> Pollen <span class="count">(4)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_pollen_level</code></td>
+          <td>WS Pollen Level</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_POLLEN = on">gated:pollen</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pollen_grass</code></td>
+          <td>WS Pollen Grass</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_POLLEN = on">gated:pollen</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pollen_tree</code></td>
+          <td>WS Pollen Tree</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_POLLEN = on">gated:pollen</span> <span class="badge off">off-default</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_pollen_weed</code></td>
+          <td>WS Pollen Weed</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_POLLEN = on">gated:pollen</span> <span class="badge off">off-default</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🌙</span> Moon <span class="count">(3)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_moon</code></td>
+          <td>WS Moon</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_MOON = on">gated:moon</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_moon_phase</code></td>
+          <td>WS Moon Phase</td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_MOON = on">gated:moon</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_moon_illumination</code></td>
+          <td>WS Moon Illumination <small style='color:#64748b'>· %</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_MOON = on">gated:moon</span> <span class="badge off">off-default</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">☀️</span> Solar Forecast <span class="count">(2)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Name</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>sensor.ws_solar_forecast_today</code></td>
+          <td>WS Solar Forecast Today <small style='color:#64748b'>· kWh</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_SOLAR_FORECAST = on">gated:solar-forecast</span> <span class="badge attrs">attrs</span></td>
+        </tr>
+        <tr>
+          <td><code>sensor.ws_solar_forecast_tomorrow</code></td>
+          <td>WS Solar Forecast Tomorrow <small style='color:#64748b'>· kWh</small></td>
+          <td><span class="badge cond" title="Requires CONF_ENABLE_SOLAR_FORECAST = on">gated:solar-forecast</span> <span class="badge off">off-default</span></td>
+        </tr></tbody>
+    </table>
+  </section>
+  <section>
+    <h2><span class="sec-icon">🔀</span> Feature Switches <span class="count">(16)</span></h2>
+    <table>
+      <thead><tr><th>Entity ID</th><th>Type</th><th>Flags</th></tr></thead>
+      <tbody>
+        <tr><td><code>switch.ws_enable_air_quality</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_animations</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_cwop</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_degree_days</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_display_sensors</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_export</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_fire_risk_score</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_laundry_score</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_metar</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_moon</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_pollen</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_running_score</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_sea_temp</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_solar_forecast</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_stargazing_score</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>
+        <tr><td><code>switch.ws_enable_wunderground</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr></tbody>
+    </table>
+  </section>
+</body>
+</html>
