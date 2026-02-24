@@ -268,6 +268,11 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="%",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "bars": max(1, min(4, -(-int(d.get(KEY_BATTERY_PCT) or 0) // 25)))
+            if d.get(KEY_BATTERY_PCT) is not None and d.get(KEY_BATTERY_PCT) > 0
+            else 1,
+        },
     ),
     WSSensorDescription(
         key=KEY_PRESSURE_TREND_HPAH,
@@ -436,7 +441,8 @@ SENSORS: list[WSSensorDescription] = [
         name="WS Current Condition",
         icon="mdi:weather-partly-cloudy",
         attrs_fn=lambda d: {
-            "mdi_icon": d.get("_condition_icon"),
+            "icon": d.get("_condition_icon"),
+            "mdi_icon": d.get("_condition_icon"),  # keep alias for backward compat
             "color": d.get("_condition_color"),
             "description": d.get("_condition_description"),
             "severity": d.get("_condition_severity"),
@@ -482,7 +488,8 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:weather-rainy",
         attrs_fn=lambda d: {
             "rain_rate": d.get(KEY_RAIN_RATE_FILT, 0.0),
-            "rain_today": d.get(KEY_RAIN_ACCUM_24H, 0.0),
+            "rain_today": d.get("_rain_today_mm", 0.0),
+            "rain_24h": d.get(KEY_RAIN_ACCUM_24H, 0.0),
             "is_raining": (d.get(KEY_RAIN_RATE_FILT) or 0.0) > 0,
         },
     ),
@@ -513,8 +520,21 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:trending-up",
         attrs_fn=lambda d: {
             "change_3h_hpa": d.get(KEY_PRESSURE_CHANGE_WINDOW_HPA),
+            "change_3h": d.get(KEY_PRESSURE_CHANGE_WINDOW_HPA),  # alias for dashboard compatibility
             "trend_rate_hpah": d.get(KEY_PRESSURE_TREND_HPAH),
             "mslp_hpa": d.get(KEY_SEA_LEVEL_PRESSURE_HPA),
+            "arrow": (
+                "\u2191\u2191" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 1.6
+                else "\u2191" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 0.8
+                else "\u2192" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) > -0.8
+                else "\u2193" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) > -1.6
+                else "\u2193\u2193"
+            ),
+            "color": (
+                "rgba(74,222,128,0.9)" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 0.8
+                else "rgba(251,191,36,0.9)" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) <= -0.8
+                else "rgba(255,255,255,0.65)"
+            ),
         },
     ),
     WSSensorDescription(

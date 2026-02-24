@@ -65,7 +65,12 @@ jobs:
       - name: Build release zip
         run: |
           cd custom_components
-          zip -r ../ws_core_v${{ steps.version.outputs.VERSION }}.zip ws_core/
+          zip -r ../ws_core_v${{ steps.version.outputs.VERSION }}.zip ws_core/ \
+            --exclude '*/__pycache__/*' \
+            --exclude '*/__pycache__' \
+            --exclude '*.pyc' \
+            --exclude '*.pyo' \
+            --exclude '*$py.class'
           cd ..
 
       - name: Create Release

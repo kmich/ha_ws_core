@@ -46,3 +46,58 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements_dev.txt
       - run: pytest tests/ -v --tb=short
+
+  no-bytecode:
+    name: No bytecode in repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if __pycache__ or .pyc files are tracked by git
+        run: |
+          if git ls-files | grep -E '(__pycache__|\.pyc$|\.pyo$)'; then
+            echo "ERROR: Bytecode files are tracked by git."
+            echo "Fix: git rm -r --cached custom_components/ws_core/__pycache__"
+            exit 1
+          fi
+          echo "OK: No bytecode files tracked."
+
+  version-consistency:
+    name: Version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check manifest == diagnostics == pyproject
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(".")
+          manifest = json.loads((root / "custom_components/ws_core/manifest.json").read_text())
+          v = manifest["version"]
+          diag = (root / "custom_components/ws_core/diagnostics.py").read_text()
+          pyproject = (root / "pyproject.toml").read_text()
+          errors = []
+          if f'"{v}"' not in diag:
+              errors.append(f"diagnostics.py does not embed version {v!r}")
+          if f'version = "{v}"' not in pyproject:
+              errors.append(f"pyproject.toml does not embed version {v!r}")
+          if errors:
+              for e in errors:
+                  print("ERROR:", e)
+              sys.exit(1)
+          print(f"OK: version {v!r} consistent across manifest.json, diagnostics.py, pyproject.toml")
+          PY
+
+  entity-validator:
+    name: Dashboard entity validator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - name: Validate dashboard entity references
+        run: python scripts/validate_dashboard_entities.py

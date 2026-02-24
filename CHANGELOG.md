@@ -2,6 +2,48 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [1.0.12] - 2026-02-24
+
+### Fixed
+- **Ghost data on setup failure** (`__init__.py`): If `coordinator.async_start()` raised an exception during entry setup, the coordinator remained registered in `hass.data` as a ghost entry. Wrapped in `try/except` with cleanup on failure.
+- **Dead code: `MOON_ICONS`** (`algorithms.py`): The `MOON_ICONS` dict was defined but never imported or used anywhere in the codebase. Removed. `MOON_ILLUMINATION` (which is used by the coordinator) is retained.
+- **Broad `except Exception` on all network I/O paths** (`coordinator.py`): Eight fetch/upload functions (Open-Meteo forecast, Open-Meteo Marine, METAR, CWOP, Weather Underground, CSV/JSON export, AQI, pollen, solar forecast) now catch specific exception types first (`aiohttp.ClientError`, `asyncio.TimeoutError`, `ValueError`, `KeyError`, `OSError` as appropriate) and use `except Exception` only as a logged fallback. The forecast task guard was narrowed from `except Exception` to `except RuntimeError`.
+- **CI: no-bytecode check** (`.github/workflows/validate.yml`): New job fails if `__pycache__` or `.pyc` files are tracked by git.
+- **CI: version consistency check** (`.github/workflows/validate.yml`): New job verifies `manifest.json`, `diagnostics.py`, and `pyproject.toml` all embed the same version string.
+- **CI: dashboard entity validator** (`.github/workflows/validate.yml`): New job runs `scripts/validate_dashboard_entities.py` and fails if any dashboard references a non-existent entity ID.
+- **Release zip includes `__pycache__`** (`.github/workflows/release.yml`): Added `--exclude` flags to strip all bytecode from the release artifact.
+- **Entity map is now generated** (`scripts/generate_entity_map.py`): Replaces the hand-maintained HTML mindmap. Derives all entity data from source code; injects version and generation timestamp automatically. Run with `python scripts/generate_entity_map.py`.
+
+## [1.0.12] - 2026-02-22
+
+### Fixed
+- **`reset_rain_baseline` service didn't reset the Kalman filter state** (`__init__.py`): The service reset `last_rain_total_mm`, `last_rain_ts`, and `last_rain_rate_filt` but left the Kalman filter estimate intact. After a reset the filter's stale estimate (high rain-rate) bled into the first few readings causing spurious non-zero rain-rate values. Fixed to recreate the Kalman instance on reset, preserving the user-tuned `measurement_noise` so the `rain_filter_alpha` setting is not lost.
+- **Four tuning `number.*` entities were exposed but had no effect** (`coordinator.py`, `algorithms.py`):
+  - `number.ws_rain_filter_alpha`: The Kalman filter was always created with hardcoded `measurement_noise=0.5`. Now wired: at coordinator startup the Kalman instance is created with `measurement_noise=rain_filter_alpha` (higher value = more smoothing).
+  - `number.ws_pressure_trend_window`: The pressure history buffer was always 12 samples × 15 min = 3 h. Now wired: sample count is computed dynamically as `round(window_h × 60 / 15)` and the deque is resized at startup.
+  - `number.ws_rain_penalty_light_mmph` / `number.ws_rain_penalty_heavy_mmph`: `laundry_drying_score` and related helpers used a hardcoded `rain_rate > 0 → score = 0` threshold. Now wired: scores degrade proportionally between `light` and `heavy` thresholds, hitting zero only at the heavy threshold.
+- **Rain "Today" resets at UTC midnight, not local midnight** (`coordinator.py`): The date comparison for the midnight rain accumulation reset used `dt_util.utcnow()` (UTC). For timezones east of UTC this caused the reset to fire hours after midnight local time. Fixed to use `dt_util.now().strftime('%Y-%m-%d')` for the local calendar date.
+- **Battery bars formula off-by-one at boundaries** (`sensor.py`): The formula `round(pct/25 + 0.5)` incorrectly yielded 2 bars at exactly 25% and 4 bars at exactly 75%. Replaced with ceiling division (`-(-pct // 25)`) so thresholds are 1–25% → 1, 26–50% → 2, 51–75% → 3, 76–100% → 4.
+- **Pressure trend sensor missing `arrow`, `color`, and `change_3h` attributes** (`sensor.py`, `coordinator.py`): The `sensor.ws_pressure_trend` `attrs_fn` only exposed `change_3h_hpa`, `trend_rate_hpah`, and `mslp_hpa`. The dashboard referenced `.arrow`, `.color`, and `.change_3h` on every render — all returned `undefined`. Coordinator now computes `_pressure_trend_arrow` and `_pressure_trend_color` and the sensor exposes them (plus a `change_3h` alias).
+- **Current condition sensor exposed `mdi_icon`, dashboard read `icon`** (`sensor.py`): The animated weather icon in the header never changed because `condAttrs.icon` was always `undefined`. Renamed the attribute to `icon` and kept `mdi_icon` as a backward-compat alias.
+- **Vanilla dashboard: `style: |` on native markdown card** (`weather_dashboard_vanilla.yaml`): The `style` key is a `card-mod` extension, not part of the native HA schema. This caused "Unknown card key: style" warnings on clean installs without `card-mod`. Removed; the storm banner now relies on content emoji for visual severity indication.
+- **Dashboard: `uvAttrs.index` → `uvAttrs.uv_index`** (`weather_dashboard.yaml`): The UV value in the light/UV card was always 0 because the attribute key is `uv_index`, not `index`.
+- **Dashboard: `wind_quadrant.attributes.cardinal` → `.state`** (`weather_dashboard.yaml`): The cardinal direction (`N`/`E`/`S`/`W`) IS the sensor state; there is no `cardinal` attribute. The wind direction display in the header now correctly uses `.state`.
+- **Dashboard: `feels_like.attributes.comfort_level` → `humidity_level.state`** (`weather_dashboard.yaml`): `feels_like` has no `comfort_level` attribute. The comfort label in the header now reads the `sensor.ws_humidity_level` state (e.g. "Comfortable", "Dry").
+- **Dashboard: stargazing card read `rain_rate_mmph` and `humidity_pct` from stargazing attrs** (`weather_dashboard.yaml`): `sensor.ws_stargazing_quality` only exposes `moon_phase` and `moon_impact`. Both values were always 0. Fixed to read from `sensor.ws_rain_rate` state and `sensor.ws_humidity` state directly.
+- **Dashboard: moon header icon used missing `stargazing.icon` attr** (`weather_dashboard.yaml`): Replaced with derived icon from `moon_phase` attribute string (new_moon → waxing_crescent → first_quarter → waxing_gibbous → full → waning_gibbous → last_quarter → waning_crescent).
+- **Dashboard: `data_quality_banner.attributes.summary` → `.data_quality`** (`weather_dashboard.yaml`): The Data Quality header referenced a non-existent `summary` attribute. Fixed to use the `data_quality` attribute that actually exists.
+- **Dashboard: `battAttrs.color` → computed from battery %** (`weather_dashboard.yaml`): Battery sensor has no `color` attribute. Replaced with JS: green > 50%, amber 20–50%, red < 20%.
+- **Dashboard: `humidity_level.attributes.color` → computed from humidity value** (`weather_dashboard.yaml`): `sensor.ws_humidity_level` has no `color` attribute. Replaced with JS thresholds.
+- **Dashboard: `illuminance.color` and `uv_level.color` → computed from values** (`weather_dashboard.yaml`): Neither sensor exposes a `color` attribute. Both now computed from the sensor state value.
+- **Dashboard: `rain_probability_combined.attributes.color` → computed from state** (`weather_dashboard.yaml`): Combined probability sensor has no `color` attribute. Replaced with `rainProb >= 70 ? '#3B82F6' : rainProb >= 40 ? '#60A5FA' : '#4ADE80'`.
+- **Dashboard: `zambretti_forecast.confidence_pct` → derived from z_number** (`weather_dashboard.yaml`): Zambretti has no `confidence_pct` attribute. Replaced with a heuristic: z-numbers 1–5 (settled fine) and 22–26 (stormy certain) → 85% confidence; any other valid z-number → 55%.
+- **Dashboard: `pressAttrs.change_3h` → `change_3h_hpa`** (`weather_dashboard.yaml`): The pressure mini-card read `.change_3h` while the attribute was `.change_3h_hpa`. Fixed (sensor now exposes both as aliases).
+- **`__pycache__` bytecode committed to repo**: Removed all `.pyc` / `__pycache__` directories. `.gitignore` already excluded them but the initial commit included pre-built bytecode. Cleaned.
+
+### Changed
+- **Version bumped**: `manifest.json`, `diagnostics.py`, and `pyproject.toml` all updated to `1.0.12`.
+
 ## [1.0.3] - 2026-02-19
 
 ### Fixed

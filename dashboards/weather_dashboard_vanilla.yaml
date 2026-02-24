@@ -39,10 +39,6 @@ views:
             Active alerts: {{ state_attr('sensor.ws_alert_state', 'alert_count') }}
             · Rain rate: {{ states('sensor.ws_rain_rate') }} mm/h
             · Wind gust: {{ states('sensor.ws_wind_gust') }}
-          style: |
-            ha-card {
-              background: {% if states('sensor.ws_alert_state') == 'warning' %}rgba(239, 68, 68, 0.15){% else %}rgba(255, 191, 36, 0.15){% endif %};
-            }
 
       # --- Weather entity card (built-in) ---
       - type: weather-forecast

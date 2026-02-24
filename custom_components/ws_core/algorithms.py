@@ -24,17 +24,8 @@ from datetime import datetime
 # Moon phase UI helpers
 # ---------------------------------------------------------------------------
 
-MOON_ICONS = {
-    "new_moon": "mdi:moon-new",
-    "waxing_crescent": "mdi:moon-waxing-crescent",
-    "first_quarter": "mdi:moon-first-quarter",
-    "waxing_gibbous": "mdi:moon-waxing-gibbous",
-    "full_moon": "mdi:moon-full",
-    "waning_gibbous": "mdi:moon-waning-gibbous",
-    "last_quarter": "mdi:moon-last-quarter",
-    "waning_crescent": "mdi:moon-waning-crescent",
-}
-
+# MOON_ILLUMINATION: approximate percentage illumination by phase.
+# Used by coordinator to populate KEY_MOON_ILLUMINATION_PCT.
 MOON_ILLUMINATION = {
     "new_moon": 0,
     "waxing_crescent": 25,
@@ -845,9 +836,13 @@ def uv_burn_time_minutes(uv_index: float, skin_type: int = 2) -> int:
 # ---------------------------------------------------------------------------
 
 
-def laundry_drying_score(temp_c, humidity, wind_speed_ms, uv_index, rain_rate_mmph, rain_probability=None) -> int:
-    """Composite drying score (0-100). Higher = better drying conditions."""
-    if rain_rate_mmph > 0:
+def laundry_drying_score(temp_c, humidity, wind_speed_ms, uv_index, rain_rate_mmph, rain_probability=None, rain_penalty_light_mmph=0.2, rain_penalty_heavy_mmph=5.0) -> int:
+    """Composite drying score (0-100). Higher = better drying conditions.
+
+    rain_penalty_light_mmph: light drizzle threshold — score reduced proportionally
+    rain_penalty_heavy_mmph: heavy rain threshold — score returns 0 immediately
+    """
+    if rain_rate_mmph >= rain_penalty_heavy_mmph:
         return 0
     if rain_probability is not None and rain_probability > 50:
         return 0
@@ -855,11 +850,16 @@ def laundry_drying_score(temp_c, humidity, wind_speed_ms, uv_index, rain_rate_mm
     hum_score = min(30, max(0, round((100 - humidity) / 100 * 30)))
     wind_score = min(20, max(0, round(wind_speed_ms / 5 * 20)))
     sun_score = min(20, max(0, round(uv_index / 10 * 20)))
-    return temp_score + hum_score + wind_score + sun_score
+    score = temp_score + hum_score + wind_score + sun_score
+    # Light drizzle: proportional penalty between light and heavy thresholds
+    if rain_rate_mmph >= rain_penalty_light_mmph:
+        penalty_factor = (rain_rate_mmph - rain_penalty_light_mmph) / max(0.01, rain_penalty_heavy_mmph - rain_penalty_light_mmph)
+        score = round(score * max(0.0, 1.0 - penalty_factor))
+    return score
 
 
-def laundry_recommendation(score: int, rain_rate_mmph: float, rain_probability) -> str:
-    if rain_rate_mmph > 0:
+def laundry_recommendation(score: int, rain_rate_mmph: float, rain_probability, rain_penalty_light_mmph: float = 0.2) -> str:
+    if rain_rate_mmph >= rain_penalty_light_mmph:
         return "Currently raining - hang indoors!"
     if rain_probability is not None and rain_probability > 50:
         return "Rain expected - hang indoors or wait"
@@ -872,8 +872,8 @@ def laundry_recommendation(score: int, rain_rate_mmph: float, rain_probability) 
     return "Poor conditions. Better to use dryer or wait."
 
 
-def laundry_dry_time(score: int, rain_rate_mmph: float) -> str:
-    if rain_rate_mmph > 0:
+def laundry_dry_time(score: int, rain_rate_mmph: float, rain_penalty_light_mmph: float = 0.2) -> str:
+    if rain_rate_mmph >= rain_penalty_light_mmph:
         return "N/A (raining)"
     if score >= 75:
         return "1.5-2.5 hours"

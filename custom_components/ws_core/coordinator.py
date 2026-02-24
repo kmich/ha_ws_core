@@ -83,6 +83,7 @@ from .algorithms import (
     parse_metar_json,
     pollen_level,
     pollen_overall,
+    pressure_trend_arrow,
     pressure_trend_display,
     running_level,
     running_recommendation,
@@ -139,6 +140,15 @@ from .const import (
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
+    # Tuning numbers (previously no-op, now wired)
+    CONF_PRESSURE_TREND_WINDOW_H,
+    CONF_RAIN_FILTER_ALPHA,
+    CONF_RAIN_PENALTY_HEAVY_MMPH,
+    CONF_RAIN_PENALTY_LIGHT_MMPH,
+    DEFAULT_PRESSURE_TREND_WINDOW_H,
+    DEFAULT_RAIN_FILTER_ALPHA,
+    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
+    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_AQI_INTERVAL_MIN,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_CWOP_INTERVAL_MIN,
@@ -387,6 +397,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._cdd_today: float = 0.0
         self._degree_day_date: str = ""
         self._degree_day_last_ts: Any = None  # datetime of last accumulation tick
+
+        # Rain today — resets at local midnight
+        self._rain_today_mm: float = 0.0
+        self._rain_today_date: str = ""
+        self._rain_today_last_total: float | None = None
+
+        # --- Tuning parameters (wired from number entities) ---
+        rain_filter_alpha = float(_get(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA))
+        # Higher alpha = more smoothing → higher Kalman measurement_noise (less responsive to jumps)
+        self.runtime.kalman = KalmanFilter(measurement_noise=float(rain_filter_alpha))
+
+        pressure_trend_window_h = float(_get(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H))
+        # Dynamic sample count: window(h) * 60 / interval(min), min 2, max 96
+        self._pressure_history_samples = max(2, min(96, round(pressure_trend_window_h * 60 / PRESSURE_HISTORY_INTERVAL_MIN)))
+        self.runtime.pressure_history = type(self.runtime.pressure_history)(maxlen=self._pressure_history_samples)
+
+        self.rain_penalty_light_mmph = float(_get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH))
+        self.rain_penalty_heavy_mmph = float(_get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH))
 
         # METAR cross-validation (v0.5.0)
         self.metar_enabled = bool(_get(CONF_ENABLE_METAR, DEFAULT_ENABLE_METAR))
@@ -853,6 +881,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         trend_3h: float = data.get(KEY_PRESSURE_TREND_HPAH, 0.0)
         data[KEY_PRESSURE_TREND_DISPLAY] = pressure_trend_display(float(trend_3h))
+        data["_pressure_trend_arrow"] = pressure_trend_arrow(float(trend_3h))
+        # Color ramp: rising=green, steady=white/grey, falling=amber/red
+        _pt_color: str
+        if trend_3h >= 0.8:
+            _pt_color = "#4ADE80"        # rising — green
+        elif trend_3h > -0.8:
+            _pt_color = "rgba(255,255,255,0.75)"  # steady — white
+        elif trend_3h > -1.6:
+            _pt_color = "#FBBF24"        # falling — amber
+        else:
+            _pt_color = "#EF4444"        # falling rapidly — red
+        data["_pressure_trend_color"] = _pt_color
 
         # Zambretti forecast (real N&Z lookup table)
         wind_quad = data.get(KEY_WIND_QUADRANT, "N")
@@ -936,6 +976,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if rt.rain_total_history_24h:
             data[KEY_RAIN_ACCUM_1H] = round(self._rain_accum_window_from_totals(rt.rain_total_history_24h, now, 1.0), 1)
             data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rt.rain_total_history_24h), 1)
+
+        # Rain today — resets at local midnight (use local time, not UTC)
+        rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
+        date_str = dt_util.now().strftime("%Y-%m-%d")
+        if date_str != self._rain_today_date:
+            self._rain_today_mm = 0.0
+            self._rain_today_date = date_str
+            self._rain_today_last_total = rain_total_mm
+        elif rain_total_mm is not None and self._rain_today_last_total is not None:
+            delta = float(rain_total_mm) - float(self._rain_today_last_total)
+            if delta > 0:
+                self._rain_today_mm += delta
+            self._rain_today_last_total = float(rain_total_mm)
+        elif rain_total_mm is not None and self._rain_today_last_total is None:
+            self._rain_today_last_total = float(rain_total_mm)
+        data["_rain_today_mm"] = round(self._rain_today_mm, 1)
 
         # Track last rain event and compute time since
         if float(rain_rate) > 0.0:
@@ -1044,12 +1100,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 uv_index=float(uv or 0),
                 rain_rate_mmph=float(rain_rate),
                 rain_probability=float(rain_prob) if rain_prob is not None else None,
+                rain_penalty_light_mmph=self.rain_penalty_light_mmph,
+                rain_penalty_heavy_mmph=self.rain_penalty_heavy_mmph,
             )
             data[KEY_LAUNDRY_SCORE] = l_score
             data["_laundry_recommendation"] = laundry_recommendation(
-                l_score, float(rain_rate), float(rain_prob) if rain_prob is not None else None
+                l_score, float(rain_rate), float(rain_prob) if rain_prob is not None else None,
+                rain_penalty_light_mmph=self.rain_penalty_light_mmph,
             )
-            data["_laundry_dry_time"] = laundry_dry_time(l_score, float(rain_rate))
+            data["_laundry_dry_time"] = laundry_dry_time(l_score, float(rain_rate), rain_penalty_light_mmph=self.rain_penalty_light_mmph)
 
         # Stargazing
         if rh is not None:
@@ -1529,7 +1588,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             rt.forecast_inflight = True
             self.hass.async_create_task(self._async_fetch_forecast())
-        except Exception:
+        except RuntimeError:
+            # Event loop shutting down — reset flag so next tick can retry.
             rt.forecast_inflight = False
 
         return cached
@@ -1580,8 +1640,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     rt.forecast_inflight = False
                     return
                 js = await resp.json()
-        except Exception as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("Open-Meteo fetch failed: %s", exc)
+            rt.forecast_consecutive_failures += 1
+            rt.forecast_inflight = False
+        except Exception as exc:
+            _LOGGER.error("Open-Meteo fetch unexpected error: %s", exc, exc_info=True)
             rt.forecast_consecutive_failures += 1
             rt.forecast_inflight = False
             return
@@ -1730,8 +1794,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rt.last_sea_temp_fetch = dt_util.utcnow()
             self.async_set_updated_data(self._compute())
 
-        except Exception as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("Open-Meteo Marine fetch failed: %s", exc)
+        except Exception as exc:
+            _LOGGER.error("Open-Meteo Marine fetch unexpected error: %s", exc, exc_info=True)
         finally:
             rt.sea_temp_inflight = False
 
@@ -1842,9 +1908,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._cwop_last_upload = dt_util.utcnow()
             self._cwop_status = f"OK {self._cwop_last_upload.strftime('%H:%M')}"
             _LOGGER.debug("CWOP upload OK: %s", packet)
-        except Exception as exc:
+        except (OSError, asyncio.TimeoutError) as exc:
             self._cwop_status = f"Error: {exc}"
             _LOGGER.warning("CWOP upload failed: %s", exc)
+        except Exception as exc:
+            self._cwop_status = f"Error: {exc}"
+            _LOGGER.error("CWOP upload unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # Weather Underground upload  (v0.6.0)
@@ -1914,9 +1983,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else:
                     self._wu_status = f"Error HTTP {resp.status}: {body[:60]}"
                     _LOGGER.warning("WUnderground upload failed HTTP %d: %s", resp.status, body[:120])
-        except Exception as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             self._wu_status = f"Error: {exc}"
             _LOGGER.warning("WUnderground upload error: %s", exc)
+        except Exception as exc:
+            self._wu_status = f"Error: {exc}"
+            _LOGGER.error("WUnderground upload unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # CSV / JSON export  (v0.6.0)
@@ -2055,8 +2127,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.runtime.last_aqi_fetch = dt_util.utcnow()
             _LOGGER.debug("ws_core AQI fetched: AQI=%s (%s)", aqi_val, self._aqi_cache.get("aqi_level"))
             await self.async_request_refresh()
-        except Exception as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("ws_core AQI fetch error: %s", exc)
+        except Exception as exc:
+            _LOGGER.error("ws_core AQI fetch unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # v0.7.0 — Pollen fetch (Tomorrow.io, free API key)
@@ -2103,8 +2177,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.runtime.last_pollen_fetch = dt_util.utcnow()
             _LOGGER.debug("ws_core pollen fetched: overall=%s", self._pollen_cache.get("overall_level"))
             await self.async_request_refresh()
-        except Exception as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("ws_core pollen fetch error: %s", exc)
+        except Exception as exc:
+            _LOGGER.error("ws_core pollen fetch unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # v0.9.0 — Solar forecast fetch (forecast.solar, free, no key)
@@ -2164,7 +2240,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "ws_core solar forecast: today=%.2f kWh, tomorrow=%.2f kWh", today_kwh or 0, tomorrow_kwh or 0
             )
             await self.async_request_refresh()
-        except Exception as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("ws_core solar forecast fetch error: %s", exc)
+            if self._solar_cache:
+                self._solar_cache["status"] = f"Error: {exc}"
+        except Exception as exc:
+            _LOGGER.error("ws_core solar forecast unexpected error: %s", exc, exc_info=True)
             if self._solar_cache:
                 self._solar_cache["status"] = f"Error: {exc}"
