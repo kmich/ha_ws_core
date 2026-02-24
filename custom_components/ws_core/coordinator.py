@@ -21,6 +21,7 @@ The _compute() method is broken into focused sub-methods:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import math
@@ -28,6 +29,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
+
+import aiohttp
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
@@ -1640,7 +1643,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     rt.forecast_inflight = False
                     return
                 js = await resp.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
+        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("Open-Meteo fetch failed: %s", exc)
             rt.forecast_consecutive_failures += 1
             rt.forecast_inflight = False
@@ -1794,7 +1797,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rt.last_sea_temp_fetch = dt_util.utcnow()
             self.async_set_updated_data(self._compute())
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
+        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("Open-Meteo Marine fetch failed: %s", exc)
         except Exception as exc:
             _LOGGER.error("Open-Meteo Marine fetch unexpected error: %s", exc, exc_info=True)
@@ -1834,7 +1837,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_upload_cwop(self) -> None:
         """Upload observation to CWOP via APRS-IS TCP."""
-        import asyncio
 
         data = self.data
         if not data:
@@ -1908,7 +1910,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._cwop_last_upload = dt_util.utcnow()
             self._cwop_status = f"OK {self._cwop_last_upload.strftime('%H:%M')}"
             _LOGGER.debug("CWOP upload OK: %s", packet)
-        except (OSError, asyncio.TimeoutError) as exc:
+        except (OSError, TimeoutError) as exc:
             self._cwop_status = f"Error: {exc}"
             _LOGGER.warning("CWOP upload failed: %s", exc)
         except Exception as exc:
@@ -1983,7 +1985,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else:
                     self._wu_status = f"Error HTTP {resp.status}: {body[:60]}"
                     _LOGGER.warning("WUnderground upload failed HTTP %d: %s", resp.status, body[:120])
-        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+        except (aiohttp.ClientError, TimeoutError) as exc:
             self._wu_status = f"Error: {exc}"
             _LOGGER.warning("WUnderground upload error: %s", exc)
         except Exception as exc:
@@ -1996,7 +1998,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_export_data(self) -> None:
         """Write current observations to CSV and/or JSON on disk."""
-        import asyncio
         import csv
         import json
         import os
@@ -2090,7 +2091,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch air quality data from Open-Meteo AQI API."""
         if not (self.forecast_lat is not None and self.forecast_lon is not None):
             return
-        import aiohttp
 
         lat = self.forecast_lat
         lon = self.forecast_lon
@@ -2127,7 +2127,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.runtime.last_aqi_fetch = dt_util.utcnow()
             _LOGGER.debug("ws_core AQI fetched: AQI=%s (%s)", aqi_val, self._aqi_cache.get("aqi_level"))
             await self.async_request_refresh()
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
+        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("ws_core AQI fetch error: %s", exc)
         except Exception as exc:
             _LOGGER.error("ws_core AQI fetch unexpected error: %s", exc, exc_info=True)
@@ -2140,7 +2140,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch pollen data from Tomorrow.io Pollen API (v4)."""
         if not (self.tomorrow_io_key and self.forecast_lat is not None and self.forecast_lon is not None):
             return
-        import aiohttp
 
         lat = self.forecast_lat
         lon = self.forecast_lon
@@ -2177,7 +2176,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.runtime.last_pollen_fetch = dt_util.utcnow()
             _LOGGER.debug("ws_core pollen fetched: overall=%s", self._pollen_cache.get("overall_level"))
             await self.async_request_refresh()
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
+        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("ws_core pollen fetch error: %s", exc)
         except Exception as exc:
             _LOGGER.error("ws_core pollen fetch unexpected error: %s", exc, exc_info=True)
@@ -2190,7 +2189,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch PV generation forecast from forecast.solar API."""
         if not (self.forecast_lat is not None and self.forecast_lon is not None):
             return
-        import aiohttp
 
         lat = self.forecast_lat
         lon = self.forecast_lon
@@ -2240,7 +2238,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "ws_core solar forecast: today=%.2f kWh, tomorrow=%.2f kWh", today_kwh or 0, tomorrow_kwh or 0
             )
             await self.async_request_refresh()
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, KeyError) as exc:
+        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("ws_core solar forecast fetch error: %s", exc)
             if self._solar_cache:
                 self._solar_cache["status"] = f"Error: {exc}"
