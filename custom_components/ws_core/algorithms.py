@@ -836,7 +836,16 @@ def uv_burn_time_minutes(uv_index: float, skin_type: int = 2) -> int:
 # ---------------------------------------------------------------------------
 
 
-def laundry_drying_score(temp_c, humidity, wind_speed_ms, uv_index, rain_rate_mmph, rain_probability=None, rain_penalty_light_mmph=0.2, rain_penalty_heavy_mmph=5.0) -> int:
+def laundry_drying_score(
+    temp_c,
+    humidity,
+    wind_speed_ms,
+    uv_index,
+    rain_rate_mmph,
+    rain_probability=None,
+    rain_penalty_light_mmph=0.2,
+    rain_penalty_heavy_mmph=5.0,
+) -> int:
     """Composite drying score (0-100). Higher = better drying conditions.
 
     rain_penalty_light_mmph: light drizzle threshold — score reduced proportionally
@@ -853,12 +862,16 @@ def laundry_drying_score(temp_c, humidity, wind_speed_ms, uv_index, rain_rate_mm
     score = temp_score + hum_score + wind_score + sun_score
     # Light drizzle: proportional penalty between light and heavy thresholds
     if rain_rate_mmph >= rain_penalty_light_mmph:
-        penalty_factor = (rain_rate_mmph - rain_penalty_light_mmph) / max(0.01, rain_penalty_heavy_mmph - rain_penalty_light_mmph)
+        penalty_factor = (rain_rate_mmph - rain_penalty_light_mmph) / max(
+            0.01, rain_penalty_heavy_mmph - rain_penalty_light_mmph
+        )
         score = round(score * max(0.0, 1.0 - penalty_factor))
     return score
 
 
-def laundry_recommendation(score: int, rain_rate_mmph: float, rain_probability, rain_penalty_light_mmph: float = 0.2) -> str:
+def laundry_recommendation(
+    score: int, rain_rate_mmph: float, rain_probability, rain_penalty_light_mmph: float = 0.2
+) -> str:
     if rain_rate_mmph >= rain_penalty_light_mmph:
         return "Currently raining - hang indoors!"
     if rain_probability is not None and rain_probability > 50:
