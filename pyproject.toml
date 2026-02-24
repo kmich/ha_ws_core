@@ -14,6 +14,7 @@ ignore = ["E501", "E701", "SIM117"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components.ws_core"]
+known-third-party = ["aiohttp", "homeassistant"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

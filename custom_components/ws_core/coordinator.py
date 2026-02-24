@@ -31,25 +31,12 @@ from datetime import timedelta
 from typing import Any
 
 import aiohttp
-
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-try:
-    from homeassistant.helpers import issue_registry as ir
-
-    HAS_REPAIRS = True
-except ImportError:
-    HAS_REPAIRS = False
-
 from .algorithms import (
-    CONDITION_COLORS,
-    CONDITION_DESCRIPTIONS,
-    CONDITION_ICONS,
-    MOON_ILLUMINATION,
-    KalmanFilter,
     aqi_level,
     beaufort_description,
     calculate_apparent_temperature,
@@ -61,6 +48,9 @@ from .algorithms import (
     calculate_us_aqi,
     calculate_wet_bulb,
     combine_rain_probability,
+    CONDITION_COLORS,
+    CONDITION_DESCRIPTIONS,
+    CONDITION_ICONS,
     cooling_degree_hours,
     determine_current_condition,
     direction_to_quadrant,
@@ -73,12 +63,14 @@ from .algorithms import (
     get_condition_severity,
     heating_degree_hours,
     humidity_level,
+    KalmanFilter,
     laundry_dry_time,
     laundry_drying_score,
     laundry_recommendation,
     least_squares_pressure_trend,
     metar_validation_label,
     moon_display_string,
+    MOON_ILLUMINATION,
     moon_next_phase_days,
     moon_phase_days,
     moon_phase_from_age,
@@ -299,6 +291,14 @@ from .const import (
     VALID_TEMP_MIN_C,
     WIND_SMOOTH_ALPHA,
 )
+
+
+try:
+    from homeassistant.helpers import issue_registry as ir
+
+    HAS_REPAIRS = True
+except ImportError:
+    HAS_REPAIRS = False
 
 _LOGGER = logging.getLogger(__name__)
 
