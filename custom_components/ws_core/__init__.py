@@ -85,9 +85,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Create a device for the station
     dev_reg = dr.async_get(hass)
-    _manifest = json.loads(
-        (pathlib.Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
-    )
+    _manifest = json.loads((pathlib.Path(__file__).parent / "manifest.json").read_text(encoding="utf-8"))
     dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
@@ -118,9 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             coord.runtime.last_rain_rate_filt = 0.0
             # Reset the Kalman filter so stale estimates don't bleed into the new baseline.
             # Preserve measurement_noise so user tuning via rain_filter_alpha is retained.
-            coord.runtime.kalman = type(coord.runtime.kalman)(
-                measurement_noise=coord.runtime.kalman.measurement_noise
-            )
+            coord.runtime.kalman = type(coord.runtime.kalman)(measurement_noise=coord.runtime.kalman.measurement_noise)
             await coord.async_refresh()
 
     # Register services once per integration domain (idempotent)
