@@ -2,7 +2,7 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
-## [1.0.12] - 2026-02-24
+## [1.1.0] - 2026-02-24
 
 ### Fixed
 - **Ghost data on setup failure** (`__init__.py`): If `coordinator.async_start()` raised an exception during entry setup, the coordinator remained registered in `hass.data` as a ghost entry. Wrapped in `try/except` with cleanup on failure.
@@ -14,7 +14,7 @@ All notable changes to Weather Station Core are documented in this file.
 - **Release zip includes `__pycache__`** (`.github/workflows/release.yml`): Added `--exclude` flags to strip all bytecode from the release artifact.
 - **Entity map is now generated** (`scripts/generate_entity_map.py`): Replaces the hand-maintained HTML mindmap. Derives all entity data from source code; injects version and generation timestamp automatically. Run with `python scripts/generate_entity_map.py`.
 
-## [1.0.12] - 2026-02-22
+## [1.1.0] - 2026-02-24
 
 ### Fixed
 - **`reset_rain_baseline` service didn't reset the Kalman filter state** (`__init__.py`): The service reset `last_rain_total_mm`, `last_rain_ts`, and `last_rain_rate_filt` but left the Kalman filter estimate intact. After a reset the filter's stale estimate (high rain-rate) bled into the first few readings causing spurious non-zero rain-rate values. Fixed to recreate the Kalman instance on reset, preserving the user-tuned `measurement_noise` so the `rain_filter_alpha` setting is not lost.
@@ -42,7 +42,7 @@ All notable changes to Weather Station Core are documented in this file.
 - **`__pycache__` bytecode committed to repo**: Removed all `.pyc` / `__pycache__` directories. `.gitignore` already excluded them but the initial commit included pre-built bytecode. Cleaned.
 
 ### Changed
-- **Version bumped**: `manifest.json`, `diagnostics.py`, and `pyproject.toml` all updated to `1.0.12`.
+- **Version bumped**: `manifest.json`, `diagnostics.py`, and `pyproject.toml` all updated to `1.1.0`.
 
 ## [1.0.3] - 2026-02-19
 

@@ -524,21 +524,15 @@ SENSORS: list[WSSensorDescription] = [
             "trend_rate_hpah": d.get(KEY_PRESSURE_TREND_HPAH),
             "mslp_hpa": d.get(KEY_SEA_LEVEL_PRESSURE_HPA),
             "arrow": (
-                "\u2191\u2191"
-                if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 1.6
-                else "\u2191"
-                if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 0.8
-                else "\u2192"
-                if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) > -0.8
-                else "\u2193"
-                if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) > -1.6
+                "\u2191\u2191" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 1.6
+                else "\u2191" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 0.8
+                else "\u2192" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) > -0.8
+                else "\u2193" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) > -1.6
                 else "\u2193\u2193"
             ),
             "color": (
-                "rgba(74,222,128,0.9)"
-                if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 0.8
-                else "rgba(251,191,36,0.9)"
-                if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) <= -0.8
+                "rgba(74,222,128,0.9)" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) >= 0.8
+                else "rgba(251,191,36,0.9)" if (d.get(KEY_PRESSURE_TREND_HPAH) or 0) <= -0.8
                 else "rgba(255,255,255,0.65)"
             ),
         },

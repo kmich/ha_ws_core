@@ -37,11 +37,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .algorithms import (
-    CONDITION_COLORS,
-    CONDITION_DESCRIPTIONS,
-    CONDITION_ICONS,
-    MOON_ILLUMINATION,
-    KalmanFilter,
     aqi_level,
     beaufort_description,
     calculate_apparent_temperature,
@@ -53,6 +48,9 @@ from .algorithms import (
     calculate_us_aqi,
     calculate_wet_bulb,
     combine_rain_probability,
+    CONDITION_COLORS,
+    CONDITION_DESCRIPTIONS,
+    CONDITION_ICONS,
     cooling_degree_hours,
     determine_current_condition,
     direction_to_quadrant,
@@ -65,12 +63,14 @@ from .algorithms import (
     get_condition_severity,
     heating_degree_hours,
     humidity_level,
+    KalmanFilter,
     laundry_dry_time,
     laundry_drying_score,
     laundry_recommendation,
     least_squares_pressure_trend,
     metar_validation_label,
     moon_display_string,
+    MOON_ILLUMINATION,
     moon_next_phase_days,
     moon_phase_days,
     moon_phase_from_age,
@@ -122,11 +122,6 @@ from .const import (
     CONF_METAR_ICAO,
     CONF_METAR_INTERVAL_MIN,
     CONF_POLLEN_INTERVAL_MIN,
-    # Tuning numbers (previously no-op, now wired)
-    CONF_PRESSURE_TREND_WINDOW_H,
-    CONF_RAIN_FILTER_ALPHA,
-    CONF_RAIN_PENALTY_HEAVY_MMPH,
-    CONF_RAIN_PENALTY_LIGHT_MMPH,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
     CONF_SOLAR_INTERVAL_MIN,
@@ -140,6 +135,15 @@ from .const import (
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
+    # Tuning numbers (previously no-op, now wired)
+    CONF_PRESSURE_TREND_WINDOW_H,
+    CONF_RAIN_FILTER_ALPHA,
+    CONF_RAIN_PENALTY_HEAVY_MMPH,
+    CONF_RAIN_PENALTY_LIGHT_MMPH,
+    DEFAULT_PRESSURE_TREND_WINDOW_H,
+    DEFAULT_RAIN_FILTER_ALPHA,
+    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
+    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_AQI_INTERVAL_MIN,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_CWOP_INTERVAL_MIN,
@@ -159,10 +163,6 @@ from .const import (
     DEFAULT_HEMISPHERE,
     DEFAULT_METAR_INTERVAL_MIN,
     DEFAULT_POLLEN_INTERVAL_MIN,
-    DEFAULT_PRESSURE_TREND_WINDOW_H,
-    DEFAULT_RAIN_FILTER_ALPHA,
-    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
-    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_SOLAR_INTERVAL_MIN,
     DEFAULT_SOLAR_PANEL_AZIMUTH,
     DEFAULT_SOLAR_PANEL_TILT,
@@ -292,6 +292,7 @@ from .const import (
     WIND_SMOOTH_ALPHA,
 )
 
+
 try:
     from homeassistant.helpers import issue_registry as ir
 
@@ -412,9 +413,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         pressure_trend_window_h = float(_get(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H))
         # Dynamic sample count: window(h) * 60 / interval(min), min 2, max 96
-        self._pressure_history_samples = max(
-            2, min(96, round(pressure_trend_window_h * 60 / PRESSURE_HISTORY_INTERVAL_MIN))
-        )
+        self._pressure_history_samples = max(2, min(96, round(pressure_trend_window_h * 60 / PRESSURE_HISTORY_INTERVAL_MIN)))
         self.runtime.pressure_history = type(self.runtime.pressure_history)(maxlen=self._pressure_history_samples)
 
         self.rain_penalty_light_mmph = float(_get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH))
@@ -889,13 +888,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Color ramp: rising=green, steady=white/grey, falling=amber/red
         _pt_color: str
         if trend_3h >= 0.8:
-            _pt_color = "#4ADE80"  # rising — green
+            _pt_color = "#4ADE80"        # rising — green
         elif trend_3h > -0.8:
             _pt_color = "rgba(255,255,255,0.75)"  # steady — white
         elif trend_3h > -1.6:
-            _pt_color = "#FBBF24"  # falling — amber
+            _pt_color = "#FBBF24"        # falling — amber
         else:
-            _pt_color = "#EF4444"  # falling rapidly — red
+            _pt_color = "#EF4444"        # falling rapidly — red
         data["_pressure_trend_color"] = _pt_color
 
         # Zambretti forecast (real N&Z lookup table)
@@ -1109,14 +1108,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             data[KEY_LAUNDRY_SCORE] = l_score
             data["_laundry_recommendation"] = laundry_recommendation(
-                l_score,
-                float(rain_rate),
-                float(rain_prob) if rain_prob is not None else None,
+                l_score, float(rain_rate), float(rain_prob) if rain_prob is not None else None,
                 rain_penalty_light_mmph=self.rain_penalty_light_mmph,
             )
-            data["_laundry_dry_time"] = laundry_dry_time(
-                l_score, float(rain_rate), rain_penalty_light_mmph=self.rain_penalty_light_mmph
-            )
+            data["_laundry_dry_time"] = laundry_dry_time(l_score, float(rain_rate), rain_penalty_light_mmph=self.rain_penalty_light_mmph)
 
         # Stargazing
         if rh is not None:
