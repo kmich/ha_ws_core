@@ -86,9 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Create a device for the station
     dev_reg = dr.async_get(hass)
-    _manifest = json.loads(
-        (pathlib.Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
-    )
+    _manifest = json.loads((pathlib.Path(__file__).parent / "manifest.json").read_text(encoding="utf-8"))
     dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
@@ -119,9 +117,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             coord.runtime.last_rain_rate_filt = 0.0
             # Reset the Kalman filter so stale estimates don't bleed into the new baseline.
             # Preserve measurement_noise so user tuning via rain_filter_alpha is retained.
-            coord.runtime.kalman = type(coord.runtime.kalman)(
-                measurement_noise=coord.runtime.kalman.measurement_noise
-            )
+            coord.runtime.kalman = type(coord.runtime.kalman)(measurement_noise=coord.runtime.kalman.measurement_noise)
             await coord.async_refresh()
 
     # Register services once per integration domain (idempotent)
@@ -134,10 +130,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     SERVICE_EXPORT_LEARNING = "export_learning_state"
 
     SERVICE_APPLY_CAL_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
-    SERVICE_RESET_LEARNING_SCHEMA = vol.Schema({
-        vol.Optional(ATTR_ENTRY_ID): cv.string,
-        vol.Optional("target", default="all"): vol.In(["all", "temp", "pressure", "solar", "forecast", "streaks"]),
-    })
+    SERVICE_RESET_LEARNING_SCHEMA = vol.Schema(
+        {
+            vol.Optional(ATTR_ENTRY_ID): cv.string,
+            vol.Optional("target", default="all"): vol.In(["all", "temp", "pressure", "solar", "forecast", "streaks"]),
+        }
+    )
     SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 
     def _get_targets(call: ServiceCall) -> list:
@@ -149,6 +147,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def _apply_cal(call: ServiceCall) -> None:
         from .learning_state import MIN_SAMPLES_MEDIUM
+
         for coord in _get_targets(call):
             ls = coord._learning_state
             opts = dict(coord._entry.options if hasattr(coord, "_entry") else {})
@@ -170,19 +169,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def _reset_learning(call: ServiceCall) -> None:
         from .learning_state import async_save_learning
+
         target = call.data.get("target", "all")
         for coord in _get_targets(call):
             ls = coord._learning_state
             if target in ("all", "temp"):
-                ls.temp_bias_ema = None; ls.temp_bias_n = 0
+                ls.temp_bias_ema = None
+                ls.temp_bias_n = 0
             if target in ("all", "pressure"):
-                ls.pressure_bias_ema = None; ls.pressure_bias_n = 0
+                ls.pressure_bias_ema = None
+                ls.pressure_bias_n = 0
             if target in ("all", "solar"):
-                ls.solar_lux_factor = 126.0; ls.solar_factor_n = 0
+                ls.solar_lux_factor = 126.0
+                ls.solar_factor_n = 0
             if target in ("all", "forecast"):
-                ls.forecast_outcomes = []; ls.blend_local = 0.5; ls.blend_openmeteo = 0.5
+                ls.forecast_outcomes = []
+                ls.blend_local = 0.5
+                ls.blend_openmeteo = 0.5
             if target in ("all", "streaks"):
-                ls.dry_streak_days = 0; ls.heat_streak_days = 0; ls.frost_streak_days = 0
+                ls.dry_streak_days = 0
+                ls.heat_streak_days = 0
+                ls.frost_streak_days = 0
                 ls.gdd_season_total = 0.0
             if coord._learning_store is not None:
                 await async_save_learning(coord._learning_store, ls)
@@ -198,9 +205,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.services.has_service(DOMAIN, SERVICE_APPLY_CAL):
         hass.services.async_register(DOMAIN, SERVICE_APPLY_CAL, _apply_cal, schema=SERVICE_APPLY_CAL_SCHEMA)
     if not hass.services.has_service(DOMAIN, SERVICE_RESET_LEARNING):
-        hass.services.async_register(DOMAIN, SERVICE_RESET_LEARNING, _reset_learning, schema=SERVICE_RESET_LEARNING_SCHEMA)
+        hass.services.async_register(
+            DOMAIN, SERVICE_RESET_LEARNING, _reset_learning, schema=SERVICE_RESET_LEARNING_SCHEMA
+        )
     if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_LEARNING):
-        hass.services.async_register(DOMAIN, SERVICE_EXPORT_LEARNING, _export_learning, schema=SERVICE_EXPORT_LEARNING_SCHEMA)
+        hass.services.async_register(
+            DOMAIN, SERVICE_EXPORT_LEARNING, _export_learning, schema=SERVICE_EXPORT_LEARNING_SCHEMA
+        )
 
     return True
 
