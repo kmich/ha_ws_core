@@ -72,7 +72,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WSStationCoordinator
 
-    coordinator = WSStationCoordinator(hass, entry.data, entry.options)
+    coordinator = WSStationCoordinator(hass, {**entry.data, "entry_id": entry.entry_id}, entry.options)
+    coordinator._entry = entry  # stored for learning service callbacks
     # Register before async_start so that async_forward_entry_setups can
     # find it; clean up on failure so no ghost entry remains.
     hass.data[DOMAIN][entry.entry_id] = coordinator
@@ -122,6 +123,95 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services once per integration domain (idempotent)
     if not hass.services.has_service(DOMAIN, SERVICE_RESET_RAIN):
         hass.services.async_register(DOMAIN, SERVICE_RESET_RAIN, _reset_rain, schema=SERVICE_RESET_RAIN_SCHEMA)
+
+    # ── v1.2.0 learning services ───────────────────────────────────────────
+    SERVICE_APPLY_CAL = "apply_learned_calibration"
+    SERVICE_RESET_LEARNING = "reset_learning_state"
+    SERVICE_EXPORT_LEARNING = "export_learning_state"
+
+    SERVICE_APPLY_CAL_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+    SERVICE_RESET_LEARNING_SCHEMA = vol.Schema(
+        {
+            vol.Optional(ATTR_ENTRY_ID): cv.string,
+            vol.Optional("target", default="all"): vol.In(["all", "temp", "pressure", "solar", "forecast", "streaks"]),
+        }
+    )
+    SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+
+    def _get_targets(call: ServiceCall) -> list:
+        entry_id = call.data.get(ATTR_ENTRY_ID)
+        if entry_id:
+            coord = hass.data[DOMAIN].get(entry_id)
+            return [coord] if coord else []
+        return list(hass.data[DOMAIN].values())
+
+    async def _apply_cal(call: ServiceCall) -> None:
+        from .learning_state import MIN_SAMPLES_MEDIUM, confidence_label
+
+        for coord in _get_targets(call):
+            ls = coord._learning_state
+            opts = dict(coord._entry.options if hasattr(coord, "_entry") else {})
+            changed = False
+            if ls.temp_bias_ema is not None and ls.temp_bias_n >= MIN_SAMPLES_MEDIUM:
+                suggestion = round(-ls.temp_bias_ema, 1)
+                current = float(opts.get("cal_temp_c", 0.0))
+                opts["cal_temp_c"] = round(current + suggestion, 1)
+                _LOGGER.info("ws_core: applying learned temp cal: %+.1f°C (was %.1f)", suggestion, current)
+                changed = True
+            if ls.pressure_bias_ema is not None and ls.pressure_bias_n >= MIN_SAMPLES_MEDIUM:
+                suggestion = round(-ls.pressure_bias_ema, 1)
+                current = float(opts.get("cal_pressure_hpa", 0.0))
+                opts["cal_pressure_hpa"] = round(current + suggestion, 1)
+                _LOGGER.info("ws_core: applying learned pressure cal: %+.1f hPa (was %.1f)", suggestion, current)
+                changed = True
+            if changed and hasattr(coord, "_entry"):
+                hass.config_entries.async_update_entry(coord._entry, options=opts)
+
+    async def _reset_learning(call: ServiceCall) -> None:
+        from .learning_state import LearningState, async_save_learning
+
+        target = call.data.get("target", "all")
+        for coord in _get_targets(call):
+            ls = coord._learning_state
+            if target in ("all", "temp"):
+                ls.temp_bias_ema = None
+                ls.temp_bias_n = 0
+            if target in ("all", "pressure"):
+                ls.pressure_bias_ema = None
+                ls.pressure_bias_n = 0
+            if target in ("all", "solar"):
+                ls.solar_lux_factor = 126.0
+                ls.solar_factor_n = 0
+            if target in ("all", "forecast"):
+                ls.forecast_outcomes = []
+                ls.blend_local = 0.5
+                ls.blend_openmeteo = 0.5
+            if target in ("all", "streaks"):
+                ls.dry_streak_days = 0
+                ls.heat_streak_days = 0
+                ls.frost_streak_days = 0
+                ls.gdd_season_total = 0.0
+            if coord._learning_store is not None:
+                await async_save_learning(coord._learning_store, ls)
+            _LOGGER.info("ws_core: learning state reset (target=%s)", target)
+
+    async def _export_learning(call: ServiceCall) -> None:
+        for coord in _get_targets(call):
+            payload = coord._learning_state.to_dict()
+            _LOGGER.info("ws_core learning state export: %s", payload)
+            # Service response is only visible via HA service call UI / REST API
+            return {"learning_state": payload}
+
+    if not hass.services.has_service(DOMAIN, SERVICE_APPLY_CAL):
+        hass.services.async_register(DOMAIN, SERVICE_APPLY_CAL, _apply_cal, schema=SERVICE_APPLY_CAL_SCHEMA)
+    if not hass.services.has_service(DOMAIN, SERVICE_RESET_LEARNING):
+        hass.services.async_register(
+            DOMAIN, SERVICE_RESET_LEARNING, _reset_learning, schema=SERVICE_RESET_LEARNING_SCHEMA
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_LEARNING):
+        hass.services.async_register(
+            DOMAIN, SERVICE_EXPORT_LEARNING, _export_learning, schema=SERVICE_EXPORT_LEARNING_SCHEMA
+        )
 
     return True
 

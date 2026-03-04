@@ -20,6 +20,8 @@ from .const import (
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
+    # v1.2.0
+    CONF_ENABLE_FOG,
     CONF_ENABLE_LAUNDRY,
     CONF_ENABLE_METAR,
     # v0.8.0
@@ -30,6 +32,7 @@ from .const import (
     # v0.9.0
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_STARGAZING,
+    CONF_ENABLE_THUNDERSTORM,
     CONF_PREFIX,
     DEFAULT_PREFIX,
     DOMAIN,
@@ -40,28 +43,41 @@ from .const import (
     KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
+    KEY_CAL_SUGGESTION_PRESSURE,
+    KEY_CAL_SUGGESTION_TEMP,
     KEY_CDD_RATE,
     KEY_CDD_TODAY,
+    KEY_CLIMATOLOGY_30D,
+    KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
     KEY_CWOP_STATUS,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
+    KEY_DRY_STREAK,
     # v0.6.0
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
     KEY_ET0_PM_DAILY_MM,
     KEY_FEELS_LIKE_C,
     KEY_FIRE_RISK_SCORE,
+    KEY_FOG_PROBABILITY,
     KEY_FORECAST,
+    KEY_FORECAST_SKILL,
     KEY_FORECAST_TILES,
     KEY_FROST_POINT_C,
+    KEY_FROST_STREAK,
+    KEY_GDD_SEASON,
+    KEY_GDD_TODAY,
     KEY_HDD_RATE,
     # v0.5.0
     KEY_HDD_TODAY,
     KEY_HEALTH_DISPLAY,
+    KEY_HEAT_STREAK,
     KEY_HUMIDITY_LEVEL_DISPLAY,
     KEY_LAST_EXPORT_TIME,
     KEY_LAUNDRY_SCORE,
+    KEY_LEARNED_PRESSURE_BIAS,
+    KEY_LEARNED_TEMP_BIAS,
     KEY_LUX,
     KEY_METAR_AGE_MIN,
     KEY_METAR_DELTA_PRESSURE,
@@ -95,11 +111,13 @@ from .const import (
     KEY_POLLEN_OVERALL,
     KEY_POLLEN_TREE,
     KEY_POLLEN_WEED,
+    KEY_PRECIP_TYPE,
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
     KEY_RAIN_ACCUM_1H,
     KEY_RAIN_ACCUM_24H,
+    KEY_RAIN_ANOMALY_30D,
     KEY_RAIN_DISPLAY,
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
@@ -108,16 +126,20 @@ from .const import (
     KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
+    KEY_SENSOR_DRIFT_FLAGS,
     KEY_SENSOR_QUALITY_FLAGS,
     KEY_SOLAR_FORECAST_STATUS,
     # v0.9.0
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
+    KEY_SOLAR_LUX_FACTOR,
     KEY_STARGAZE_SCORE,
+    KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
+    KEY_THUNDERSTORM_RISK,
     KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
@@ -1009,6 +1031,221 @@ SENSORS: list[WSSensorDescription] = [
             "hargreaves_et0": d.get(KEY_ET0_DAILY_MM),
         },
     ),
+    # =========================================================================
+    # v1.2.0 — NEW METEOROLOGICAL SENSORS
+    # =========================================================================
+    # B1 Fog probability
+    WSSensorDescription(
+        key=KEY_FOG_PROBABILITY,
+        name="WS Fog Probability",
+        icon="mdi:weather-fog",
+        native_unit="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "risk_level": d.get("_fog_risk_level"),
+            "dew_point_depression_c": d.get("_fog_dew_point_depression"),
+        },
+    ),
+    # B2 Thunderstorm risk
+    WSSensorDescription(
+        key=KEY_THUNDERSTORM_RISK,
+        name="WS Thunderstorm Risk",
+        icon="mdi:weather-lightning",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "risk_level": d.get("_thunderstorm_level"),
+            "contributing_factors": d.get("_thunderstorm_factors", []),
+            "caveat": d.get("_thunderstorm_caveat"),
+        },
+    ),
+    # B3 Precipitation type
+    WSSensorDescription(
+        key=KEY_PRECIP_TYPE,
+        name="WS Precipitation Type",
+        icon="mdi:weather-snowy-rainy",
+    ),
+    # B4 Growing degree days
+    WSSensorDescription(
+        key=KEY_GDD_TODAY,
+        name="WS Growing Degree Days (Today)",
+        icon="mdi:sprout",
+        native_unit="°C·d",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "base_temp_c": d.get("_gdd_base_c"),
+            "cap_temp_c": d.get("_gdd_cap_c"),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_GDD_SEASON,
+        name="WS Growing Degree Days (Season)",
+        icon="mdi:sprout-outline",
+        native_unit="°C·d",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        attrs_fn=lambda d: {
+            "season_reset_date": d.get("_gdd_season_reset_date"),
+            "base_temp_c": d.get("_gdd_base_c"),
+            "cap_temp_c": d.get("_gdd_cap_c"),
+        },
+    ),
+    # B5 Streak counters
+    WSSensorDescription(
+        key=KEY_DRY_STREAK,
+        name="WS Dry Streak",
+        icon="mdi:water-off",
+        native_unit="d",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {"last_rain_date": d.get("_dry_streak_last_rain")},
+    ),
+    WSSensorDescription(
+        key=KEY_HEAT_STREAK,
+        name="WS Heat Streak",
+        icon="mdi:thermometer-high",
+        native_unit="d",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {"threshold_c": d.get("_heat_streak_threshold_c")},
+    ),
+    WSSensorDescription(
+        key=KEY_FROST_STREAK,
+        name="WS Frost Streak",
+        icon="mdi:snowflake",
+        native_unit="d",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {"threshold_c": d.get("_frost_streak_threshold_c")},
+    ),
+    # =========================================================================
+    # v1.2.0 — STATION INTELLIGENCE
+    # =========================================================================
+    # C1 Sensor drift detection
+    WSSensorDescription(
+        key=KEY_SENSOR_DRIFT_FLAGS,
+        name="WS Sensor Drift",
+        icon="mdi:chart-timeline-variant-shimmer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "drifting_sensors": d.get("_drift_details", []),
+            "all_clear": len(d.get("_drift_details") or []) == 0,
+        },
+    ),
+    # C2 Cross-sensor consistency
+    WSSensorDescription(
+        key=KEY_CONSISTENCY_FLAGS,
+        name="WS Sensor Consistency",
+        icon="mdi:compare-horizontal",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "flags": d.get("_consistency_details", []),
+            "all_clear": len(d.get("_consistency_details") or []) == 0,
+        },
+    ),
+    # =========================================================================
+    # v1.2.0 — ROLLING CLIMATOLOGY
+    # =========================================================================
+    # D1 30-day stats
+    WSSensorDescription(
+        key=KEY_CLIMATOLOGY_30D,
+        name="WS Climatology (30-day)",
+        icon="mdi:calendar-month",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: d.get("_climatology_stats") or {},
+    ),
+    # D2 Anomaly sensors
+    WSSensorDescription(
+        key=KEY_TEMP_ANOMALY_30D,
+        name="WS Temperature Anomaly (30-day)",
+        icon="mdi:thermometer-alert",
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {"normal_30d_c": d.get("_temp_normal_30d")},
+    ),
+    WSSensorDescription(
+        key=KEY_RAIN_ANOMALY_30D,
+        name="WS Rain Anomaly (30-day)",
+        icon="mdi:water-percent-alert",
+        native_unit=UNIT_RAIN_MM,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {"normal_30d_avg_mm": d.get("_rain_normal_30d_avg")},
+    ),
+    # =========================================================================
+    # v1.2.0 — SELF-LEARNING SENSORS (METAR-gated + always-on)
+    # =========================================================================
+    # A4 Solar lux factor (always on)
+    WSSensorDescription(
+        key=KEY_SOLAR_LUX_FACTOR,
+        name="WS Solar Lux Factor",
+        icon="mdi:sun-wireless",
+        native_unit="lx/(W/m²)",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"calibration_days": d.get("_solar_lux_factor_n_days", 0)},
+    ),
+    # A3 Forecast skill (always on once enough data)
+    WSSensorDescription(
+        key=KEY_FORECAST_SKILL,
+        name="WS Forecast Skill",
+        icon="mdi:chart-bar",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "brier_score_local": d.get("_forecast_skill_bs_local"),
+            "brier_score_openmeteo": d.get("_forecast_skill_bs_openmeteo"),
+            "blend_local": d.get("_forecast_blend_local"),
+            "blend_openmeteo": d.get("_forecast_blend_openmeteo"),
+            "n_outcomes": d.get("_forecast_skill_n_outcomes", 0),
+        },
+    ),
+    # A1 Learned temperature bias (METAR-gated)
+    WSSensorDescription(
+        key=KEY_LEARNED_TEMP_BIAS,
+        name="WS Learned Temperature Bias",
+        icon="mdi:thermometer-lines",
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "confidence": d.get("_learned_temp_bias_confidence"),
+            "n_samples": d.get("_learned_temp_bias_n", 0),
+            "note": "Positive = station reads warmer than METAR",
+        },
+    ),
+    # A1 Calibration suggestion for temperature (METAR-gated)
+    WSSensorDescription(
+        key=KEY_CAL_SUGGESTION_TEMP,
+        name="WS Cal Suggestion: Temperature",
+        icon="mdi:thermometer-alert",
+        native_unit=UNIT_TEMP_C,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "confidence": d.get("_cal_suggestion_temp_confidence"),
+            "apply_service": "ws_core.apply_learned_calibration",
+        },
+    ),
+    # A2 Learned pressure bias (METAR-gated)
+    WSSensorDescription(
+        key=KEY_LEARNED_PRESSURE_BIAS,
+        name="WS Learned Pressure Bias",
+        icon="mdi:gauge-low",
+        native_unit=UNIT_PRESSURE_HPA,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "confidence": d.get("_learned_pressure_bias_confidence"),
+            "n_samples": d.get("_learned_pressure_bias_n", 0),
+        },
+    ),
+    # A2 Calibration suggestion for pressure (METAR-gated)
+    WSSensorDescription(
+        key=KEY_CAL_SUGGESTION_PRESSURE,
+        name="WS Cal Suggestion: Pressure",
+        icon="mdi:gauge-low",
+        native_unit=UNIT_PRESSURE_HPA,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "confidence": d.get("_cal_suggestion_pressure_confidence"),
+            "apply_service": "ws_core.apply_learned_calibration",
+        },
+    ),
 ]
 
 # Sensor-to-feature-toggle mapping for granular control
@@ -1045,8 +1282,6 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_AQI_LEVEL: CONF_ENABLE_AIR_QUALITY,
     KEY_PM2_5: CONF_ENABLE_AIR_QUALITY,
     KEY_PM10: CONF_ENABLE_AIR_QUALITY,
-    KEY_NO2: CONF_ENABLE_AIR_QUALITY,
-    KEY_OZONE: CONF_ENABLE_AIR_QUALITY,
     # Pollen  (v0.7.0)
     KEY_POLLEN_OVERALL: CONF_ENABLE_POLLEN,
     KEY_POLLEN_GRASS: CONF_ENABLE_POLLEN,
@@ -1060,6 +1295,20 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_SOLAR_FORECAST_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
     KEY_SOLAR_FORECAST_TOMORROW_KWH: CONF_ENABLE_SOLAR_FORECAST,
     KEY_ET0_PM_DAILY_MM: CONF_ENABLE_SOLAR_FORECAST,
+    # v1.2.0 — optional new sensors
+    KEY_FOG_PROBABILITY: CONF_ENABLE_FOG,
+    KEY_THUNDERSTORM_RISK: CONF_ENABLE_THUNDERSTORM,
+    # v1.2.0 — GDD + streaks gated by degree_days switch (reuse)
+    KEY_GDD_TODAY: CONF_ENABLE_DEGREE_DAYS,
+    KEY_GDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
+    KEY_DRY_STREAK: CONF_ENABLE_DEGREE_DAYS,
+    KEY_HEAT_STREAK: CONF_ENABLE_DEGREE_DAYS,
+    KEY_FROST_STREAK: CONF_ENABLE_DEGREE_DAYS,
+    # v1.2.0 — METAR-gated learning sensors
+    KEY_LEARNED_TEMP_BIAS: CONF_ENABLE_METAR,
+    KEY_CAL_SUGGESTION_TEMP: CONF_ENABLE_METAR,
+    KEY_LEARNED_PRESSURE_BIAS: CONF_ENABLE_METAR,
+    KEY_CAL_SUGGESTION_PRESSURE: CONF_ENABLE_METAR,
 }
 
 
@@ -1124,8 +1373,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         # v0.7.0 diagnostic sub-pollutants
         KEY_PM2_5,
         KEY_PM10,
-        KEY_NO2,
-        KEY_OZONE,
         KEY_POLLEN_GRASS,
         KEY_POLLEN_TREE,
         KEY_POLLEN_WEED,
@@ -1134,6 +1381,14 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         # v0.9.0
         KEY_SOLAR_FORECAST_TOMORROW_KWH,
         KEY_ET0_PM_DAILY_MM,
+        # v1.2.0 — diagnostic learning sensors hidden by default
+        KEY_LEARNED_TEMP_BIAS,
+        KEY_LEARNED_PRESSURE_BIAS,
+        KEY_FORECAST_SKILL,
+        KEY_SOLAR_LUX_FACTOR,
+        KEY_CLIMATOLOGY_30D,
+        KEY_SENSOR_DRIFT_FLAGS,
+        KEY_CONSISTENCY_FLAGS,
     }
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
@@ -1273,6 +1528,26 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_SOLAR_FORECAST_TODAY_KWH: "solar_forecast_today",
             KEY_SOLAR_FORECAST_TOMORROW_KWH: "solar_forecast_tomorrow",
             KEY_ET0_PM_DAILY_MM: "et0_penman_monteith",
+            # v1.2.0
+            KEY_FOG_PROBABILITY: "fog_probability",
+            KEY_THUNDERSTORM_RISK: "thunderstorm_risk",
+            KEY_PRECIP_TYPE: "precipitation_type",
+            KEY_GDD_TODAY: "gdd_today",
+            KEY_GDD_SEASON: "gdd_season",
+            KEY_DRY_STREAK: "dry_streak_days",
+            KEY_HEAT_STREAK: "heat_streak_days",
+            KEY_FROST_STREAK: "frost_streak_days",
+            KEY_SENSOR_DRIFT_FLAGS: "sensor_drift",
+            KEY_CONSISTENCY_FLAGS: "sensor_consistency",
+            KEY_CLIMATOLOGY_30D: "climatology_30d",
+            KEY_TEMP_ANOMALY_30D: "temperature_anomaly_30d",
+            KEY_RAIN_ANOMALY_30D: "rain_anomaly_30d",
+            KEY_LEARNED_TEMP_BIAS: "learned_temp_bias",
+            KEY_CAL_SUGGESTION_TEMP: "cal_suggestion_temp",
+            KEY_LEARNED_PRESSURE_BIAS: "learned_pressure_bias",
+            KEY_CAL_SUGGESTION_PRESSURE: "cal_suggestion_pressure",
+            KEY_FORECAST_SKILL: "forecast_skill",
+            KEY_SOLAR_LUX_FACTOR: "solar_lux_factor",
         }
         if key in overrides:
             return overrides[key]

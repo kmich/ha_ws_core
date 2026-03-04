@@ -1567,3 +1567,250 @@ def et0_penman_monteith(
     denominator = delta + gamma * (1 + 0.34 * u2)
     et0 = numerator / denominator if denominator > 0 else 0.0
     return round(max(0.0, et0), 3)
+
+
+# =============================================================================
+# v1.2.0 — New meteorological algorithms
+# =============================================================================
+
+
+def fog_probability(
+    temp_c: float,
+    dew_c: float,
+    wind_ms: float,
+    rain_rate_mmph: float,
+    is_night: bool,
+) -> tuple[float, str]:
+    """Estimate fog formation probability (0–100 %) and risk level.
+
+    Based on dew-point depression, wind speed, time of day, and rain.
+    Returns (probability_pct, risk_label).
+    """
+    depression = temp_c - dew_c  # °C; approaches 0 as RH→100%
+
+    # Base probability from dew-point depression
+    if depression > 4.0:
+        base = 0.0
+    elif depression <= 0.0:
+        base = 80.0
+    else:
+        base = 80.0 * (1.0 - depression / 4.0)
+
+    # Wind penalty: fog disperses in wind above 2 m/s
+    wind_penalty = max(0.0, (wind_ms - 2.0) * 15.0)
+
+    # Night / dawn bonus (radiative cooling)
+    night_bonus = 10.0 if is_night else 0.0
+
+    # Rain penalty (precipitation clears fog droplets)
+    rain_penalty = 40.0 if rain_rate_mmph > 0.2 else 0.0
+
+    prob = max(0.0, min(100.0, base - wind_penalty + night_bonus - rain_penalty))
+
+    if prob >= 75.0:
+        label = "Probable"
+    elif prob >= 50.0:
+        label = "Likely"
+    elif prob >= 20.0:
+        label = "Possible"
+    else:
+        label = "Unlikely"
+
+    return round(prob, 1), label
+
+
+def precipitation_type(temp_c: float, dew_c: float, rain_rate_mmph: float) -> str:
+    """Classify precipitation type from surface temperature and dew point.
+
+    Returns one of: 'Rain', 'Sleet', 'Snow', 'Freezing Rain', 'None'.
+    """
+    if rain_rate_mmph <= 0.0:
+        return "None"
+    if temp_c > 4.0:
+        return "Rain"
+    if 2.0 < temp_c <= 4.0:
+        return "Rain"  # possible mixed, but report as rain
+    if 0.0 < temp_c <= 2.0:
+        return "Sleet"
+    # temp_c <= 0
+    if dew_c > 0.0:
+        return "Freezing Rain"
+    return "Snow"
+
+
+def thunderstorm_risk_index(
+    temp_c: float,
+    dew_c: float,
+    pressure_trend_3h: float,
+    wind_ms: float,
+    wind_ms_1h_ago: float | None,
+    lux_current: float | None,
+    lux_1h_ago: float | None,
+    is_day: bool,
+) -> tuple[int, str, list[str]]:
+    """Surface-proxy thunderstorm risk index (0–100) and level.
+
+    Returns (index, level, contributing_factors_list).
+    NOTE: This is a surface heuristic only, not a true stability index.
+          It has no knowledge of upper-level lapse rates or wind shear.
+    """
+    score = 0.0
+    factors: list[str] = []
+
+    # 1. Temperature-dew point gap (smaller gap → more instability/moisture)
+    td_gap = temp_c - dew_c
+    if td_gap < 3.0 and temp_c > 18.0:
+        score += 25.0
+        factors.append("High surface moisture (T-Td < 3°C)")
+    elif td_gap < 6.0 and temp_c > 20.0:
+        score += 12.0
+        factors.append("Moderate surface moisture")
+
+    # 2. Surface temperature (convective potential requires heat)
+    if temp_c > 30.0:
+        score += 20.0
+        factors.append("High surface temperature (>30°C)")
+    elif temp_c > 25.0:
+        score += 10.0
+        factors.append("Warm surface temperature (>25°C)")
+
+    # 3. Rapid pressure fall (synoptic forcing / cold front approach)
+    if pressure_trend_3h < -1.6:
+        score += 25.0
+        factors.append("Rapid pressure fall (>1.6 hPa/h)")
+    elif pressure_trend_3h < -0.8:
+        score += 12.0
+        factors.append("Pressure falling (>0.8 hPa/h)")
+
+    # 4. Wind speed increase (surface convergence)
+    if wind_ms_1h_ago is not None and wind_ms > wind_ms_1h_ago + 3.0:
+        score += 15.0
+        factors.append("Wind speed increasing rapidly")
+
+    # 5. Sudden illuminance drop (anvil shadow / cumulonimbus approach)
+    if is_day and lux_current is not None and lux_1h_ago is not None and lux_1h_ago > 5000:
+        lux_drop_pct = (lux_1h_ago - lux_current) / lux_1h_ago * 100.0
+        if lux_drop_pct > 60.0:
+            score += 15.0
+            factors.append(f"Illuminance drop {lux_drop_pct:.0f}% in 1h (possible anvil shadow)")
+
+    index = max(0, min(100, round(score)))
+
+    if index >= 70:
+        level = "High"
+    elif index >= 45:
+        level = "Elevated"
+    elif index >= 25:
+        level = "Moderate"
+    elif index >= 10:
+        level = "Low"
+    else:
+        level = "Negligible"
+
+    return index, level, factors
+
+
+# ---------------------------------------------------------------------------
+# Drift detection (C1) — simple linear regression slope
+# ---------------------------------------------------------------------------
+
+
+def linear_regression_slope(values: list[float], times_h: list[float]) -> tuple[float, float]:
+    """Return (slope_per_hour, r_squared) via least-squares.
+
+    Args:
+        values: observed values (e.g. temperature readings)
+        times_h: corresponding elapsed hours from first observation
+    Returns:
+        (slope, r_squared) — slope in units/hour
+    """
+    n = len(values)
+    if n < 3:
+        return 0.0, 0.0
+    sx = sum(times_h)
+    sy = sum(values)
+    sxy = sum(x * y for x, y in zip(times_h, values))
+    sxx = sum(x * x for x in times_h)
+    denom = n * sxx - sx * sx
+    if abs(denom) < 1e-9:
+        return 0.0, 0.0
+    slope = (n * sxy - sx * sy) / denom
+    intercept = (sy - slope * sx) / n
+    # R² = 1 - SS_res / SS_tot
+    y_mean = sy / n
+    ss_tot = sum((y - y_mean) ** 2 for y in values)
+    ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(times_h, values))
+    r_sq = 1.0 - ss_res / ss_tot if ss_tot > 1e-9 else 0.0
+    return round(slope, 6), round(max(0.0, r_sq), 4)
+
+
+# ---------------------------------------------------------------------------
+# Cross-sensor consistency checks (C2) — stateless
+# ---------------------------------------------------------------------------
+
+
+def cross_sensor_consistency_flags(
+    uv: float | None,
+    lux: float | None,
+    wind_ms: float | None,
+    gust_ms: float | None,
+    temp_c: float | None,
+    dew_c: float | None,
+    pressure_history_stable: bool,
+    rain_rate: float,
+    rain_total_increasing: bool,
+) -> list[dict]:
+    """Return list of consistency violation dicts (empty list = all clear)."""
+    flags = []
+
+    # UV > 6 but illuminance < 20,000 lx (midday sun → expect high lux)
+    if uv is not None and lux is not None and float(uv) > 6.0 and float(lux) < 20000:
+        flags.append(
+            {
+                "check": "uv_lux_mismatch",
+                "sensors": ["uv_index", "illuminance"],
+                "detail": f"UV={uv:.1f} but lux={lux:.0f} (expected >20000 lx at UV>6)",
+            }
+        )
+
+    # Wind gust below wind speed (physically impossible)
+    if wind_ms is not None and gust_ms is not None and float(gust_ms) < float(wind_ms) * 0.9:
+        flags.append(
+            {
+                "check": "gust_below_wind",
+                "sensors": ["wind_speed", "wind_gust"],
+                "detail": f"Gust {gust_ms:.1f} < wind {wind_ms:.1f} m/s",
+            }
+        )
+
+    # Dew point > temperature (thermodynamically impossible)
+    if temp_c is not None and dew_c is not None and float(dew_c) > float(temp_c) + 0.5:
+        flags.append(
+            {
+                "check": "dewpoint_exceeds_temperature",
+                "sensors": ["temperature", "dew_point"],
+                "detail": f"Dew point {dew_c:.1f}°C > temperature {temp_c:.1f}°C",
+            }
+        )
+
+    # Pressure stuck but wind is active (barometer malfunction)
+    if pressure_history_stable:
+        flags.append(
+            {
+                "check": "pressure_stuck",
+                "sensors": ["pressure"],
+                "detail": "Pressure unchanged (±0.1 hPa) for >8h with wind present",
+            }
+        )
+
+    # Rain rate > 0 but total not incrementing
+    if rain_rate > 0.1 and not rain_total_increasing:
+        flags.append(
+            {
+                "check": "rain_rate_total_mismatch",
+                "sensors": ["rain_rate", "rain_total"],
+                "detail": "Rain rate non-zero but cumulative total not incrementing",
+            }
+        )
+
+    return flags

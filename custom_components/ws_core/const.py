@@ -397,3 +397,62 @@ KEY_SOLAR_FORECAST_TODAY_KWH = "solar_forecast_today_kwh"
 KEY_SOLAR_FORECAST_TOMORROW_KWH = "solar_forecast_tomorrow_kwh"
 KEY_SOLAR_FORECAST_STATUS = "solar_forecast_status"
 KEY_ET0_PM_DAILY_MM = "et0_pm_daily_mm"  # Penman-Monteith (when solar available)
+
+# ---------------------------------------------------------------------------
+# v1.2.0 — Self-learning, new met sensors, station intelligence, climatology
+# ---------------------------------------------------------------------------
+
+# Config keys — GDD growing season reset
+CONF_GDD_RESET_MONTH = "gdd_reset_month"
+CONF_GDD_RESET_DAY = "gdd_reset_day"
+CONF_GDD_CAP_C = "gdd_cap_c"
+CONF_THRESH_HEAT_DAY_C = "thresh_heat_day_c"
+
+# Config keys — optional new sensor groups
+CONF_ENABLE_FOG = "enable_fog"
+CONF_ENABLE_THUNDERSTORM = "enable_thunderstorm_risk"
+
+# Defaults
+DEFAULT_GDD_RESET_MONTH = 1
+DEFAULT_GDD_RESET_DAY = 1
+DEFAULT_GDD_CAP_C = 30.0
+DEFAULT_THRESH_HEAT_DAY_C = 30.0
+DEFAULT_ENABLE_FOG = False
+DEFAULT_ENABLE_THUNDERSTORM = False
+
+# Learning algorithm constants
+LEARNING_EMA_ALPHA = 0.05  # ~20 observation halflife
+LEARNING_MIN_SAMPLES_MEDIUM = 48  # ~2 days of hourly METAR
+LEARNING_MIN_SAMPLES_HIGH = 168  # 7 days
+LEARNING_SOLAR_BETA = 0.02  # slow solar factor adaptation
+LEARNING_SOLAR_DEFAULT = 126.0  # standard photopic lux→W/m²
+LEARNING_SOLAR_MIN = 80.0
+LEARNING_SOLAR_MAX = 200.0
+LEARNING_SAVE_INTERVAL_S = 3600  # persist to storage once per hour
+
+# Data keys — v1.2.0 Learning sensors (METAR-gated)
+KEY_LEARNED_TEMP_BIAS = "learned_temp_bias"
+KEY_CAL_SUGGESTION_TEMP = "cal_suggestion_temp"
+KEY_LEARNED_PRESSURE_BIAS = "learned_pressure_bias"
+KEY_CAL_SUGGESTION_PRESSURE = "cal_suggestion_pressure"
+KEY_FORECAST_SKILL = "forecast_skill"
+KEY_SOLAR_LUX_FACTOR = "solar_lux_factor"
+
+# Data keys — v1.2.0 New meteorological sensors
+KEY_FOG_PROBABILITY = "fog_probability"
+KEY_THUNDERSTORM_RISK = "thunderstorm_risk"
+KEY_PRECIP_TYPE = "precipitation_type"
+KEY_GDD_TODAY = "gdd_today"
+KEY_GDD_SEASON = "gdd_season"
+KEY_DRY_STREAK = "dry_streak_days"
+KEY_HEAT_STREAK = "heat_streak_days"
+KEY_FROST_STREAK = "frost_streak_days"
+
+# Data keys — v1.2.0 Station intelligence
+KEY_SENSOR_DRIFT_FLAGS = "sensor_drift_flags"
+KEY_CONSISTENCY_FLAGS = "consistency_flags"
+
+# Data keys — v1.2.0 Rolling climatology
+KEY_CLIMATOLOGY_30D = "climatology_30d"
+KEY_TEMP_ANOMALY_30D = "temp_anomaly_30d"
+KEY_RAIN_ANOMALY_30D = "rain_anomaly_30d"

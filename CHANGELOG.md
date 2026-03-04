@@ -2,6 +2,82 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [1.2.0] - 2026-03-03
+
+### Added — Theme A: Self-Learning Layer
+- **learning_state.py** New module persisting all adaptive state to HA storage (schema-versioned, survives restarts, resets gracefully on corruption).
+- **sensor.ws_learned_temp_bias** / **sensor.ws_learned_pressure_bias** EMA calibration bias tracker vs METAR (alpha=0.05, ~20-observation halflife). Only created when METAR is enabled.
+- **sensor.ws_cal_suggestion_temp** / **sensor.ws_cal_suggestion_pressure** Suggested offset corrections (suppressed until confidence >= medium / 48 samples). Never auto-applied.
+- **sensor.ws_forecast_skill** Rolling 90-day Brier skill score with automatic local/Open-Meteo blend weight adaptation via softmax.
+- **sensor.ws_solar_lux_factor** Self-adapting lux to W/m2 factor (default 126, range 80-200) updated on clear days near solar noon.
+- **Service ws_core.apply_learned_calibration** Writes learned offsets to cal number entities (confidence >= medium required).
+- **Service ws_core.reset_learning_state** Clears one or all learning targets (temp, pressure, solar, forecast, streaks, all).
+- **Service ws_core.export_learning_state** Returns current learning state as JSON via service response.
+
+### Added — Theme B: New Meteorological Sensors
+- **sensor.ws_fog_probability** (0-100%, risk level) Dew-point depression model with wind, night, and rain corrections. Gated by switch.ws_enable_fog.
+- **sensor.ws_thunderstorm_risk** (0-100 index) Surface heuristic: T-Td gap, temp, pressure fall rate, wind acceleration, illuminance drop. Gated by switch.ws_enable_thunderstorm_risk. Caveat displayed on card.
+- **sensor.ws_precipitation_type** Decision-tree classifier: Rain / Sleet / Snow / Freezing Rain / None.
+- **sensor.ws_gdd_today** / **sensor.ws_gdd_season** Growing Degree Days with configurable base (existing) and cap temperature. Seasonal accumulation resets on configurable month/day set in Options. Gated by switch.ws_enable_degree_days.
+- **sensor.ws_dry_streak_days** / **sensor.ws_heat_streak_days** / **sensor.ws_frost_streak_days** Consecutive-day counters reset at midnight. Gated by switch.ws_enable_degree_days.
+
+### Added — Theme C: Station Intelligence
+- **sensor.ws_sensor_drift** 72-hour linear regression slope on temperature, humidity, and pressure; flags monotonic drift (R^2 > 0.85 threshold). Also detects rain bucket stuck at constant non-zero rate.
+- **sensor.ws_sensor_consistency** Six cross-sensor physical-impossibility checks: UV/lux mismatch, gust < wind, dew point > temp, pressure stuck with wind, rain rate/total mismatch.
+
+### Added — Theme D: Rolling Climatology
+- **sensor.ws_climatology_30d** Rolling 30-day stats (avg high/low, records, rain days) built from local data. Meaningful after 14+ days.
+- **sensor.ws_temperature_anomaly_30d** / **sensor.ws_rain_anomaly_30d** Today vs 30-day rolling normal.
+
+### Added — Config & Numbers
+- **number.ws_gdd_cap_temp** GDD heat cap temperature (default 30 C).
+- **number.ws_thresh_heat_day** Heat streak threshold (default 30 C).
+- **Options flow** Added GDD cap, heat threshold, and season reset month/day to the degree_days_opt step.
+
+### Changed
+- **Dashboard (Advanced view)** Added six new card sections: GDD & Streaks, 30-Day Climatology, Today vs Normal, Fog & Precipitation Type, Learning Layer (cal suggestions, forecast skill, solar factor), Station Intelligence (drift + consistency).
+- **coordinator.py** Seven new _compute_* sub-methods plus _update_forecast_skill_window. Learning state loaded at async_start, saved hourly and on clean shutdown.
+- **algorithms.py** Added fog_probability, precipitation_type, thunderstorm_risk_index, linear_regression_slope, cross_sensor_consistency_flags.
+- **manifest.json** Version bumped to 1.2.0.
+
+## [1.2.0] - 2026-03-03
+
+### Added — Theme A: Self-Learning Layer
+- **`learning_state.py`** — New module persisting all adaptive state to HA storage (schema-versioned, survives restarts, resets gracefully on corruption).
+- **`sensor.ws_learned_temp_bias`** / **`sensor.ws_learned_pressure_bias`** — EMA calibration bias tracker vs METAR (α=0.05, ~20-observation halflife). Gated by METAR switch.
+- **`sensor.ws_cal_suggestion_temp`** / **`sensor.ws_cal_suggestion_pressure`** — Suggested offset corrections, suppressed until confidence ≥ medium (48 samples). Never auto-applied.
+- **`sensor.ws_forecast_skill`** — Rolling 90-day Brier skill score; automatic local/Open-Meteo blend weight adaptation via softmax.
+- **`sensor.ws_solar_lux_factor`** — Self-adapting lux→W/m² factor (default 126, range 80–200) updated on clear days near solar noon. Improves ET₀ accuracy.
+- **Service `ws_core.apply_learned_calibration`** — Writes learned offsets to calibration number entities (confidence ≥ medium required).
+- **Service `ws_core.reset_learning_state`** — Clears one or all learning targets: `temp`, `pressure`, `solar`, `forecast`, `streaks`, `all`.
+- **Service `ws_core.export_learning_state`** — Returns current learning state as JSON via service response.
+
+### Added — Theme B: New Meteorological Sensors
+- **`sensor.ws_fog_probability`** (0–100 %, risk level) — Dew-point depression model with wind, night, and rain corrections. Gated by `switch.ws_enable_fog`.
+- **`sensor.ws_thunderstorm_risk`** (0–100 index) — Surface heuristic proxy: T-Td gap, high temperature, rapid pressure fall, wind acceleration, illuminance drop. Gated by `switch.ws_enable_thunderstorm_risk`.
+- **`sensor.ws_precipitation_type`** — Decision-tree classifier: Rain / Sleet / Snow / Freezing Rain / None.
+- **`sensor.ws_gdd_today`** / **`sensor.ws_gdd_season`** — Growing Degree Days with configurable base (existing) and new cap temperature. Seasonal accumulation resets on configurable month/day. Gated by `switch.ws_enable_degree_days`.
+- **`sensor.ws_dry_streak_days`** / **`sensor.ws_heat_streak_days`** / **`sensor.ws_frost_streak_days`** — Consecutive-day counters reset at midnight. Gated by `switch.ws_enable_degree_days`.
+
+### Added — Theme C: Station Intelligence
+- **`sensor.ws_sensor_drift`** — 72-hour linear regression slope on temperature, humidity, pressure, and rain rate; flags monotonic drift (R² ≥ 0.85). Also detects rain bucket stuck at constant non-zero value.
+- **`sensor.ws_sensor_consistency`** — Six cross-sensor physical-impossibility checks: UV/lux mismatch, gust < wind, dew > temp, pressure stuck while windy, rain rate/total mismatch.
+
+### Added — Theme D: Rolling Climatology
+- **`sensor.ws_climatology_30d`** — Rolling 30-day stats (avg high/low, records, rain days) from local data. Meaningful after ~14 days.
+- **`sensor.ws_temperature_anomaly_30d`** / **`sensor.ws_rain_anomaly_30d`** — Today vs 30-day rolling normal.
+
+### Added — Config & Numbers
+- **`number.ws_gdd_cap_temp`** — GDD heat cap temperature (default 30 °C, 15–45 °C).
+- **`number.ws_thresh_heat_day`** — Heat streak threshold (default 30 °C, 20–45 °C).
+- **Options flow** — Added GDD cap, heat threshold, and season reset month/day to the `degree_days_opt` step.
+
+### Changed
+- **Dashboard (Advanced view)** — Six new card sections inserted before Station Diagnostics: GDD & Streaks, 30-Day Climatology, Today vs Normal, Fog & Precipitation Type, Learning Layer (cal suggestions + forecast skill), Sensor Drift & Consistency.
+- **`coordinator.py`** — Seven new `_compute_*` sub-methods + `_update_forecast_skill_window`. Learning state loaded at `async_start`, saved hourly and on clean shutdown.
+- **`algorithms.py`** — Added `fog_probability`, `precipitation_type`, `thunderstorm_risk_index`, `linear_regression_slope`, `cross_sensor_consistency_flags`.
+- **`manifest.json`** — Version bumped to 1.2.0.
+
 ## [1.1.0] - 2026-02-24
 
 ### Fixed
@@ -14,9 +90,7 @@ All notable changes to Weather Station Core are documented in this file.
 - **Release zip includes `__pycache__`** (`.github/workflows/release.yml`): Added `--exclude` flags to strip all bytecode from the release artifact.
 - **Entity map is now generated** (`scripts/generate_entity_map.py`): Replaces the hand-maintained HTML mindmap. Derives all entity data from source code; injects version and generation timestamp automatically. Run with `python scripts/generate_entity_map.py`.
 
-## [1.1.0] - 2026-02-24
-
-### Fixed
+### Also Fixed in 1.1.0
 - **`reset_rain_baseline` service didn't reset the Kalman filter state** (`__init__.py`): The service reset `last_rain_total_mm`, `last_rain_ts`, and `last_rain_rate_filt` but left the Kalman filter estimate intact. After a reset the filter's stale estimate (high rain-rate) bled into the first few readings causing spurious non-zero rain-rate values. Fixed to recreate the Kalman instance on reset, preserving the user-tuned `measurement_noise` so the `rain_filter_alpha` setting is not lost.
 - **Four tuning `number.*` entities were exposed but had no effect** (`coordinator.py`, `algorithms.py`):
   - `number.ws_rain_filter_alpha`: The Kalman filter was always created with hardcoded `measurement_noise=0.5`. Now wired: at coordinator startup the Kalman instance is created with `measurement_noise=rain_filter_alpha` (higher value = more smoothing).

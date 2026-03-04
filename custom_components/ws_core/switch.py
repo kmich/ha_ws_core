@@ -26,6 +26,7 @@ from .const import (
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_EXPORT,
     CONF_ENABLE_FIRE_RISK,
+    CONF_ENABLE_FOG,
     CONF_ENABLE_LAUNDRY,
     CONF_ENABLE_METAR,
     CONF_ENABLE_MOON,
@@ -34,6 +35,7 @@ from .const import (
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_STARGAZING,
+    CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_WUNDERGROUND,
     CONF_PREFIX,
     DEFAULT_ENABLE_AIR_QUALITY,
@@ -42,6 +44,7 @@ from .const import (
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_EXPORT,
     DEFAULT_ENABLE_FIRE_RISK,
+    DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_LAUNDRY,
     DEFAULT_ENABLE_METAR,
     DEFAULT_ENABLE_MOON,
@@ -50,6 +53,7 @@ from .const import (
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_STARGAZING,
+    DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_PREFIX,
     DOMAIN,
@@ -163,6 +167,19 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_SOLAR_FORECAST,
         name="Feature: Solar PV Forecast",
         icon="mdi:solar-power",
+    ),
+    # v1.2.0
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_FOG,
+        default=DEFAULT_ENABLE_FOG,
+        name="Feature: Fog Probability",
+        icon="mdi:weather-fog",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_THUNDERSTORM,
+        default=DEFAULT_ENABLE_THUNDERSTORM,
+        name="Feature: Thunderstorm Risk",
+        icon="mdi:weather-lightning",
     ),
 )
 
