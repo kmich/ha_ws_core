@@ -37,12 +37,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .algorithms import (
+    CONDITION_COLORS,
+    CONDITION_DESCRIPTIONS,
+    CONDITION_ICONS,
+    MOON_ILLUMINATION,
+    KalmanFilter,
     aqi_level,
-    cross_sensor_consistency_flags,
-    fog_probability,
-    linear_regression_slope,
-    precipitation_type,
-    thunderstorm_risk_index,
     beaufort_description,
     calculate_apparent_temperature,
     calculate_dew_point,
@@ -53,10 +53,8 @@ from .algorithms import (
     calculate_us_aqi,
     calculate_wet_bulb,
     combine_rain_probability,
-    CONDITION_COLORS,
-    CONDITION_DESCRIPTIONS,
-    CONDITION_ICONS,
     cooling_degree_hours,
+    cross_sensor_consistency_flags,
     determine_current_condition,
     direction_to_quadrant,
     et0_hargreaves,
@@ -64,18 +62,18 @@ from .algorithms import (
     et0_penman_monteith,
     fire_danger_level,
     fire_risk_score,
+    fog_probability,
     format_rain_display,
     get_condition_severity,
     heating_degree_hours,
     humidity_level,
-    KalmanFilter,
     laundry_dry_time,
     laundry_drying_score,
     laundry_recommendation,
     least_squares_pressure_trend,
+    linear_regression_slope,
     metar_validation_label,
     moon_display_string,
-    MOON_ILLUMINATION,
     moon_next_phase_days,
     moon_phase_days,
     moon_phase_from_age,
@@ -83,6 +81,7 @@ from .algorithms import (
     parse_metar_json,
     pollen_level,
     pollen_overall,
+    precipitation_type,
     pressure_trend_arrow,
     pressure_trend_display,
     running_level,
@@ -90,6 +89,7 @@ from .algorithms import (
     running_score,
     smooth_wind_direction,
     stargazing_quality,
+    thunderstorm_risk_index,
     uv_burn_time_minutes,
     uv_level,
     uv_recommendation,
@@ -110,11 +110,13 @@ from .const import (
     # v0.5.0 new
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_EXPORT,
+    CONF_ENABLE_FOG,
     CONF_ENABLE_METAR,
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
+    CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_WUNDERGROUND,
     CONF_EXPORT_FORMAT,
     CONF_EXPORT_INTERVAL_MIN,
@@ -123,10 +125,18 @@ from .const import (
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
+    CONF_GDD_CAP_C,
+    CONF_GDD_RESET_DAY,
+    CONF_GDD_RESET_MONTH,
     CONF_HEMISPHERE,
     CONF_METAR_ICAO,
     CONF_METAR_INTERVAL_MIN,
     CONF_POLLEN_INTERVAL_MIN,
+    # Tuning numbers (previously no-op, now wired)
+    CONF_PRESSURE_TREND_WINDOW_H,
+    CONF_RAIN_FILTER_ALPHA,
+    CONF_RAIN_PENALTY_HEAVY_MMPH,
+    CONF_RAIN_PENALTY_LIGHT_MMPH,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
     CONF_SOLAR_INTERVAL_MIN,
@@ -135,20 +145,12 @@ from .const import (
     CONF_SOLAR_PEAK_KW,
     CONF_SOURCES,
     CONF_STALENESS_S,
+    CONF_THRESH_HEAT_DAY_C,
     CONF_TOMORROW_IO_KEY,
     CONF_UNITS_MODE,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
-    # Tuning numbers (previously no-op, now wired)
-    CONF_PRESSURE_TREND_WINDOW_H,
-    CONF_RAIN_FILTER_ALPHA,
-    CONF_RAIN_PENALTY_HEAVY_MMPH,
-    CONF_RAIN_PENALTY_LIGHT_MMPH,
-    DEFAULT_PRESSURE_TREND_WINDOW_H,
-    DEFAULT_RAIN_FILTER_ALPHA,
-    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
-    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_AQI_INTERVAL_MIN,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_CWOP_INTERVAL_MIN,
@@ -157,35 +159,33 @@ from .const import (
     DEFAULT_ENABLE_CWOP,
     DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_EXPORT,
+    DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_METAR,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SOLAR_FORECAST,
+    DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_EXPORT_FORMAT,
     DEFAULT_EXPORT_INTERVAL_MIN,
     DEFAULT_FORECAST_INTERVAL_MIN,
+    DEFAULT_GDD_CAP_C,
+    DEFAULT_GDD_RESET_DAY,
+    DEFAULT_GDD_RESET_MONTH,
     DEFAULT_HEMISPHERE,
     DEFAULT_METAR_INTERVAL_MIN,
     DEFAULT_POLLEN_INTERVAL_MIN,
+    DEFAULT_PRESSURE_TREND_WINDOW_H,
+    DEFAULT_RAIN_FILTER_ALPHA,
+    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
+    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_SOLAR_INTERVAL_MIN,
     DEFAULT_SOLAR_PANEL_AZIMUTH,
     DEFAULT_SOLAR_PANEL_TILT,
     DEFAULT_SOLAR_PEAK_KW,
     DEFAULT_STALENESS_S,
-    DEFAULT_WU_INTERVAL_MIN,
-    CONF_ENABLE_FOG,
-    CONF_ENABLE_THUNDERSTORM,
-    CONF_GDD_CAP_C,
-    CONF_GDD_RESET_MONTH,
-    CONF_GDD_RESET_DAY,
-    CONF_THRESH_HEAT_DAY_C,
-    DEFAULT_ENABLE_FOG,
-    DEFAULT_ENABLE_THUNDERSTORM,
-    DEFAULT_GDD_CAP_C,
-    DEFAULT_GDD_RESET_MONTH,
-    DEFAULT_GDD_RESET_DAY,
     DEFAULT_THRESH_HEAT_DAY_C,
+    DEFAULT_WU_INTERVAL_MIN,
     FORECAST_MAX_RETRY_S,
     FORECAST_MIN_RETRY_S,
     KEY_ALERT_MESSAGE,
@@ -195,26 +195,39 @@ from .const import (
     KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
+    KEY_CAL_SUGGESTION_PRESSURE,
+    KEY_CAL_SUGGESTION_TEMP,
     KEY_CDD_RATE,
     KEY_CDD_TODAY,
+    KEY_CLIMATOLOGY_30D,
+    KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
     KEY_CWOP_STATUS,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
+    KEY_DRY_STREAK,
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
     KEY_ET0_PM_DAILY_MM,
     KEY_FEELS_LIKE_C,
     KEY_FIRE_RISK_SCORE,
+    KEY_FOG_PROBABILITY,
     KEY_FORECAST,
+    KEY_FORECAST_SKILL,
     KEY_FORECAST_TILES,
     KEY_FROST_POINT_C,
+    KEY_FROST_STREAK,
+    KEY_GDD_SEASON,
+    KEY_GDD_TODAY,
     KEY_HDD_RATE,
     KEY_HDD_TODAY,
     KEY_HEALTH_DISPLAY,
+    KEY_HEAT_STREAK,
     KEY_HUMIDITY_LEVEL_DISPLAY,
     KEY_LAST_EXPORT_TIME,
     KEY_LAUNDRY_SCORE,
+    KEY_LEARNED_PRESSURE_BIAS,
+    KEY_LEARNED_TEMP_BIAS,
     KEY_LUX,
     KEY_METAR_AGE_MIN,
     KEY_METAR_DELTA_PRESSURE,
@@ -249,11 +262,13 @@ from .const import (
     KEY_POLLEN_OVERALL,
     KEY_POLLEN_TREE,
     KEY_POLLEN_WEED,
+    KEY_PRECIP_TYPE,
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
     KEY_RAIN_ACCUM_1H,
     KEY_RAIN_ACCUM_24H,
+    KEY_RAIN_ANOMALY_30D,
     KEY_RAIN_DISPLAY,
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
@@ -262,16 +277,20 @@ from .const import (
     KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
+    KEY_SENSOR_DRIFT_FLAGS,
     KEY_SENSOR_QUALITY_FLAGS,
     KEY_SOLAR_FORECAST_STATUS,
     # v0.9.0
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
+    KEY_SOLAR_LUX_FACTOR,
     KEY_STARGAZE_SCORE,
+    KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
+    KEY_THUNDERSTORM_RISK,
     KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
@@ -282,28 +301,9 @@ from .const import (
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
     KEY_WU_STATUS,
-    KEY_FOG_PROBABILITY,
-    KEY_THUNDERSTORM_RISK,
-    KEY_PRECIP_TYPE,
-    KEY_GDD_TODAY,
-    KEY_GDD_SEASON,
-    KEY_DRY_STREAK,
-    KEY_HEAT_STREAK,
-    KEY_FROST_STREAK,
-    KEY_SENSOR_DRIFT_FLAGS,
-    KEY_CONSISTENCY_FLAGS,
-    KEY_CLIMATOLOGY_30D,
-    KEY_TEMP_ANOMALY_30D,
-    KEY_RAIN_ANOMALY_30D,
-    KEY_LEARNED_TEMP_BIAS,
-    KEY_CAL_SUGGESTION_TEMP,
-    KEY_LEARNED_PRESSURE_BIAS,
-    KEY_CAL_SUGGESTION_PRESSURE,
-    KEY_FORECAST_SKILL,
-    KEY_SOLAR_LUX_FACTOR,
-    LEARNING_SAVE_INTERVAL_S,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
+    LEARNING_SAVE_INTERVAL_S,
     PRESSURE_HISTORY_INTERVAL_MIN,
     PRESSURE_HISTORY_SAMPLES,
     RAIN_RATE_PHYSICAL_CAP_MMPH,
@@ -328,7 +328,6 @@ from .const import (
     VALID_TEMP_MIN_C,
     WIND_SMOOTH_ALPHA,
 )
-
 
 try:
     from homeassistant.helpers import issue_registry as ir
@@ -450,7 +449,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         pressure_trend_window_h = float(_get(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H))
         # Dynamic sample count: window(h) * 60 / interval(min), min 2, max 96
-        self._pressure_history_samples = max(2, min(96, round(pressure_trend_window_h * 60 / PRESSURE_HISTORY_INTERVAL_MIN)))
+        self._pressure_history_samples = max(
+            2, min(96, round(pressure_trend_window_h * 60 / PRESSURE_HISTORY_INTERVAL_MIN))
+        )
         self.runtime.pressure_history = type(self.runtime.pressure_history)(maxlen=self._pressure_history_samples)
 
         self.rain_penalty_light_mmph = float(_get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH))
@@ -520,6 +521,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # v1.2.0 Persistent learning state (loaded async in async_start)
         from .learning_state import LearningState as _LS
+
         self._learning_state: Any = _LS()
         self._learning_store: Any = None
         self._learning_last_save: Any = None
@@ -567,7 +569,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_start(self) -> None:
         # Load persistent learning state from HA storage
         from homeassistant.helpers.storage import Store
+
         from .learning_state import async_load_learning
+
         entry_id = self.entry_data.get("entry_id") or id(self)
         self._learning_store = Store(self.hass, 1, f"ws_core_{entry_id}_learning")
         self._learning_state = await async_load_learning(self._learning_store)
@@ -662,6 +666,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Persist learning state one last time on clean shutdown
         if self._learning_store is not None:
             from .learning_state import async_save_learning
+
             await async_save_learning(self._learning_store, self._learning_state)
 
     @callback
@@ -981,13 +986,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Color ramp: rising=green, steady=white/grey, falling=amber/red
         _pt_color: str
         if trend_3h >= 0.8:
-            _pt_color = "#4ADE80"        # rising — green
+            _pt_color = "#4ADE80"  # rising — green
         elif trend_3h > -0.8:
             _pt_color = "rgba(255,255,255,0.75)"  # steady — white
         elif trend_3h > -1.6:
-            _pt_color = "#FBBF24"        # falling — amber
+            _pt_color = "#FBBF24"  # falling — amber
         else:
-            _pt_color = "#EF4444"        # falling rapidly — red
+            _pt_color = "#EF4444"  # falling rapidly — red
         data["_pressure_trend_color"] = _pt_color
 
         # Zambretti forecast (real N&Z lookup table)
@@ -1201,10 +1206,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             data[KEY_LAUNDRY_SCORE] = l_score
             data["_laundry_recommendation"] = laundry_recommendation(
-                l_score, float(rain_rate), float(rain_prob) if rain_prob is not None else None,
+                l_score,
+                float(rain_rate),
+                float(rain_prob) if rain_prob is not None else None,
                 rain_penalty_light_mmph=self.rain_penalty_light_mmph,
             )
-            data["_laundry_dry_time"] = laundry_dry_time(l_score, float(rain_rate), rain_penalty_light_mmph=self.rain_penalty_light_mmph)
+            data["_laundry_dry_time"] = laundry_dry_time(
+                l_score, float(rain_rate), rain_penalty_light_mmph=self.rain_penalty_light_mmph
+            )
 
         # Stargazing
         if rh is not None:
@@ -1479,9 +1488,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     def _compute_fog_precip_type(
-        self, data: dict, now: Any,
-        tc: float | None, dew_c: float | None,
-        wind_ms: float | None, rain_rate: float,
+        self,
+        data: dict,
+        now: Any,
+        tc: float | None,
+        dew_c: float | None,
+        wind_ms: float | None,
+        rain_rate: float,
     ) -> None:
         """Fog probability, precipitation type, and thunderstorm risk."""
         sun_state = self.hass.states.get("sun.sun")
@@ -1493,8 +1506,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # ── Fog probability (B1) ───────────────────────────────────────────
         if self.fog_enabled and tc is not None and dew_c is not None:
             prob, label = fog_probability(
-                float(tc), float(dew_c),
-                float(wind_ms or 0), float(rain_rate), is_night,
+                float(tc),
+                float(dew_c),
+                float(wind_ms or 0),
+                float(rain_rate),
+                is_night,
             )
             data[KEY_FOG_PROBABILITY] = prob
             data["_fog_risk_level"] = label
@@ -1533,8 +1549,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_thunderstorm_level"] = level
             data["_thunderstorm_factors"] = factors
             data["_thunderstorm_caveat"] = (
-                "Surface proxy only. No upper-air data. "
-                "Many false positives possible on hot/humid days."
+                "Surface proxy only. No upper-air data. Many false positives possible on hot/humid days."
             )
 
     # ------------------------------------------------------------------
@@ -1543,8 +1558,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _compute_gdd_and_streaks(self, data: dict, now: Any) -> None:
         """Growing degree days (today + season) and streak counters."""
-        from .learning_state import gdd_daily, update_daily_streaks
         from homeassistant.util import dt as _dt
+
+        from .learning_state import gdd_daily, update_daily_streaks
 
         local_now = _dt.now()
         date_str = local_now.strftime("%Y-%m-%d")
@@ -1582,6 +1598,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._learning_last_daily_update = date_str
             # Also update climatology
             from .learning_state import update_climatology
+
             rain_today = float(data.get("_rain_today_mm", 0.0))
             update_climatology(self._learning_state, date_str, float(t_high), float(t_low), rain_today)
 
@@ -1661,17 +1678,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             times_h = [(ts - first_ts).total_seconds() / 3600.0 for ts, _ in buf]
             slope, r_sq = linear_regression_slope(vals, times_h)
             if abs(slope) >= max_slope_abs and r_sq >= r_sq_thresh:
-                flags.append({
-                    "sensor": sensor_name,
-                    "slope_per_h": round(slope, 4),
-                    "r_squared": r_sq,
-                    "unit": unit,
-                    "direction": "rising" if slope > 0 else "falling",
-                })
+                flags.append(
+                    {
+                        "sensor": sensor_name,
+                        "slope_per_h": round(slope, 4),
+                        "r_squared": r_sq,
+                        "unit": unit,
+                        "direction": "rising" if slope > 0 else "falling",
+                    }
+                )
 
-        _check_slope(self._drift_temp,     0.1,  0.85, "temperature", "°C/h")
-        _check_slope(self._drift_humidity, 0.5,  0.85, "humidity",    "%/h")
-        _check_slope(self._drift_pressure, 1.5,  0.85, "pressure",    "hPa/h")
+        _check_slope(self._drift_temp, 0.1, 0.85, "temperature", "°C/h")
+        _check_slope(self._drift_humidity, 0.5, 0.85, "humidity", "%/h")
+        _check_slope(self._drift_pressure, 1.5, 0.85, "pressure", "hPa/h")
 
         # Stuck rain bucket: rain_rate non-zero but constant at same non-zero value for >4h
         if len(self._drift_rain_rate) >= 240:
@@ -1680,13 +1699,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if len(nonzero) >= 240 * 0.8:
                 rate_range = max(nonzero) - min(nonzero)
                 if rate_range < 0.1 and len(nonzero) > 50:
-                    flags.append({
-                        "sensor": "rain_rate",
-                        "slope_per_h": 0.0,
-                        "r_squared": 1.0,
-                        "unit": "mm/h",
-                        "direction": "stuck",
-                    })
+                    flags.append(
+                        {
+                            "sensor": "rain_rate",
+                            "slope_per_h": 0.0,
+                            "r_squared": 1.0,
+                            "unit": "mm/h",
+                            "direction": "stuck",
+                        }
+                    )
 
         status = "Warning" if flags else "OK"
         data[KEY_SENSOR_DRIFT_FLAGS] = status
@@ -1736,9 +1757,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         flags = cross_sensor_consistency_flags(
-            uv=uv, lux=lux,
-            wind_ms=wind_ms, gust_ms=gust_ms,
-            temp_c=tc, dew_c=dew_c,
+            uv=uv,
+            lux=lux,
+            wind_ms=wind_ms,
+            gust_ms=gust_ms,
+            temp_c=tc,
+            dew_c=dew_c,
             pressure_history_stable=pressure_stuck,
             rain_rate=rain_rate,
             rain_total_increasing=not rain_total_not_incrementing,
@@ -1753,10 +1777,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _compute_learning_sensors(self, data: dict) -> None:
         """Publish learning state values into coordinator data (METAR-gated)."""
+        # Forecast skill sensor (always published when data exists)
+        from .learning_state import brier_score as _bs
+        from .learning_state import compute_blend_weights as _bw
         from .learning_state import confidence_label, suggested_correction
 
-        # Forecast skill sensor (always published when data exists)
-        from .learning_state import brier_score as _bs, compute_blend_weights as _bw
         outcomes = self._learning_state.forecast_outcomes
         if len(outcomes) >= 10:
             bs_local = _bs(outcomes, "local_prob")
@@ -1808,6 +1833,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _update_forecast_skill_window(self, data: dict, now: Any) -> None:
         """Track rolling 6-hour forecast outcomes for Brier skill scoring (A3)."""
         from .learning_state import record_forecast_outcome
+
         # Start a new window if none active
         if self._skill_window_start is None:
             self._skill_window_start = now
@@ -1848,6 +1874,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             or (now - self._learning_last_save).total_seconds() >= LEARNING_SAVE_INTERVAL_S
         ):
             from .learning_state import async_save_learning
+
             await async_save_learning(self._learning_store, self._learning_state)
             self._learning_last_save = now
 
@@ -1902,11 +1929,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     # Only update within 2h of solar noon (approx. 10-14 local)
                     if 10 <= hour <= 14 and sun_elev >= 20:
                         # Check cloud cover proxy: lux should be >70% of theoretical max
+                        from .const import LEARNING_SOLAR_BETA, LEARNING_SOLAR_MAX, LEARNING_SOLAR_MIN
                         from .learning_state import update_solar_lux_factor
-                        from .const import LEARNING_SOLAR_BETA, LEARNING_SOLAR_MIN, LEARNING_SOLAR_MAX
+
                         new_factor = update_solar_lux_factor(
                             self._learning_state.solar_lux_factor,
-                            float(lux), sun_elev,
+                            float(lux),
+                            sun_elev,
                             beta=LEARNING_SOLAR_BETA,
                             factor_min=LEARNING_SOLAR_MIN,
                             factor_max=LEARNING_SOLAR_MAX,
@@ -1985,10 +2014,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             if calm_conditions:
                 from .learning_state import update_ema
+
                 if delta_t is not None:
-                    self._learning_state.temp_bias_ema = update_ema(
-                        self._learning_state.temp_bias_ema, float(delta_t)
-                    )
+                    self._learning_state.temp_bias_ema = update_ema(self._learning_state.temp_bias_ema, float(delta_t))
                     self._learning_state.temp_bias_n += 1
                 if delta_p is not None:
                     self._learning_state.pressure_bias_ema = update_ema(
