@@ -836,7 +836,16 @@ def uv_burn_time_minutes(uv_index: float, skin_type: int = 2) -> int:
 # ---------------------------------------------------------------------------
 
 
-def laundry_drying_score(temp_c, humidity, wind_speed_ms, uv_index, rain_rate_mmph, rain_probability=None, rain_penalty_light_mmph=0.2, rain_penalty_heavy_mmph=5.0) -> int:
+def laundry_drying_score(
+    temp_c,
+    humidity,
+    wind_speed_ms,
+    uv_index,
+    rain_rate_mmph,
+    rain_probability=None,
+    rain_penalty_light_mmph=0.2,
+    rain_penalty_heavy_mmph=5.0,
+) -> int:
     """Composite drying score (0-100). Higher = better drying conditions.
 
     rain_penalty_light_mmph: light drizzle threshold — score reduced proportionally
@@ -853,12 +862,16 @@ def laundry_drying_score(temp_c, humidity, wind_speed_ms, uv_index, rain_rate_mm
     score = temp_score + hum_score + wind_score + sun_score
     # Light drizzle: proportional penalty between light and heavy thresholds
     if rain_rate_mmph >= rain_penalty_light_mmph:
-        penalty_factor = (rain_rate_mmph - rain_penalty_light_mmph) / max(0.01, rain_penalty_heavy_mmph - rain_penalty_light_mmph)
+        penalty_factor = (rain_rate_mmph - rain_penalty_light_mmph) / max(
+            0.01, rain_penalty_heavy_mmph - rain_penalty_light_mmph
+        )
         score = round(score * max(0.0, 1.0 - penalty_factor))
     return score
 
 
-def laundry_recommendation(score: int, rain_rate_mmph: float, rain_probability, rain_penalty_light_mmph: float = 0.2) -> str:
+def laundry_recommendation(
+    score: int, rain_rate_mmph: float, rain_probability, rain_penalty_light_mmph: float = 0.2
+) -> str:
     if rain_rate_mmph >= rain_penalty_light_mmph:
         return "Currently raining - hang indoors!"
     if rain_probability is not None and rain_probability > 50:
@@ -1752,42 +1765,52 @@ def cross_sensor_consistency_flags(
 
     # UV > 6 but illuminance < 20,000 lx (midday sun → expect high lux)
     if uv is not None and lux is not None and float(uv) > 6.0 and float(lux) < 20000:
-        flags.append({
-            "check": "uv_lux_mismatch",
-            "sensors": ["uv_index", "illuminance"],
-            "detail": f"UV={uv:.1f} but lux={lux:.0f} (expected >20000 lx at UV>6)",
-        })
+        flags.append(
+            {
+                "check": "uv_lux_mismatch",
+                "sensors": ["uv_index", "illuminance"],
+                "detail": f"UV={uv:.1f} but lux={lux:.0f} (expected >20000 lx at UV>6)",
+            }
+        )
 
     # Wind gust below wind speed (physically impossible)
     if wind_ms is not None and gust_ms is not None and float(gust_ms) < float(wind_ms) * 0.9:
-        flags.append({
-            "check": "gust_below_wind",
-            "sensors": ["wind_speed", "wind_gust"],
-            "detail": f"Gust {gust_ms:.1f} < wind {wind_ms:.1f} m/s",
-        })
+        flags.append(
+            {
+                "check": "gust_below_wind",
+                "sensors": ["wind_speed", "wind_gust"],
+                "detail": f"Gust {gust_ms:.1f} < wind {wind_ms:.1f} m/s",
+            }
+        )
 
     # Dew point > temperature (thermodynamically impossible)
     if temp_c is not None and dew_c is not None and float(dew_c) > float(temp_c) + 0.5:
-        flags.append({
-            "check": "dewpoint_exceeds_temperature",
-            "sensors": ["temperature", "dew_point"],
-            "detail": f"Dew point {dew_c:.1f}°C > temperature {temp_c:.1f}°C",
-        })
+        flags.append(
+            {
+                "check": "dewpoint_exceeds_temperature",
+                "sensors": ["temperature", "dew_point"],
+                "detail": f"Dew point {dew_c:.1f}°C > temperature {temp_c:.1f}°C",
+            }
+        )
 
     # Pressure stuck but wind is active (barometer malfunction)
     if pressure_history_stable:
-        flags.append({
-            "check": "pressure_stuck",
-            "sensors": ["pressure"],
-            "detail": "Pressure unchanged (±0.1 hPa) for >8h with wind present",
-        })
+        flags.append(
+            {
+                "check": "pressure_stuck",
+                "sensors": ["pressure"],
+                "detail": "Pressure unchanged (±0.1 hPa) for >8h with wind present",
+            }
+        )
 
     # Rain rate > 0 but total not incrementing
     if rain_rate > 0.1 and not rain_total_increasing:
-        flags.append({
-            "check": "rain_rate_total_mismatch",
-            "sensors": ["rain_rate", "rain_total"],
-            "detail": "Rain rate non-zero but cumulative total not incrementing",
-        })
+        flags.append(
+            {
+                "check": "rain_rate_total_mismatch",
+                "sensors": ["rain_rate", "rain_total"],
+                "detail": "Rain rate non-zero but cumulative total not incrementing",
+            }
+        )
 
     return flags
