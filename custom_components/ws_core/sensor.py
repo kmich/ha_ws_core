@@ -1358,7 +1358,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
     }
 
     _DISABLED_BY_DEFAULT = {
-        KEY_TEMP_AVG_24H,
         KEY_TEMP_DISPLAY,
         KEY_WIND_DIR_SMOOTH_DEG,
         KEY_BATTERY_DISPLAY,

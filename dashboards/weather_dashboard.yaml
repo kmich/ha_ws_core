@@ -1333,14 +1333,14 @@ views:
     path: advanced
     icon: mdi:flask-outline
     type: sections
-    max_columns: 2
+    max_columns: 4
     dense_section_placement: false
     subview: true
     sections:
 
       # ── NAVIGATION ──────────────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 1
         cards:
           - type: custom:button-card
@@ -1365,7 +1365,7 @@ views:
 
       # ── CURRENT CONDITIONS & FORECAST ────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -1445,7 +1445,7 @@ views:
                 [[[
                   var attrs = (entity && entity.attributes) || {};
                   var provider = (entity && entity.state) || '--';
-                  var days = attrs.daily || attrs.forecast || [];
+                  var days = attrs.days || attrs.daily || attrs.forecast || [];
                   var count = Array.isArray(days) ? days.length : (attrs.count || 0);
                   var updated = attrs.updated_at || attrs.fetched_at || '';
                   return '<div style="margin-top:8px;">'
@@ -1458,7 +1458,7 @@ views:
 
       # ── SKY: MOON & STARGAZING / UV EXPOSURE ────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -1554,8 +1554,8 @@ views:
 
       # ── ACTIVITY SCORES (conditional) ───────────────────────────────────────
       - type: grid
-        column_span: 2
-        columns: 2
+        column_span: 4
+        columns: 4
         cards:
           - type: conditional
             conditions:
@@ -1765,7 +1765,7 @@ views:
 
       # ── RAIN DETAIL ─────────────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -1864,7 +1864,7 @@ views:
 
       # ── WIND DETAIL ─────────────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -1956,7 +1956,7 @@ views:
 
       # ── PRESSURE & ZAMBRETTI ─────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -2047,7 +2047,7 @@ views:
 
       # ── TEMPERATURE EXTENDED ─────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -2142,7 +2142,7 @@ views:
 
       # ── AIR QUALITY & POLLEN (conditional) ──────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -2244,7 +2244,7 @@ views:
 
       # ── MOON & SOLAR FORECAST (conditional) ─────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -2335,7 +2335,7 @@ views:
 
       # ── ET₀ & DEGREE DAYS (conditional) ─────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -2433,7 +2433,7 @@ views:
 
       # ── METAR VALIDATION (conditional) ──────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -2541,7 +2541,7 @@ views:
 
       # ── UPLOAD STATUS (conditional) ──────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -2634,7 +2634,7 @@ views:
 
       # ── DISPLAY SENSORS (conditional) ───────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -2777,7 +2777,7 @@ views:
 
       # ── GDD & STREAKS (conditional) ──────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -2867,7 +2867,7 @@ views:
 
       # ── 30-DAY CLIMATOLOGY ──────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -2956,7 +2956,7 @@ views:
 
       # ── FOG & PRECIPITATION TYPE (conditional) ──────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -3033,7 +3033,7 @@ views:
 
       # ── LEARNING LAYER ──────────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: conditional
@@ -3134,7 +3134,7 @@ views:
 
       # ── SENSOR DRIFT & CONSISTENCY ──────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -3221,7 +3221,7 @@ views:
 
       # ── STATION DIAGNOSTICS ──────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 2
         cards:
           - type: custom:button-card
@@ -3318,6 +3318,22 @@ views:
                     + '</div>';
                 ]]]
 
+      # ── RADAR ────────────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        columns: 1
+        cards:
+          - type: iframe
+            url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9&oFa=1&oC=1&oU=1&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=1
+            aspect_ratio: 40%
+            card_mod:
+              style: |
+                ha-card {
+                  background: rgba(20,20,35,0.95) !important;
+                  border: 1px solid rgba(255,255,255,0.08) !important;
+                  border-radius: 16px !important;
+                  overflow: hidden !important;
+                }
       # ── WIND ROSE ────────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
@@ -3332,10 +3348,12 @@ views:
             windspeed_entities:
               - entity: sensor.ws_wind_speed
                 name: Wind Speed
+                use_for_windrose: true
                 speed_range_beaufort: true
-                output_speed_unit: mps
+                speed_unit: mps
             cardinal_direction_letters: NESW
-            windspeed_bar_location: bottom
+            windspeed_bar:
+              location: bottom
             current_direction:
               show_arrow: true
             card_mod:
@@ -3344,21 +3362,121 @@ views:
                   background: rgba(20,20,35,0.95) !important;
                   border: 1px solid rgba(255,255,255,0.08) !important;
                   border-radius: 16px !important;
+                  min-height: 500px !important;
                 }
 
-      # ── RADAR ────────────────────────────────────────────────────────────────
+      # ── RAIN GRAPH ───────────────────────────────────────────────────────────
       - type: grid
         column_span: 2
         columns: 1
         cards:
-          - type: iframe
-            url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9&oFa=1&oC=1&oU=1&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=1
-            aspect_ratio: 56%
+          - type: custom:stack-in-card
+            mode: vertical
             card_mod:
               style: |
                 ha-card {
                   background: rgba(20,20,35,0.95) !important;
                   border: 1px solid rgba(255,255,255,0.08) !important;
                   border-radius: 16px !important;
-                  overflow: hidden !important;
+                  min-height: 500px !important;
+                  padding: 12px !important;
                 }
+            cards:
+              - type: custom:button-card
+                entity: sensor.ws_rain_rate
+                name: Rain Overview
+                show_icon: true
+                icon: mdi:weather-rainy
+                show_state: false
+                triggers_update:
+                  - sensor.ws_rain_last_1h
+                  - sensor.ws_rain_last_24h
+                  - sensor.ws_rain_total
+                  - sensor.ws_rain_rate_raw
+                styles:
+                  card:
+                    - background: transparent
+                    - border: none
+                    - box-shadow: none
+                    - padding: 4px 0 8px 0
+                  name:
+                    - font-size: 14px
+                    - font-weight: 600
+                    - color: rgba(255,255,255,0.7)
+                  icon:
+                    - width: 28px
+                    - color: '#38bdf8'
+                custom_fields:
+                  details: |
+                    [[[
+                      var rate = parseFloat(entity && entity.state) || 0;
+                      var rateRaw = parseFloat((states['sensor.ws_rain_rate_raw'] || {}).state) || 0;
+                      var r1h = parseFloat((states['sensor.ws_rain_last_1h'] || {}).state) || 0;
+                      var r24h = parseFloat((states['sensor.ws_rain_last_24h'] || {}).state) || 0;
+                      var total = parseFloat((states['sensor.ws_rain_total'] || {}).state) || 0;
+                      var rateColor = rate > 5 ? '#3b82f6' : rate > 0 ? '#60a5fa' : 'rgba(255,255,255,0.4)';
+                      return '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:rgba(255,255,255,0.75);margin-top:4px;">'
+                        + '<span><b style="color:' + rateColor + ';">' + rate.toFixed(1) + ' mm/h</b> now</span>'
+                        + '<span><b style="color:#93c5fd;">' + r1h.toFixed(1) + ' mm</b> /1h</span>'
+                        + '<span><b style="color:#60a5fa;">' + r24h.toFixed(1) + ' mm</b> /24h</span>'
+                        + '<span><b style="color:rgba(255,255,255,0.6);">' + total.toFixed(0) + ' mm</b> total</span>'
+                        + '</div>';
+                    ]]]
+              - type: custom:mini-graph-card
+                entities:
+                  - entity: sensor.ws_rain_rate
+                    name: Rain Rate
+                    color: '#38bdf8'
+                hours_to_show: 24
+                points_per_hour: 4
+                line_width: 2
+                height: 120
+                animate: true
+                lower_bound: 0
+                smoothing: false
+                show:
+                  name: false
+                  icon: false
+                  state: false
+                  legend: true
+                  labels: true
+                  points: hover
+                  fill: fade
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: transparent !important;
+                      box-shadow: none !important;
+                      border: none !important;
+                    }
+              - type: custom:mini-graph-card
+                entities:
+                  - entity: sensor.ws_rain_last_1h
+                    name: 1h Accum.
+                    color: '#60a5fa'
+                  - entity: sensor.ws_rain_last_24h
+                    name: 24h Accum.
+                    color: '#818cf8'
+                    y_axis: secondary
+                hours_to_show: 24
+                points_per_hour: 2
+                line_width: 2
+                height: 120
+                animate: true
+                lower_bound: 0
+                smoothing: true
+                show:
+                  name: false
+                  icon: false
+                  state: false
+                  legend: true
+                  labels: true
+                  points: hover
+                  fill: fade
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: transparent !important;
+                      box-shadow: none !important;
+                      border: none !important;
+                    }
