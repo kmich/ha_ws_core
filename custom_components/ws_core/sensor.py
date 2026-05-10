@@ -15,7 +15,6 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .algorithms import aqi_level as _aqi_level
-
 from .const import (
     # v0.7.0
     CONF_ENABLE_AIR_QUALITY,
@@ -690,7 +689,7 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="AQI",
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
-            "level": _aqi_level((d.get(KEY_AQI) or 0)),
+            "level": _aqi_level(d.get(KEY_AQI) or 0),
             "pm2_5_ug_m3": d.get(KEY_PM2_5),
             "pm10_ug_m3": d.get(KEY_PM10),
             "no2_ug_m3": d.get(KEY_NO2),

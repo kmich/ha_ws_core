@@ -22,7 +22,6 @@ v0.3.0 cleanup notes:
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 import math
@@ -41,7 +40,6 @@ from .algorithms import (
     CONDITION_COLORS,
     CONDITION_DESCRIPTIONS,
     CONDITION_ICONS,
-    MOON_ILLUMINATION,
     KalmanFilter,
     aqi_level,
     beaufort_description,
@@ -49,7 +47,6 @@ from .algorithms import (
     calculate_dew_point,
     calculate_frost_point,
     calculate_moon_illumination,
-    calculate_moon_phase,
     calculate_rain_probability,
     calculate_us_aqi,
     calculate_wet_bulb,
@@ -72,15 +69,11 @@ from .algorithms import (
     moon_next_phase_days,
     moon_phase_days,
     moon_phase_from_age,
-    pollen_level,
-    pollen_overall,
     pressure_trend_arrow,
     pressure_trend_display,
     smooth_wind_direction,
     thunderstorm_risk_index,
-    uv_burn_time_minutes,
     uv_level,
-    uv_recommendation,
     wind_speed_to_beaufort,
     zambretti_forecast,
 )
@@ -89,6 +82,7 @@ from .const import (
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
     CONF_ENABLE_AIR_QUALITY,
+    CONF_ENABLE_FIRE_RISK,
     # v0.6.0 new
     # v0.5.0 new
     CONF_ENABLE_FOG,
@@ -122,17 +116,13 @@ from .const import (
     DEFAULT_AQI_INTERVAL_MIN,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ENABLE_AIR_QUALITY,
-    DEFAULT_ENABLE_CWOP,
-    DEFAULT_ENABLE_DEGREE_DAYS,
-    DEFAULT_ENABLE_EXPORT,
+    DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
-    DEFAULT_ENABLE_METAR,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_WUNDERGROUND,
-    DEFAULT_EXPORT_FORMAT,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_HEMISPHERE,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
@@ -266,6 +256,10 @@ except ImportError:
     HAS_REPAIRS = False
 
 _LOGGER = logging.getLogger(__name__)
+
+# Keys removed from const.py in v0.3.0 but still used internally by coordinator
+__KEY_RAIN_RATE_RAW = "rain_rate_raw_mmph"
+__KEY_TIME_SINCE_RAIN = "time_since_rain"
 
 
 # ---------------------------------------------------------------------------
@@ -927,7 +921,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if rt.last_rain_total_mm is None or rt.last_rain_ts is None:
                 rt.last_rain_total_mm = float(rain_total_mm)
                 rt.last_rain_ts = now
-                data[KEY_RAIN_RATE_RAW] = 0.0
+                data[_KEY_RAIN_RATE_RAW] = 0.0
                 data[KEY_RAIN_RATE_FILT] = 0.0
             else:
                 dv = float(rain_total_mm) - float(rt.last_rain_total_mm)
@@ -938,7 +932,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 filtered = rt.kalman.update(raw)
                 rt.last_rain_total_mm = float(rain_total_mm)
                 rt.last_rain_ts = now
-                data[KEY_RAIN_RATE_RAW] = round(raw, 2)
+                data[_KEY_RAIN_RATE_RAW] = round(raw, 2)
                 data[KEY_RAIN_RATE_FILT] = filtered
 
         rain_rate: float = data.get(KEY_RAIN_RATE_FILT, 0.0)
@@ -972,17 +966,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             delta = now - rt.last_rain_event_ts
             total_s = int(delta.total_seconds())
             if total_s < 60:
-                data[KEY_TIME_SINCE_RAIN] = "Just now"
+                data[_KEY_TIME_SINCE_RAIN] = "Just now"
             elif total_s < 3600:
-                data[KEY_TIME_SINCE_RAIN] = f"{total_s // 60}m ago"
+                data[_KEY_TIME_SINCE_RAIN] = f"{total_s // 60}m ago"
             elif total_s < 86400:
                 h = total_s // 3600
-                data[KEY_TIME_SINCE_RAIN] = f"{h}h ago"
+                data[_KEY_TIME_SINCE_RAIN] = f"{h}h ago"
             else:
                 d = total_s // 86400
-                data[KEY_TIME_SINCE_RAIN] = f"{d}d ago"
+                data[_KEY_TIME_SINCE_RAIN] = f"{d}d ago"
         else:
-            data[KEY_TIME_SINCE_RAIN] = "No rain recorded"
+            data[_KEY_TIME_SINCE_RAIN] = "No rain recorded"
 
         return rain_rate
 
