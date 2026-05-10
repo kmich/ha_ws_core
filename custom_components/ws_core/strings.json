@@ -85,21 +85,16 @@
         "description": "Choose which sensors to enable. Each can be toggled independently. You can change these later in Configure.",
         "data": {
           "enable_display_sensors": "Display sensors (humidity level, UV level, pressure trend, station health)",
-          "enable_laundry_score": "Laundry drying score",
-          "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
-          "enable_running_score": "Running conditions score",
           "enable_sea_temp": "Sea surface temperature (Open-Meteo Marine API)",
-          "enable_degree_days": "Heating / Cooling Degree Days",
-          "enable_metar": "METAR cross-validation (compare local sensors vs nearest airport)",
-          "enable_cwop": "CWOP upload (share data with Citizen Weather Observer Program)",
           "enable_wunderground": "Weather Underground upload (share data with Weather Underground PWS)",
-          "enable_export": "CSV / JSON data export (save observations to file)",
           "enable_air_quality": "Air quality index (Open-Meteo, free, no API key)",
-          "enable_pollen": "Pollen levels (Tomorrow.io, free API key required)",
+          "enable_pollen": "Pollen levels (Open-Meteo, free, no API key)",
           "enable_moon": "Moon phase & illumination",
           "enable_solar_forecast": "Solar PV generation forecast (forecast.solar, free)",
-          "_go_back": "← Go back to previous step"
+          "_go_back": "← Go back to previous step",
+          "enable_fog_probability": "Fog probability sensor",
+          "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)"
         }
       },
       "sea_temp": {
@@ -111,33 +106,6 @@
           "_go_back": "← Go back to previous step"
         }
       },
-      "degree_days": {
-        "title": "Degree Days — base temperature",
-        "description": "Heating Degree Days (HDD) and Cooling Degree Days (CDD) measure how much heating or cooling a building needs each day. The base temperature is the outdoor temperature at which no heating or cooling is required — typically 18 °C (64 °F) for residential buildings. HDD accumulates when it is colder than the base; CDD when it is warmer. Both reset at midnight.",
-        "data": {
-          "degree_day_base_c": "Base temperature",
-          "_go_back": "← Go back to previous step"
-        }
-      },
-      "metar": {
-        "title": "METAR cross-validation",
-        "description": "Fetches the latest aviation METAR report from the nearest airport and compares temperature and pressure against your local sensors. Free data from aviationweather.gov — no API key required. Find your nearest ICAO code at aviationweather.gov/metar. Leave the ICAO field blank to skip setup now and configure later.",
-        "data": {
-          "metar_icao": "Nearest airport ICAO code (e.g. LGAV for Athens)",
-          "metar_interval_min": "Fetch interval",
-          "_go_back": "← Go back to previous step"
-        }
-      },
-      "cwop": {
-        "title": "CWOP upload",
-        "description": "Upload observations to the Citizen Weather Observer Program (cwop.aprs.net). You need a free CWOP callsign — register at wxqa.com. Amateur radio operators use their callsign; citizens use a CW or EW callsign. Leave blank to skip and configure later.",
-        "data": {
-          "cwop_callsign": "CWOP callsign (e.g. CW1234 or EW1234) — leave blank to skip",
-          "cwop_passcode": "APRS passcode (-1 for citizen stations)",
-          "cwop_interval_min": "Upload interval",
-          "_go_back": "← Go back to previous step"
-        }
-      },
       "wunderground": {
         "title": "Weather Underground upload",
         "description": "Upload observations to your Weather Underground Personal Weather Station. You need a station ID and API key from your Weather Underground account (wunderground.com/member/devices). Leave both fields blank to skip and configure later.",
@@ -145,16 +113,6 @@
           "wu_station_id": "Station ID (e.g. IATHEN123) — leave blank to skip",
           "wu_api_key": "API key — leave blank to skip",
           "wu_interval_min": "Upload interval",
-          "_go_back": "← Go back to previous step"
-        }
-      },
-      "export": {
-        "title": "CSV / JSON data export",
-        "description": "Periodically write all sensor readings to a file on your Home Assistant host. Each day gets its own file (e.g. ws_core_20260218.csv). The directory will be created automatically if it does not exist.",
-        "data": {
-          "export_path": "Export directory path (on HA host)",
-          "export_format": "File format",
-          "export_interval_min": "Export interval",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -170,8 +128,6 @@
         "title": "Pollen Data",
         "description": "{info}",
         "data": {
-          "tomorrow_io_key": "Tomorrow.io API key",
-          "pollen_interval_min": "Refresh interval",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -309,20 +265,15 @@
         "description": "Toggle sensors and enable external data sources. Sub-steps will appear for each enabled feature.",
         "data": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_laundry_score": "Laundry drying score",
-          "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
-          "enable_running_score": "Running conditions score",
           "enable_sea_temp": "Sea surface temperature",
-          "enable_degree_days": "Heating / Cooling Degree Days",
-          "enable_metar": "METAR cross-validation",
-          "enable_cwop": "CWOP upload",
           "enable_wunderground": "Weather Underground upload",
-          "enable_export": "CSV / JSON data export",
           "enable_air_quality": "Air quality index (Open-Meteo)",
-          "enable_pollen": "Pollen levels (Tomorrow.io)",
+          "enable_pollen": "Pollen levels (Open-Meteo, free, no API key)",
           "enable_moon": "Moon phase & illumination",
-          "enable_solar_forecast": "Solar PV forecast (forecast.solar)"
+          "enable_solar_forecast": "Solar PV forecast (forecast.solar)",
+          "enable_fog_probability": "Fog probability sensor",
+          "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -349,28 +300,6 @@
           "sea_temp_lon": "Sea temperature longitude"
         }
       },
-      "degree_days_opt": {
-        "title": "Degree Days",
-        "data": {
-          "degree_day_base_c": "Degree day base temperature"
-        }
-      },
-      "metar_opt": {
-        "title": "METAR Cross-Validation",
-        "description": "{info}",
-        "data": {
-          "metar_icao": "Airport ICAO code",
-          "metar_interval_min": "Fetch interval"
-        }
-      },
-      "cwop_opt": {
-        "title": "CWOP Upload",
-        "data": {
-          "cwop_callsign": "CWOP callsign",
-          "cwop_passcode": "APRS passcode",
-          "cwop_interval_min": "Upload interval"
-        }
-      },
       "wunderground_opt": {
         "title": "Weather Underground",
         "description": "{info}",
@@ -378,14 +307,6 @@
           "wu_station_id": "Station ID",
           "wu_api_key": "API key",
           "wu_interval_min": "Upload interval"
-        }
-      },
-      "export_opt": {
-        "title": "Data Export",
-        "data": {
-          "export_path": "Export directory",
-          "export_format": "Format",
-          "export_interval_min": "Interval"
         }
       },
       "air_quality_opt": {
@@ -398,10 +319,7 @@
       "pollen_opt": {
         "title": "Pollen Settings",
         "description": "{info}",
-        "data": {
-          "tomorrow_io_key": "Tomorrow.io API key",
-          "pollen_interval_min": "Refresh interval"
-        }
+        "data": {}
       },
       "solar_forecast_opt": {
         "title": "Solar Forecast Settings",

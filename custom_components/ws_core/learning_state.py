@@ -20,10 +20,9 @@ from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
-LEARNING_SCHEMA_VERSION = 1
+LEARNING_SCHEMA_VERSION = 2  # v0.3.0: removed METAR bias fields, GDD season tracking
 EMA_ALPHA = 0.05  # ~20 observations halflife
-MIN_SAMPLES_MEDIUM = 48  # ~2 days of hourly METAR
-MIN_SAMPLES_HIGH = 168  # 7 days
+# v0.3.0: removed MIN_SAMPLES_MEDIUM, MIN_SAMPLES_HIGH (METAR bias confidence thresholds)
 
 
 # ---------------------------------------------------------------------------
@@ -33,34 +32,26 @@ MIN_SAMPLES_HIGH = 168  # 7 days
 
 @dataclass
 class LearningState:
-    """All persistent learned state for one ws_core entry."""
+    """All persistent learned state for one ws_core entry.
+
+    v0.3.0: removed METAR-related bias EMAs (temp_bias_*, pressure_bias_*)
+    and GDD season tracking (gdd_season_*). Schema bumped to v2 — old
+    state files are discarded on load.
+    """
 
     schema_version: int = LEARNING_SCHEMA_VERSION
 
-    # A1 — Temperature bias vs METAR
-    temp_bias_ema: float | None = None
-    temp_bias_n: int = 0
-
-    # A2 — Pressure bias vs METAR
-    pressure_bias_ema: float | None = None
-    pressure_bias_n: int = 0
-
-    # A3 — Forecast skill (Brier score per source, rolling 90 d)
+    # Forecast skill (Brier score per source, rolling 90 d)
     # Each entry: {ts, outcome, local_prob, openmeteo_prob}
     forecast_outcomes: list = field(default_factory=list)
     blend_local: float = 0.5
     blend_openmeteo: float = 0.5
 
-    # A4 — Solar lux-to-irradiance factor
+    # Solar lux-to-irradiance factor
     solar_lux_factor: float = 126.0
     solar_factor_n: int = 0
 
-    # B4 — Growing Degree Days (season accumulation)
-    gdd_season_total: float = 0.0
-    gdd_season_last_date: str = ""  # YYYY-MM-DD last accumulation day
-    gdd_season_reset_applied: str = ""  # YYYY-MM-DD of last season reset
-
-    # B5 — Streak counters
+    # Streak counters (kept; backed by RestoreEntity in v0.3.0)
     dry_streak_days: int = 0
     dry_streak_last_rain_date: str = ""
     heat_streak_days: int = 0
@@ -68,12 +59,12 @@ class LearningState:
     frost_streak_days: int = 0
     frost_streak_last_frost_date: str = ""
 
-    # D1 — Rolling 30-day climatology buffer
+    # Rolling 30-day climatology buffer
     # Each entry: {date, t_high, t_low, rain_total}
     climatology_days: list = field(default_factory=list)
 
     # Internal: last time we pushed a 6h forecast outcome window
-    _last_outcome_window: str = ""  # ISO datetime string, not persisted as meaningful
+    _last_outcome_window: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -128,21 +119,6 @@ def update_ema(current: float | None, new_value: float, alpha: float = EMA_ALPHA
     if current is None:
         return new_value
     return alpha * new_value + (1.0 - alpha) * current
-
-
-def confidence_label(n: int) -> str:
-    if n >= MIN_SAMPLES_HIGH:
-        return "high"
-    if n >= MIN_SAMPLES_MEDIUM:
-        return "medium"
-    return "low"
-
-
-def suggested_correction(bias_ema: float | None, n: int) -> float | None:
-    """Return rounded suggested offset (−bias), or None if not enough data."""
-    if bias_ema is None or n < MIN_SAMPLES_MEDIUM:
-        return None
-    return round(-bias_ema, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -266,15 +242,6 @@ def update_solar_lux_factor(
 # ---------------------------------------------------------------------------
 
 
-def gdd_daily(t_high: float, t_low: float, base_c: float = 10.0, cap_c: float = 30.0) -> float:
-    """Standard double-threshold growing degree days for one day."""
-    t_h = min(float(t_high), cap_c)
-    t_l = max(float(t_low), base_c)
-    if t_l > t_h:
-        return 0.0
-    return round(max(0.0, (t_h + t_l) / 2.0 - base_c), 3)
-
-
 # ---------------------------------------------------------------------------
 # Streak & GDD daily update (B4/B5)  — called once per day at midnight
 # ---------------------------------------------------------------------------
@@ -288,12 +255,12 @@ def update_daily_streaks(
     rain_today_mm: float,
     thresh_heat_c: float,
     thresh_freeze_c: float,
-    gdd_base_c: float,
-    gdd_cap_c: float,
-    gdd_reset_month: int,
-    gdd_reset_day: int,
 ) -> None:
-    """Update all daily accumulators for the given calendar date."""
+    """Update streak counters for the given calendar date.
+
+    v0.3.0: GDD season accumulation removed (degree-days were cut entirely).
+    Only streak counters (dry/heat/frost) are updated here.
+    """
 
     # ── Dry streak ──────────────────────────────────────────────────────────
     if rain_today_mm < 1.0:
@@ -318,24 +285,6 @@ def update_daily_streaks(
             state.frost_streak_last_frost_date = date_str
     else:
         state.frost_streak_days = 0
-
-    # ── GDD season accumulation ───────────────────────────────────────────────
-    if state.gdd_season_last_date == date_str:
-        return  # already updated today
-
-    # Check whether we need to reset the season counter
-    try:
-        d = datetime.strptime(date_str, "%Y-%m-%d")
-        reset_this_year = f"{d.year}-{gdd_reset_month:02d}-{gdd_reset_day:02d}"
-        if state.gdd_season_reset_applied < reset_this_year <= date_str:
-            state.gdd_season_total = 0.0
-            state.gdd_season_reset_applied = reset_this_year
-    except ValueError:
-        pass
-
-    if t_high is not None and t_low is not None:
-        state.gdd_season_total += gdd_daily(t_high, t_low, gdd_base_c, gdd_cap_c)
-        state.gdd_season_last_date = date_str
 
 
 # ---------------------------------------------------------------------------

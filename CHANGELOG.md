@@ -2,6 +2,46 @@
 
 All notable changes to Weather Station Core are documented in this file.
 
+## [1.3.0] - TBD
+
+### BREAKING — removed entities (22)
+
+The following entities are removed and will be cleaned from the entity registry automatically on first launch via `async_migrate_entry`. Update any automations or dashboards that reference them.
+
+**METAR family (7):** `ws_metar_validation`, `ws_temp_vs_metar_delta`, `ws_pressure_vs_metar_delta`, `ws_cal_suggestion_temperature`, `ws_cal_suggestion_pressure`, `ws_learned_temp_bias`, `ws_learned_pressure_bias`
+
+**Roadmap-but-never-built (2):** `ws_last_export_time`, `ws_cwop_upload_status`
+
+**Lifestyle scores (3):** `ws_running_score`, `ws_laundry_drying_score`, `ws_stargazing_quality`
+
+**Degree days (4):** `ws_growing_degree_days_today`, `ws_growing_degree_days_season`, `ws_cooling_degree_days_today`, `ws_heating_degree_days_today`
+
+**Redundancies (6):** `ws_moon_phase` (phase is now attribute on `ws_moon`), `ws_air_quality_level` (level is attribute on `ws_air_quality_index`), `ws_pressure_trend_raw`, `ws_rain_rate_raw`, `ws_precipitation_type`, `ws_time_since_rain`
+
+### BREAKING — removed service
+
+- `ws_core.apply_learned_calibration` — tied to the cut METAR family
+
+### Fixed
+
+- **`weather.ws` reports "cloudy" when it's sunny**: Condition property now prefers local sensor data → Open-Meteo hourly → Open-Meteo daily (in that order), instead of always using the daily summary.
+- **`ws_uv_level` shows `unknown` at night**: UV=0 now correctly returns "None" (WMO scale). Was a truthy-check bug (`if uv :=` skipped 0.0).
+- **`ws_zambretti_forecast` wrong output in stable high pressure**: Recalibrated MSLP→Z scale to match original dial bands; suppressed wind-direction influence when wind < 1 m/s; added fair-weather sanity guard.
+
+### Changed
+
+- **Pollen**: Now fetched from Open-Meteo Air Quality API (free, no key) in the same call as AQI. Tomorrow.io dependency removed.
+- **All opt-in features now default OFF** in the wizard: fire risk, fog, thunderstorm, sea temp, WU upload, AQI, pollen, moon, solar forecast.
+- **Config entry version bumped to 3** (was 2). Migration chains v1→v2→v3 automatically.
+- Removed services: `apply_learned_calibration`.
+- Added services: `reset_learning_state` (target: all/solar/forecast/streaks), `export_learning_state`.
+
+### Disabled by default (deferred)
+
+- `ws_temperature_anomaly_30_day` — needs climatology baseline (target: v1.4.0)
+- `ws_rain_anomaly_30_day` — same
+- `ws_weather_underground_status` — WU upload roadmap
+
 ## [1.2.0] - 2026-03-03
 
 ### Added — Theme A: Self-Learning Layer

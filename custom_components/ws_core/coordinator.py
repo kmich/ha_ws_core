@@ -1,4 +1,4 @@
-"""Coordinator for Weather Station Core -- v0.5.0.
+"""Coordinator for Weather Station Core -- v0.3.0.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors
@@ -8,15 +8,16 @@ The _compute() method is broken into focused sub-methods:
   _compute_derived_precipitation() Rain rate, Kalman filter, rain display
   _compute_condition()             36-condition classifier
   _compute_rain_probability()      Local + API probability
-  _compute_activity_scores()       Laundry, fire risk, running, stargazing
-  _compute_degree_days()           HDD/CDD daily accumulators  [v0.5.0]
-  _compute_et0()                   ET₀ Hargreaves-Samani       [v0.6.0]
+  _compute_et0()                   ET₀ Hargreaves-Samani
   _compute_health()                Staleness, package status, alerts
   _compute()                       Orchestrator -- calls all sub-methods
-  _async_fetch_metar()             Aviation METAR cross-validation [v0.5.0]
-  _async_fetch_cwop()              CWOP APRS-IS upload         [v0.6.0]
-  _async_fetch_wunderground()      Weather Underground upload  [v0.6.0]
-  _async_export_data()             CSV/JSON file export        [v0.6.0]
+
+v0.3.0 cleanup notes:
+  - Removed METAR family entirely (cross-validation, learned biases, calibration suggestions)
+  - Removed lifestyle scores (laundry, running, stargazing)
+  - Removed degree-day accumulators (HDD/CDD/GDD - kept code path for streaks only)
+  - Removed CWOP upload, CSV/JSON export
+  - Pollen now fetched via Open-Meteo Air Quality API instead of Tomorrow.io
 """
 
 from __future__ import annotations
@@ -53,7 +54,6 @@ from .algorithms import (
     calculate_us_aqi,
     calculate_wet_bulb,
     combine_rain_probability,
-    cooling_degree_hours,
     cross_sensor_consistency_flags,
     determine_current_condition,
     direction_to_quadrant,
@@ -65,30 +65,18 @@ from .algorithms import (
     fog_probability,
     format_rain_display,
     get_condition_severity,
-    heating_degree_hours,
     humidity_level,
-    laundry_dry_time,
-    laundry_drying_score,
-    laundry_recommendation,
     least_squares_pressure_trend,
     linear_regression_slope,
-    metar_validation_label,
     moon_display_string,
     moon_next_phase_days,
     moon_phase_days,
     moon_phase_from_age,
-    moon_stargazing_impact,
-    parse_metar_json,
     pollen_level,
     pollen_overall,
-    precipitation_type,
     pressure_trend_arrow,
     pressure_trend_display,
-    running_level,
-    running_recommendation,
-    running_score,
     smooth_wind_direction,
-    stargazing_quality,
     thunderstorm_risk_index,
     uv_burn_time_minutes,
     uv_level,
@@ -99,44 +87,25 @@ from .algorithms import (
 from .const import (
     CONF_AQI_INTERVAL_MIN,
     CONF_CLIMATE_REGION,
-    CONF_CWOP_CALLSIGN,
-    CONF_CWOP_INTERVAL_MIN,
-    CONF_CWOP_PASSCODE,
-    CONF_DEGREE_DAY_BASE_C,
     CONF_ELEVATION_M,
     CONF_ENABLE_AIR_QUALITY,
     # v0.6.0 new
-    CONF_ENABLE_CWOP,
     # v0.5.0 new
-    CONF_ENABLE_DEGREE_DAYS,
-    CONF_ENABLE_EXPORT,
     CONF_ENABLE_FOG,
-    CONF_ENABLE_METAR,
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_WUNDERGROUND,
-    CONF_EXPORT_FORMAT,
-    CONF_EXPORT_INTERVAL_MIN,
-    CONF_EXPORT_PATH,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
-    CONF_GDD_CAP_C,
-    CONF_GDD_RESET_DAY,
-    CONF_GDD_RESET_MONTH,
     CONF_HEMISPHERE,
-    CONF_METAR_ICAO,
-    CONF_METAR_INTERVAL_MIN,
-    CONF_POLLEN_INTERVAL_MIN,
     # Tuning numbers (previously no-op, now wired)
     CONF_PRESSURE_TREND_WINDOW_H,
     CONF_RAIN_FILTER_ALPHA,
-    CONF_RAIN_PENALTY_HEAVY_MMPH,
-    CONF_RAIN_PENALTY_LIGHT_MMPH,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
     CONF_SOLAR_INTERVAL_MIN,
@@ -146,15 +115,12 @@ from .const import (
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_THRESH_HEAT_DAY_C,
-    CONF_TOMORROW_IO_KEY,
     CONF_UNITS_MODE,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
     DEFAULT_AQI_INTERVAL_MIN,
     DEFAULT_CLIMATE_REGION,
-    DEFAULT_CWOP_INTERVAL_MIN,
-    DEFAULT_DEGREE_DAY_BASE_C,
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_CWOP,
     DEFAULT_ENABLE_DEGREE_DAYS,
@@ -167,18 +133,10 @@ from .const import (
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_EXPORT_FORMAT,
-    DEFAULT_EXPORT_INTERVAL_MIN,
     DEFAULT_FORECAST_INTERVAL_MIN,
-    DEFAULT_GDD_CAP_C,
-    DEFAULT_GDD_RESET_DAY,
-    DEFAULT_GDD_RESET_MONTH,
     DEFAULT_HEMISPHERE,
-    DEFAULT_METAR_INTERVAL_MIN,
-    DEFAULT_POLLEN_INTERVAL_MIN,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_RAIN_FILTER_ALPHA,
-    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
-    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_SOLAR_INTERVAL_MIN,
     DEFAULT_SOLAR_PANEL_AZIMUTH,
     DEFAULT_SOLAR_PANEL_TILT,
@@ -192,17 +150,11 @@ from .const import (
     KEY_ALERT_STATE,
     # v0.7.0
     KEY_AQI,
-    KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
-    KEY_CAL_SUGGESTION_PRESSURE,
-    KEY_CAL_SUGGESTION_TEMP,
-    KEY_CDD_RATE,
-    KEY_CDD_TODAY,
     KEY_CLIMATOLOGY_30D,
     KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
-    KEY_CWOP_STATUS,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
     KEY_DRY_STREAK,
@@ -217,34 +169,16 @@ from .const import (
     KEY_FORECAST_TILES,
     KEY_FROST_POINT_C,
     KEY_FROST_STREAK,
-    KEY_GDD_SEASON,
-    KEY_GDD_TODAY,
-    KEY_HDD_RATE,
-    KEY_HDD_TODAY,
     KEY_HEALTH_DISPLAY,
     KEY_HEAT_STREAK,
     KEY_HUMIDITY_LEVEL_DISPLAY,
-    KEY_LAST_EXPORT_TIME,
-    KEY_LAUNDRY_SCORE,
-    KEY_LEARNED_PRESSURE_BIAS,
-    KEY_LEARNED_TEMP_BIAS,
     KEY_LUX,
-    KEY_METAR_AGE_MIN,
-    KEY_METAR_DELTA_PRESSURE,
-    KEY_METAR_DELTA_TEMP,
-    KEY_METAR_PRESSURE_HPA,
-    KEY_METAR_STATION,
-    KEY_METAR_TEMP_C,
-    KEY_METAR_VALIDATION,
-    KEY_METAR_WIND_DIR,
-    KEY_METAR_WIND_MS,
     KEY_MOON_AGE_DAYS,
     KEY_MOON_DISPLAY,
     KEY_MOON_ILLUMINATION_PCT,
     KEY_MOON_NEXT_FULL,
     KEY_MOON_NEXT_NEW,
     # v0.8.0
-    KEY_MOON_PHASE,
     KEY_NO2,
     KEY_NORM_HUMIDITY,
     KEY_NORM_PRESSURE_HPA,
@@ -262,7 +196,6 @@ from .const import (
     KEY_POLLEN_OVERALL,
     KEY_POLLEN_TREE,
     KEY_POLLEN_WEED,
-    KEY_PRECIP_TYPE,
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
@@ -273,8 +206,6 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
-    KEY_RAIN_RATE_RAW,
-    KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -284,14 +215,12 @@ from .const import (
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
-    KEY_STARGAZE_SCORE,
     KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
     KEY_THUNDERSTORM_RISK,
-    KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
     KEY_WET_BULB_C,
@@ -429,13 +358,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sea_temp_lon = _get(CONF_SEA_TEMP_LON, None)
         self._sea_temp_cache: dict[str, Any] | None = None
 
-        # Degree days (v0.5.0)
-        self.degree_days_enabled = bool(_get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS))
-        self.degree_day_base_c = float(_get(CONF_DEGREE_DAY_BASE_C, DEFAULT_DEGREE_DAY_BASE_C))
-        self._hdd_today: float = 0.0
-        self._cdd_today: float = 0.0
-        self._degree_day_date: str = ""
-        self._degree_day_last_ts: Any = None  # datetime of last accumulation tick
+        # v0.3.0: degree days removed entirely (HDD/CDD/GDD)
+        # v0.3.0: Fire risk score (kept; opt-in via wizard)
+        self.fire_risk_enabled = bool(_get(CONF_ENABLE_FIRE_RISK, DEFAULT_ENABLE_FIRE_RISK))
 
         # Rain today — resets at local midnight
         self._rain_today_mm: float = 0.0
@@ -454,25 +379,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.runtime.pressure_history = type(self.runtime.pressure_history)(maxlen=self._pressure_history_samples)
 
-        self.rain_penalty_light_mmph = float(_get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH))
-        self.rain_penalty_heavy_mmph = float(_get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH))
+        # v0.3.0: removed METAR cross-validation, CWOP upload, CSV/JSON export
 
-        # METAR cross-validation (v0.5.0)
-        self.metar_enabled = bool(_get(CONF_ENABLE_METAR, DEFAULT_ENABLE_METAR))
-        self.metar_icao: str = str(_get(CONF_METAR_ICAO, "") or "")
-        self.metar_interval_min = int(_get(CONF_METAR_INTERVAL_MIN, DEFAULT_METAR_INTERVAL_MIN))
-        self._metar_cache: dict[str, Any] | None = None
-        self._metar_last_fetch: Any = None
-
-        # v0.6.0 CWOP upload
-        self.cwop_enabled = bool(_get(CONF_ENABLE_CWOP, DEFAULT_ENABLE_CWOP))
-        self.cwop_callsign: str = str(_get(CONF_CWOP_CALLSIGN, "") or "")
-        self.cwop_passcode: str = str(_get(CONF_CWOP_PASSCODE, "-1") or "-1")
-        self.cwop_interval_min = int(_get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN))
-        self._cwop_last_upload: Any = None
-        self._cwop_status: str = "Disabled"
-
-        # v0.6.0 Weather Underground upload
+        # Weather Underground upload (kept disabled-by-default for v0.6 roadmap)
         self.wu_enabled = bool(_get(CONF_ENABLE_WUNDERGROUND, DEFAULT_ENABLE_WUNDERGROUND))
         self.wu_station_id: str = str(_get(CONF_WU_STATION_ID, "") or "")
         self.wu_api_key: str = str(_get(CONF_WU_API_KEY, "") or "")
@@ -480,28 +389,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._wu_last_upload: Any = None
         self._wu_status: str = "Disabled"
 
-        # v0.6.0 CSV/JSON export
-        self.export_enabled = bool(_get(CONF_ENABLE_EXPORT, DEFAULT_ENABLE_EXPORT))
-        self.export_path: str = str(_get(CONF_EXPORT_PATH, "/config/ws_core_export") or "/config/ws_core_export")
-        self.export_format: str = str(_get(CONF_EXPORT_FORMAT, DEFAULT_EXPORT_FORMAT))
-        self.export_interval_min = int(_get(CONF_EXPORT_INTERVAL_MIN, DEFAULT_EXPORT_INTERVAL_MIN))
-        self._export_last_time: Any = None
-
-        # v0.7.0 Air Quality (Open-Meteo AQI, free)
+        # Air Quality + Pollen (Open-Meteo Air Quality API, single fetch)
         self.aqi_enabled = bool(_get(CONF_ENABLE_AIR_QUALITY, DEFAULT_ENABLE_AIR_QUALITY))
         self.aqi_interval_min = int(_get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
         self._aqi_cache: dict[str, Any] | None = None
 
-        # v0.7.0 Pollen (Tomorrow.io)
+        # Pollen (v0.3.0: now via Open-Meteo Air Quality API; piggybacks on AQI fetch)
         self.pollen_enabled = bool(_get(CONF_ENABLE_POLLEN, DEFAULT_ENABLE_POLLEN))
-        self.tomorrow_io_key: str = str(_get(CONF_TOMORROW_IO_KEY, "") or "")
-        self.pollen_interval_min = int(_get(CONF_POLLEN_INTERVAL_MIN, DEFAULT_POLLEN_INTERVAL_MIN))
         self._pollen_cache: dict[str, Any] | None = None
 
-        # v0.8.0 Moon (calculated, no external API)
+        # Moon (calculated, no external API)
         self.moon_enabled = bool(_get(CONF_ENABLE_MOON, DEFAULT_ENABLE_MOON))
 
-        # v0.9.0 Solar forecast (forecast.solar, free)
+        # Solar forecast (forecast.solar, free)
         self.solar_forecast_enabled = bool(_get(CONF_ENABLE_SOLAR_FORECAST, DEFAULT_ENABLE_SOLAR_FORECAST))
         self.solar_peak_kw = float(_get(CONF_SOLAR_PEAK_KW, DEFAULT_SOLAR_PEAK_KW))
         self.solar_panel_azimuth = int(_get(CONF_SOLAR_PANEL_AZIMUTH, DEFAULT_SOLAR_PANEL_AZIMUTH))
@@ -509,17 +409,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.solar_interval_min = int(_get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN))
         self._solar_cache: dict[str, Any] | None = None
 
-        # v1.2.0 New feature toggles
+        # Risk feature toggles (all default-off, opt-in via wizard)
         self.fog_enabled = bool(_get(CONF_ENABLE_FOG, DEFAULT_ENABLE_FOG))
         self.thunderstorm_enabled = bool(_get(CONF_ENABLE_THUNDERSTORM, DEFAULT_ENABLE_THUNDERSTORM))
 
-        # v1.2.0 GDD / streak configuration
-        self.gdd_cap_c = float(_get(CONF_GDD_CAP_C, DEFAULT_GDD_CAP_C))
-        self.gdd_reset_month = int(_get(CONF_GDD_RESET_MONTH, DEFAULT_GDD_RESET_MONTH))
-        self.gdd_reset_day = int(_get(CONF_GDD_RESET_DAY, DEFAULT_GDD_RESET_DAY))
+        # Streak threshold (kept; was previously bundled with degree days)
         self.thresh_heat_day_c = float(_get(CONF_THRESH_HEAT_DAY_C, DEFAULT_THRESH_HEAT_DAY_C))
 
-        # v1.2.0 Persistent learning state (loaded async in async_start)
+        # Persistent learning state (loaded async in async_start)
         from .learning_state import LearningState as _LS
 
         self._learning_state: Any = _LS()
@@ -573,37 +470,23 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         from .learning_state import async_load_learning
 
         entry_id = self.entry_data.get("entry_id") or id(self)
-        self._learning_store = Store(self.hass, 1, f"ws_core_{entry_id}_learning")
+        # v0.3.0: bumped Store version to 2 to match LearningState schema_version.
+        # Old v1 state files contain METAR bias/GDD fields; from_dict will discard them.
+        self._learning_store = Store(self.hass, 2, f"ws_core_{entry_id}_learning")
         self._learning_state = await async_load_learning(self._learning_store)
-        _LOGGER.debug("ws_core learning state loaded (temp_bias_n=%s)", self._learning_state.temp_bias_n)
+        _LOGGER.debug("ws_core learning state loaded (solar_factor_n=%s, dry_streak=%s)",
+                      self._learning_state.solar_factor_n, self._learning_state.dry_streak_days)
 
         entity_ids = [eid for eid in self.sources.values() if eid]
         if entity_ids:
             self._unsubs.append(async_track_state_change_event(self.hass, entity_ids, self._handle_source_change))
         self._unsubs.append(async_track_time_interval(self.hass, self._handle_tick, timedelta(seconds=60)))
 
-        # METAR periodic fetch (v0.5.0)
-        if self.metar_enabled and self.metar_icao:
-            self._unsubs.append(
-                async_track_time_interval(
-                    self.hass,
-                    lambda _now: self.hass.async_create_task(self._async_fetch_metar()),
-                    timedelta(minutes=self.metar_interval_min),
-                )
-            )
-            self.hass.async_create_task(self._async_fetch_metar())
+        # v0.3.0: removed METAR fetch, CWOP upload, CSV/JSON export schedulers.
+        # v0.3.0: pollen no longer has its own scheduler - it piggybacks on
+        # the Open-Meteo Air Quality fetch (same API, same call).
 
-        # CWOP periodic upload (v0.6.0)
-        if self.cwop_enabled and self.cwop_callsign:
-            self._unsubs.append(
-                async_track_time_interval(
-                    self.hass,
-                    lambda _now: self.hass.async_create_task(self._async_upload_cwop()),
-                    timedelta(minutes=self.cwop_interval_min),
-                )
-            )
-
-        # Weather Underground periodic upload (v0.6.0)
+        # Weather Underground periodic upload (kept disabled-by-default for v0.6 roadmap)
         if self.wu_enabled and self.wu_station_id and self.wu_api_key:
             self._unsubs.append(
                 async_track_time_interval(
@@ -613,18 +496,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
             )
 
-        # CSV/JSON export (v0.6.0)
-        if self.export_enabled:
-            self._unsubs.append(
-                async_track_time_interval(
-                    self.hass,
-                    lambda _now: self.hass.async_create_task(self._async_export_data()),
-                    timedelta(minutes=self.export_interval_min),
-                )
-            )
-
-        # Air quality periodic fetch (v0.7.0)
-        if self.aqi_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
+        # Air quality + pollen periodic fetch (Open-Meteo Air Quality API, single call)
+        if (self.aqi_enabled or self.pollen_enabled) and self.forecast_lat is not None and self.forecast_lon is not None:
             self._unsubs.append(
                 async_track_time_interval(
                     self.hass,
@@ -634,18 +507,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self.hass.async_create_task(self._async_fetch_aqi())
 
-        # Pollen periodic fetch (v0.7.0)
-        if self.pollen_enabled and self.tomorrow_io_key and self.forecast_lat is not None:
-            self._unsubs.append(
-                async_track_time_interval(
-                    self.hass,
-                    lambda _now: self.hass.async_create_task(self._async_fetch_pollen()),
-                    timedelta(minutes=self.pollen_interval_min),
-                )
-            )
-            self.hass.async_create_task(self._async_fetch_pollen())
-
-        # Solar forecast periodic fetch (v0.9.0)
+        # Solar forecast periodic fetch
         if self.solar_forecast_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
             self._unsubs.append(
                 async_track_time_interval(
@@ -942,8 +804,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 data["_temp_color"] = "#EF4444"  # hot – red
         if rh is not None:
             data[KEY_HUMIDITY_LEVEL_DISPLAY] = humidity_level(float(rh))
-        if uv := data.get(KEY_UV):
-            data[KEY_UV_LEVEL_DISPLAY] = uv_level(float(uv))
+        # v0.3.0 fix: previously `if uv := data.get(KEY_UV):` was a truthy check,
+        # so when UV was 0.0 (nighttime) the level was never set and the entity
+        # showed "unknown". Now we explicitly check for None.
+        uv_val = data.get(KEY_UV)
+        if uv_val is not None:
+            data[KEY_UV_LEVEL_DISPLAY] = uv_level(float(uv_val))
 
         return dew_c
 
@@ -1006,6 +872,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 month=dt_util.now().month,
                 hemisphere=self.hemisphere,
                 climate=self.climate_region,
+                # v0.3.0: pass wind_speed_ms so the function can suppress
+                # wind direction influence at very low wind speeds, and
+                # pass rain_24h_mm so it can apply the dry-fair sanity guard.
+                wind_speed_ms=data.get(KEY_NORM_WIND_SPEED_MS),
+                rain_24h_mm=data.get(KEY_RAIN_ACCUM_24H),
             )
             data[KEY_ZAMBRETTI_FORECAST] = forecast_text
             data[KEY_ZAMBRETTI_NUMBER] = z_number
@@ -1184,107 +1055,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             combined = combine_rain_probability(local_prob, api_prob, dt_util.now().hour)
             data[KEY_RAIN_PROBABILITY_COMBINED] = combined
-
-    def _compute_activity_scores(
-        self, data: dict, tc: float | None, rh: float | None, wind_ms: float | None, rain_rate: float, uv: float | None
-    ) -> None:
-        """Laundry, stargazing, fire risk, running activity scores."""
-        feels_like = data.get(KEY_FEELS_LIKE_C)
-
-        # Laundry drying
-        if tc is not None and rh is not None and wind_ms is not None:
-            rain_prob = data.get(KEY_RAIN_PROBABILITY_COMBINED)
-            l_score = laundry_drying_score(
-                temp_c=float(tc),
-                humidity=float(rh),
-                wind_speed_ms=float(wind_ms),
-                uv_index=float(uv or 0),
-                rain_rate_mmph=float(rain_rate),
-                rain_probability=float(rain_prob) if rain_prob is not None else None,
-                rain_penalty_light_mmph=self.rain_penalty_light_mmph,
-                rain_penalty_heavy_mmph=self.rain_penalty_heavy_mmph,
-            )
-            data[KEY_LAUNDRY_SCORE] = l_score
-            data["_laundry_recommendation"] = laundry_recommendation(
-                l_score,
-                float(rain_rate),
-                float(rain_prob) if rain_prob is not None else None,
-                rain_penalty_light_mmph=self.rain_penalty_light_mmph,
-            )
-            data["_laundry_dry_time"] = laundry_dry_time(
-                l_score, float(rain_rate), rain_penalty_light_mmph=self.rain_penalty_light_mmph
-            )
-
-        # Stargazing
-        if rh is not None:
-            moon_phase = self._get_moon_phase()
-            sg_quality = stargazing_quality(
-                cloud_cover_pct=None,
-                humidity=float(rh),
-                rain_rate_mmph=float(rain_rate),
-                moon_phase=moon_phase,
-            )
-            data[KEY_STARGAZE_SCORE] = sg_quality
-            data["_moon_phase"] = moon_phase
-            data["_moon_stargazing_impact"] = moon_stargazing_impact(moon_phase)
-
-        # Fire Risk Score (renamed from Fire Weather Index)
-        if tc is not None and rh is not None and wind_ms is not None:
-            rain_24h = data.get(KEY_RAIN_ACCUM_24H, 0.0)
-            frs = fire_risk_score(float(tc), float(rh), float(wind_ms), rain_24h)
-            data[KEY_FIRE_RISK_SCORE] = frs
-            data["_fire_danger_level"] = fire_danger_level(frs)
-            data["_fire_rain_24h_mm"] = round(rain_24h, 1)
-
-        # Running conditions
-        if feels_like is not None and uv is not None:
-            r_score = running_score(float(feels_like), float(uv))
-            data[KEY_RUNNING_SCORE] = r_score
-            data["_running_level"] = running_level(r_score)
-            data["_running_recommendation"] = running_recommendation(float(feels_like), float(uv))
-
-        # UV exposure details
-        if uv is not None:
-            data["_uv_recommendation"] = uv_recommendation(float(uv))
-            data["_uv_burn_fair_skin"] = f"{uv_burn_time_minutes(float(uv), 2)} minutes"
-
-    def _compute_degree_days(self, data: dict, now: Any) -> None:
-        """Accumulate heating/cooling degree days for today.  (v0.5.0)
-
-        HDD/CDD accumulate as degree-hours, reset at local midnight.
-        The hourly rate sensors (hdd_rate, cdd_rate) always reflect the
-        instantaneous contribution — useful for Riemann-sum utility meters.
-        """
-        if not self.degree_days_enabled:
-            return
-        temp_c: float | None = data.get(KEY_NORM_TEMP_C)
-        if temp_c is None:
-            return
-
-        base = self.degree_day_base_c
-        date_str = now.strftime("%Y-%m-%d")
-
-        # Reset at midnight
-        if date_str != self._degree_day_date:
-            self._hdd_today = 0.0
-            self._cdd_today = 0.0
-            self._degree_day_date = date_str
-            self._degree_day_last_ts = now
-
-        # Accumulate degree-hours since last tick
-        if self._degree_day_last_ts is not None:
-            elapsed_h = (now - self._degree_day_last_ts).total_seconds() / 3600.0
-            elapsed_h = min(elapsed_h, 1.5)  # cap at 1.5h to guard against cold-start spikes
-            self._hdd_today += heating_degree_hours(temp_c, base) * elapsed_h
-            self._cdd_today += cooling_degree_hours(temp_c, base) * elapsed_h
-        self._degree_day_last_ts = now
-
-        # Publish: convert degree-hours → degree-days (divide by 24)
-        data[KEY_HDD_TODAY] = round(self._hdd_today / 24.0, 3)
-        data[KEY_CDD_TODAY] = round(self._cdd_today / 24.0, 3)
-        # Instantaneous rates in °C·h⁻¹ (for Riemann sum integrations)
-        data[KEY_HDD_RATE] = round(heating_degree_hours(temp_c, base), 2)
-        data[KEY_CDD_RATE] = round(cooling_degree_hours(temp_c, base), 2)
 
     def _compute_et0(self, data: dict, now: Any) -> None:
         """Calculate ET₀ (reference evapotranspiration) via Hargreaves-Samani.  (v0.6.0)
@@ -1487,7 +1257,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # v1.2.0 — Fog, precipitation type, thunderstorm index
     # ------------------------------------------------------------------
 
-    def _compute_fog_precip_type(
+    def _compute_fog_and_thunderstorm(
         self,
         data: dict,
         now: Any,
@@ -1496,14 +1266,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         wind_ms: float | None,
         rain_rate: float,
     ) -> None:
-        """Fog probability, precipitation type, and thunderstorm risk."""
+        """Fog probability and thunderstorm risk.
+
+        v0.3.0: precipitation_type removed (was redundant with rain_rate +
+        temperature; trivially derivable in dashboard if needed).
+        """
         sun_state = self.hass.states.get("sun.sun")
         is_day = True
         if sun_state:
             is_day = sun_state.state == "above_horizon"
         is_night = not is_day
 
-        # ── Fog probability (B1) ───────────────────────────────────────────
+        # ── Fog probability ────────────────────────────────────────────────
         if self.fog_enabled and tc is not None and dew_c is not None:
             prob, label = fog_probability(
                 float(tc),
@@ -1516,12 +1290,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_fog_risk_level"] = label
             data["_fog_dew_point_depression"] = round(float(tc) - float(dew_c), 1)
 
-        # ── Precipitation type (B3) ─────────────────────────────────────────
-        if tc is not None and dew_c is not None:
-            ptype = precipitation_type(float(tc), float(dew_c), float(rain_rate))
-            data[KEY_PRECIP_TYPE] = ptype
-
-        # ── Thunderstorm risk (B2) ──────────────────────────────────────────
+        # ── Thunderstorm risk ──────────────────────────────────────────────
         if self.thunderstorm_enabled and tc is not None and dew_c is not None:
             lux_now = data.get(KEY_LUX)
             wind_now = data.get(KEY_NORM_WIND_SPEED_MS)
@@ -1556,27 +1325,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # v1.2.0 — GDD accumulation, streak counters
     # ------------------------------------------------------------------
 
-    def _compute_gdd_and_streaks(self, data: dict, now: Any) -> None:
-        """Growing degree days (today + season) and streak counters."""
+    def _compute_streaks(self, data: dict, now: Any) -> None:
+        """Update dry/heat/frost streak counters (RestoreEntity-backed in v0.3.0).
+
+        Cut from the previous _compute_gdd_and_streaks: GDD/HDD/CDD computation
+        was removed in v0.3.0 because the baselines were never properly seeded
+        (they reset to install date rather than Jan 1 / season start).
+        """
         from homeassistant.util import dt as _dt
 
-        from .learning_state import gdd_daily, update_daily_streaks
+        from .learning_state import update_daily_streaks
 
         local_now = _dt.now()
         date_str = local_now.strftime("%Y-%m-%d")
 
         t_high = data.get(KEY_TEMP_HIGH_24H)
         t_low = data.get(KEY_TEMP_LOW_24H)
-        tc = data.get(KEY_NORM_TEMP_C)
-        base = self.degree_day_base_c
-        cap = self.gdd_cap_c
-
-        # GDD today (uses current 24h high/low; proxy for daily value mid-run)
-        if t_high is not None and t_low is not None:
-            gdd_t = gdd_daily(float(t_high), float(t_low), base, cap)
-            data[KEY_GDD_TODAY] = gdd_t
-        elif tc is not None:
-            data[KEY_GDD_TODAY] = 0.0  # not enough 24h data yet
 
         # Daily update (once per calendar day)
         if date_str != self._learning_last_daily_update and t_high is not None and t_low is not None:
@@ -1590,23 +1354,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 rain_today_mm=rain_today,
                 thresh_heat_c=self.thresh_heat_day_c,
                 thresh_freeze_c=thresh_freeze,
-                gdd_base_c=base,
-                gdd_cap_c=cap,
-                gdd_reset_month=self.gdd_reset_month,
-                gdd_reset_day=self.gdd_reset_day,
             )
             self._learning_last_daily_update = date_str
-            # Also update climatology
+            # Also update climatology (still tracks 30-day rolling for anomalies)
             from .learning_state import update_climatology
 
-            rain_today = float(data.get("_rain_today_mm", 0.0))
             update_climatology(self._learning_state, date_str, float(t_high), float(t_low), rain_today)
-
-        # Publish season total
-        data[KEY_GDD_SEASON] = round(self._learning_state.gdd_season_total, 2)
-        data["_gdd_season_reset_date"] = self._learning_state.gdd_season_reset_applied
-        data["_gdd_base_c"] = base
-        data["_gdd_cap_c"] = cap
 
         # Publish streak counters
         data[KEY_DRY_STREAK] = self._learning_state.dry_streak_days
@@ -1776,11 +1529,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     def _compute_learning_sensors(self, data: dict) -> None:
-        """Publish learning state values into coordinator data (METAR-gated)."""
-        # Forecast skill sensor (always published when data exists)
+        """Publish learning state values into coordinator data.
+
+        v0.3.0: METAR-gated cal_suggestion / learned_bias sensors removed
+        with the rest of the METAR family. Only forecast skill and solar lux
+        factor remain in the learning loop.
+        """
         from .learning_state import brier_score as _bs
         from .learning_state import compute_blend_weights as _bw
-        from .learning_state import confidence_label, suggested_correction
 
         outcomes = self._learning_state.forecast_outcomes
         if len(outcomes) >= 10:
@@ -1799,32 +1555,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Solar lux factor (always published)
         data[KEY_SOLAR_LUX_FACTOR] = self._learning_state.solar_lux_factor
         data["_solar_lux_factor_n_days"] = self._learning_state.solar_factor_n
-
-        # METAR-gated sensors — only when metar_enabled
-        if not self.metar_enabled:
-            return
-
-        ls = self._learning_state
-        conf_t = confidence_label(ls.temp_bias_n)
-        conf_p = confidence_label(ls.pressure_bias_n)
-
-        if ls.temp_bias_ema is not None:
-            data[KEY_LEARNED_TEMP_BIAS] = round(ls.temp_bias_ema, 2)
-            data["_learned_temp_bias_confidence"] = conf_t
-            data["_learned_temp_bias_n"] = ls.temp_bias_n
-            suggestion_t = suggested_correction(ls.temp_bias_ema, ls.temp_bias_n)
-            if suggestion_t is not None:
-                data[KEY_CAL_SUGGESTION_TEMP] = suggestion_t
-                data["_cal_suggestion_temp_confidence"] = conf_t
-
-        if ls.pressure_bias_ema is not None:
-            data[KEY_LEARNED_PRESSURE_BIAS] = round(ls.pressure_bias_ema, 2)
-            data["_learned_pressure_bias_confidence"] = conf_p
-            data["_learned_pressure_bias_n"] = ls.pressure_bias_n
-            suggestion_p = suggested_correction(ls.pressure_bias_ema, ls.pressure_bias_n)
-            if suggestion_p is not None:
-                data[KEY_CAL_SUGGESTION_PRESSURE] = suggestion_p
-                data["_cal_suggestion_pressure_confidence"] = conf_p
 
     # ------------------------------------------------------------------
     # v1.2.0 — Learning state persistence (called from _compute)
@@ -1905,15 +1635,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_SENSOR_QUALITY_FLAGS] = flags
 
         self._compute_condition(data, tc, rh, wind_ms, gust_ms, rain_rate, dew_c, lux, uv)
-        self._compute_activity_scores(data, tc, rh, wind_ms, rain_rate, uv)
-        self._compute_degree_days(data, now)
+        # v0.3.0: removed _compute_activity_scores (laundry, running, stargazing)
+        # v0.3.0: removed _compute_degree_days (HDD/CDD)
+        # Fire risk is the only score that survived; computed inline below.
+        if self.fire_risk_enabled and tc is not None and rh is not None:
+            rain_24h = float(data.get(KEY_RAIN_ACCUM_24H, 0.0) or 0.0)
+            f_score = fire_risk_score(float(tc), float(rh), float(wind_ms or 0), rain_24h)
+            data[KEY_FIRE_RISK_SCORE] = f_score
+            data["_fire_danger_level"] = fire_danger_level(f_score)
+
         self._compute_et0(data, now)
         self._compute_health(data, now, missing, missing_entities)
 
-        # v1.2.0 new compute methods
-        self._compute_fog_precip_type(data, now, tc, dew_c, wind_ms, rain_rate)
-        if self.degree_days_enabled:
-            self._compute_gdd_and_streaks(data, now)
+        # v0.3.0: renamed _compute_fog_precip_type -> _compute_fog_and_thunderstorm
+        # (precipitation_type was redundant with rain_rate + temperature)
+        self._compute_fog_and_thunderstorm(data, now, tc, dew_c, wind_ms, rain_rate)
+        # v0.3.0: streaks now run unconditionally (used to be gated behind
+        # the now-removed `degree_days_enabled` flag, which was wrong - streaks
+        # are independent of GDD).
+        self._compute_streaks(data, now)
         self._compute_climatology(data)
         self._compute_drift_detection(data, now)
         self._compute_consistency_checks(data, now)
@@ -1975,71 +1715,23 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_sea_temp_grid_lon"] = self._sea_temp_cache.get("grid_lon")
             data["_sea_temp_disclaimer"] = self._sea_temp_cache.get("disclaimer")
 
-        # METAR cross-validation (v0.5.0)
-        if self.metar_enabled and self._metar_cache:
-            m = self._metar_cache
-            data[KEY_METAR_TEMP_C] = m.get("temp_c")
-            data[KEY_METAR_PRESSURE_HPA] = m.get("pressure_hpa")
-            data[KEY_METAR_WIND_MS] = m.get("wind_ms")
-            data[KEY_METAR_WIND_DIR] = m.get("wind_dir_deg")
-            data[KEY_METAR_STATION] = m.get("station_id")
-            data[KEY_METAR_AGE_MIN] = m.get("age_min")
-            # Compute deltas against local readings
-            local_temp = data.get(KEY_NORM_TEMP_C)
-            local_press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-            metar_temp = m.get("temp_c")
-            metar_press = m.get("pressure_hpa")
-            delta_t = (
-                round(float(local_temp) - float(metar_temp), 1)
-                if (local_temp is not None and metar_temp is not None)
-                else None
-            )
-            delta_p = (
-                round(float(local_press) - float(metar_press), 1)
-                if (local_press is not None and metar_press is not None)
-                else None
-            )
-            data[KEY_METAR_DELTA_TEMP] = delta_t
-            data[KEY_METAR_DELTA_PRESSURE] = delta_p
-            data[KEY_METAR_VALIDATION] = metar_validation_label(delta_t, delta_p, m.get("age_min"))
+        # v0.3.0 cleanup: removed METAR cross-validation, CWOP/export status blocks.
+        # Weather Underground status retained but disabled-by-default for v0.6 roadmap.
+        if self.wu_enabled:
+            data[KEY_WU_STATUS] = self._wu_status
 
-            # v1.2.0 — Update adaptive calibration EMA (A1/A2)
-            # Only update when conditions are calm (no strong wind or rain siting effects)
-            local_wind = data.get(KEY_NORM_WIND_SPEED_MS)
-            local_rain_rate = data.get(KEY_RAIN_RATE_FILT, 0.0)
-            calm_conditions = (
-                (local_wind is None or float(local_wind) <= 3.0)
-                and float(local_rain_rate or 0) <= 0.1
-                and (m.get("age_min") or 999) < 90
-            )
-            if calm_conditions:
-                from .learning_state import update_ema
-
-                if delta_t is not None:
-                    self._learning_state.temp_bias_ema = update_ema(self._learning_state.temp_bias_ema, float(delta_t))
-                    self._learning_state.temp_bias_n += 1
-                if delta_p is not None:
-                    self._learning_state.pressure_bias_ema = update_ema(
-                        self._learning_state.pressure_bias_ema, float(delta_p)
-                    )
-                    self._learning_state.pressure_bias_n += 1
-
-        # Upload/export status (v0.6.0)
-        data[KEY_CWOP_STATUS] = self._cwop_status
-        data[KEY_WU_STATUS] = self._wu_status
-        data[KEY_LAST_EXPORT_TIME] = self._export_last_time.isoformat() if self._export_last_time else None
-
-        # Air Quality (v0.7.0)
+        # Air Quality (Open-Meteo Air Quality API)
         if self.aqi_enabled and self._aqi_cache:
             aq = self._aqi_cache
             data[KEY_AQI] = aq.get("aqi")
-            data[KEY_AQI_LEVEL] = aq.get("aqi_level")
+            # v0.3.0: KEY_AQI_LEVEL removed as separate sensor; level lives
+            # as an attribute on the AQI sensor, computed inline in sensor.py.
             data[KEY_PM2_5] = aq.get("pm2_5")
             data[KEY_PM10] = aq.get("pm10")
             data[KEY_NO2] = aq.get("no2")
             data[KEY_OZONE] = aq.get("ozone")
 
-        # Pollen (v0.7.0)
+        # Pollen (now from Open-Meteo Air Quality API; same fetch as AQI)
         if self.pollen_enabled and self._pollen_cache:
             pol = self._pollen_cache
             data[KEY_POLLEN_GRASS] = pol.get("grass_index")
@@ -2047,33 +1739,37 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_POLLEN_WEED] = pol.get("weed_index")
             data[KEY_POLLEN_OVERALL] = pol.get("overall_level")
 
-        # Moon (v0.8.0) — pure calculation, no external API
+        # Moon (pure calculation, no external API)
         if self.moon_enabled:
             local_now = dt_util.now()
             age = moon_phase_days(local_now.year, local_now.month, local_now.day)
             phase_key = moon_phase_from_age(age)
             illum_frac = calculate_moon_illumination(local_now.year, local_now.month, local_now.day)
             illum_pct = round(illum_frac * 100)
-            data[KEY_MOON_PHASE] = phase_key
+            # v0.3.0: phase_key now stored in private "_moon_phase" field
+            # (sensor.py reads it as an attribute on the moon display sensor).
+            # The standalone KEY_MOON_PHASE sensor was cut as redundant.
+            data["_moon_phase"] = phase_key
             data[KEY_MOON_ILLUMINATION_PCT] = illum_pct
             data[KEY_MOON_DISPLAY] = moon_display_string(phase_key, illum_pct)
             data[KEY_MOON_AGE_DAYS] = age
             data[KEY_MOON_NEXT_FULL] = moon_next_phase_days(local_now.year, local_now.month, local_now.day, 14.77)
             data[KEY_MOON_NEXT_NEW] = moon_next_phase_days(local_now.year, local_now.month, local_now.day, 0.0)
 
-        # Solar forecast (v0.9.0)
+        # Solar forecast
         if self.solar_forecast_enabled and self._solar_cache:
             sol = self._solar_cache
             data[KEY_SOLAR_FORECAST_TODAY_KWH] = sol.get("today_kwh")
             data[KEY_SOLAR_FORECAST_TOMORROW_KWH] = sol.get("tomorrow_kwh")
             data[KEY_SOLAR_FORECAST_STATUS] = sol.get("status", "OK")
 
-        # Penman-Monteith ET₀ (v0.9.0) — uses solar radiation sensor if configured
-        if self.degree_days_enabled and self.forecast_lat is not None:
+        # Penman-Monteith ET₀ — uses solar radiation sensor if configured
+        # v0.3.0: ungated from removed degree_days_enabled flag; runs whenever
+        # forecast_lat is configured and the required inputs are available.
+        if self.forecast_lat is not None:
             tc = data.get(KEY_NORM_TEMP_C)
             rh = data.get(KEY_NORM_HUMIDITY)
             ws = data.get(KEY_NORM_WIND_SPEED_MS)
-            # Try to read solar radiation source if wired
             sol_rad = self._get_solar_radiation()
             if tc is not None and rh is not None and ws is not None and sol_rad is not None:
                 high = data.get(KEY_TEMP_HIGH_24H) or tc
@@ -2097,16 +1793,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
     # Moon / forecast helpers
     # ------------------------------------------------------------------
-
-    def _get_moon_phase(self) -> str:
-        for entity_id in ("sensor.moon_phase", "sensor.moon"):
-            st = self.hass.states.get(entity_id)
-            if st and st.state not in ("unknown", "unavailable", "none", ""):
-                phase = st.state.replace(" ", "_").lower()
-                if phase in MOON_ILLUMINATION:
-                    return phase
-        now = dt_util.now()
-        return calculate_moon_phase(now.year, now.month, now.day)
 
     def _build_forecast_tiles(self, daily: list) -> list:
         labels = ["Today", "Tomorrow", "Day 3", "Day 4", "Day 5"]
@@ -2369,114 +2055,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # METAR cross-validation  (v0.5.0)
     # ------------------------------------------------------------------
 
-    async def _async_fetch_metar(self) -> None:
-        """Fetch METAR from aviationweather.gov and update cache."""
-        if not self.metar_icao:
-            return
-        icao = self.metar_icao.upper().strip()
-        url = f"https://aviationweather.gov/api/data/metar?ids={icao}&format=json&taf=false"
-        try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-            async with session.get(url, timeout=15) as resp:
-                if resp.status != 200:
-                    _LOGGER.warning("METAR fetch failed HTTP %d for %s", resp.status, icao)
-                    return
-                reports = await resp.json()
-                if not reports:
-                    _LOGGER.debug("No METAR reports found for %s", icao)
-                    return
-                self._metar_cache = parse_metar_json(reports[0])
-                self._metar_last_fetch = dt_util.utcnow()
-                _LOGGER.debug("METAR %s fetched: %s", icao, self._metar_cache.get("raw_text", ""))
-                self.async_set_updated_data(self._compute())
-        except Exception as exc:
-            _LOGGER.warning("METAR fetch error for %s: %s", icao, exc)
-
     # ------------------------------------------------------------------
     # CWOP APRS-IS upload  (v0.6.0)
     # ------------------------------------------------------------------
-
-    async def _async_upload_cwop(self) -> None:
-        """Upload observation to CWOP via APRS-IS TCP."""
-
-        data = self.data
-        if not data:
-            return
-        callsign = self.cwop_callsign.upper().strip()
-        if not callsign:
-            return
-
-        lat = self.forecast_lat
-        lon = self.forecast_lon
-        if lat is None or lon is None:
-            _LOGGER.warning("CWOP upload: lat/lon not configured")
-            return
-
-        # Format APRS packet
-        def _aprs_lat(deg: float) -> str:
-            d = abs(deg)
-            dd = int(d)
-            mm = (d - dd) * 60
-            hem = "N" if deg >= 0 else "S"
-            return f"{dd:02d}{mm:05.2f}{hem}"
-
-        def _aprs_lon(deg: float) -> str:
-            d = abs(deg)
-            dd = int(d)
-            mm = (d - dd) * 60
-            hem = "E" if deg >= 0 else "W"
-            return f"{dd:03d}{mm:05.2f}{hem}"
-
-        now_utc = dt_util.utcnow()
-        time_str = now_utc.strftime("%d%H%Mz")
-
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        temp_f = round(float(temp_c) * 9 / 5 + 32) if temp_c is not None else 0
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-        wind_kt = round(float(wind_ms) * 1.94384)
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-        gust_kt = round(float(gust_ms) * 1.94384)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        h_str = f"h{round(float(humidity)):02d}" if humidity is not None else ""
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
-        rain_1h_hun = round(float(rain_1h) * 3.93701)  # mm → 1/100 inch
-        rain_24h_hun = round(float(rain_24h) * 3.93701)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        b_str = f"b{round(float(press) * 10):05d}" if press is not None else ""
-
-        aprs_lat = _aprs_lat(float(lat))
-        aprs_lon = _aprs_lon(float(lon))
-        packet = (
-            f"{callsign}>APRS,TCPIP*:@{time_str}{aprs_lat}/{aprs_lon}_"
-            f"{int(wind_dir):03d}/{wind_kt:03d}g{gust_kt:03d}"
-            f"t{temp_f:03d}r{rain_1h_hun:03d}p{rain_24h_hun:03d}"
-            f"{h_str}{b_str}ws_core"
-        )
-
-        try:
-            reader, writer = await asyncio.wait_for(asyncio.open_connection("cwop.aprs.net", 14580), timeout=15)
-            # Read banner
-            await asyncio.wait_for(reader.read(512), timeout=5)
-            # Login
-            login_str = f"user {callsign} pass {self.cwop_passcode} vers ws_core 0.6.0\r\n"
-            writer.write(login_str.encode())
-            await writer.drain()
-            await asyncio.sleep(1)
-            # Send packet
-            writer.write(f"{packet}\r\n".encode())
-            await writer.drain()
-            writer.close()
-            self._cwop_last_upload = dt_util.utcnow()
-            self._cwop_status = f"OK {self._cwop_last_upload.strftime('%H:%M')}"
-            _LOGGER.debug("CWOP upload OK: %s", packet)
-        except (OSError, TimeoutError) as exc:
-            self._cwop_status = f"Error: {exc}"
-            _LOGGER.warning("CWOP upload failed: %s", exc)
-        except Exception as exc:
-            self._cwop_status = f"Error: {exc}"
-            _LOGGER.error("CWOP upload unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # Weather Underground upload  (v0.6.0)
@@ -2557,80 +2138,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # CSV / JSON export  (v0.6.0)
     # ------------------------------------------------------------------
 
-    async def _async_export_data(self) -> None:
-        """Write current observations to CSV and/or JSON on disk."""
-        import csv
-        import json
-        import os
-
-        data = self.data
-        if not data:
-            return
-
-        def _do_export() -> None:
-            now = dt_util.utcnow()
-            row = {
-                "timestamp_utc": now.isoformat(),
-                "temperature_c": data.get(KEY_NORM_TEMP_C),
-                "humidity_pct": data.get(KEY_NORM_HUMIDITY),
-                "dew_point_c": data.get(KEY_DEW_POINT_C),
-                "wet_bulb_c": data.get(KEY_WET_BULB_C),
-                "frost_point_c": data.get(KEY_FROST_POINT_C),
-                "feels_like_c": data.get(KEY_FEELS_LIKE_C),
-                "station_pressure_hpa": data.get(KEY_NORM_PRESSURE_HPA),
-                "sea_level_pressure_hpa": data.get(KEY_SEA_LEVEL_PRESSURE_HPA),
-                "pressure_trend_hpah": data.get(KEY_PRESSURE_TREND_HPAH),
-                "wind_speed_ms": data.get(KEY_NORM_WIND_SPEED_MS),
-                "wind_gust_ms": data.get(KEY_NORM_WIND_GUST_MS),
-                "wind_direction_deg": data.get(KEY_NORM_WIND_DIR_DEG),
-                "rain_total_mm": data.get(KEY_NORM_RAIN_TOTAL_MM),
-                "rain_rate_mmph": data.get(KEY_RAIN_RATE_FILT),
-                "rain_1h_mm": data.get(KEY_RAIN_ACCUM_1H),
-                "rain_24h_mm": data.get(KEY_RAIN_ACCUM_24H),
-                "illuminance_lx": data.get(KEY_LUX),
-                "uv_index": data.get(KEY_UV),
-                "hdd_today": data.get(KEY_HDD_TODAY),
-                "cdd_today": data.get(KEY_CDD_TODAY),
-                "et0_daily_mm": data.get(KEY_ET0_DAILY_MM),
-                "current_condition": data.get(KEY_CURRENT_CONDITION),
-                "zambretti_forecast": data.get(KEY_ZAMBRETTI_FORECAST),
-                "rain_probability_combined": data.get(KEY_RAIN_PROBABILITY_COMBINED),
-            }
-
-            fmt = self.export_format.lower()
-            export_dir = self.export_path
-            os.makedirs(export_dir, exist_ok=True)
-            date_str = now.strftime("%Y%m%d")
-
-            if fmt in ("csv", "both"):
-                csv_path = os.path.join(export_dir, f"ws_core_{date_str}.csv")
-                write_header = not os.path.exists(csv_path)
-                with open(csv_path, "a", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=list(row.keys()))
-                    if write_header:
-                        writer.writeheader()
-                    writer.writerow(row)
-
-            if fmt in ("json", "both"):
-                json_path = os.path.join(export_dir, f"ws_core_{date_str}.json")
-                existing = []
-                if os.path.exists(json_path):
-                    try:
-                        with open(json_path) as f:
-                            existing = json.load(f)
-                    except Exception:
-                        existing = []
-                existing.append(row)
-                with open(json_path, "w") as f:
-                    json.dump(existing, f, indent=2)
-
-        try:
-            await asyncio.get_event_loop().run_in_executor(None, _do_export)
-            self._export_last_time = dt_util.utcnow()
-            _LOGGER.debug("ws_core data exported to %s", self.export_path)
-        except Exception as exc:
-            _LOGGER.warning("ws_core export failed: %s", exc)
-
     # ------------------------------------------------------------------
     # v0.9.0 — Solar radiation source helper
     # ------------------------------------------------------------------
@@ -2649,98 +2156,121 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     async def _async_fetch_aqi(self) -> None:
-        """Fetch air quality data from Open-Meteo AQI API."""
+        """Fetch air quality + pollen from Open-Meteo Air Quality API.
+
+        v0.3.0: pollen now comes from this same API (single fetch) instead of
+        Tomorrow.io. Open-Meteo's pollen fields use European Aerobiology
+        Network / Copernicus levels in grains/m³ for alder, birch, grass,
+        mugwort, olive, ragweed.
+        """
         if not (self.forecast_lat is not None and self.forecast_lon is not None):
+            return
+        if not (self.aqi_enabled or self.pollen_enabled):
             return
 
         lat = self.forecast_lat
         lon = self.forecast_lon
+        # Build params depending on what's enabled
+        current_params = []
+        if self.aqi_enabled:
+            current_params.extend(["pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide", "ozone"])
+        if self.pollen_enabled:
+            current_params.extend(["alder_pollen", "birch_pollen", "grass_pollen",
+                                   "mugwort_pollen", "olive_pollen", "ragweed_pollen"])
         url = (
             "https://air-quality-api.open-meteo.com/v1/air-quality"
             f"?latitude={lat}&longitude={lon}"
-            "&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone"
+            f"&current={','.join(current_params)}"
             "&timezone=auto"
         )
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                     if resp.status != 200:
-                        _LOGGER.warning("ws_core AQI fetch failed: HTTP %s", resp.status)
+                        _LOGGER.warning("ws_core AQI/pollen fetch failed: HTTP %s", resp.status)
                         return
                     raw = await resp.json()
             cur = raw.get("current", {})
-            pm25 = cur.get("pm2_5")
-            pm10 = cur.get("pm10")
-            no2 = cur.get("nitrogen_dioxide")
-            ozone = cur.get("ozone")
-            co = cur.get("carbon_monoxide")
-            aqi_val = calculate_us_aqi(pm25, pm10)
-            self._aqi_cache = {
-                "pm2_5": pm25,
-                "pm10": pm10,
-                "no2": no2,
-                "ozone": ozone,
-                "co": co,
-                "aqi": aqi_val,
-                "aqi_level": aqi_level(aqi_val) if aqi_val is not None else None,
-                "fetched_at": dt_util.utcnow().isoformat(),
-            }
-            self.runtime.last_aqi_fetch = dt_util.utcnow()
-            _LOGGER.debug("ws_core AQI fetched: AQI=%s (%s)", aqi_val, self._aqi_cache.get("aqi_level"))
+
+            # AQI side
+            if self.aqi_enabled:
+                pm25 = cur.get("pm2_5")
+                pm10 = cur.get("pm10")
+                no2 = cur.get("nitrogen_dioxide")
+                ozone = cur.get("ozone")
+                co = cur.get("carbon_monoxide")
+                aqi_val = calculate_us_aqi(pm25, pm10)
+                self._aqi_cache = {
+                    "pm2_5": pm25,
+                    "pm10": pm10,
+                    "no2": no2,
+                    "ozone": ozone,
+                    "co": co,
+                    "aqi": aqi_val,
+                    "aqi_level": aqi_level(aqi_val) if aqi_val is not None else None,
+                    "fetched_at": dt_util.utcnow().isoformat(),
+                }
+                self.runtime.last_aqi_fetch = dt_util.utcnow()
+                _LOGGER.debug("ws_core AQI fetched: AQI=%s (%s)", aqi_val, self._aqi_cache.get("aqi_level"))
+
+            # Pollen side: Open-Meteo grains/m³ -> 0-5 index per WHO/EAN bands
+            if self.pollen_enabled:
+                # Tree pollen = max of alder, birch, olive (these are the active
+                # tree species in Open-Meteo; not all are active everywhere)
+                tree_grains = max(
+                    (cur.get(k) or 0)
+                    for k in ("alder_pollen", "birch_pollen", "olive_pollen")
+                )
+                grass_grains = cur.get("grass_pollen") or 0
+                # Weed = max of mugwort, ragweed
+                weed_grains = max(cur.get("mugwort_pollen") or 0, cur.get("ragweed_pollen") or 0)
+
+                # WHO/EAN bands for grains/m³ (index 0-5):
+                # 0 = none/not detected
+                # 1 = very low (<10 trees, <5 grass, <10 weed)
+                # 2 = low
+                # 3 = moderate
+                # 4 = high
+                # 5 = very high
+                def _grains_to_index(grains: float, scale: str) -> int:
+                    """Convert grains/m³ to 0-5 index using species-appropriate bands."""
+                    if grains is None or grains <= 0:
+                        return 0
+                    bands = {
+                        "tree": [10, 50, 90, 1500, 2500],   # birch-dominated bands
+                        "grass": [5, 20, 50, 200, 500],
+                        "weed": [10, 50, 100, 200, 500],
+                    }[scale]
+                    for i, threshold in enumerate(bands, start=1):
+                        if grains < threshold:
+                            return i
+                    return 5
+
+                tree_idx = _grains_to_index(tree_grains, "tree")
+                grass_idx = _grains_to_index(grass_grains, "grass")
+                weed_idx = _grains_to_index(weed_grains, "weed")
+                overall_idx = max(tree_idx, grass_idx, weed_idx)
+                level_text = {0: "None", 1: "Very Low", 2: "Low",
+                              3: "Medium", 4: "High", 5: "Very High"}[overall_idx]
+
+                self._pollen_cache = {
+                    "tree_index": tree_idx,
+                    "grass_index": grass_idx,
+                    "weed_index": weed_idx,
+                    "overall_index": overall_idx,
+                    "overall_level": level_text,
+                    "tree_grains_m3": tree_grains,
+                    "grass_grains_m3": grass_grains,
+                    "weed_grains_m3": weed_grains,
+                    "fetched_at": dt_util.utcnow().isoformat(),
+                }
+                _LOGGER.debug("ws_core pollen fetched: overall=%s (%s)", overall_idx, level_text)
+
             await self.async_request_refresh()
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
-            _LOGGER.warning("ws_core AQI fetch error: %s", exc)
+            _LOGGER.warning("ws_core AQI/pollen fetch error: %s", exc)
         except Exception as exc:
-            _LOGGER.error("ws_core AQI fetch unexpected error: %s", exc, exc_info=True)
-
-    # ------------------------------------------------------------------
-    # v0.7.0 — Pollen fetch (Tomorrow.io, free API key)
-    # ------------------------------------------------------------------
-
-    async def _async_fetch_pollen(self) -> None:
-        """Fetch pollen data from Tomorrow.io Pollen API (v4)."""
-        if not (self.tomorrow_io_key and self.forecast_lat is not None and self.forecast_lon is not None):
-            return
-
-        lat = self.forecast_lat
-        lon = self.forecast_lon
-        url = (
-            "https://api.tomorrow.io/v4/weather/realtime"
-            f"?location={lat},{lon}"
-            "&fields=grassIndex,treeIndex,weedIndex"
-            f"&apikey={self.tomorrow_io_key}"
-        )
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status == 429:
-                        _LOGGER.warning("ws_core pollen: Tomorrow.io rate limit hit")
-                        return
-                    if resp.status != 200:
-                        _LOGGER.warning("ws_core pollen fetch failed: HTTP %s", resp.status)
-                        return
-                    raw = await resp.json()
-            values = raw.get("data", {}).get("values", {})
-            grass = values.get("grassIndex")
-            tree = values.get("treeIndex")
-            weed = values.get("weedIndex")
-            self._pollen_cache = {
-                "grass_index": grass,
-                "tree_index": tree,
-                "weed_index": weed,
-                "grass_level": pollen_level(grass),
-                "tree_level": pollen_level(tree),
-                "weed_level": pollen_level(weed),
-                "overall_level": pollen_overall(grass, tree, weed),
-                "fetched_at": dt_util.utcnow().isoformat(),
-            }
-            self.runtime.last_pollen_fetch = dt_util.utcnow()
-            _LOGGER.debug("ws_core pollen fetched: overall=%s", self._pollen_cache.get("overall_level"))
-            await self.async_request_refresh()
-        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
-            _LOGGER.warning("ws_core pollen fetch error: %s", exc)
-        except Exception as exc:
-            _LOGGER.error("ws_core pollen fetch unexpected error: %s", exc, exc_info=True)
+            _LOGGER.error("ws_core AQI/pollen fetch unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # v0.9.0 — Solar forecast fetch (forecast.solar, free, no key)

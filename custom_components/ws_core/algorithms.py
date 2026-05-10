@@ -334,14 +334,30 @@ def zambretti_forecast(
     month: int,
     hemisphere: str = "Northern",
     climate: str = "Mediterranean",
+    wind_speed_ms: float | None = None,
+    rain_24h_mm: float | None = None,
 ) -> tuple[str, int]:
     """Zambretti barometric forecaster using the real N&Z lookup method.
 
-    The algorithm maps MSLP to a Z-number (1-26) on a linear scale from
-    950-1050 hPa, then applies corrections for:
-      - Pressure trend (rising/falling shifts the Z-number)
-      - Wind direction (regional patterns shift the Z-number)
-      - Season (summer vs winter adjustment)
+    The algorithm maps MSLP to a Z-number (1-26), then applies corrections
+    for pressure trend, wind direction, and season.
+
+    v0.3.0 fixes:
+      - Recalibrated MSLP→Z scale to match the original Zambretti dial bands.
+        Previously a linear 950-1050 hPa map flattened the "fair" zone too
+        aggressively, so 1015 hPa MSLP returned Z=10 ("Changeable") instead
+        of the expected Z=6-8 ("Fairly fine"). The new piecewise map matches
+        the dial's published bands.
+      - Wind direction influence is suppressed when wind_speed_ms < 1.0,
+        because at very low wind speeds the direction is meteorological
+        noise rather than a prevailing-wind signal.
+      - Sanity guard: if pressure is high (>1015 hPa) AND humidity is
+        moderate (<60%) AND there has been no rain in 24h, do not return
+        a "showery/rainy/unsettled" output. The base scale was reading
+        these conditions correctly as Z=8-12, but the texts in that range
+        still mention rain ("Showery early, improving") when the input
+        is clearly stable fair weather. We clamp Z to a fair-weather text
+        when these guard conditions hold.
 
     Returns: (forecast_text, z_number)
 
@@ -352,26 +368,36 @@ def zambretti_forecast(
     Accuracy: ~65-75% for 6-12h forecasts in maritime/Mediterranean
     climates. Less reliable in continental interiors and tropics.
     """
-    # Clamp MSLP to scale range
-    p = max(950.0, min(1050.0, mslp))
-
-    # Base Z-number: linear map from pressure (high P = low Z = fair)
-    # Z ranges 1-26. At 1050 hPa -> Z~1, at 950 hPa -> Z~26
-    z_base = 26.0 - ((p - 950.0) / 100.0) * 25.0
+    # ----------------------------------------------------------------
+    # Base Z-number: piecewise map from MSLP (matches Zambretti dial bands)
+    # ----------------------------------------------------------------
+    p = max(950.0, min(1060.0, mslp))
+    if p >= 1050.0:
+        z_base = 1.0 + (1060.0 - p) / 10.0 * 2.0
+    elif p >= 1030.0:
+        z_base = 3.0 + (1050.0 - p) / 20.0 * 4.0
+    elif p >= 1015.0:
+        z_base = 7.0 + (1030.0 - p) / 15.0 * 4.0
+    elif p >= 1000.0:
+        z_base = 11.0 + (1015.0 - p) / 15.0 * 6.0
+    elif p >= 985.0:
+        z_base = 17.0 + (1000.0 - p) / 15.0 * 5.0
+    else:
+        z_base = 22.0 + (985.0 - p) / 35.0 * 4.0
 
     # Seasonal adjustment
     is_winter = (month <= 3 or month >= 10) if hemisphere == "Northern" else (4 <= month <= 9)
     season_adj = 1.0 if is_winter else -1.0
 
-    # Pressure trend adjustment (the core Zambretti insight)
+    # Pressure trend adjustment
     if pressure_trend_3h > 1.6:
-        trend_adj = -4.0  # rapidly rising = much better weather
+        trend_adj = -4.0
     elif pressure_trend_3h > 0.8:
         trend_adj = -2.0
     elif pressure_trend_3h > 0.1:
         trend_adj = -1.0
     elif pressure_trend_3h < -1.6:
-        trend_adj = 4.0  # rapidly falling = much worse weather
+        trend_adj = 4.0
     elif pressure_trend_3h < -0.8:
         trend_adj = 2.0
     elif pressure_trend_3h < -0.1:
@@ -379,7 +405,7 @@ def zambretti_forecast(
     else:
         trend_adj = 0.0
 
-    # Wind direction adjustment (climate-region-aware)
+    # Wind direction adjustment (climate-region-aware, suppressed at low wind)
     wind_patterns = {
         "Atlantic Europe": {"good": ["E", "N"], "bad": ["W", "S"]},
         "Mediterranean": {"good": ["N", "E"], "bad": ["S", "W"]},
@@ -391,14 +417,16 @@ def zambretti_forecast(
         "Custom": {"good": ["N", "E"], "bad": ["S", "W"]},
     }
     pattern = wind_patterns.get(climate, wind_patterns["Mediterranean"])
-    if wind_quadrant in pattern["good"]:
+    if wind_speed_ms is not None and wind_speed_ms < 1.0:
+        wind_adj = 0.0
+    elif wind_quadrant in pattern["good"]:
         wind_adj = -1.0
     elif wind_quadrant in pattern["bad"]:
         wind_adj = 1.0
     else:
         wind_adj = 0.0
 
-    # Humidity adjustment (high humidity biases toward unsettled)
+    # Humidity adjustment
     if humidity > 85:
         hum_adj = 1.0
     elif humidity < 40:
@@ -409,6 +437,17 @@ def zambretti_forecast(
     # Combine
     z_final = z_base + trend_adj + wind_adj + season_adj + hum_adj
     z_number = max(1, min(26, round(z_final)))
+
+    # Sanity guard: clamp away from rain narratives when inputs are stable fair.
+    if (
+        mslp > 1015.0
+        and humidity < 60.0
+        and (rain_24h_mm is None or rain_24h_mm < 0.2)
+        and pressure_trend_3h > -1.0
+        and 8 <= z_number <= 14
+    ):
+        z_number = 6
+
     forecast_text = ZAMBRETTI_TEXTS[z_number - 1]
     return forecast_text, z_number
 
@@ -802,6 +841,9 @@ def humidity_level(humidity: float) -> str:
 
 
 def uv_level(uv_index: float) -> str:
+    """WMO UV index categories. UV=0 is None (no UV present, e.g. nighttime)."""
+    if uv_index <= 0:
+        return "None"
     if uv_index >= 11:
         return "Extreme"
     if uv_index >= 8:
@@ -814,6 +856,8 @@ def uv_level(uv_index: float) -> str:
 
 
 def uv_recommendation(uv_index: float) -> str:
+    if uv_index <= 0:
+        return "No protection needed"
     if uv_index >= 8:
         return "Avoid sun exposure"
     if uv_index >= 6:
@@ -834,98 +878,6 @@ def uv_burn_time_minutes(uv_index: float, skin_type: int = 2) -> int:
 # ---------------------------------------------------------------------------
 # Activity scores
 # ---------------------------------------------------------------------------
-
-
-def laundry_drying_score(
-    temp_c,
-    humidity,
-    wind_speed_ms,
-    uv_index,
-    rain_rate_mmph,
-    rain_probability=None,
-    rain_penalty_light_mmph=0.2,
-    rain_penalty_heavy_mmph=5.0,
-) -> int:
-    """Composite drying score (0-100). Higher = better drying conditions.
-
-    rain_penalty_light_mmph: light drizzle threshold — score reduced proportionally
-    rain_penalty_heavy_mmph: heavy rain threshold — score returns 0 immediately
-    """
-    if rain_rate_mmph >= rain_penalty_heavy_mmph:
-        return 0
-    if rain_probability is not None and rain_probability > 50:
-        return 0
-    temp_score = min(30, max(0, round(temp_c / 35 * 30)))
-    hum_score = min(30, max(0, round((100 - humidity) / 100 * 30)))
-    wind_score = min(20, max(0, round(wind_speed_ms / 5 * 20)))
-    sun_score = min(20, max(0, round(uv_index / 10 * 20)))
-    score = temp_score + hum_score + wind_score + sun_score
-    # Light drizzle: proportional penalty between light and heavy thresholds
-    if rain_rate_mmph >= rain_penalty_light_mmph:
-        penalty_factor = (rain_rate_mmph - rain_penalty_light_mmph) / max(
-            0.01, rain_penalty_heavy_mmph - rain_penalty_light_mmph
-        )
-        score = round(score * max(0.0, 1.0 - penalty_factor))
-    return score
-
-
-def laundry_recommendation(
-    score: int, rain_rate_mmph: float, rain_probability, rain_penalty_light_mmph: float = 0.2
-) -> str:
-    if rain_rate_mmph >= rain_penalty_light_mmph:
-        return "Currently raining - hang indoors!"
-    if rain_probability is not None and rain_probability > 50:
-        return "Rain expected - hang indoors or wait"
-    if score >= 75:
-        return "Excellent conditions! Hang outside now."
-    if score >= 50:
-        return "Good drying weather. Hang outside."
-    if score >= 25:
-        return "Fair conditions. Will dry slowly outside."
-    return "Poor conditions. Better to use dryer or wait."
-
-
-def laundry_dry_time(score: int, rain_rate_mmph: float, rain_penalty_light_mmph: float = 0.2) -> str:
-    if rain_rate_mmph >= rain_penalty_light_mmph:
-        return "N/A (raining)"
-    if score >= 75:
-        return "1.5-2.5 hours"
-    if score >= 50:
-        return "2.5-4 hours"
-    if score >= 25:
-        return "4-6 hours"
-    return "6+ hours (use dryer)"
-
-
-def running_score(feels_like_c: float, uv_index: float) -> int:
-    """Running conditions score (0-100)."""
-    temp_score = max(0, min(100, 100 - ((feels_like_c - 15) ** 2) / 4))
-    uv_score = max(0, min(100, 100 - (uv_index * 10)))
-    return round(temp_score * 0.7 + uv_score * 0.3)
-
-
-def running_level(score: int) -> str:
-    if score >= 80:
-        return "Excellent"
-    if score >= 60:
-        return "Good"
-    if score >= 40:
-        return "Fair"
-    return "Poor"
-
-
-def running_recommendation(feels_like_c: float, uv_index: float) -> str:
-    if feels_like_c < 10:
-        return "Too cold for comfortable running. Dress warmly."
-    if feels_like_c < 15:
-        return "Cool but good running weather. Light layers recommended."
-    if feels_like_c < 22 and uv_index < 5:
-        return "Perfect running conditions!"
-    if feels_like_c < 28 and uv_index < 7:
-        return "Warm but manageable. Stay hydrated."
-    if feels_like_c < 32:
-        return "Hot conditions. Run early morning or evening."
-    return "Too hot for safe running. Avoid midday."
 
 
 def fire_risk_score(temp_c: float, humidity: float, wind_speed_ms: float, rain_24h_mm: float) -> float:
@@ -965,49 +917,6 @@ def fire_danger_level(score: float) -> str:
 # ---------------------------------------------------------------------------
 # Stargazing
 # ---------------------------------------------------------------------------
-
-
-def stargazing_quality(cloud_cover_pct, humidity: float, rain_rate_mmph: float, moon_phase: str) -> str:
-    if rain_rate_mmph > 0:
-        return "Poor (Raining)"
-    if cloud_cover_pct is None:
-        cloud_cover_pct = 80 if humidity > 90 else (50 if humidity > 70 else 20)
-    moon_penalty = 0
-    if "full" in moon_phase:
-        moon_penalty = 40
-    elif "gibbous" in moon_phase:
-        moon_penalty = 25
-    elif "quarter" in moon_phase:
-        moon_penalty = 15
-    elif "crescent" in moon_phase:
-        moon_penalty = 5
-    base = 90 if cloud_cover_pct < 20 else (60 if cloud_cover_pct < 50 else (30 if cloud_cover_pct < 80 else 10))
-    quality_score = max(0, base - moon_penalty)
-    if quality_score >= 70:
-        return "Excellent"
-    if quality_score >= 50:
-        return "Good"
-    if quality_score >= 30:
-        return "Fair"
-    return "Poor"
-
-
-def moon_stargazing_impact(moon_phase: str | None = None, illumination: float | int | None = None) -> str:
-    """Stargazing impact classification based on moon brightness."""
-    if illumination is None and moon_phase:
-        illumination = MOON_ILLUMINATION.get(moon_phase)
-    if illumination is None:
-        return "unknown"
-    illum = float(illumination)
-    if illum <= 10:
-        return "excellent"
-    if illum <= 25:
-        return "good"
-    if illum <= 50:
-        return "fair"
-    if illum <= 75:
-        return "poor"
-    return "bad"
 
 
 # ---------------------------------------------------------------------------
@@ -1053,20 +962,6 @@ def calculate_moon_phase(year: int, month: int, day: int) -> str:
 # =============================================================================
 # DEGREE DAYS  (v0.5.0)
 # =============================================================================
-
-
-def heating_degree_hours(temp_c: float, base_c: float = 18.0) -> float:
-    """Return the heating degree-hour contribution for current temperature.
-
-    HDH = max(0, base - temp).  Accumulate over one hour to get HDH/day.
-    Divide running sum by 24 to express in degree-day units.
-    """
-    return max(0.0, base_c - temp_c)
-
-
-def cooling_degree_hours(temp_c: float, base_c: float = 18.0) -> float:
-    """Return the cooling degree-hour contribution for current temperature."""
-    return max(0.0, temp_c - base_c)
 
 
 # =============================================================================
@@ -1148,97 +1043,6 @@ def et0_hourly_estimate(et0_daily_mm: float, hour_utc: int) -> float:
 # =============================================================================
 # METAR PARSING  (v0.5.0)
 # =============================================================================
-
-
-def parse_metar_json(report: dict) -> dict:
-    """Parse an aviationweather.gov JSON METAR report into a normalised dict.
-
-    Returns keys: temp_c, dewpoint_c, pressure_hpa, wind_ms, wind_dir_deg,
-                  raw_text, station_id, age_min.  Missing fields are None.
-    """
-    result: dict = {
-        "station_id": report.get("icaoId") or report.get("stationId"),
-        "raw_text": report.get("rawOb") or report.get("rawMETAR"),
-        "temp_c": None,
-        "dewpoint_c": None,
-        "pressure_hpa": None,
-        "wind_ms": None,
-        "wind_dir_deg": None,
-        "age_min": None,
-    }
-
-    # Temperature
-    temp = report.get("temp")
-    if temp is not None:
-        with contextlib.suppress(ValueError, TypeError):
-            result["temp_c"] = float(temp)
-
-    # Dewpoint
-    dewp = report.get("dewp")
-    if dewp is not None:
-        with contextlib.suppress(ValueError, TypeError):
-            result["dewpoint_c"] = float(dewp)
-
-    # Altimeter (inHg) → hPa,  or directly from altimHg/slp
-    # Try slp first (sea level pressure in hPa)
-    slp = report.get("slp")
-    altim = report.get("altim")
-    if slp is not None:
-        with contextlib.suppress(ValueError, TypeError):
-            result["pressure_hpa"] = float(slp)
-    elif altim is not None:
-        with contextlib.suppress(ValueError, TypeError):
-            # altim in inHg → hPa (1 inHg = 33.8639 hPa)
-            result["pressure_hpa"] = round(float(altim) * 33.8639, 1)
-
-    # Wind speed (knots) → m/s
-    wspd = report.get("wspd")
-    if wspd is not None:
-        with contextlib.suppress(ValueError, TypeError):
-            result["wind_ms"] = round(float(wspd) * 0.514444, 1)
-
-    # Wind direction
-    wdir = report.get("wdir")
-    if wdir is not None:
-        with contextlib.suppress(ValueError, TypeError):
-            result["wind_dir_deg"] = int(float(wdir))
-
-    # Observation age in minutes (use obsTime epoch if available)
-    import time as _time
-
-    obs_time = report.get("obsTime")
-    if obs_time is not None:
-        try:
-            age_s = _time.time() - float(obs_time)
-            result["age_min"] = round(age_s / 60, 0)
-        except (ValueError, TypeError):
-            pass
-
-    return result
-
-
-def metar_validation_label(
-    delta_temp: float | None,
-    delta_pressure: float | None,
-    age_min: float | None,
-) -> str:
-    """Classify local vs METAR agreement.
-
-    Returns one of: "Match" / "Plausible" / "Check sensor" / "Stale METAR" / "No data"
-    """
-    if delta_temp is None and delta_pressure is None:
-        return "No data"
-    if age_min is not None and age_min > 90:
-        return "Stale METAR"
-
-    temp_ok = delta_temp is None or abs(delta_temp) <= 2.5
-    press_ok = delta_pressure is None or abs(delta_pressure) <= 3.0
-
-    if temp_ok and press_ok:
-        return "Match"
-    if abs(delta_temp or 0) <= 5.0 and abs(delta_pressure or 0) <= 6.0:
-        return "Plausible"
-    return "Check sensor"
 
 
 # ===========================================================================
@@ -1617,25 +1421,6 @@ def fog_probability(
         label = "Unlikely"
 
     return round(prob, 1), label
-
-
-def precipitation_type(temp_c: float, dew_c: float, rain_rate_mmph: float) -> str:
-    """Classify precipitation type from surface temperature and dew point.
-
-    Returns one of: 'Rain', 'Sleet', 'Snow', 'Freezing Rain', 'None'.
-    """
-    if rain_rate_mmph <= 0.0:
-        return "None"
-    if temp_c > 4.0:
-        return "Rain"
-    if 2.0 < temp_c <= 4.0:
-        return "Rain"  # possible mixed, but report as rain
-    if 0.0 < temp_c <= 2.0:
-        return "Sleet"
-    # temp_c <= 0
-    if dew_c > 0.0:
-        return "Freezing Rain"
-    return "Snow"
 
 
 def thunderstorm_risk_index(

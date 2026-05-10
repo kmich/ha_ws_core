@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.weather import WeatherEntity
@@ -182,16 +183,42 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
 
     @property
     def condition(self) -> str | None:
+        """Determine the current weather condition.
+
+        v0.3.0 fix: prefer the local-sensor-driven KEY_CURRENT_CONDITION
+        (which integrates illuminance, rain rate, wind, etc. in real time)
+        over Open-Meteo's daily weathercode summary. Open-Meteo's *hourly*
+        weathercode is used as a fallback when local data is unavailable.
+        Previously, the daily weathercode for *the whole day* was returned
+        as the current condition, causing "cloudy" when the sun was clearly
+        out.
+        """
         d = self.coordinator.data or {}
+
+        # 1. Local condition (computed by determine_current_condition).
+        # This integrates real-time illuminance, rain rate, wind gust, etc.
+        local = d.get(KEY_CURRENT_CONDITION)
+        if local:
+            return self._LOCAL_CONDITION_MAP.get(local, "partlycloudy")
+
+        # 2. Open-Meteo hourly weathercode for the current hour.
         fc = d.get(KEY_FORECAST) or {}
+        hourly = fc.get("hourly") or []
+        if hourly:
+            now_iso = datetime.now().strftime("%Y-%m-%dT%H:00")
+            for item in hourly:
+                if str(item.get("datetime", "")).startswith(now_iso[:13]):
+                    h_cond = _weathercode_to_condition(item.get("weathercode"))
+                    if h_cond:
+                        return h_cond
+                    break
+
+        # 3. Fallback: Open-Meteo daily summary (least-preferred).
         daily = fc.get("daily") or []
         if daily:
             api_cond = _weathercode_to_condition(daily[0].get("weathercode"))
             if api_cond:
                 return api_cond
-        local = d.get(KEY_CURRENT_CONDITION)
-        if local:
-            return self._LOCAL_CONDITION_MAP.get(local, "partlycloudy")
         return None
 
     def _build_daily_forecast(self) -> list[dict[str, Any]] | None:

@@ -26,8 +26,6 @@ from .const import (
     CONF_PREFIX,
     CONF_PRESSURE_TREND_WINDOW_H,
     CONF_RAIN_FILTER_ALPHA,
-    CONF_RAIN_PENALTY_HEAVY_MMPH,
-    CONF_RAIN_PENALTY_LIGHT_MMPH,
     CONF_STALENESS_S,
     CONF_THRESH_FREEZE_C,
     CONF_THRESH_RAIN_RATE_MMPH,
@@ -39,8 +37,6 @@ from .const import (
     DEFAULT_PREFIX,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_RAIN_FILTER_ALPHA,
-    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
-    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_STALENESS_S,
     DEFAULT_THRESH_FREEZE_C,
     DEFAULT_THRESH_RAIN_RATE_MMPH,
@@ -178,28 +174,7 @@ PARAM_NUMBERS: tuple[WSNumberDesc, ...] = (
         native_step=1.0,
         native_unit="h",
     ),
-    WSNumberDesc(
-        key="rain_penalty_light",
-        conf_key=CONF_RAIN_PENALTY_LIGHT_MMPH,
-        default=DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
-        name="Tuning: Rain Penalty Start",
-        icon="mdi:weather-rainy",
-        native_min=0.0,
-        native_max=5.0,
-        native_step=0.1,
-        native_unit="mm/h",
-    ),
-    WSNumberDesc(
-        key="rain_penalty_heavy",
-        conf_key=CONF_RAIN_PENALTY_HEAVY_MMPH,
-        default=DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
-        name="Tuning: Rain Penalty Maximum",
-        icon="mdi:weather-pouring",
-        native_min=0.1,
-        native_max=50.0,
-        native_step=0.5,
-        native_unit="mm/h",
-    ),
+    # v0.3.0: rain_penalty_light/heavy entities removed (laundry score was cut)
 )
 
 
