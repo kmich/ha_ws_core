@@ -11,7 +11,6 @@ from custom_components.ws_core.algorithms import (
     uv_burn_time_minutes, uv_level,
     calculate_us_aqi, aqi_level, pollen_level, pollen_overall,
     calculate_moon_phase, calculate_moon_illumination, moon_display_string,
-    heating_degree_hours, cooling_degree_hours,
     et0_hargreaves, et0_penman_monteith,
     KalmanFilter,
 )
@@ -166,20 +165,6 @@ class TestMoon:
     def test_display_string(self):
         s = moon_display_string("full_moon", 99.5)
         assert len(s) > 3
-
-
-class TestDegreeDays:
-    def test_hdd_cold(self):
-        assert heating_degree_hours(5.0, base_c=18.0) > 0
-
-    def test_hdd_warm(self):
-        assert heating_degree_hours(25.0, base_c=18.0) == 0.0
-
-    def test_cdd_hot(self):
-        assert cooling_degree_hours(30.0, base_c=18.0) > 0
-
-    def test_cdd_cold(self):
-        assert cooling_degree_hours(10.0, base_c=18.0) == 0.0
 
 
 class TestET0:

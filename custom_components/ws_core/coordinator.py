@@ -468,8 +468,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Old v1 state files contain METAR bias/GDD fields; from_dict will discard them.
         self._learning_store = Store(self.hass, 2, f"ws_core_{entry_id}_learning")
         self._learning_state = await async_load_learning(self._learning_store)
-        _LOGGER.debug("ws_core learning state loaded (solar_factor_n=%s, dry_streak=%s)",
-                      self._learning_state.solar_factor_n, self._learning_state.dry_streak_days)
+        _LOGGER.debug(
+            "ws_core learning state loaded (solar_factor_n=%s, dry_streak=%s)",
+            self._learning_state.solar_factor_n,
+            self._learning_state.dry_streak_days,
+        )
 
         entity_ids = [eid for eid in self.sources.values() if eid]
         if entity_ids:
@@ -491,7 +494,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
         # Air quality + pollen periodic fetch (Open-Meteo Air Quality API, single call)
-        if (self.aqi_enabled or self.pollen_enabled) and self.forecast_lat is not None and self.forecast_lon is not None:
+        if (
+            (self.aqi_enabled or self.pollen_enabled)
+            and self.forecast_lat is not None
+            and self.forecast_lon is not None
+        ):
             self._unsubs.append(
                 async_track_time_interval(
                     self.hass,
@@ -2169,8 +2176,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.aqi_enabled:
             current_params.extend(["pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide", "ozone"])
         if self.pollen_enabled:
-            current_params.extend(["alder_pollen", "birch_pollen", "grass_pollen",
-                                   "mugwort_pollen", "olive_pollen", "ragweed_pollen"])
+            current_params.extend(
+                ["alder_pollen", "birch_pollen", "grass_pollen", "mugwort_pollen", "olive_pollen", "ragweed_pollen"]
+            )
         url = (
             "https://air-quality-api.open-meteo.com/v1/air-quality"
             f"?latitude={lat}&longitude={lon}"
@@ -2211,10 +2219,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self.pollen_enabled:
                 # Tree pollen = max of alder, birch, olive (these are the active
                 # tree species in Open-Meteo; not all are active everywhere)
-                tree_grains = max(
-                    (cur.get(k) or 0)
-                    for k in ("alder_pollen", "birch_pollen", "olive_pollen")
-                )
+                tree_grains = max((cur.get(k) or 0) for k in ("alder_pollen", "birch_pollen", "olive_pollen"))
                 grass_grains = cur.get("grass_pollen") or 0
                 # Weed = max of mugwort, ragweed
                 weed_grains = max(cur.get("mugwort_pollen") or 0, cur.get("ragweed_pollen") or 0)
@@ -2231,7 +2236,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     if grains is None or grains <= 0:
                         return 0
                     bands = {
-                        "tree": [10, 50, 90, 1500, 2500],   # birch-dominated bands
+                        "tree": [10, 50, 90, 1500, 2500],  # birch-dominated bands
                         "grass": [5, 20, 50, 200, 500],
                         "weed": [10, 50, 100, 200, 500],
                     }[scale]
@@ -2244,8 +2249,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 grass_idx = _grains_to_index(grass_grains, "grass")
                 weed_idx = _grains_to_index(weed_grains, "weed")
                 overall_idx = max(tree_idx, grass_idx, weed_idx)
-                level_text = {0: "None", 1: "Very Low", 2: "Low",
-                              3: "Medium", 4: "High", 5: "Very High"}[overall_idx]
+                level_text = {0: "None", 1: "Very Low", 2: "Low", 3: "Medium", 4: "High", 5: "Very High"}[overall_idx]
 
                 self._pollen_cache = {
                     "tree_index": tree_idx,

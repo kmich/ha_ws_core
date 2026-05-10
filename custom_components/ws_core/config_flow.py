@@ -36,13 +36,13 @@ from .const import (
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_FOG,
-    CONF_ENABLE_THUNDERSTORM,
     # v0.8.0
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
     # v0.9.0
     CONF_ENABLE_SOLAR_FORECAST,
+    CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ENABLE_ZAMBRETTI,
     CONF_FORECAST_ENABLED,
@@ -54,6 +54,8 @@ from .const import (
     CONF_PREFIX,
     CONF_PRESSURE_TREND_WINDOW_H,
     CONF_RAIN_FILTER_ALPHA,
+    CONF_RAIN_PENALTY_HEAVY_MMPH,
+    CONF_RAIN_PENALTY_LIGHT_MMPH,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
     CONF_SOLAR_INTERVAL_MIN,
@@ -64,8 +66,6 @@ from .const import (
     CONF_STALENESS_S,
     CONF_TEMP_UNIT,
     CONF_THRESH_FREEZE_C,
-    CONF_RAIN_PENALTY_HEAVY_MMPH,
-    CONF_RAIN_PENALTY_LIGHT_MMPH,
     CONF_THRESH_RAIN_RATE_MMPH,
     CONF_THRESH_WIND_GUST_MS,
     CONF_UNITS_MODE,
@@ -84,11 +84,11 @@ from .const import (
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
-    DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_SOLAR_FORECAST,
+    DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
@@ -97,6 +97,8 @@ from .const import (
     DEFAULT_PREFIX,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_RAIN_FILTER_ALPHA,
+    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
+    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_SOLAR_INTERVAL_MIN,
     DEFAULT_SOLAR_PANEL_AZIMUTH,
     DEFAULT_SOLAR_PANEL_TILT,
@@ -105,8 +107,6 @@ from .const import (
     DEFAULT_TEMP_UNIT,
     DEFAULT_THRESH_FREEZE_C,
     DEFAULT_THRESH_RAIN_RATE_MMPH,
-    DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
-    DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_THRESH_WIND_GUST_MS,
     DEFAULT_UNITS_MODE,
     DEFAULT_WU_INTERVAL_MIN,
@@ -1462,10 +1462,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="pollen_opt",
             data_schema=vol.Schema({}),
             description_placeholders={
-                "info": (
-                    "Pollen data via Open-Meteo Air Quality API "
-                    "(free, no key). Piggybacks on AQI fetch."
-                )
+                "info": ("Pollen data via Open-Meteo Air Quality API (free, no key). Piggybacks on AQI fetch.")
             },
             last_step=False,
         )
