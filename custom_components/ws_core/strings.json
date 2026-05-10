@@ -275,17 +275,11 @@
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
-          "enable_running_score": "Running conditions score",
           "enable_sea_temp": "Sea surface temperature",
-          "enable_degree_days": "Heating / Cooling Degree Days",
-          "enable_metar": "METAR cross-validation",
-          "enable_cwop": "CWOP upload",
           "enable_wunderground": "Weather Underground upload",
-          "enable_export": "CSV / JSON data export",
           "enable_air_quality": "Air quality index (Open-Meteo)",
-          "enable_pollen": "Pollen levels (Tomorrow.io)",
+          "enable_pollen": "Pollen levels (Open-Meteo, free, no API key)",
           "enable_moon": "Moon phase & illumination",
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)"
         }

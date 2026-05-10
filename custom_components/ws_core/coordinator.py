@@ -134,8 +134,6 @@ from .const import (
     DEFAULT_STALENESS_S,
     DEFAULT_THRESH_HEAT_DAY_C,
     DEFAULT_WU_INTERVAL_MIN,
-    FORECAST_MAX_RETRY_S,
-    FORECAST_MIN_RETRY_S,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     # v0.7.0
@@ -257,9 +255,11 @@ except ImportError:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Keys removed from const.py in v0.3.0 but still used internally by coordinator
+# Constants removed from const.py in v0.3.0 but still used internally by coordinator
 _KEY_RAIN_RATE_RAW = "rain_rate_raw_mmph"
 _KEY_TIME_SINCE_RAIN = "time_since_rain"
+FORECAST_MIN_RETRY_S = 60
+FORECAST_MAX_RETRY_S = 3600
 
 
 # ---------------------------------------------------------------------------
