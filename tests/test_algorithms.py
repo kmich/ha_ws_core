@@ -8,7 +8,7 @@ from custom_components.ws_core.algorithms import (
     calculate_dew_point, calculate_sea_level_pressure, calculate_apparent_temperature,
     wind_speed_to_beaufort, beaufort_description, direction_to_quadrant,
     pressure_trend_display, zambretti_forecast,
-    uv_burn_time_minutes, uv_level, laundry_drying_score,
+    uv_burn_time_minutes, uv_level,
     calculate_us_aqi, aqi_level, pollen_level, pollen_overall,
     calculate_moon_phase, calculate_moon_illumination, moon_display_string,
     heating_degree_hours, cooling_degree_hours,
@@ -110,22 +110,6 @@ class TestUV:
         assert uv_level(6.0) == "High"
         assert uv_level(8.0) == "Very High"
         assert uv_level(11.0) == "Extreme"
-
-
-class TestLaundry:
-    def test_ideal_conditions(self):
-        score = laundry_drying_score(
-            temp_c=28.0, humidity=30.0, wind_speed_ms=3.0,
-            uv_index=7.0, rain_rate_mmph=0.0, rain_probability=5.0,
-        )
-        assert score >= 70
-
-    def test_rain_kills_score(self):
-        score = laundry_drying_score(
-            temp_c=22.0, humidity=80.0, wind_speed_ms=2.0,
-            uv_index=1.0, rain_rate_mmph=5.0, rain_probability=90.0,
-        )
-        assert score < 20
 
 
 class TestAQI:

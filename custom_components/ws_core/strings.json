@@ -185,7 +185,6 @@
           "cal_wind_ms": "Wind speed calibration offset",
           "enable_zambretti": "Zambretti forecast & classifier",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_laundry_score": "Laundry drying score",
           "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
           "enable_running_score": "Running conditions score",
@@ -234,7 +233,6 @@
           "cal_pressure_hpa": "Pressure calibration offset",
           "cal_wind_ms": "Wind speed calibration offset",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_laundry_score": "Laundry drying score",
           "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
           "enable_running_score": "Running conditions score",
@@ -277,7 +275,6 @@
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_laundry_score": "Laundry drying score",
           "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
           "enable_running_score": "Running conditions score",
@@ -378,9 +375,6 @@
       },
       "ws_enable_display_sensors": {
         "name": "Feature: Display Sensors"
-      },
-      "ws_enable_laundry_score": {
-        "name": "Feature: Laundry Drying Score"
       },
       "ws_enable_stargazing_score": {
         "name": "Feature: Stargazing Quality"

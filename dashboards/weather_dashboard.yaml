@@ -2300,14 +2300,8 @@ views:
         column_span: 4
         columns: 2
         cards:
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_fog
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_fog_probability
+          - type: custom:button-card
+            entity: sensor.ws_fog_probability
               name: Fog Probability
               show_state: false
               show_icon: true

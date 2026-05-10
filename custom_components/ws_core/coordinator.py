@@ -258,8 +258,8 @@ except ImportError:
 _LOGGER = logging.getLogger(__name__)
 
 # Keys removed from const.py in v0.3.0 but still used internally by coordinator
-__KEY_RAIN_RATE_RAW = "rain_rate_raw_mmph"
-__KEY_TIME_SINCE_RAIN = "time_since_rain"
+_KEY_RAIN_RATE_RAW = "rain_rate_raw_mmph"
+_KEY_TIME_SINCE_RAIN = "time_since_rain"
 
 
 # ---------------------------------------------------------------------------
