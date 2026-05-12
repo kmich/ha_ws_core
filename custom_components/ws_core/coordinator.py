@@ -22,6 +22,7 @@ v0.3.0 cleanup notes:
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import math
@@ -502,7 +503,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     timedelta(minutes=self.aqi_interval_min),
                 )
             )
-            self.hass.async_create_task(self._async_fetch_aqi())
+            async def _deferred_aqi():
+                await asyncio.sleep(10)
+                try:
+                    await self._async_fetch_aqi()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("ws_core: deferred AQI fetch failed (will retry): %s", err)
+
+            self.hass.async_create_task(_deferred_aqi())
 
         # Solar forecast periodic fetch
         if self.solar_forecast_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
@@ -513,9 +521,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     timedelta(minutes=self.solar_interval_min),
                 )
             )
-            self.hass.async_create_task(self._async_fetch_solar_forecast())
 
-        await self.async_refresh()
+            async def _deferred_solar():
+                await asyncio.sleep(30)
+                try:
+                    await self._async_fetch_solar_forecast()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("ws_core: deferred solar forecast fetch failed (will retry): %s", err)
+
+            self.hass.async_create_task(_deferred_solar())
+
+        # Defer first refresh by 5s so config entry creation completes before any network calls.
+        async def _deferred_refresh():
+            await asyncio.sleep(5)
+            try:
+                await self.async_refresh()
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("ws_core: deferred first refresh failed (will retry on next tick): %s", err)
+
+        self.hass.async_create_task(_deferred_refresh())
 
     async def async_stop(self) -> None:
         for u in self._unsubs:

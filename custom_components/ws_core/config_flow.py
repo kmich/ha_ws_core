@@ -439,9 +439,11 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._step_history.append(step_id)
         # Add go-back toggle to every step except the first one
         if step_id != "user" and len(self._step_history) > 1:
-            schema_dict = dict(data_schema.schema)
-            schema_dict[vol.Optional("_go_back", default=False)] = bool
-            data_schema = vol.Schema(schema_dict)
+            try:
+                extended = {**data_schema.schema, vol.Optional("_go_back", default=False): bool}
+                data_schema = vol.Schema(extended)
+            except Exception:  # noqa: BLE001
+                pass
         return self.async_show_form(
             step_id=step_id,
             data_schema=data_schema,
@@ -481,7 +483,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_PREFIX] = _sanitize_prefix(str(user_input.get(CONF_PREFIX) or DEFAULT_PREFIX))
             return await self.async_step_required_sources()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="user",
             data_schema=vol.Schema(
                 {
@@ -522,7 +524,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             for k in REQUIRED_SOURCES
         }
-        return self.async_show_form(
+        return self._show_step(
             step_id="required_sources",
             data_schema=vol.Schema(fields),
             errors=errors,
@@ -562,7 +564,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             for k in OPTIONAL_SOURCES
         }
         # fmt: on
-        return self.async_show_form(
+        return self._show_step(
             step_id="optional_sources",
             data_schema=vol.Schema(fields),
             errors=errors,
@@ -593,7 +595,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_ELEVATION_M] = elev
                 return await self.async_step_display()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="location",
             data_schema=vol.Schema(
                 {
@@ -647,7 +649,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default_units = DEFAULT_UNITS_MODE
             default_temp = DEFAULT_TEMP_UNIT
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="display",
             data_schema=vol.Schema(
                 {
@@ -690,7 +692,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
         default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="forecast",
             data_schema=vol.Schema(
                 {
@@ -743,7 +745,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="features",
             data_schema=vol.Schema(
                 {
@@ -795,7 +797,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
         default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="sea_temp",
             data_schema=vol.Schema(
                 {
@@ -856,7 +858,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_alerts()
 
         existing_station = self._data.get(CONF_WU_STATION_ID, "")
-        return self.async_show_form(
+        return self._show_step(
             step_id="wunderground",
             data_schema=vol.Schema(
                 {
@@ -906,7 +908,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="air_quality",
             data_schema=vol.Schema(
                 {
@@ -938,7 +940,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="pollen",
             data_schema=vol.Schema({}),
             description_placeholders={
@@ -969,7 +971,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             return await self.async_step_alerts()
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="solar_forecast",
             data_schema=vol.Schema(
                 {
@@ -1037,7 +1039,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         gust_max = round(_convert_gust_to_display(VALID_WIND_GUST_MAX_MS, imperial), 1)
 
-        return self.async_show_form(
+        return self._show_step(
             step_id="alerts",
             data_schema=vol.Schema(
                 {
