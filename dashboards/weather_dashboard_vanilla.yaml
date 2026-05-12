@@ -117,6 +117,8 @@ views:
             name: Last 24 Hours
           - entity: sensor.ws_rain_total
             name: Season Total
+          - entity: sensor.ws_time_since_rain
+            name: Last Rain
           - entity: sensor.ws_rain_probability_combined
             name: Rain Probability
 
@@ -298,24 +300,55 @@ views:
         hours_to_show: 24
         entities:
           - entity: sensor.ws_rain_rate
-            name: Rain Rate
+            name: Filtered
+          - entity: sensor.ws_rain_rate_raw
+            name: Raw
 
   # =============================================
-  # PAGE 4: RISK SCORES
+  # PAGE 4: ACTIVITY SCORES
   # =============================================
-  - title: Risk
-    path: risk
-    icon: mdi:alert-octagon-outline
+  - title: Activities
+    path: activities
+    icon: mdi:run
     cards:
       - type: markdown
         content: >-
-          Risk sensors are opt-in via the integration's Configure screen.
-          Each is independent — enable only what you want.
+          Activity scores require **Activity scores** enabled in Configure.
 
       - type: grid
         columns: 2
         square: false
         cards:
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_laundry_score
+                state: "on"
+            card:
+              type: entity
+              entity: sensor.ws_laundry_drying_score
+              name: Laundry Drying
+              icon: mdi:hanger
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_running_score
+                state: "on"
+            card:
+              type: entity
+              entity: sensor.ws_running_score
+              name: Running
+              icon: mdi:run
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_stargazing_score
+                state: "on"
+            card:
+              type: entity
+              entity: sensor.ws_stargazing_quality
+              name: Stargazing
+              icon: mdi:telescope
           - type: conditional
             conditions:
               - condition: state
@@ -326,23 +359,3 @@ views:
               entity: sensor.ws_fire_risk_score
               name: Fire Risk
               icon: mdi:fire
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_fog_probability
-                state: "on"
-            card:
-              type: entity
-              entity: sensor.ws_fog_probability
-              name: Fog Probability
-              icon: mdi:weather-fog
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_thunderstorm_risk
-                state: "on"
-            card:
-              type: entity
-              entity: sensor.ws_thunderstorm_risk
-              name: Thunderstorm Risk
-              icon: mdi:weather-lightning

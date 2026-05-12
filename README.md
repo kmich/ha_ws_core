@@ -7,7 +7,7 @@
 
 **Turn any personal weather station into a comprehensive, scientifically-documented weather intelligence hub for Home Assistant.**
 
-Weather Station Core reads raw sensor data from your existing weather station -- Ecowitt, Davis, WeatherFlow, Shelly, or any HA-integrated PWS -- and produces ~25 derived meteorological values through a guided config flow. No YAML required.
+Weather Station Core reads raw sensor data from your existing weather station -- Ecowitt, Davis, WeatherFlow, Shelly, or any HA-integrated PWS -- and produces 40+ derived meteorological values through a guided config flow. No YAML required.
 
 <p align="center">
   <em>Screenshots: Config flow, Main dashboard, Advanced page</em><br>
@@ -18,19 +18,20 @@ Weather Station Core reads raw sensor data from your existing weather station --
 
 ## Features
 
-- **Real Zambretti barometric forecaster** -- Negretti & Zambra lookup table with corrected MSLP→Z dial bands, climate-region-aware wind corrections, low-wind suppression, and dry-fair sanity guards (v1.3.0 fixes)
+- **Real Zambretti barometric forecaster** -- Negretti & Zambra lookup table (Z-numbers 1-26), climate-region-aware wind corrections, seasonal adjustment
 - **Wet-bulb temperature** (Stull 2011, +-0.3 C) and **frost point** (Buck 1981 ice constants)
 - **Climate-region-aware rain probability** with Open-Meteo NWP blending
 - **Kalman-filtered rain rate** for de-noised precipitation readings
-- **36-condition weather classifier** with severity levels and MDI icons -- prefers local sensor data over Open-Meteo daily summary (v1.3.0 fix)
-- **Risk sensors** (all opt-in via wizard): fire risk, fog probability, thunderstorm risk
-- **Air Quality Index + Pollen** via Open-Meteo Air Quality API (free, no API key) -- PM2.5, PM10, NO2, ozone, plus alder/birch/grass/mugwort/olive/ragweed pollen in a single fetch
+- **36-condition weather classifier** with severity levels and MDI icons
+- **Activity scores**: laundry drying, stargazing quality, running conditions, fire risk
+- **Air Quality Index** via Open-Meteo (free, no API key) -- PM2.5, PM10, NO2, ozone
+- **Pollen levels** (grass, tree, weed) via Tomorrow.io (free API key required)
 - **Moon phase & illumination** -- calculated astronomically, no API key required
 - **Solar PV forecast** (today + tomorrow kWh) via forecast.solar (free, no API key)
 - **Penman-Monteith ET0** -- automatically activates when a solar radiation sensor is available
 - **7-day daily forecast** via Open-Meteo (free, no API key required)
-- **Sea surface temperature** via Open-Meteo Marine API (opt-in, useful for coastal users)
-- **Weather Underground upload** (opt-in, disabled-by-default, roadmap)
+- **METAR cross-validation** -- auto-detects nearest ICAO airport from your coordinates
+- **CWOP & Weather Underground uploads** with credential validation at setup
 - **Full options flow** -- every setting reconfigurable post-install via the Configure button, no reinstall needed
 
 ---
@@ -85,8 +86,8 @@ The 7-step wizard walks you through:
 | 4. Location & climate | Hemisphere, climate region, elevation (auto-detected from HA) |
 | 5. Display units | Temperature, wind, rain, pressure unit preferences |
 | 6. Forecast | Enable/disable Open-Meteo 7-day forecast, coordinates |
-| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU, air quality, pollen, moon, solar forecast (all default-off, opt-in) |
-| 7a-7e | Per-feature sub-steps for each enabled feature (sea temp coordinates, WU credentials, panel config, etc.) |
+| 7. Features | Toggle feature groups: activity scores, sea temp, degree days, METAR, CWOP, WU, export, air quality, pollen, moon, solar forecast |
+| 7a-7n | Per-feature sub-steps for each enabled feature (ICAO code, API keys, panel config, etc.) |
 | 8. Alerts | Wind/rain/freeze thresholds (final step) |
 
 Every step (except the first) includes a "Go back" toggle to return to the previous step. Zambretti forecasting and the weather condition classifier are always enabled (core functionality).
@@ -138,29 +139,37 @@ All settings can be changed later via **Configure** (Settings → Devices & Serv
 | `sensor.ws_temperature_low_24h` | 24-hour low temperature |
 | `sensor.ws_wind_gust_max_24h` | 24-hour maximum gust |
 
-### Risk Sensors (opt-in via wizard, default-off)
+### Activity Scores (disabled by default, enable in options)
 
 | Entity | Scale | Description |
 |---|---|---|
+| `sensor.ws_laundry_drying_score` | 0–100 | Outdoor drying conditions |
+| `sensor.ws_stargazing_quality` | text | Stargazing quality (Excellent/Good/Fair/Poor) |
 | `sensor.ws_fire_risk_score` | 0–50 | Simplified fire risk heuristic |
-| `sensor.ws_fog_probability` | 0–100% | Fog probability from dew-point depression |
-| `sensor.ws_thunderstorm_risk` | 0–100 | Heuristic thunderstorm risk (surface proxy only) |
+| `sensor.ws_running_score` | 0–100 | Running conditions score |
 
-### Air Quality + Pollen (Open-Meteo Air Quality API; opt-in, single fetch)
+### Air Quality (optional, enable_air_quality)
 
 | Entity | Unit | Description |
 |---|---|---|
-| `sensor.ws_air_quality_index` | AQI | US EPA AQI (PM2.5-based). Level string ("Good"/"Moderate"/etc.) is exposed as an attribute. |
-| `sensor.ws_pollen_overall` |  --  | Highest of grass/tree/weed (None/Very Low/Low/Medium/High/Very High) |
-| `sensor.ws_pollen_grass` | 0–5 | Grass pollen index |
-| `sensor.ws_pollen_tree` | 0–5 | Tree pollen index (max of alder/birch/olive) |
-| `sensor.ws_pollen_weed` | 0–5 | Weed pollen index (max of mugwort/ragweed) |
+| `sensor.ws_air_quality_index` | AQI | US EPA AQI from Open-Meteo (PM2.5-based) |
+| `sensor.ws_air_quality_level` |  --  | Level label: Good / Moderate / Unhealthy / etc. |
 
-### Moon (opt-in)
+### Pollen (optional, enable_pollen + Tomorrow.io API key)
 
 | Entity | Description |
 |---|---|
-| `sensor.ws_moon` | Human-readable phase name with emoji + illumination %. The phase key (`waxing_crescent`/`first_quarter`/etc.) is exposed as an attribute. |
+| `sensor.ws_pollen_level` | Highest of grass/tree/weed (None/Low/Medium/High/Very High) |
+| `sensor.ws_pollen_grass` | Grass pollen IQLA index |
+| `sensor.ws_pollen_tree` | Tree pollen IQLA index |
+| `sensor.ws_pollen_weed` | Weed pollen IQLA index |
+
+### Moon (optional, enable_moon)
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_moon` | Human-readable phase name with emoji |
+| `sensor.ws_moon_phase` | Phase key (new/waxing_crescent/first_quarter/etc.) |
 | `sensor.ws_moon_illumination` | Illumination percentage |
 
 ### Solar PV Forecast (optional, enable_solar_forecast)
@@ -205,11 +214,16 @@ All configurable parameters are exposed as entities on the device page so users 
 | Entity | Description |
 |---|---|
 | `switch.ws_enable_display_sensors` | Display sensors (levels, trends, health) |
+| `switch.ws_enable_laundry_score` | Laundry drying score |
+| `switch.ws_enable_stargazing_score` | Stargazing quality |
 | `switch.ws_enable_fire_risk_score` | Fire risk score |
-| `switch.ws_enable_fog_probability` | Fog probability |
-| `switch.ws_enable_thunderstorm_risk` | Thunderstorm risk |
+| `switch.ws_enable_running_score` | Running conditions score |
 | `switch.ws_enable_sea_temp` | Sea surface temperature |
+| `switch.ws_enable_degree_days` | Degree days |
+| `switch.ws_enable_metar` | METAR cross-validation |
+| `switch.ws_enable_cwop` | CWOP upload |
 | `switch.ws_enable_wunderground` | Weather Underground upload |
+| `switch.ws_enable_export` | CSV/JSON data export |
 | `switch.ws_enable_air_quality` | Air quality index |
 | `switch.ws_enable_pollen` | Pollen levels |
 | `switch.ws_enable_moon` | Moon phase & illumination |
