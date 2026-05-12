@@ -503,6 +503,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     timedelta(minutes=self.aqi_interval_min),
                 )
             )
+
             async def _deferred_aqi():
                 await asyncio.sleep(10)
                 try:

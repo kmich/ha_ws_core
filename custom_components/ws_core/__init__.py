@@ -61,8 +61,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
                 new_data[CONF_HEMISPHERE] = DEFAULT_HEMISPHERE
         if CONF_CLIMATE_REGION not in new_data:
             new_data[CONF_CLIMATE_REGION] = DEFAULT_CLIMATE_REGION
-        _LOGGER.info("Migrated to v2: hemisphere=%s, climate_region=%s",
-                     new_data[CONF_HEMISPHERE], new_data[CONF_CLIMATE_REGION])
+        _LOGGER.info(
+            "Migrated to v2: hemisphere=%s, climate_region=%s", new_data[CONF_HEMISPHERE], new_data[CONF_CLIMATE_REGION]
+        )
 
     # ---- v2 -> v3 (v0.3.0 cleanup) ----
     if entry.version < 3:
@@ -81,8 +82,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
                 continue
             # Match by unique_id
             if ent.unique_id in deprecated_uids:
-                _LOGGER.info("v0.3.0 migration: removing deprecated entity %s (unique_id=%s)",
-                             ent.entity_id, ent.unique_id)
+                _LOGGER.info(
+                    "v0.3.0 migration: removing deprecated entity %s (unique_id=%s)", ent.entity_id, ent.unique_id
+                )
                 registry.async_remove(ent.entity_id)
                 removed_count += 1
                 continue
@@ -90,8 +92,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
             # (handles users who renamed the prefix between installs)
             for dep_key in DEPRECATED_KEYS_V030:
                 if ent.entity_id.endswith(f"_{dep_key}") or ent.entity_id.endswith(f".{prefix}_{dep_key}"):
-                    _LOGGER.info("v0.3.0 migration: removing deprecated entity %s (slug match)",
-                                 ent.entity_id)
+                    _LOGGER.info("v0.3.0 migration: removing deprecated entity %s (slug match)", ent.entity_id)
                     registry.async_remove(ent.entity_id)
                     removed_count += 1
                     break
@@ -106,8 +107,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
                 del new_options[k]
                 cut_data_count += 1
 
-        _LOGGER.info("v0.3.0 migration: removed %d deprecated entities, scrubbed %d config keys",
-                     removed_count, cut_data_count)
+        _LOGGER.info(
+            "v0.3.0 migration: removed %d deprecated entities, scrubbed %d config keys", removed_count, cut_data_count
+        )
 
     hass.config_entries.async_update_entry(
         entry,
@@ -133,7 +135,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await coordinator.async_start()
     except Exception as err:
-        _LOGGER.warning("ws_core: async_start raised %s — entry will still be created, sensors populate on first tick", err)
+        _LOGGER.warning(
+            "ws_core: async_start raised %s — entry will still be created, sensors populate on first tick", err
+        )
         # Do NOT re-raise — a failed initial fetch must not block entry creation.
         # The 60s tick scheduler will retry all fetches automatically.
 

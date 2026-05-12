@@ -530,10 +530,10 @@ views:
                       const sunset = sunAttrs.next_setting ? _toHHMM(sunAttrs.next_setting) : '--:--';
                       const isDay = states['sun.sun']?.state === 'above_horizon';
 
-                      const moonAttrs = states['sensor.ws_stargazing_quality']?.attributes || {};
+                      const moonAttrs = states['sensor.ws_moon']?.attributes || {};
                       let moonHtml = '';
                       if (!isDay) {
-                        const mp = (moonAttrs.moon_phase || '').toLowerCase();
+                        const mp = (moonAttrs.phase || '').toLowerCase();
                         const moonIcon = mp.includes('full') ? 'mdi:moon-full'
                           : mp.includes('new') ? 'mdi:moon-new'
                           : mp.includes('waxing_gibbous') ? 'mdi:moon-waxing-gibbous'
