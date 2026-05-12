@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_PREFIX, DEFAULT_PREFIX, DOMAIN, KEY_PACKAGE_OK
@@ -30,6 +31,15 @@ class WSPackageOK(CoordinatorEntity, BinarySensorEntity):
     @property
     def device_info(self):
         return {"identifiers": {(DOMAIN, self._entry.entry_id)}}
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        desired = f"binary_sensor.{self._attr_suggested_object_id}"
+        if self.entity_id and self.entity_id != desired:
+            reg = er.async_get(self.hass)
+            current = reg.async_get(self.entity_id)
+            if current and current.unique_id == self.unique_id and reg.async_get(desired) is None:
+                reg.async_update_entity(self.entity_id, new_entity_id=desired)
 
     @property
     def is_on(self) -> bool | None:

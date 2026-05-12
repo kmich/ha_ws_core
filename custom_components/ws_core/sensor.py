@@ -1066,12 +1066,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        desired = None
-        if self._desc.key == KEY_DATA_QUALITY:
-            desired = f"sensor.{self._prefix}_data_quality_banner"
-        elif self._desc.key == KEY_FORECAST:
-            desired = f"sensor.{self._prefix}_forecast_daily"
-        if desired and self.entity_id and self.entity_id != desired:
+        desired = f"sensor.{self._attr_suggested_object_id}"
+        if self.entity_id and self.entity_id != desired:
             reg = er.async_get(self.hass)
             current = reg.async_get(self.entity_id)
             if current and current.unique_id == self.unique_id and reg.async_get(desired) is None:

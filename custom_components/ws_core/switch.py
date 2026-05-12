@@ -15,6 +15,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -206,6 +207,12 @@ class WSToggleSwitch(RestoreEntity, SwitchEntity):
     async def async_added_to_hass(self) -> None:
         """Restore last state."""
         await super().async_added_to_hass()
+        desired = f"switch.{self._attr_suggested_object_id}"
+        if self.entity_id and self.entity_id != desired:
+            reg = er.async_get(self.hass)
+            current = reg.async_get(self.entity_id)
+            if current and current.unique_id == self.unique_id and reg.async_get(desired) is None:
+                reg.async_update_entity(self.entity_id, new_entity_id=desired)
         last_state = await self.async_get_last_state()
         if last_state:
             self._attr_is_on = last_state.state == "on"
@@ -251,6 +258,15 @@ class WSFeatureSwitch(SwitchEntity):
     @property
     def device_info(self) -> dict[str, Any]:
         return {"identifiers": {(DOMAIN, self._entry.entry_id)}}
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        desired = f"switch.{self._attr_suggested_object_id}"
+        if self.entity_id and self.entity_id != desired:
+            reg = er.async_get(self.hass)
+            current = reg.async_get(self.entity_id)
+            if current and current.unique_id == self.unique_id and reg.async_get(desired) is None:
+                reg.async_update_entity(self.entity_id, new_entity_id=desired)
 
     @property
     def is_on(self) -> bool:
