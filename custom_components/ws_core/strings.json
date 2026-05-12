@@ -185,30 +185,14 @@
           "cal_wind_ms": "Wind speed calibration offset",
           "enable_zambretti": "Zambretti forecast & classifier",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_laundry_score": "Laundry drying score",
-          "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
-          "enable_running_score": "Running conditions score",
           "enable_sea_temp": "Sea surface temperature",
           "sea_temp_lat": "Sea temperature latitude",
           "sea_temp_lon": "Sea temperature longitude",
-          "enable_degree_days": "Heating / Cooling Degree Days",
-          "degree_day_base_c": "Degree day base temperature",
-          "enable_metar": "METAR cross-validation",
-          "metar_icao": "Nearest airport ICAO code",
-          "metar_interval_min": "METAR fetch interval",
-          "enable_cwop": "CWOP upload",
-          "cwop_callsign": "CWOP callsign",
-          "cwop_passcode": "APRS passcode",
-          "cwop_interval_min": "CWOP upload interval",
           "enable_wunderground": "Weather Underground upload",
           "wu_station_id": "WU Station ID",
           "wu_api_key": "WU API key",
-          "wu_interval_min": "WU upload interval",
-          "enable_export": "CSV / JSON data export",
-          "export_path": "Export directory path",
-          "export_format": "Export file format",
-          "export_interval_min": "Export interval"
+          "wu_interval_min": "WU upload interval"
         },
         "data_description": {
           "prefix": "Entity prefix",
@@ -234,30 +218,14 @@
           "cal_pressure_hpa": "Pressure calibration offset",
           "cal_wind_ms": "Wind speed calibration offset",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_laundry_score": "Laundry drying score",
-          "enable_stargazing_score": "Stargazing quality",
           "enable_fire_risk_score": "Fire risk score",
-          "enable_running_score": "Running conditions score",
           "enable_sea_temp": "Sea surface temperature",
           "sea_temp_lat": "Sea temperature latitude",
           "sea_temp_lon": "Sea temperature longitude",
-          "enable_degree_days": "Heating / Cooling Degree Days",
-          "degree_day_base_c": "Degree day base temperature",
-          "enable_metar": "METAR cross-validation",
-          "metar_icao": "Nearest airport ICAO code",
-          "metar_interval_min": "METAR fetch interval",
-          "enable_cwop": "CWOP upload",
-          "cwop_callsign": "CWOP callsign",
-          "cwop_passcode": "APRS passcode",
-          "cwop_interval_min": "CWOP upload interval",
           "enable_wunderground": "Weather Underground upload",
           "wu_station_id": "WU Station ID",
           "wu_api_key": "WU API key",
-          "wu_interval_min": "WU upload interval",
-          "enable_export": "CSV / JSON data export",
-          "export_path": "Export directory path",
-          "export_format": "Export file format",
-          "export_interval_min": "Export interval"
+          "wu_interval_min": "WU upload interval"
         }
       },
       "features_opt": {
@@ -281,7 +249,7 @@
           "enable_sea_temp": "Sea surface temperature",
           "enable_wunderground": "Weather Underground upload",
           "enable_air_quality": "Air quality index (Open-Meteo)",
-          "enable_pollen": "Pollen levels (Tomorrow.io)",
+          "enable_pollen": "Pollen levels (Open-Meteo)",
           "enable_moon": "Moon phase & illumination",
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)"
         }
@@ -372,35 +340,14 @@
       "ws_enable_display_sensors": {
         "name": "Feature: Display Sensors"
       },
-      "ws_enable_laundry_score": {
-        "name": "Feature: Laundry Drying Score"
-      },
-      "ws_enable_stargazing_score": {
-        "name": "Feature: Stargazing Quality"
-      },
       "ws_enable_fire_risk_score": {
         "name": "Feature: Fire Risk Score"
-      },
-      "ws_enable_running_score": {
-        "name": "Feature: Running Score"
       },
       "ws_enable_sea_temp": {
         "name": "Feature: Sea Surface Temperature"
       },
-      "ws_enable_degree_days": {
-        "name": "Feature: Degree Days"
-      },
-      "ws_enable_metar": {
-        "name": "Feature: METAR Validation"
-      },
-      "ws_enable_cwop": {
-        "name": "Feature: CWOP Upload"
-      },
       "ws_enable_wunderground": {
         "name": "Feature: Weather Underground"
-      },
-      "ws_enable_export": {
-        "name": "Feature: Data Export"
       },
       "ws_enable_air_quality": {
         "name": "Feature: Air Quality Index"

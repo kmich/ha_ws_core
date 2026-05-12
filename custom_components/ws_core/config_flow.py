@@ -142,33 +142,6 @@ _LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-async def _autodetect_metar_icao(lat: float, lon: float) -> str:
-    """Find the nearest ICAO airport code via aviationweather.gov stations API."""
-    try:
-        import aiohttp
-
-        url = (
-            "https://aviationweather.gov/api/data/stationinfo"
-            f"?bbox={lat - 2:.2f},{lon - 3:.2f},{lat + 2:.2f},{lon + 3:.2f}&format=json"
-        )
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-                if resp.status != 200:
-                    return ""
-                stations = await resp.json()
-        if not isinstance(stations, list) or not stations:
-            return ""
-
-        # Find nearest by simple lat/lon distance
-        def _dist(s: dict) -> float:
-            return (float(s.get("lat", 0)) - lat) ** 2 + (float(s.get("lon", 0)) - lon) ** 2
-
-        nearest = min(stations, key=_dist)
-        return str(nearest.get("icaoId", nearest.get("stationIdentifier", ""))).upper()
-    except Exception:
-        return ""
-
-
 async def _validate_wu_credentials(station_id: str, api_key: str) -> tuple[bool, str]:
     """Validate Weather Underground station ID + API key. Returns (valid, error_key)."""
     try:
@@ -308,69 +281,6 @@ def _guess_climate_region(hass: HomeAssistant) -> str:
         return "Continental Europe"
     # Default Atlantic Europe
     return "Atlantic Europe"
-
-
-async def _auto_detect_metar_icao(hass) -> str:
-    """Nearest METAR station to HA lat/lon via aviationweather.gov. Returns ICAO or empty string."""
-    try:
-        lat = float(hass.config.latitude)
-        lon = float(hass.config.longitude)
-    except (TypeError, ValueError):
-        return ""
-    url = (
-        "https://aviationweather.gov/api/data/metar"
-        f"?bbox={lon - 1.0:.2f},{lat - 1.0:.2f},{lon + 1.0:.2f},{lat + 1.0:.2f}"
-        "&format=json&taf=false"
-    )
-    try:
-        import aiohttp
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-                if resp.status != 200:
-                    return ""
-                data = await resp.json()
-        if not data:
-            return ""
-        best_icao, best_dist = "", 999.0
-        for st in data:
-            slat, slon, icao = st.get("lat"), st.get("lon"), st.get("icaoId", "")
-            if slat is None or not icao:
-                continue
-            dist = ((float(slat) - lat) ** 2 + (float(slon) - lon) ** 2) ** 0.5
-            if dist < best_dist:
-                best_dist, best_icao = dist, icao
-        return best_icao
-    except Exception:
-        return ""
-
-
-async def _validate_cwop(callsign: str) -> bool:
-    """TCP ping to cwop.aprs.net:14580 to confirm reachability."""
-    import asyncio
-
-    try:
-        _, writer = await asyncio.wait_for(asyncio.open_connection("cwop.aprs.net", 14580), timeout=5)
-        writer.close()
-        await asyncio.wait_for(writer.wait_closed(), timeout=3)
-        return True
-    except Exception:
-        return False
-
-
-async def _validate_wu(station_id: str, api_key: str) -> bool:
-    """Test WU PWS credentials with a lightweight observations call."""
-    if not (station_id and api_key):
-        return False
-    url = f"https://api.weather.com/v2/pws/observations/current?stationId={station_id}&format=json&units=m&apiKey={api_key}"
-    try:
-        import aiohttp
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
-                return resp.status == 200
-    except Exception:
-        return False
 
 
 def _is_imperial(units_mode: str, hass: HomeAssistant) -> bool:
@@ -881,19 +791,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 7g: CSV/JSON export configuration  (v0.6.0)
-    # ------------------------------------------------------------------
-    def _next_after_export(self):
-        """Return the next step after export in the config flow."""
-        if self._data.get(CONF_ENABLE_AIR_QUALITY):
-            return self.async_step_air_quality()
-        if self._data.get(CONF_ENABLE_POLLEN):
-            return self.async_step_pollen()
-        if self._data.get(CONF_ENABLE_SOLAR_FORECAST):
-            return self.async_step_solar_forecast()
-        return self.async_step_alerts()
-
-    # ------------------------------------------------------------------
     # v0.7.0 — Air Quality (Open-Meteo, free, no API key)
     # ------------------------------------------------------------------
     async def async_step_air_quality(self, user_input: dict[str, Any] | None = None):
@@ -924,7 +821,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # v0.7.0 — Pollen (Tomorrow.io, free API key required)
+    # v0.7.0 — Pollen (Open-Meteo, free, no API key)
     # ------------------------------------------------------------------
     async def async_step_pollen(self, user_input: dict[str, Any] | None = None):
         """Pollen confirmation step.
