@@ -322,36 +322,6 @@ views:
           - type: conditional
             conditions:
               - condition: state
-                entity: switch.ws_enable_laundry_score
-                state: "on"
-            card:
-              type: entity
-              entity: sensor.ws_laundry_drying_score
-              name: Laundry Drying
-              icon: mdi:hanger
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_running_score
-                state: "on"
-            card:
-              type: entity
-              entity: sensor.ws_running_score
-              name: Running
-              icon: mdi:run
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_stargazing_score
-                state: "on"
-            card:
-              type: entity
-              entity: sensor.ws_stargazing_quality
-              name: Stargazing
-              icon: mdi:telescope
-          - type: conditional
-            conditions:
-              - condition: state
                 entity: switch.ws_enable_fire_risk_score
                 state: "on"
             card:

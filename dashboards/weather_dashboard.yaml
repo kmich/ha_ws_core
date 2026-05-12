@@ -1908,7 +1908,7 @@ views:
                   var combined = parseFloat(entity && entity.state) || 0;
                   var attrs = (entity && entity.attributes) || {};
                   var local = attrs.local_probability_pct || 0;
-                  var tsr = (states['sensor.ws_dry_streak'] || {}).state;
+                  var tsr = (states['sensor.ws_dry_streak_days'] || {}).state;
                   var tsrLabel = tsr !== undefined && !isNaN(parseInt(tsr)) ? parseInt(tsr) + 'd dry' : '--';
                   var prob = parseFloat((states['sensor.ws_rain_probability'] || {}).state) || 0;
                   var zamb = (states['sensor.ws_zambretti_forecast'] || {}).state || '--';

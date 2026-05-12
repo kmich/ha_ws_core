@@ -71,6 +71,7 @@ KNOWN_EXTERNAL: set[str] = {
     "input_text.weather_background_path",
     "input_text.weather_station_location",
     "input_text.weather_lightning_sensor",
+    "sensor.iopool_lagonisi_temperature",
 }
 
 

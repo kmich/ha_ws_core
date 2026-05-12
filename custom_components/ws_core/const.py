@@ -456,3 +456,54 @@ KEY_CONSISTENCY_FLAGS = "consistency_flags"
 KEY_CLIMATOLOGY_30D = "climatology_30d"
 KEY_TEMP_ANOMALY_30D = "temp_anomaly_30d"
 KEY_RAIN_ANOMALY_30D = "rain_anomaly_30d"
+
+# ---------------------------------------------------------------------------
+# Migration — v0.3.0 deprecated entity keys and config keys
+# ---------------------------------------------------------------------------
+DEPRECATED_KEYS_V030 = (
+    "metar_validation",
+    "metar_delta_temp_c",
+    "metar_delta_pressure_hpa",
+    "learned_temp_bias",
+    "cal_suggestion_temp",
+    "learned_pressure_bias",
+    "cal_suggestion_pressure",
+    "last_export_time",
+    "cwop_upload_status",
+    "running_score",
+    "laundry_drying_score",
+    "stargazing_quality",
+    "gdd_today",
+    "gdd_season",
+    "hdd_today",
+    "cdd_today",
+    "moon_phase",
+    "air_quality_level",
+    "pressure_trend_hpah_raw",
+    "rain_rate_mmph_raw",
+    "precipitation_type",
+    "time_since_rain",
+)
+
+DEPRECATED_CONF_KEYS_V030 = (
+    "enable_laundry_score",
+    "enable_stargazing_score",
+    "enable_running_score",
+    "enable_degree_days",
+    "degree_day_base_c",
+    "enable_metar",
+    "metar_icao",
+    "metar_interval_min",
+    "enable_cwop",
+    "cwop_callsign",
+    "cwop_passcode",
+    "cwop_interval_min",
+    "enable_export",
+    "export_path",
+    "export_format",
+    "export_interval_min",
+    "enable_activity_scores",
+    "enable_extended_sensors",
+    "rain_penalty_light_mmph",
+    "rain_penalty_heavy_mmph",
+)
