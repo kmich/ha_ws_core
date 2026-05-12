@@ -1079,11 +1079,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
                     ),
                     vol.Optional(
+                        CONF_RAIN_PENALTY_LIGHT_MMPH,
                         default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_LIGHT_MMPH, imperial), 2),
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u)
                     ),
                     vol.Optional(
+                        CONF_RAIN_PENALTY_HEAVY_MMPH,
                         default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_HEAVY_MMPH, imperial), 1),
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
