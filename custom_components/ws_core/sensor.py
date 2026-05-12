@@ -21,15 +21,12 @@ from .const import (
     CONF_ENABLE_FIRE_RISK,
     # v1.2.0
     CONF_ENABLE_FOG,
-    CONF_ENABLE_LAUNDRY,
     # v0.8.0
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
-    CONF_ENABLE_RUNNING,
     CONF_ENABLE_SEA_TEMP,
     # v0.9.0
     CONF_ENABLE_SOLAR_FORECAST,
-    CONF_ENABLE_STARGAZING,
     CONF_ENABLE_THUNDERSTORM,
     CONF_PREFIX,
     DEFAULT_PREFIX,
@@ -39,12 +36,10 @@ from .const import (
     # v0.7.0
     KEY_AQI,
     KEY_AQI_LEVEL,
-    KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
     KEY_CLIMATOLOGY_30D,
     KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
-    KEY_CWOP_STATUS,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
     KEY_DRY_STREAK,
@@ -63,8 +58,6 @@ from .const import (
     KEY_HEALTH_DISPLAY,
     KEY_HEAT_STREAK,
     KEY_HUMIDITY_LEVEL_DISPLAY,
-    KEY_LAST_EXPORT_TIME,
-    KEY_LAUNDRY_SCORE,
     KEY_LUX,
     KEY_MOON_AGE_DAYS,
     KEY_MOON_DISPLAY,
@@ -99,7 +92,6 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
-    KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -109,7 +101,6 @@ from .const import (
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
-    KEY_STARGAZE_SCORE,
     KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
@@ -606,29 +597,6 @@ SENSORS: list[WSSensorDescription] = [
             "color": d.get("_temp_color", "#4ADE80"),
         },
     ),
-    # =========================================================================
-    # ACTIVITY OPTIMIZATION SENSORS (disabled by default)
-    # =========================================================================
-    WSSensorDescription(
-        key=KEY_LAUNDRY_SCORE,
-        name="WS Laundry Drying Score",
-        icon="mdi:hanger",
-        native_unit="score",
-        state_class=SensorStateClass.MEASUREMENT,
-        attrs_fn=lambda d: {
-            "recommendation": d.get("_laundry_recommendation"),
-            "estimated_dry_time": d.get("_laundry_dry_time"),
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_STARGAZE_SCORE,
-        name="WS Stargazing Quality",
-        icon="mdi:telescope",
-        attrs_fn=lambda d: {
-            "moon_phase": d.get("_moon_phase"),
-            "moon_impact": d.get("_moon_stargazing_impact"),
-        },
-    ),
     WSSensorDescription(
         key=KEY_FIRE_RISK_SCORE,
         name="WS Fire Risk Score",
@@ -647,19 +615,6 @@ SENSORS: list[WSSensorDescription] = [
             ),
             "reference": "Inspired by Canadian FWI structure (Van Wagner 1987). "
             "Full FWI requires daily FFMC/DMC/DC moisture codes not available from PWS hardware.",
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_RUNNING_SCORE,
-        name="WS Running Score",
-        icon="mdi:run",
-        native_unit="score",
-        state_class=SensorStateClass.MEASUREMENT,
-        attrs_fn=lambda d: {
-            "level": d.get("_running_level"),
-            "recommendation": d.get("_running_recommendation"),
-            "feels_like_c": d.get(KEY_FEELS_LIKE_C),
-            "uv_index": d.get(KEY_UV),
         },
     ),
     # =========================================================================
@@ -706,25 +661,12 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # ---------------------------------------------------------------
-    # Upload / Export Status  (v0.6.0)
+    # Upload Status  (v0.6.0)
     # ---------------------------------------------------------------
-    WSSensorDescription(
-        key=KEY_CWOP_STATUS,
-        name="WS CWOP Upload Status",
-        icon="mdi:broadcast",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
     WSSensorDescription(
         key=KEY_WU_STATUS,
         name="WS Weather Underground Status",
         icon="mdi:weather-cloudy-clock",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    WSSensorDescription(
-        key=KEY_LAST_EXPORT_TIME,
-        name="WS Last Export Time",
-        icon="mdi:export",
-        device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # ---------------------------------------------------------------
@@ -762,7 +704,7 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # ---------------------------------------------------------------
-    # Pollen  (v0.7.0, Tomorrow.io)
+    # Pollen  (v0.7.0, Open-Meteo)
     # ---------------------------------------------------------------
     WSSensorDescription(
         key=KEY_POLLEN_OVERALL,
@@ -1008,12 +950,8 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_PRESSURE_TREND_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_HEALTH_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_FORECAST_TILES: CONF_ENABLE_DISPLAY_SENSORS,
-    KEY_BATTERY_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
-    # Individual activity scores
-    KEY_LAUNDRY_SCORE: CONF_ENABLE_LAUNDRY,
-    KEY_STARGAZE_SCORE: CONF_ENABLE_STARGAZING,
+    # Risk sensors
     KEY_FIRE_RISK_SCORE: CONF_ENABLE_FIRE_RISK,
-    KEY_RUNNING_SCORE: CONF_ENABLE_RUNNING,
     # Sea temperature
     KEY_SEA_SURFACE_TEMP: CONF_ENABLE_SEA_TEMP,
     # Air Quality  (v0.7.0)
@@ -1081,7 +1019,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
     _DISABLED_BY_DEFAULT = {
         KEY_TEMP_DISPLAY,
         KEY_WIND_DIR_SMOOTH_DEG,
-        KEY_BATTERY_DISPLAY,
         KEY_SENSOR_QUALITY_FLAGS,
         KEY_ZAMBRETTI_NUMBER,
         KEY_ET0_HOURLY_MM,
@@ -1191,11 +1128,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_HUMIDITY_LEVEL_DISPLAY: "humidity_level",
             KEY_UV_LEVEL_DISPLAY: "uv_level",
             KEY_TEMP_DISPLAY: "temperature_display",
-            KEY_LAUNDRY_SCORE: "laundry_drying_score",
-            KEY_STARGAZE_SCORE: "stargazing_quality",
             KEY_FIRE_RISK_SCORE: "fire_risk_score",
             KEY_SENSOR_QUALITY_FLAGS: "sensor_quality_flags",
-            KEY_RUNNING_SCORE: "running_score",
             KEY_LUX: "illuminance",
             KEY_UV: "uv_index",
             KEY_ALERT_STATE: "alert_state",
@@ -1207,9 +1141,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             # v0.6.0
             KEY_ET0_DAILY_MM: "et0_daily",
             KEY_ET0_HOURLY_MM: "et0_hourly",
-            KEY_CWOP_STATUS: "cwop_upload_status",
             KEY_WU_STATUS: "wu_upload_status",
-            KEY_LAST_EXPORT_TIME: "last_export_time",
             # v0.7.0
             KEY_AQI: "air_quality_index",
             KEY_PM2_5: "pm2_5",
