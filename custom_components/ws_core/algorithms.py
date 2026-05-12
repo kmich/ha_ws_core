@@ -16,7 +16,6 @@ References:
 
 from __future__ import annotations
 
-import contextlib
 import math
 from datetime import datetime
 

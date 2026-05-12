@@ -22,7 +22,6 @@ v0.3.0 cleanup notes:
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 import math
@@ -41,7 +40,6 @@ from .algorithms import (
     CONDITION_COLORS,
     CONDITION_DESCRIPTIONS,
     CONDITION_ICONS,
-    MOON_ILLUMINATION,
     KalmanFilter,
     aqi_level,
     beaufort_description,
@@ -49,7 +47,6 @@ from .algorithms import (
     calculate_dew_point,
     calculate_frost_point,
     calculate_moon_illumination,
-    calculate_moon_phase,
     calculate_rain_probability,
     calculate_us_aqi,
     calculate_wet_bulb,
@@ -72,15 +69,11 @@ from .algorithms import (
     moon_next_phase_days,
     moon_phase_days,
     moon_phase_from_age,
-    pollen_level,
-    pollen_overall,
     pressure_trend_arrow,
     pressure_trend_display,
     smooth_wind_direction,
     thunderstorm_risk_index,
-    uv_burn_time_minutes,
     uv_level,
-    uv_recommendation,
     wind_speed_to_beaufort,
     zambretti_forecast,
 )
@@ -89,6 +82,7 @@ from .const import (
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
     CONF_ENABLE_AIR_QUALITY,
+    CONF_ENABLE_FIRE_RISK,
     # v0.6.0 new
     # v0.5.0 new
     CONF_ENABLE_FOG,
@@ -122,17 +116,13 @@ from .const import (
     DEFAULT_AQI_INTERVAL_MIN,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ENABLE_AIR_QUALITY,
-    DEFAULT_ENABLE_CWOP,
-    DEFAULT_ENABLE_DEGREE_DAYS,
-    DEFAULT_ENABLE_EXPORT,
+    DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
-    DEFAULT_ENABLE_METAR,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_WUNDERGROUND,
-    DEFAULT_EXPORT_FORMAT,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_HEMISPHERE,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
@@ -206,6 +196,7 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
+    KEY_RAIN_RATE_RAW,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -221,6 +212,7 @@ from .const import (
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
     KEY_THUNDERSTORM_RISK,
+    KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
     KEY_WET_BULB_C,
@@ -474,8 +466,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Old v1 state files contain METAR bias/GDD fields; from_dict will discard them.
         self._learning_store = Store(self.hass, 2, f"ws_core_{entry_id}_learning")
         self._learning_state = await async_load_learning(self._learning_store)
-        _LOGGER.debug("ws_core learning state loaded (solar_factor_n=%s, dry_streak=%s)",
-                      self._learning_state.solar_factor_n, self._learning_state.dry_streak_days)
+        _LOGGER.debug(
+            "ws_core learning state loaded (solar_factor_n=%s, dry_streak=%s)",
+            self._learning_state.solar_factor_n,
+            self._learning_state.dry_streak_days,
+        )
 
         entity_ids = [eid for eid in self.sources.values() if eid]
         if entity_ids:
@@ -497,7 +492,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
         # Air quality + pollen periodic fetch (Open-Meteo Air Quality API, single call)
-        if (self.aqi_enabled or self.pollen_enabled) and self.forecast_lat is not None and self.forecast_lon is not None:
+        if (
+            (self.aqi_enabled or self.pollen_enabled)
+            and self.forecast_lat is not None
+            and self.forecast_lon is not None
+        ):
             self._unsubs.append(
                 async_track_time_interval(
                     self.hass,
@@ -2175,8 +2174,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.aqi_enabled:
             current_params.extend(["pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide", "ozone"])
         if self.pollen_enabled:
-            current_params.extend(["alder_pollen", "birch_pollen", "grass_pollen",
-                                   "mugwort_pollen", "olive_pollen", "ragweed_pollen"])
+            current_params.extend(
+                ["alder_pollen", "birch_pollen", "grass_pollen", "mugwort_pollen", "olive_pollen", "ragweed_pollen"]
+            )
         url = (
             "https://air-quality-api.open-meteo.com/v1/air-quality"
             f"?latitude={lat}&longitude={lon}"
@@ -2217,10 +2217,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self.pollen_enabled:
                 # Tree pollen = max of alder, birch, olive (these are the active
                 # tree species in Open-Meteo; not all are active everywhere)
-                tree_grains = max(
-                    (cur.get(k) or 0)
-                    for k in ("alder_pollen", "birch_pollen", "olive_pollen")
-                )
+                tree_grains = max((cur.get(k) or 0) for k in ("alder_pollen", "birch_pollen", "olive_pollen"))
                 grass_grains = cur.get("grass_pollen") or 0
                 # Weed = max of mugwort, ragweed
                 weed_grains = max(cur.get("mugwort_pollen") or 0, cur.get("ragweed_pollen") or 0)
@@ -2237,7 +2234,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     if grains is None or grains <= 0:
                         return 0
                     bands = {
-                        "tree": [10, 50, 90, 1500, 2500],   # birch-dominated bands
+                        "tree": [10, 50, 90, 1500, 2500],  # birch-dominated bands
                         "grass": [5, 20, 50, 200, 500],
                         "weed": [10, 50, 100, 200, 500],
                     }[scale]
@@ -2250,8 +2247,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 grass_idx = _grains_to_index(grass_grains, "grass")
                 weed_idx = _grains_to_index(weed_grains, "weed")
                 overall_idx = max(tree_idx, grass_idx, weed_idx)
-                level_text = {0: "None", 1: "Very Low", 2: "Low",
-                              3: "Medium", 4: "High", 5: "Very High"}[overall_idx]
+                level_text = {0: "None", 1: "Very Low", 2: "Low", 3: "Medium", 4: "High", 5: "Very High"}[overall_idx]
 
                 self._pollen_cache = {
                     "tree_index": tree_idx,
