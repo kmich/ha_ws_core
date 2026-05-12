@@ -17,13 +17,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     # v0.7.0
     CONF_ENABLE_AIR_QUALITY,
-    CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     # v1.2.0
     CONF_ENABLE_FOG,
     CONF_ENABLE_LAUNDRY,
-    CONF_ENABLE_METAR,
     # v0.8.0
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
@@ -43,10 +41,6 @@ from .const import (
     KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
-    KEY_CAL_SUGGESTION_PRESSURE,
-    KEY_CAL_SUGGESTION_TEMP,
-    KEY_CDD_RATE,
-    KEY_CDD_TODAY,
     KEY_CLIMATOLOGY_30D,
     KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
@@ -66,28 +60,12 @@ from .const import (
     KEY_FORECAST_TILES,
     KEY_FROST_POINT_C,
     KEY_FROST_STREAK,
-    KEY_GDD_SEASON,
-    KEY_GDD_TODAY,
-    KEY_HDD_RATE,
-    # v0.5.0
-    KEY_HDD_TODAY,
     KEY_HEALTH_DISPLAY,
     KEY_HEAT_STREAK,
     KEY_HUMIDITY_LEVEL_DISPLAY,
     KEY_LAST_EXPORT_TIME,
     KEY_LAUNDRY_SCORE,
-    KEY_LEARNED_PRESSURE_BIAS,
-    KEY_LEARNED_TEMP_BIAS,
     KEY_LUX,
-    KEY_METAR_AGE_MIN,
-    KEY_METAR_DELTA_PRESSURE,
-    KEY_METAR_DELTA_TEMP,
-    KEY_METAR_PRESSURE_HPA,
-    KEY_METAR_STATION,
-    KEY_METAR_TEMP_C,
-    KEY_METAR_VALIDATION,
-    KEY_METAR_WIND_DIR,
-    KEY_METAR_WIND_MS,
     KEY_MOON_AGE_DAYS,
     KEY_MOON_DISPLAY,
     KEY_MOON_ILLUMINATION_PCT,
@@ -111,7 +89,6 @@ from .const import (
     KEY_POLLEN_OVERALL,
     KEY_POLLEN_TREE,
     KEY_POLLEN_WEED,
-    KEY_PRECIP_TYPE,
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
@@ -122,7 +99,6 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
-    KEY_RAIN_RATE_RAW,
     KEY_RUNNING_SCORE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
@@ -140,7 +116,6 @@ from .const import (
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
     KEY_THUNDERSTORM_RISK,
-    KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
     KEY_WET_BULB_C,
@@ -250,15 +225,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit=UNIT_RAIN_MM,
         state_class=SensorStateClass.TOTAL_INCREASING,  # FIX: cumulative counter
-    ),
-    WSSensorDescription(
-        key=KEY_RAIN_RATE_RAW,
-        name="WS Rain Rate Raw",
-        icon="mdi:weather-pouring",
-        device_class=SensorDeviceClass.PRECIPITATION_INTENSITY,
-        native_unit="mm/h",
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
         key=KEY_RAIN_RATE_FILT,
@@ -532,11 +498,6 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
-        key=KEY_TIME_SINCE_RAIN,
-        name="WS Time Since Rain",
-        icon="mdi:clock-outline",
-    ),
-    WSSensorDescription(
         key=KEY_PRESSURE_TREND_DISPLAY,
         name="WS Pressure Trend",
         icon="mdi:trending-up",
@@ -720,117 +681,6 @@ SENSORS: list[WSSensorDescription] = [
         },
     ),
     # ---------------------------------------------------------------
-    # Degree Days  (v0.5.0)
-    # ---------------------------------------------------------------
-    WSSensorDescription(
-        key=KEY_HDD_TODAY,
-        name="WS Heating Degree Days (Today)",
-        icon="mdi:thermometer-minus",
-        native_unit="°C·d",
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        attrs_fn=lambda d: {
-            "hdd_rate_ch": d.get(KEY_HDD_RATE),
-            "base_temp_c": d.get("_degree_day_base_c"),
-            "description": "Heating degree days accumulated today (resets at midnight)",
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_CDD_TODAY,
-        name="WS Cooling Degree Days (Today)",
-        icon="mdi:thermometer-plus",
-        native_unit="°C·d",
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        attrs_fn=lambda d: {
-            "cdd_rate_ch": d.get(KEY_CDD_RATE),
-            "base_temp_c": d.get("_degree_day_base_c"),
-            "description": "Cooling degree days accumulated today (resets at midnight)",
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_HDD_RATE,
-        name="WS HDD Rate",
-        icon="mdi:thermometer-low",
-        native_unit="°C",
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "description": "Instantaneous heating degree-hour rate (use Riemann sum helper for daily totals)"
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_CDD_RATE,
-        name="WS CDD Rate",
-        icon="mdi:thermometer-high",
-        native_unit="°C",
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "description": "Instantaneous cooling degree-hour rate (use Riemann sum helper for daily totals)"
-        },
-    ),
-    # ---------------------------------------------------------------
-    # METAR Cross-Validation  (v0.5.0)
-    # ---------------------------------------------------------------
-    WSSensorDescription(
-        key=KEY_METAR_VALIDATION,
-        name="WS METAR Validation",
-        icon="mdi:shield-check",
-        attrs_fn=lambda d: {
-            "station_id": d.get(KEY_METAR_STATION),
-            "metar_temp_c": d.get(KEY_METAR_TEMP_C),
-            "metar_pressure_hpa": d.get(KEY_METAR_PRESSURE_HPA),
-            "metar_wind_ms": d.get(KEY_METAR_WIND_MS),
-            "metar_wind_dir_deg": d.get(KEY_METAR_WIND_DIR),
-            "delta_temp_c": d.get(KEY_METAR_DELTA_TEMP),
-            "delta_pressure_hpa": d.get(KEY_METAR_DELTA_PRESSURE),
-            "metar_age_min": d.get(KEY_METAR_AGE_MIN),
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_METAR_TEMP_C,
-        name="WS METAR Temperature",
-        icon="mdi:thermometer-lines",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        native_unit=UNIT_TEMP_C,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    WSSensorDescription(
-        key=KEY_METAR_PRESSURE_HPA,
-        name="WS METAR Pressure",
-        icon="mdi:gauge",
-        device_class=SensorDeviceClass.PRESSURE,
-        native_unit=UNIT_PRESSURE_HPA,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    WSSensorDescription(
-        key=KEY_METAR_DELTA_TEMP,
-        name="WS Temp vs METAR Delta",
-        icon="mdi:thermometer-alert",
-        native_unit=UNIT_TEMP_C,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "local_temp_c": d.get(KEY_NORM_TEMP_C),
-            "metar_temp_c": d.get(KEY_METAR_TEMP_C),
-            "station_id": d.get(KEY_METAR_STATION),
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_METAR_DELTA_PRESSURE,
-        name="WS Pressure vs METAR Delta",
-        icon="mdi:gauge-empty",
-        native_unit=UNIT_PRESSURE_HPA,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "local_pressure_hpa": d.get(KEY_SEA_LEVEL_PRESSURE_HPA),
-            "metar_pressure_hpa": d.get(KEY_METAR_PRESSURE_HPA),
-            "station_id": d.get(KEY_METAR_STATION),
-        },
-    ),
-    # ---------------------------------------------------------------
     # ET₀ Evapotranspiration  (v0.6.0)
     # ---------------------------------------------------------------
     WSSensorDescription(
@@ -893,16 +743,6 @@ SENSORS: list[WSSensorDescription] = [
             "no2_ug_m3": d.get(KEY_NO2),
             "ozone_ug_m3": d.get(KEY_OZONE),
             "scale": "US EPA (0-50 Good, 51-100 Moderate, 101-150 Unhealthy for Sensitive, 151-200 Unhealthy, 201-300 Very Unhealthy, 300+ Hazardous)",
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_AQI_LEVEL,
-        name="WS Air Quality Level",
-        icon="mdi:air-filter",
-        attrs_fn=lambda d: {
-            "aqi": d.get(KEY_AQI),
-            "pm2_5_ug_m3": d.get(KEY_PM2_5),
-            "pm10_ug_m3": d.get(KEY_PM10),
         },
     ),
     WSSensorDescription(
@@ -978,15 +818,6 @@ SENSORS: list[WSSensorDescription] = [
         },
     ),
     WSSensorDescription(
-        key=KEY_MOON_PHASE,
-        name="WS Moon Phase",
-        icon="mdi:moon-full",
-        attrs_fn=lambda d: {
-            "illumination_pct": d.get(KEY_MOON_ILLUMINATION_PCT),
-            "age_days": d.get(KEY_MOON_AGE_DAYS),
-        },
-    ),
-    WSSensorDescription(
         key=KEY_MOON_ILLUMINATION_PCT,
         name="WS Moon Illumination",
         icon="mdi:moon-full",
@@ -1057,36 +888,6 @@ SENSORS: list[WSSensorDescription] = [
             "risk_level": d.get("_thunderstorm_level"),
             "contributing_factors": d.get("_thunderstorm_factors", []),
             "caveat": d.get("_thunderstorm_caveat"),
-        },
-    ),
-    # B3 Precipitation type
-    WSSensorDescription(
-        key=KEY_PRECIP_TYPE,
-        name="WS Precipitation Type",
-        icon="mdi:weather-snowy-rainy",
-    ),
-    # B4 Growing degree days
-    WSSensorDescription(
-        key=KEY_GDD_TODAY,
-        name="WS Growing Degree Days (Today)",
-        icon="mdi:sprout",
-        native_unit="°C·d",
-        state_class=SensorStateClass.MEASUREMENT,
-        attrs_fn=lambda d: {
-            "base_temp_c": d.get("_gdd_base_c"),
-            "cap_temp_c": d.get("_gdd_cap_c"),
-        },
-    ),
-    WSSensorDescription(
-        key=KEY_GDD_SEASON,
-        name="WS Growing Degree Days (Season)",
-        icon="mdi:sprout-outline",
-        native_unit="°C·d",
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        attrs_fn=lambda d: {
-            "season_reset_date": d.get("_gdd_season_reset_date"),
-            "base_temp_c": d.get("_gdd_base_c"),
-            "cap_temp_c": d.get("_gdd_cap_c"),
         },
     ),
     # B5 Streak counters
@@ -1195,57 +996,6 @@ SENSORS: list[WSSensorDescription] = [
             "n_outcomes": d.get("_forecast_skill_n_outcomes", 0),
         },
     ),
-    # A1 Learned temperature bias (METAR-gated)
-    WSSensorDescription(
-        key=KEY_LEARNED_TEMP_BIAS,
-        name="WS Learned Temperature Bias",
-        icon="mdi:thermometer-lines",
-        native_unit=UNIT_TEMP_C,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "confidence": d.get("_learned_temp_bias_confidence"),
-            "n_samples": d.get("_learned_temp_bias_n", 0),
-            "note": "Positive = station reads warmer than METAR",
-        },
-    ),
-    # A1 Calibration suggestion for temperature (METAR-gated)
-    WSSensorDescription(
-        key=KEY_CAL_SUGGESTION_TEMP,
-        name="WS Cal Suggestion: Temperature",
-        icon="mdi:thermometer-alert",
-        native_unit=UNIT_TEMP_C,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "confidence": d.get("_cal_suggestion_temp_confidence"),
-            "apply_service": "ws_core.apply_learned_calibration",
-        },
-    ),
-    # A2 Learned pressure bias (METAR-gated)
-    WSSensorDescription(
-        key=KEY_LEARNED_PRESSURE_BIAS,
-        name="WS Learned Pressure Bias",
-        icon="mdi:gauge-low",
-        native_unit=UNIT_PRESSURE_HPA,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "confidence": d.get("_learned_pressure_bias_confidence"),
-            "n_samples": d.get("_learned_pressure_bias_n", 0),
-        },
-    ),
-    # A2 Calibration suggestion for pressure (METAR-gated)
-    WSSensorDescription(
-        key=KEY_CAL_SUGGESTION_PRESSURE,
-        name="WS Cal Suggestion: Pressure",
-        icon="mdi:gauge-low",
-        native_unit=UNIT_PRESSURE_HPA,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        attrs_fn=lambda d: {
-            "confidence": d.get("_cal_suggestion_pressure_confidence"),
-            "apply_service": "ws_core.apply_learned_calibration",
-        },
-    ),
 ]
 
 # Sensor-to-feature-toggle mapping for granular control
@@ -1266,20 +1016,8 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_RUNNING_SCORE: CONF_ENABLE_RUNNING,
     # Sea temperature
     KEY_SEA_SURFACE_TEMP: CONF_ENABLE_SEA_TEMP,
-    # Degree days  (v0.5.0)
-    KEY_HDD_TODAY: CONF_ENABLE_DEGREE_DAYS,
-    KEY_CDD_TODAY: CONF_ENABLE_DEGREE_DAYS,
-    KEY_HDD_RATE: CONF_ENABLE_DEGREE_DAYS,
-    KEY_CDD_RATE: CONF_ENABLE_DEGREE_DAYS,
-    # METAR  (v0.5.0)
-    KEY_METAR_VALIDATION: CONF_ENABLE_METAR,
-    KEY_METAR_TEMP_C: CONF_ENABLE_METAR,
-    KEY_METAR_PRESSURE_HPA: CONF_ENABLE_METAR,
-    KEY_METAR_DELTA_TEMP: CONF_ENABLE_METAR,
-    KEY_METAR_DELTA_PRESSURE: CONF_ENABLE_METAR,
     # Air Quality  (v0.7.0)
     KEY_AQI: CONF_ENABLE_AIR_QUALITY,
-    KEY_AQI_LEVEL: CONF_ENABLE_AIR_QUALITY,
     KEY_PM2_5: CONF_ENABLE_AIR_QUALITY,
     KEY_PM10: CONF_ENABLE_AIR_QUALITY,
     # Pollen  (v0.7.0)
@@ -1289,7 +1027,6 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_POLLEN_WEED: CONF_ENABLE_POLLEN,
     # Moon  (v0.8.0)
     KEY_MOON_DISPLAY: CONF_ENABLE_MOON,
-    KEY_MOON_PHASE: CONF_ENABLE_MOON,
     KEY_MOON_ILLUMINATION_PCT: CONF_ENABLE_MOON,
     # Solar forecast  (v0.9.0)
     KEY_SOLAR_FORECAST_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
@@ -1347,12 +1084,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_BATTERY_DISPLAY,
         KEY_SENSOR_QUALITY_FLAGS,
         KEY_ZAMBRETTI_NUMBER,
-        # New v0.5.0 diagnostic/rate sensors hidden by default
-        KEY_HDD_RATE,
-        KEY_CDD_RATE,
         KEY_ET0_HOURLY_MM,
-        KEY_METAR_TEMP_C,
-        KEY_METAR_PRESSURE_HPA,
         # v0.7.0 diagnostic sub-pollutants
         KEY_PM2_5,
         KEY_PM10,
@@ -1365,8 +1097,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_SOLAR_FORECAST_TOMORROW_KWH,
         KEY_ET0_PM_DAILY_MM,
         # v1.2.0 — diagnostic learning sensors hidden by default
-        KEY_LEARNED_TEMP_BIAS,
-        KEY_LEARNED_PRESSURE_BIAS,
         KEY_FORECAST_SKILL,
         KEY_SOLAR_LUX_FACTOR,
         KEY_CLIMATOLOGY_30D,
@@ -1437,7 +1167,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_NORM_WIND_GUST_MS: "wind_gust",
             KEY_NORM_WIND_DIR_DEG: "wind_direction",
             KEY_NORM_RAIN_TOTAL_MM: "rain_total",
-            KEY_RAIN_RATE_RAW: "rain_rate_raw",
             KEY_RAIN_RATE_FILT: "rain_rate",
             KEY_BATTERY_PCT: "battery",
             KEY_FEELS_LIKE_C: "feels_like",
@@ -1452,7 +1181,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_RAIN_DISPLAY: "rain_display",
             KEY_RAIN_ACCUM_1H: "rain_last_1h",
             KEY_RAIN_ACCUM_24H: "rain_last_24h",
-            KEY_TIME_SINCE_RAIN: "time_since_rain",
             KEY_PRESSURE_TREND_DISPLAY: "pressure_trend",
             KEY_HEALTH_DISPLAY: "station_health",
             KEY_FORECAST_TILES: "forecast_tiles",
@@ -1476,16 +1204,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_PRESSURE_CHANGE_WINDOW_HPA: "pressure_change_window",
             KEY_PRESSURE_TREND_HPAH: "pressure_trend_raw",
             KEY_SEA_SURFACE_TEMP: "sea_surface_temperature",
-            # v0.5.0
-            KEY_HDD_TODAY: "heating_degree_days_today",
-            KEY_CDD_TODAY: "cooling_degree_days_today",
-            KEY_HDD_RATE: "hdd_rate",
-            KEY_CDD_RATE: "cdd_rate",
-            KEY_METAR_VALIDATION: "metar_validation",
-            KEY_METAR_TEMP_C: "metar_temperature",
-            KEY_METAR_PRESSURE_HPA: "metar_pressure",
-            KEY_METAR_DELTA_TEMP: "temp_vs_metar_delta",
-            KEY_METAR_DELTA_PRESSURE: "pressure_vs_metar_delta",
             # v0.6.0
             KEY_ET0_DAILY_MM: "et0_daily",
             KEY_ET0_HOURLY_MM: "et0_hourly",
@@ -1494,7 +1212,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_LAST_EXPORT_TIME: "last_export_time",
             # v0.7.0
             KEY_AQI: "air_quality_index",
-            KEY_AQI_LEVEL: "air_quality_level",
             KEY_PM2_5: "pm2_5",
             KEY_PM10: "pm10",
             KEY_NO2: "no2",
@@ -1505,7 +1222,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_POLLEN_WEED: "pollen_weed",
             # v0.8.0
             KEY_MOON_DISPLAY: "moon",
-            KEY_MOON_PHASE: "moon_phase",
             KEY_MOON_ILLUMINATION_PCT: "moon_illumination",
             # v0.9.0
             KEY_SOLAR_FORECAST_TODAY_KWH: "solar_forecast_today",
@@ -1514,9 +1230,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             # v1.2.0
             KEY_FOG_PROBABILITY: "fog_probability",
             KEY_THUNDERSTORM_RISK: "thunderstorm_risk",
-            KEY_PRECIP_TYPE: "precipitation_type",
-            KEY_GDD_TODAY: "gdd_today",
-            KEY_GDD_SEASON: "gdd_season",
             KEY_DRY_STREAK: "dry_streak_days",
             KEY_HEAT_STREAK: "heat_streak_days",
             KEY_FROST_STREAK: "frost_streak_days",
@@ -1525,10 +1238,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_CLIMATOLOGY_30D: "climatology_30d",
             KEY_TEMP_ANOMALY_30D: "temperature_anomaly_30d",
             KEY_RAIN_ANOMALY_30D: "rain_anomaly_30d",
-            KEY_LEARNED_TEMP_BIAS: "learned_temp_bias",
-            KEY_CAL_SUGGESTION_TEMP: "cal_suggestion_temp",
-            KEY_LEARNED_PRESSURE_BIAS: "learned_pressure_bias",
-            KEY_CAL_SUGGESTION_PRESSURE: "cal_suggestion_pressure",
             KEY_FORECAST_SKILL: "forecast_skill",
             KEY_SOLAR_LUX_FACTOR: "solar_lux_factor",
         }

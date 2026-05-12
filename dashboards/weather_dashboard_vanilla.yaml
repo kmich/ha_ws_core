@@ -117,8 +117,8 @@ views:
             name: Last 24 Hours
           - entity: sensor.ws_rain_total
             name: Season Total
-          - entity: sensor.ws_time_since_rain
-            name: Last Rain
+          - entity: sensor.ws_dry_streak_days
+            name: Dry Streak
           - entity: sensor.ws_rain_probability_combined
             name: Rain Probability
 
@@ -300,9 +300,7 @@ views:
         hours_to_show: 24
         entities:
           - entity: sensor.ws_rain_rate
-            name: Filtered
-          - entity: sensor.ws_rain_rate_raw
-            name: Raw
+            name: Rain Rate
 
   # =============================================
   # PAGE 4: ACTIVITY SCORES

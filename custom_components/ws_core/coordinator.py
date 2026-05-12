@@ -196,7 +196,6 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
-    KEY_RAIN_RATE_RAW,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -212,7 +211,6 @@ from .const import (
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
     KEY_THUNDERSTORM_RISK,
-    KEY_TIME_SINCE_RAIN,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
     KEY_WET_BULB_C,
@@ -926,7 +924,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if rt.last_rain_total_mm is None or rt.last_rain_ts is None:
                 rt.last_rain_total_mm = float(rain_total_mm)
                 rt.last_rain_ts = now
-                data[KEY_RAIN_RATE_RAW] = 0.0
                 data[KEY_RAIN_RATE_FILT] = 0.0
             else:
                 dv = float(rain_total_mm) - float(rt.last_rain_total_mm)
@@ -937,7 +934,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 filtered = rt.kalman.update(raw)
                 rt.last_rain_total_mm = float(rain_total_mm)
                 rt.last_rain_ts = now
-                data[KEY_RAIN_RATE_RAW] = round(raw, 2)
                 data[KEY_RAIN_RATE_FILT] = filtered
 
         rain_rate: float = data.get(KEY_RAIN_RATE_FILT, 0.0)
@@ -964,24 +960,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._rain_today_last_total = float(rain_total_mm)
         data["_rain_today_mm"] = round(self._rain_today_mm, 1)
 
-        # Track last rain event and compute time since
+        # Track last rain event timestamp (used by streak counters)
         if float(rain_rate) > 0.0:
             rt.last_rain_event_ts = now
-        if rt.last_rain_event_ts is not None:
-            delta = now - rt.last_rain_event_ts
-            total_s = int(delta.total_seconds())
-            if total_s < 60:
-                data[KEY_TIME_SINCE_RAIN] = "Just now"
-            elif total_s < 3600:
-                data[KEY_TIME_SINCE_RAIN] = f"{total_s // 60}m ago"
-            elif total_s < 86400:
-                h = total_s // 3600
-                data[KEY_TIME_SINCE_RAIN] = f"{h}h ago"
-            else:
-                d = total_s // 86400
-                data[KEY_TIME_SINCE_RAIN] = f"{d}d ago"
-        else:
-            data[KEY_TIME_SINCE_RAIN] = "No rain recorded"
 
         return rain_rate
 
