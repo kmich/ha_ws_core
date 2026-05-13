@@ -1438,6 +1438,28 @@ views:
       - type: grid
         column_span: 4
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             name: "← Back to Weather"
@@ -1452,6 +1474,8 @@ views:
                 - border-radius: 14px
                 - padding: 10px 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 14px
                 - font-weight: 500
@@ -1463,6 +1487,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_current_condition
@@ -1480,6 +1526,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -1527,6 +1575,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -1565,6 +1615,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: conditional
             conditions:
@@ -1584,6 +1656,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -1624,6 +1698,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -1655,6 +1731,28 @@ views:
       - type: grid
         column_span: 4
         columns: 3
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: conditional
             conditions:
@@ -1674,6 +1772,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -1724,6 +1824,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -1776,6 +1878,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -1817,6 +1921,28 @@ views:
       - type: grid
         column_span: 4
         columns: 4
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_rain_rate
@@ -1835,6 +1961,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -1880,6 +2008,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -1976,6 +2106,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_wind_beaufort
@@ -1995,6 +2147,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2040,6 +2194,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2068,6 +2224,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_sea_level_pressure
@@ -2085,6 +2263,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2128,6 +2308,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2159,6 +2341,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_temperature
@@ -2180,6 +2384,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2226,6 +2432,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2254,6 +2462,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: conditional
             conditions:
@@ -2277,6 +2507,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2324,6 +2556,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2356,6 +2590,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: conditional
             conditions:
@@ -2378,6 +2634,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2425,6 +2683,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2452,6 +2712,28 @@ views:
       - type: grid
         column_span: 2
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_et0_daily
@@ -2467,6 +2749,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2497,6 +2781,28 @@ views:
       - type: grid
         column_span: 2
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: conditional
             conditions:
@@ -2516,6 +2822,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2531,6 +2839,28 @@ views:
       - type: grid
         column_span: 4
         columns: 4
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: conditional
             conditions:
@@ -2550,6 +2880,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2593,6 +2925,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2638,6 +2972,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2674,6 +3010,28 @@ views:
       - type: grid
         column_span: 2
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_dry_streak_days
@@ -2690,6 +3048,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2714,6 +3074,28 @@ views:
       - type: grid
         column_span: 2
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_temperature_anomaly_30d
@@ -2729,6 +3111,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2759,8 +3143,30 @@ views:
 
       # ── FOG & THUNDERSTORM (conditional) ────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: conditional
             conditions:
@@ -2780,6 +3186,8 @@ views:
                   - border-radius: 14px
                   - padding: 16px
                   - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
                 name:
                   - font-size: 16px
                   - font-weight: 600
@@ -2806,6 +3214,28 @@ views:
       - type: grid
         column_span: 4
         columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:button-card
             entity: sensor.ws_station_health
@@ -2824,6 +3254,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2868,6 +3300,8 @@ views:
                 - border-radius: 14px
                 - padding: 16px
                 - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
               name:
                 - font-size: 16px
                 - font-weight: 600
@@ -2905,6 +3339,28 @@ views:
       - type: grid
         column_span: 4
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: iframe
             url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9&oFa=1&oC=1&oU=1&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=1
@@ -2912,8 +3368,30 @@ views:
 
       # ── WIND ROSE ────────────────────────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
         cards:
           - type: custom:windrose-card
             title: Wind Rose (24h)
