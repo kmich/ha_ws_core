@@ -1491,8 +1491,58 @@ views:
 
       # ── CURRENT CONDITIONS & FORECAST ────────────────────────────────────────
       - type: grid
-        column_span: 4
-        columns: 4
+        column_span: 2
+        columns: 1
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              display: grid !important;
+              grid-template-columns: 1fr !important;
+              align-items: stretch !important;
+              justify-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              justify-self: stretch !important;
+              width: 100% !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              width: 100% !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+        cards:
+          - type: custom:windrose-card
+            title: Wind Rose (24h)
+            windspeed_bar_location: bottom
+            data_period:
+              period_back: -24h
+            wind_direction_entity:
+              entity: sensor.ws_wind_direction
+            windspeed_entities:
+              - entity: sensor.ws_wind_speed
+                name: Wind Speed
+                windspeed_bar_full: false
+                speed_range_beaufort: true
+            current_direction:
+              show_arrow: true
+
+            card_mod:
+              style: |
+                ha-card { max-height: 520px !important; height: 100% !important; }
+      - type: grid
+        column_span: 2
+        columns: 2
         card_mod:
           style: |
             ha-card {
@@ -1516,24 +1566,6 @@ views:
               min-height: 0 !important;
             }
         cards:
-          - type: custom:windrose-card
-            title: Wind Rose (24h)
-            windspeed_bar_location: bottom
-            data_period:
-              period_back: -24h
-            wind_direction_entity:
-              entity: sensor.ws_wind_direction
-            windspeed_entities:
-              - entity: sensor.ws_wind_speed
-                name: Wind Speed
-                windspeed_bar_full: false
-                speed_range_beaufort: true
-            current_direction:
-              show_arrow: true
-
-            grid_options:
-              columns: 1
-              rows: 2
           - type: custom:button-card
             entity: sensor.ws_current_condition
             name: Current Conditions
@@ -2373,92 +2405,6 @@ views:
                     + '</div></div>';
                 ]]]
 
-          - type: custom:mini-graph-card
-            entities:
-              - entity: sensor.ws_rain_rate
-                name: Rain Rate
-                color: '#38bdf8'
-            hours_to_show: 24
-            points_per_hour: 4
-            line_width: 2
-            height: 120
-            animate: true
-            lower_bound: 0
-            smoothing: false
-            show:
-              name: false
-              icon: false
-              state: false
-              legend: true
-              labels: true
-              points: hover
-              fill: fade
-            card_mod:
-              style: |
-                ha-card {
-                  background: transparent !important;
-                  box-shadow: none !important;
-                  border: none !important;
-                }
-          - type: custom:mini-graph-card
-            entities:
-              - entity: sensor.ws_rain_last_1h
-                name: 1h Accum.
-                color: '#60a5fa'
-              - entity: sensor.ws_rain_last_24h
-                name: 24h Accum.
-                color: '#818cf8'
-                y_axis: secondary
-            hours_to_show: 24
-            points_per_hour: 2
-            line_width: 2
-            height: 120
-            animate: true
-            lower_bound: 0
-            smoothing: true
-            show:
-              name: false
-              icon: false
-              state: false
-              legend: true
-              labels: true
-              points: hover
-              fill: fade
-            card_mod:
-              style: |
-                ha-card {
-                  background: transparent !important;
-                  box-shadow: none !important;
-                  border: none !important;
-                }
-
-      # ── WIND DETAIL ─────────────────────────────────────────────────────────
-      - type: grid
-        column_span: 4
-        columns: 4
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
           - type: custom:button-card
             entity: sensor.ws_wind_beaufort
             name: Wind Detail
@@ -2551,6 +2497,32 @@ views:
                 ]]]
 
       # ── PRESSURE & ZAMBRETTI ─────────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        columns: 4
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+        cards:
           - type: custom:button-card
             entity: sensor.ws_sea_level_pressure
             name: Pressure Detail
@@ -2642,32 +2614,6 @@ views:
                 ]]]
 
       # ── TEMPERATURE EXTENDED ─────────────────────────────────────────────────
-      - type: grid
-        column_span: 4
-        columns: 4
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
           - type: custom:button-card
             entity: sensor.ws_temperature
             name: Temperature Detail
@@ -2763,6 +2709,32 @@ views:
                 ]]]
 
       # ── AIR QUALITY & POLLEN (conditional) ──────────────────────────────────
+      - type: grid
+        column_span: 4
+        columns: 2
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+        cards:
           - type: custom:button-card
             entity: sensor.ws_station_health
             name: Station Health
