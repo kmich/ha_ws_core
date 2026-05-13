@@ -1447,16 +1447,22 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              display: grid !important;
+              grid-template-columns: 1fr !important;
               align-items: stretch !important;
+              justify-items: stretch !important;
             }
             #root > hui-card,
             .grid > hui-card {
               align-self: stretch !important;
+              justify-self: stretch !important;
+              width: 100% !important;
               height: 100% !important;
               min-height: 0 !important;
             }
             #root > hui-card > *,
             .grid > hui-card > * {
+              width: 100% !important;
               height: 100% !important;
               min-height: 0 !important;
             }
@@ -1496,16 +1502,22 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              display: grid !important;
+              grid-template-columns: 1fr !important;
               align-items: stretch !important;
+              justify-items: stretch !important;
             }
             #root > hui-card,
             .grid > hui-card {
               align-self: stretch !important;
+              justify-self: stretch !important;
+              width: 100% !important;
               height: 100% !important;
               min-height: 0 !important;
             }
             #root > hui-card > *,
             .grid > hui-card > * {
+              width: 100% !important;
               height: 100% !important;
               min-height: 0 !important;
             }
@@ -3003,132 +3015,6 @@ views:
 
       - type: grid
         column_span: 4
-        columns: 4
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_display_sensors
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_temperature_display
-              name: Temperature Display
-              show_state: false
-              show_icon: true
-              icon: mdi:thermometer
-              styles:
-                card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: |
-                      [[[
-                        var attrs = (entity && entity.attributes) || {};
-                        return attrs.color || '#60a5fa';
-                      ]]]
-              custom_fields:
-                details: |
-                  [[[
-                    var state = (entity && entity.state) || '--';
-                    var attrs = (entity && entity.attributes) || {};
-                    var pct = parseFloat(attrs.bar_percent) || 50;
-                    var color = attrs.color || '#60a5fa';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:36px;font-weight:200;color:white;">' + state + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> °C</span></div>'
-                      + '<div style="margin-top:10px;background:rgba(255,255,255,0.1);border-radius:4px;height:6px;">'
-                      + '<div style="width:' + Math.min(100,Math.max(0,pct)) + '%;height:100%;background:' + color + ';border-radius:4px;"></div>'
-                      + '</div>'
-                      + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">' + pct.toFixed(0) + '% of range</div>'
-                      + '</div>';
-                  ]]]
-
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_display_sensors
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_forecast_tiles
-              name: Forecast Tiles
-              show_state: false
-              show_icon: true
-              icon: mdi:calendar-weather
-              styles:
-                card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: '#818cf8'
-              custom_fields:
-                details: |
-                  [[[
-                    var attrs = (entity && entity.attributes) || {};
-                    var tiles = attrs.tiles || [];
-                    var count = attrs.count || tiles.length || 0;
-                    var html = '<div style="margin-top:8px;">'
-                      + '<div style="font-size:13px;color:rgba(255,255,255,0.5);">' + count + ' day forecast</div>'
-                      + '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">';
-                    for (var i = 0; i < Math.min(tiles.length, 5); i++) {
-                      var t = tiles[i];
-                      var label = t.label || t.day || '';
-                      var icon = t.icon || 'mdi:weather-cloudy';
-                      var high = t.high_c !== undefined ? parseFloat(t.high_c).toFixed(0) : (t.temp_high !== undefined ? parseFloat(t.temp_high).toFixed(0) : '--');
-                      var low = t.low_c !== undefined ? parseFloat(t.low_c).toFixed(0) : (t.temp_low !== undefined ? parseFloat(t.temp_low).toFixed(0) : '--');
-                      html += '<div style="flex:1;text-align:center;padding:6px 4px;background:rgba(255,255,255,0.05);border-radius:8px;">'
-                        + '<div style="font-size:10px;color:rgba(255,255,255,0.4);">' + label + '</div>'
-                        + '<div style="font-size:11px;color:white;margin-top:4px;">' + high + '°/' + low + '°</div>'
-                        + '</div>';
-                    }
-                    html += '</div></div>';
-                    return html;
-                  ]]]
-
-
-      # ── STREAK COUNTERS ──────────────────────────────────────────────────────
-      - type: grid
-        column_span: 4
         columns: 1
         card_mod:
           style: |
@@ -3139,22 +3025,33 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              display: grid !important;
+              grid-template-columns: 1fr !important;
               align-items: stretch !important;
+              justify-items: stretch !important;
             }
             #root > hui-card,
             .grid > hui-card {
               align-self: stretch !important;
+              justify-self: stretch !important;
+              width: 100% !important;
               height: 100% !important;
               min-height: 0 !important;
             }
             #root > hui-card > *,
             .grid > hui-card > * {
+              width: 100% !important;
               height: 100% !important;
               min-height: 0 !important;
             }
         cards:
           - type: iframe
             url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9&oFa=1&oC=1&oU=1&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=1
-            aspect_ratio: 120%
+            aspect_ratio: 30%
 
       # ── WIND ROSE ────────────────────────────────────────────────────────────
+            card_mod:
+              style: |
+                ha-card { min-height: 600px !important; }
+                #root, .card-content { min-height: 600px !important; }
+                iframe { min-height: 600px !important; height: 600px !important; }
