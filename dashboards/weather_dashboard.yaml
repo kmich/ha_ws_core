@@ -2445,7 +2445,7 @@ views:
               details: |
                 [[[
                   var avg = parseFloat(entity && entity.state);
-                  var wetBulb = parseFloat((states['sensor.ws_wet_bulb_temperature'] || {}).state);
+                  var wetBulb = parseFloat((states['sensor.ws_wet_bulb'] || {}).state);
                   var frost = parseFloat((states['sensor.ws_frost_point'] || {}).state);
                   var dew = parseFloat((states['sensor.ws_dew_point'] || {}).state);
                   var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
