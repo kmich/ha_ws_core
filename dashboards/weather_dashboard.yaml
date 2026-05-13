@@ -1492,53 +1492,6 @@ views:
       # ── CURRENT CONDITIONS & FORECAST ────────────────────────────────────────
       - type: grid
         column_span: 4
-        columns: 1
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              display: grid !important;
-              grid-template-columns: 1fr !important;
-              align-items: stretch !important;
-              justify-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              justify-self: stretch !important;
-              width: 100% !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              width: 100% !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
-          - type: custom:windrose-card
-            title: Wind Rose (24h)
-            windspeed_bar_location: bottom
-            data_period:
-              period_back: -24h
-            wind_direction_entity:
-              entity: sensor.ws_wind_direction
-            windspeed_entities:
-              - entity: sensor.ws_wind_speed
-                name: Wind Speed
-                windspeed_bar_full: false
-                speed_range_beaufort: true
-            current_direction:
-              show_arrow: true
-
-      - type: grid
-        column_span: 4
         columns: 4
         card_mod:
           style: |
@@ -1563,6 +1516,24 @@ views:
               min-height: 0 !important;
             }
         cards:
+          - type: custom:windrose-card
+            title: Wind Rose (24h)
+            windspeed_bar_location: bottom
+            data_period:
+              period_back: -24h
+            wind_direction_entity:
+              entity: sensor.ws_wind_direction
+            windspeed_entities:
+              - entity: sensor.ws_wind_speed
+                name: Wind Speed
+                windspeed_bar_full: false
+                speed_range_beaufort: true
+            current_direction:
+              show_arrow: true
+
+            grid_options:
+              columns: 1
+              rows: 2
           - type: custom:button-card
             entity: sensor.ws_current_condition
             name: Current Conditions
@@ -1614,57 +1585,6 @@ views:
                     + '</div></div>';
                 ]]]
 
-          - type: custom:button-card
-            entity: sensor.ws_forecast_daily
-            name: 7-Day Forecast
-            show_state: false
-            show_icon: true
-            icon: mdi:calendar-weather
-            triggers_update:
-              - sensor.ws_forecast_daily
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#818cf8'
-            custom_fields:
-              details: |
-                [[[
-                  var attrs = (entity && entity.attributes) || {};
-                  var daily = attrs.daily || [];
-                  if (!Array.isArray(daily) || daily.length === 0) {
-                    return '<div style="margin-top:8px;color:rgba(255,255,255,0.4);">No forecast data</div>';
-                  }
-                  var iconMap = {0:'mdi:weather-sunny',1:'mdi:weather-sunny',2:'mdi:weather-partly-cloudy',3:'mdi:weather-cloudy',45:'mdi:weather-fog',48:'mdi:weather-fog',51:'mdi:weather-drizzle',53:'mdi:weather-drizzle',55:'mdi:weather-drizzle',61:'mdi:weather-rainy',63:'mdi:weather-rainy',65:'mdi:weather-pouring',80:'mdi:weather-rainy',81:'mdi:weather-pouring',95:'mdi:weather-lightning',96:'mdi:weather-lightning-rainy'};
-                  var rows = daily.slice(0,7).map(function(d) {
-                    var date = new Date(d.date);
-                    var day = date.toLocaleDateString('en',{weekday:'short'});
-                    var icon = iconMap[d.weathercode] || 'mdi:weather-cloudy';
-                    var tmax = isNaN(d.tmax_c) ? '--' : Math.round(d.tmax_c) + '°';
-                    var tmin = isNaN(d.tmin_c) ? '--' : Math.round(d.tmin_c) + '°';
-                    var rain = d.precip_mm > 0.1 ? '<span style="color:#60a5fa;font-size:10px;">💧' + parseFloat(d.precip_mm).toFixed(1) + '</span>' : '';
-                    return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.06);">'
-                      + '<span style="font-size:11px;color:rgba(255,255,255,0.5);width:28px;">' + day + '</span>'
-                      + '<ha-icon icon="' + icon + '" style="--mdc-icon-size:16px;color:rgba(255,255,255,0.7);flex-shrink:0;"></ha-icon>'
-                      + '<span style="font-size:12px;color:#f87171;font-weight:500;width:26px;">' + tmax + '</span>'
-                      + '<span style="font-size:12px;color:#93c5fd;width:26px;">' + tmin + '</span>'
-                      + rain
-                      + '</div>';
-                  }).join('');
-                  return '<div style="margin-top:6px;">' + rows + '</div>';
-                ]]]
-
-      # ── SKY & UV ────────────────────────────────
           - type: conditional
             conditions:
               - condition: state
@@ -1755,32 +1675,6 @@ views:
                 ]]]
 
       # ── RISK SENSORS (conditional) ──────────────────────────────────────────
-      - type: grid
-        column_span: 4
-        columns: 4
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
           - type: conditional
             conditions:
               - condition: state
@@ -1945,6 +1839,32 @@ views:
                   ]]]
 
       # ── RAIN DETAIL ─────────────────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        columns: 4
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+        cards:
           - type: conditional
             conditions:
               - condition: state
@@ -1994,32 +1914,6 @@ views:
                       + '</div></div>';
                   ]]]
 
-      - type: grid
-        column_span: 4
-        columns: 4
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
           - type: conditional
             conditions:
               - condition: state
@@ -2169,6 +2063,32 @@ views:
                   ]]]
 
       # ── ET₀ EVAPOTRANSPIRATION ──────────────────────────────────────────────────
+      - type: grid
+        column_span: 4
+        columns: 4
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+        cards:
           - type: custom:button-card
             entity: sensor.ws_et0_daily
             name: ET₀ Today
@@ -2212,6 +2132,122 @@ views:
                 ]]]
 
       # ── UPLOAD STATUS (conditional) ──────────────────────────────────────────
+          - type: custom:button-card
+            entity: sensor.ws_dry_streak_days
+            name: Streak Counters
+            show_state: false
+            show_icon: true
+            icon: mdi:calendar-range
+            triggers_update:
+              - sensor.ws_heat_streak_days
+              - sensor.ws_frost_streak_days
+            styles:
+              card:
+                - background: rgba(30,30,30,0.9)
+                - border-radius: 14px
+                - padding: 16px
+                - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
+              name:
+                - font-size: 16px
+                - font-weight: 600
+                - color: white
+              icon:
+                - width: 48px
+                - color: '#fbbf24'
+            custom_fields:
+              details: |
+                [[[
+                  var dry = parseInt((entity && entity.state) || 0);
+                  var heat = parseInt((states['sensor.ws_heat_streak_days'] || {}).state || 0);
+                  var frost = parseInt((states['sensor.ws_frost_streak_days'] || {}).state || 0);
+                  return '<div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.8);line-height:2.2;">'
+                    + '<div style="display:flex;justify-content:space-between;"><span>Dry</span><span style="font-size:20px;font-weight:300;color:#fbbf24;">' + dry + 'd</span></div>'
+                    + '<div style="display:flex;justify-content:space-between;"><span>Heat</span><span style="font-size:20px;font-weight:300;color:#ef4444;">' + heat + 'd</span></div>'
+                    + '<div style="display:flex;justify-content:space-between;"><span>Frost</span><span style="font-size:20px;font-weight:300;color:#93c5fd;">' + frost + 'd</span></div>'
+                    + '</div>';
+                ]]]
+
+      # ── 30-DAY CLIMATOLOGY ──────────────────────────────────────────────────
+          - type: custom:button-card
+            entity: sensor.ws_temperature_anomaly_30d
+            name: 30-Day Anomaly
+            show_state: false
+            show_icon: true
+            icon: mdi:thermometer-alert
+            triggers_update:
+              - sensor.ws_rain_anomaly_30d
+            styles:
+              card:
+                - background: rgba(30,30,30,0.9)
+                - border-radius: 14px
+                - padding: 16px
+                - border: 1px solid rgba(255,255,255,0.1)
+                - height: 100%
+                - box-sizing: border-box
+              name:
+                - font-size: 16px
+                - font-weight: 600
+                - color: white
+              icon:
+                - width: 48px
+                - color: |
+                    [[[
+                      var v = parseFloat(entity && entity.state);
+                      if (isNaN(v)) return 'rgba(255,255,255,0.4)';
+                      return v > 2 ? '#ef4444' : v < -2 ? '#60a5fa' : '#4ade80';
+                    ]]]
+            custom_fields:
+              details: |
+                [[[
+                  var tA = parseFloat(entity && entity.state);
+                  var rA = parseFloat((states['sensor.ws_rain_anomaly_30d'] || {}).state);
+                  var fmt = function(v, u) { if (isNaN(v)) return '--'; return (v > 0 ? '+' : '') + v.toFixed(1) + ' ' + u; };
+                  var tc = isNaN(tA) ? 'rgba(255,255,255,0.4)' : (tA > 2 ? '#ef4444' : tA < -2 ? '#60a5fa' : '#4ade80');
+                  var rc = isNaN(rA) ? 'rgba(255,255,255,0.4)' : (rA > 5 ? '#3b82f6' : rA < -5 ? '#fbbf24' : '#4ade80');
+                  return '<div style="margin-top:8px;">'
+                    + '<div style="display:flex;gap:20px;">'
+                    + '<div><div style="font-size:24px;font-weight:200;color:' + tc + ';">' + fmt(tA,'\u00b0C') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Temp anomaly</div></div>'
+                    + '<div><div style="font-size:24px;font-weight:200;color:' + rc + ';">' + fmt(rA,'mm') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Rain anomaly</div></div>'
+                    + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:8px;">vs 30-day rolling average · Enable entity in HA to activate</div>'
+                    + '</div>';
+                ]]]
+
+
+      # ── STATION DIAGNOSTICS ──────────────────────────────────────────────────
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_wunderground
+                state: "on"
+            card:
+              type: custom:button-card
+              entity: sensor.ws_wu_upload_status
+              name: Weather Underground
+              show_state: true
+              show_icon: true
+              icon: mdi:weather-cloudy-clock
+              styles:
+                card:
+                  - background: rgba(30,30,30,0.9)
+                  - border-radius: 14px
+                  - padding: 16px
+                  - border: 1px solid rgba(255,255,255,0.1)
+                  - height: 100%
+                  - box-sizing: border-box
+                name:
+                  - font-size: 16px
+                  - font-weight: 600
+                  - color: white
+                state:
+                  - font-size: 13px
+                  - color: rgba(255,255,255,0.6)
+                icon:
+                  - width: 48px
+                  - color: '#f59e0b'
+
+      # ── DISPLAY SENSORS (conditional) ───────────────────────────────────────
       - type: grid
         column_span: 4
         columns: 4
@@ -2728,116 +2764,6 @@ views:
 
       # ── AIR QUALITY & POLLEN (conditional) ──────────────────────────────────
           - type: custom:button-card
-            entity: sensor.ws_dry_streak_days
-            name: Streak Counters
-            show_state: false
-            show_icon: true
-            icon: mdi:calendar-range
-            triggers_update:
-              - sensor.ws_heat_streak_days
-              - sensor.ws_frost_streak_days
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#fbbf24'
-            custom_fields:
-              details: |
-                [[[
-                  var dry = parseInt((entity && entity.state) || 0);
-                  var heat = parseInt((states['sensor.ws_heat_streak_days'] || {}).state || 0);
-                  var frost = parseInt((states['sensor.ws_frost_streak_days'] || {}).state || 0);
-                  return '<div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.8);line-height:2.2;">'
-                    + '<div style="display:flex;justify-content:space-between;"><span>Dry</span><span style="font-size:20px;font-weight:300;color:#fbbf24;">' + dry + 'd</span></div>'
-                    + '<div style="display:flex;justify-content:space-between;"><span>Heat</span><span style="font-size:20px;font-weight:300;color:#ef4444;">' + heat + 'd</span></div>'
-                    + '<div style="display:flex;justify-content:space-between;"><span>Frost</span><span style="font-size:20px;font-weight:300;color:#93c5fd;">' + frost + 'd</span></div>'
-                    + '</div>';
-                ]]]
-
-      # ── 30-DAY CLIMATOLOGY ──────────────────────────────────────────────────
-          - type: custom:button-card
-            entity: sensor.ws_temperature_anomaly_30d
-            name: 30-Day Anomaly
-            show_state: false
-            show_icon: true
-            icon: mdi:thermometer-alert
-            triggers_update:
-              - sensor.ws_rain_anomaly_30d
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
-                    [[[
-                      var v = parseFloat(entity && entity.state);
-                      if (isNaN(v)) return 'rgba(255,255,255,0.4)';
-                      return v > 2 ? '#ef4444' : v < -2 ? '#60a5fa' : '#4ade80';
-                    ]]]
-            custom_fields:
-              details: |
-                [[[
-                  var tA = parseFloat(entity && entity.state);
-                  var rA = parseFloat((states['sensor.ws_rain_anomaly_30d'] || {}).state);
-                  var fmt = function(v, u) { if (isNaN(v)) return '--'; return (v > 0 ? '+' : '') + v.toFixed(1) + ' ' + u; };
-                  var tc = isNaN(tA) ? 'rgba(255,255,255,0.4)' : (tA > 2 ? '#ef4444' : tA < -2 ? '#60a5fa' : '#4ade80');
-                  var rc = isNaN(rA) ? 'rgba(255,255,255,0.4)' : (rA > 5 ? '#3b82f6' : rA < -5 ? '#fbbf24' : '#4ade80');
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="display:flex;gap:20px;">'
-                    + '<div><div style="font-size:24px;font-weight:200;color:' + tc + ';">' + fmt(tA,'\u00b0C') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Temp anomaly</div></div>'
-                    + '<div><div style="font-size:24px;font-weight:200;color:' + rc + ';">' + fmt(rA,'mm') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Rain anomaly</div></div>'
-                    + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:8px;">vs 30-day rolling average · Enable entity in HA to activate</div>'
-                    + '</div>';
-                ]]]
-
-
-      # ── STATION DIAGNOSTICS ──────────────────────────────────────────────────
-      - type: grid
-        column_span: 4
-        columns: 4
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
-          - type: custom:button-card
             entity: sensor.ws_station_health
             name: Station Health
             show_state: false
@@ -2936,83 +2862,6 @@ views:
                 ]]]
 
       # ── RADAR ────────────────────────────────────────────────────────────────
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_wunderground
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_wu_upload_status
-              name: Weather Underground
-              show_state: true
-              show_icon: true
-              icon: mdi:weather-cloudy-clock
-              styles:
-                card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                state:
-                  - font-size: 13px
-                  - color: rgba(255,255,255,0.6)
-                icon:
-                  - width: 48px
-                  - color: '#f59e0b'
-
-      # ── DISPLAY SENSORS (conditional) ───────────────────────────────────────
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_display_sensors
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_rain_display
-              name: Rain Display
-              show_state: false
-              show_icon: true
-              icon: mdi:weather-rainy
-              styles:
-                card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: '#38bdf8'
-              custom_fields:
-                details: |
-                  [[[
-                    var attrs = (entity && entity.attributes) || {};
-                    var rate = parseFloat(attrs.rain_rate) || 0;
-                    var today = parseFloat(attrs.rain_today) || 0;
-                    var h24 = parseFloat(attrs.rain_24h) || 0;
-                    var isRaining = attrs.is_raining === true;
-                    var rateColor = rate > 5 ? '#3b82f6' : rate > 0 ? '#60a5fa' : 'rgba(255,255,255,0.4)';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:32px;font-weight:200;color:' + rateColor + ';">' + rate.toFixed(1) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> mm/h</span></div>'
-                      + (isRaining ? '<div style="font-size:12px;color:#60a5fa;margin-top:4px;">Currently raining</div>' : '<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px;">Not raining</div>')
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                      + '<div><strong>Today:</strong> ' + today.toFixed(1) + ' mm</div>'
-                      + '<div><strong>Last 24h:</strong> ' + h24.toFixed(1) + ' mm</div>'
-                      + '</div></div>';
-                  ]]]
-
       - type: grid
         column_span: 4
         columns: 1
