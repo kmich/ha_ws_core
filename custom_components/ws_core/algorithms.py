@@ -701,12 +701,16 @@ def determine_current_condition(
     if not is_day:
         return "clear-night" if humidity < 50 and illuminance_lx < 100 else "overcast-night"
 
-    # Cloud cover from illuminance (approximate, no solar-angle correction)
-    if illuminance_lx < 5000:
+    # Cloud cover from illuminance (approximate, no solar-angle correction).
+    # Thresholds tuned to match human perception rather than radiometric truth:
+    # at low-to-moderate sun angles, partly-cloudy skies often register only
+    # 5-15 kLx, so an aggressive "cloudy" band makes the sensor disagree with
+    # what you see outside. These bounds favour partly-cloudy over cloudy.
+    if illuminance_lx < 1500:
         return "overcast"
-    if illuminance_lx < 20000:
+    if illuminance_lx < 6000:
         return "cloudy"
-    if illuminance_lx < 60000:
+    if illuminance_lx < 35000:
         return "partly-cloudy"
     return "sunny"
 
