@@ -1585,6 +1585,7 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              grid-template-columns: repeat(3, 1fr) !important;
               align-items: stretch !important;
             }
             #root > hui-card,
@@ -1766,6 +1767,7 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              grid-template-columns: repeat(3, 1fr) !important;
               align-items: stretch !important;
             }
             #root > hui-card,
@@ -1942,6 +1944,7 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              grid-template-columns: repeat(3, 1fr) !important;
               align-items: stretch !important;
             }
             #root > hui-card,
@@ -2254,6 +2257,7 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              grid-template-columns: repeat(3, 1fr) !important;
               align-items: stretch !important;
             }
             #root > hui-card,
@@ -2585,6 +2589,7 @@ views:
               padding: 0 !important;
             }
             #root, .grid {
+              grid-template-columns: repeat(3, 1fr) !important;
               align-items: stretch !important;
             }
             #root > hui-card,
