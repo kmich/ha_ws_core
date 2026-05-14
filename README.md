@@ -11,6 +11,14 @@ Weather Station Core reads raw sensor data from your existing weather station �
 
 ---
 
+## Screenshots
+
+| Weather view | Advanced view |
+|---|---|
+| ![Weather dashboard](screenshots/dashboard_weather.jpg) | ![Advanced dashboard](screenshots/dashboard_advanced.jpg) |
+
+---
+
 ## Features
 
 - **Real Zambretti barometric forecaster** — Negretti & Zambra lookup table (Z-numbers 1–26), climate-region-aware wind corrections, seasonal adjustment
