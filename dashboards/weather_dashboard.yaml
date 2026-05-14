@@ -1491,7 +1491,7 @@ views:
 
       # ── CURRENT CONDITIONS & FORECAST ────────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 4
         columns: 1
         card_mod:
           style: |
@@ -1539,13 +1539,10 @@ views:
 
             card_mod:
               style: |
-                ha-card {
-                  overflow: hidden !important;
-                  height: 100% !important;
-                }
+                ha-card { overflow: hidden !important; }
       - type: grid
-        column_span: 2
-        columns: 2
+        column_span: 4
+        columns: 4
         card_mod:
           style: |
             ha-card {
@@ -1762,6 +1759,32 @@ views:
                       + '</div>';
                   ]]]
 
+      - type: grid
+        column_span: 4
+        columns: 4
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+            #root, .grid {
+              align-items: stretch !important;
+            }
+            #root > hui-card,
+            .grid > hui-card {
+              align-self: stretch !important;
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+            #root > hui-card > *,
+            .grid > hui-card > * {
+              height: 100% !important;
+              min-height: 0 !important;
+            }
+        cards:
           - type: conditional
             conditions:
               - condition: state
