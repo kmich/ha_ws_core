@@ -1613,12 +1613,32 @@ views:
                 }
             cards:
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_fog
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_fog_probability
                   name: Fog Probability
                   show_state: false
@@ -1658,12 +1678,32 @@ views:
                       ]]]
 
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_thunderstorm_risk
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_thunderstorm_risk
                   name: Thunderstorm Risk
                   show_state: false
@@ -1710,12 +1750,32 @@ views:
                       ]]]
 
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_fire_risk_score
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_fire_risk_score
                   name: Fire Risk Score
                   show_state: false
@@ -1803,6 +1863,15 @@ views:
                 }
             cards:
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_current_condition
                 name: Current Conditions
                 show_state: false
@@ -1854,6 +1923,15 @@ views:
                     ]]]
 
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_temperature
                 name: Temperature Detail
                 show_state: false
@@ -1907,6 +1985,15 @@ views:
                     ]]]
 
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_temperature_avg_24h
                 name: Temperature Extended
                 show_state: false
@@ -1988,6 +2075,15 @@ views:
                 }
             cards:
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_wind_beaufort
                 name: Wind Detail
                 show_state: false
@@ -2038,6 +2134,15 @@ views:
                     ]]]
 
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_wind_direction
                 name: Wind Direction
                 show_state: false
@@ -2080,6 +2185,15 @@ views:
 
           # ── PRESSURE & ZAMBRETTI ─────────────────────────────────────────────────
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_sea_level_pressure
                 name: Pressure Detail
                 show_state: false
@@ -2147,6 +2261,15 @@ views:
                 }
             cards:
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_zambretti_forecast
                 name: Zambretti Detail
                 show_state: false
@@ -2193,6 +2316,15 @@ views:
 
           # ── TEMPERATURE EXTENDED ─────────────────────────────────────────────────
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_rain_rate
                 name: Rain Accumulations
                 show_state: false
@@ -2238,6 +2370,15 @@ views:
                     ]]]
 
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_rain_probability_combined
                 name: Rain Analysis
                 show_state: false
@@ -2331,6 +2472,15 @@ views:
                 }
             cards:
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_uv_level
                 name: UV Exposure
                 show_state: false
@@ -2376,12 +2526,32 @@ views:
 
           # ── RISK SENSORS (conditional) ──────────────────────────────────────────
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_solar_forecast
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_solar_forecast_today
                   name: Solar Forecast
                   show_state: false
@@ -2422,12 +2592,32 @@ views:
 
           # ── ET₀ EVAPOTRANSPIRATION ──────────────────────────────────────────────────
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_moon
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_moon
                   name: Moon Phase
                   show_state: false
@@ -2494,12 +2684,32 @@ views:
                 }
             cards:
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_sea_temp
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_sea_surface_temperature
                   name: Sea Temperature
                   show_state: false
@@ -2552,12 +2762,32 @@ views:
 
           # ── RAIN DETAIL ─────────────────────────────────────────────────────────
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_air_quality
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_air_quality_index
                   name: Air Quality
                   show_state: false
@@ -2601,12 +2831,32 @@ views:
                       ]]]
 
               - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
                 conditions:
                   - condition: state
                     entity: switch.ws_enable_pollen
                     state: "on"
                 card:
                   type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
                   entity: sensor.ws_pollen_level
                   name: Pollen
                   show_state: false
@@ -2693,6 +2943,15 @@ views:
                 }
             cards:
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_temperature_anomaly_30d
                 name: 30-Day Anomaly
                 show_state: false
@@ -2739,6 +2998,15 @@ views:
 
           # ── STATION DIAGNOSTICS ──────────────────────────────────────────────────
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_dry_streak_days
                 name: Streak Counters
                 show_state: false
@@ -2777,6 +3045,15 @@ views:
 
           # ── 30-DAY CLIMATOLOGY ──────────────────────────────────────────────────
               - type: custom:button-card
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: block;
+                    }
+                    ha-card {
+                      height: 100% !important;
+                    }
                 entity: sensor.ws_et0_daily
                 name: ET₀ Today
                 show_state: false
