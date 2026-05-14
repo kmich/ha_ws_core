@@ -127,19 +127,6 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         name="Feature: Solar PV Forecast",
         icon="mdi:solar-power",
     ),
-    # v1.2.0
-    WSFeatureDesc(
-        conf_key=CONF_ENABLE_FOG,
-        default=DEFAULT_ENABLE_FOG,
-        name="Feature: Fog Probability",
-        icon="mdi:weather-fog",
-    ),
-    WSFeatureDesc(
-        conf_key=CONF_ENABLE_THUNDERSTORM,
-        default=DEFAULT_ENABLE_THUNDERSTORM,
-        name="Feature: Thunderstorm Risk",
-        icon="mdi:weather-lightning",
-    ),
 )
 
 
