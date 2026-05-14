@@ -3095,9 +3095,9 @@ views:
                         + '</div></div>';
                     ]]]
 
-          # ── WIND ROSE (1/3) & RADAR (2/3) side by side ─────────────────────────
+          # ── WIND ROSE (1/4) & RADAR (3/4) side by side ─────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 1
         columns: 1
         card_mod:
           style: |
@@ -3130,7 +3130,7 @@ views:
               style: |
                 ha-card { overflow: hidden !important; }
       - type: grid
-        column_span: 4
+        column_span: 3
         columns: 1
         card_mod:
           style: |
