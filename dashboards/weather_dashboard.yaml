@@ -1575,7 +1575,7 @@ views:
       # ── CURRENT CONDITIONS & FORECAST ────────────────────────────────────────
       - type: grid
         column_span: 4
-        columns: 3
+        columns: 1
         card_mod:
           style: |
             ha-card {
@@ -1584,180 +1584,186 @@ views:
               border: none !important;
               padding: 0 !important;
             }
-            #root, .grid {
-              grid-template-columns: repeat(3, 1fr) !important;
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
+
         cards:
           - type: heading
             heading: Hazards & Risk
             heading_style: title
             icon: mdi:alert
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_fog
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_fog_probability
-              name: Fog Probability
-              show_state: false
-              show_icon: true
-              icon: mdi:weather-fog
-              styles:
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+                #root {
+                  align-items: stretch !important;
+                  gap: 8px !important;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_fog
+                    state: "on"
                 card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: '#94a3b8'
-              custom_fields:
-                details: |
-                  [[[
-                    var prob = parseFloat(entity && entity.state);
-                    var attrs = (entity && entity.attributes) || {};
-                    var level = attrs.risk_level || '--';
-                    var dep = attrs.dew_point_depression_c;
-                    var humidity = parseFloat((states['sensor.ws_humidity'] || {}).state) || 0;
-                    var col = prob >= 50 ? '#94a3b8' : prob >= 20 ? '#cbd5e1' : 'rgba(255,255,255,0.4)';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:36px;font-weight:200;color:' + col + ';">' + (isNaN(prob) ? '--' : prob.toFixed(0)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> %</span></div>'
-                      + '<div style="font-size:14px;color:' + col + ';margin-top:4px;">' + level + '</div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                      + (dep !== undefined ? '<div><strong>T–Td:</strong> ' + parseFloat(dep).toFixed(1) + '°C</div>' : '')
-                      + '<div><strong>Humidity:</strong> ' + humidity + '%</div>'
-                      + '</div></div>';
-                  ]]]
+                  type: custom:button-card
+                  entity: sensor.ws_fog_probability
+                  name: Fog Probability
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:weather-fog
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: '#94a3b8'
+                  custom_fields:
+                    details: |
+                      [[[
+                        var prob = parseFloat(entity && entity.state);
+                        var attrs = (entity && entity.attributes) || {};
+                        var level = attrs.risk_level || '--';
+                        var dep = attrs.dew_point_depression_c;
+                        var humidity = parseFloat((states['sensor.ws_humidity'] || {}).state) || 0;
+                        var col = prob >= 50 ? '#94a3b8' : prob >= 20 ? '#cbd5e1' : 'rgba(255,255,255,0.4)';
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:36px;font-weight:200;color:' + col + ';">' + (isNaN(prob) ? '--' : prob.toFixed(0)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> %</span></div>'
+                          + '<div style="font-size:14px;color:' + col + ';margin-top:4px;">' + level + '</div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                          + (dep !== undefined ? '<div><strong>T–Td:</strong> ' + parseFloat(dep).toFixed(1) + '°C</div>' : '')
+                          + '<div><strong>Humidity:</strong> ' + humidity + '%</div>'
+                          + '</div></div>';
+                      ]]]
 
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_thunderstorm_risk
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_thunderstorm_risk
-              name: Thunderstorm Risk
-              show_state: false
-              show_icon: true
-              icon: mdi:weather-lightning
-              styles:
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_thunderstorm_risk
+                    state: "on"
                 card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: |
+                  type: custom:button-card
+                  entity: sensor.ws_thunderstorm_risk
+                  name: Thunderstorm Risk
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:weather-lightning
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: |
+                          [[[
+                            var score = parseInt(entity && entity.state) || 0;
+                            if (score >= 70) return '#ef4444';
+                            if (score >= 40) return '#f59e0b';
+                            if (score >= 15) return '#fbbf24';
+                            return '#10b981';
+                          ]]]
+                  custom_fields:
+                    score: |
                       [[[
                         var score = parseInt(entity && entity.state) || 0;
-                        if (score >= 70) return '#ef4444';
-                        if (score >= 40) return '#f59e0b';
-                        if (score >= 15) return '#fbbf24';
-                        return '#10b981';
+                        var attrs = (entity && entity.attributes) || {};
+                        var level = attrs.risk_level || attrs.level || '';
+                        var factors = attrs.triggering_factors || attrs.factors || [];
+                        var scoreColor = score >= 70 ? '#ef4444' : score >= 40 ? '#f59e0b' : score >= 15 ? '#fbbf24' : '#10b981';
+                        var factorsHtml = Array.isArray(factors) && factors.length
+                          ? factors.slice(0,3).map(function(f) { return '<div>\u26a1 ' + String(f).replace(/_/g,' ') + '</div>'; }).join('')
+                          : '<div style="color:rgba(255,255,255,0.4);">No active triggers</div>';
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:32px;font-weight:300;color:' + scoreColor + ';">' + score + '/100'
+                          + (level ? ' <span style="font-size:14px;color:' + scoreColor + ';font-weight:500;">' + level + '</span>' : '') + '</div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.9;">' + factorsHtml + '</div>'
+                          + '</div>';
                       ]]]
-              custom_fields:
-                score: |
-                  [[[
-                    var score = parseInt(entity && entity.state) || 0;
-                    var attrs = (entity && entity.attributes) || {};
-                    var level = attrs.risk_level || attrs.level || '';
-                    var factors = attrs.triggering_factors || attrs.factors || [];
-                    var scoreColor = score >= 70 ? '#ef4444' : score >= 40 ? '#f59e0b' : score >= 15 ? '#fbbf24' : '#10b981';
-                    var factorsHtml = Array.isArray(factors) && factors.length
-                      ? factors.slice(0,3).map(function(f) { return '<div>\u26a1 ' + String(f).replace(/_/g,' ') + '</div>'; }).join('')
-                      : '<div style="color:rgba(255,255,255,0.4);">No active triggers</div>';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:32px;font-weight:300;color:' + scoreColor + ';">' + score + '/100'
-                      + (level ? ' <span style="font-size:14px;color:' + scoreColor + ';font-weight:500;">' + level + '</span>' : '') + '</div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.9;">' + factorsHtml + '</div>'
-                      + '</div>';
-                  ]]]
 
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_fire_risk_score
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_fire_risk_score
-              name: Fire Risk Score
-              show_state: false
-              show_icon: true
-              icon: mdi:fire
-              styles:
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_fire_risk_score
+                    state: "on"
                 card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: |
+                  type: custom:button-card
+                  entity: sensor.ws_fire_risk_score
+                  name: Fire Risk Score
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:fire
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: |
+                          [[[
+                            var fwi = parseFloat(entity && entity.state) || 0;
+                            if (fwi >= 50) return '#991b1b';
+                            if (fwi >= 30) return '#dc2626';
+                            if (fwi >= 19) return '#f59e0b';
+                            if (fwi >= 8) return '#fbbf24';
+                            return '#10b981';
+                          ]]]
+                  custom_fields:
+                    score: |
                       [[[
                         var fwi = parseFloat(entity && entity.state) || 0;
-                        if (fwi >= 50) return '#991b1b';
-                        if (fwi >= 30) return '#dc2626';
-                        if (fwi >= 19) return '#f59e0b';
-                        if (fwi >= 8) return '#fbbf24';
-                        return '#10b981';
+                        var attrs = (entity && entity.attributes) || {};
+                        var level = attrs.danger_level || 'Low';
+                        var temp = attrs.temperature_c;
+                        var humid = attrs.humidity_pct;
+                        var wind = attrs.wind_ms;
+                        var levelColor = level === 'Catastrophic' ? '#991b1b' : level === 'Extreme' ? '#dc2626' : level === 'Very High' ? '#ef4444' : level === 'High' ? '#f59e0b' : level === 'Moderate' ? '#fbbf24' : '#10b981';
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:32px;font-weight:300;color:white;">' + fwi.toFixed(0) + ' <span style="font-size:14px;color:' + levelColor + ';font-weight:600;">' + level + '</span></div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.8;">'
+                          + '<div>Temp: ' + (temp !== undefined ? parseFloat(temp).toFixed(1) + 'C' : 'N/A') + '</div>'
+                          + '<div>Humidity: ' + (humid !== undefined ? humid + '%' : 'N/A') + '</div>'
+                          + '<div>Wind: ' + (wind !== undefined ? parseFloat(wind).toFixed(1) + ' m/s' : 'N/A') + '</div>'
+                          + '</div></div>';
                       ]]]
-              custom_fields:
-                score: |
-                  [[[
-                    var fwi = parseFloat(entity && entity.state) || 0;
-                    var attrs = (entity && entity.attributes) || {};
-                    var level = attrs.danger_level || 'Low';
-                    var temp = attrs.temperature_c;
-                    var humid = attrs.humidity_pct;
-                    var wind = attrs.wind_ms;
-                    var levelColor = level === 'Catastrophic' ? '#991b1b' : level === 'Extreme' ? '#dc2626' : level === 'Very High' ? '#ef4444' : level === 'High' ? '#f59e0b' : level === 'Moderate' ? '#fbbf24' : '#10b981';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:32px;font-weight:300;color:white;">' + fwi.toFixed(0) + ' <span style="font-size:14px;color:' + levelColor + ';font-weight:600;">' + level + '</span></div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px;line-height:1.8;">'
-                      + '<div>Temp: ' + (temp !== undefined ? parseFloat(temp).toFixed(1) + 'C' : 'N/A') + '</div>'
-                      + '<div>Humidity: ' + (humid !== undefined ? humid + '%' : 'N/A') + '</div>'
-                      + '<div>Wind: ' + (wind !== undefined ? parseFloat(wind).toFixed(1) + ' m/s' : 'N/A') + '</div>'
-                      + '</div></div>';
-                  ]]]
 
       - type: grid
         column_span: 4
-        columns: 3
+        columns: 1
         card_mod:
           style: |
             ha-card {
@@ -1766,175 +1772,181 @@ views:
               border: none !important;
               padding: 0 !important;
             }
-            #root, .grid {
-              grid-template-columns: repeat(3, 1fr) !important;
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
+
         cards:
           - type: heading
             heading: Temperature
             heading_style: title
             icon: mdi:thermometer
-          - type: custom:button-card
-            entity: sensor.ws_current_condition
-            name: Current Conditions
-            show_state: false
-            show_icon: true
-            icon: mdi:weather-partly-cloudy
-            triggers_update:
-              - sensor.ws_wind_gust
-              - sensor.ws_temperature
-              - sensor.ws_rain_rate
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+                #root {
+                  align-items: stretch !important;
+                  gap: 8px !important;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: custom:button-card
+                entity: sensor.ws_current_condition
+                name: Current Conditions
+                show_state: false
+                show_icon: true
+                icon: mdi:weather-partly-cloudy
+                triggers_update:
+                  - sensor.ws_wind_gust
+                  - sensor.ws_temperature
+                  - sensor.ws_rain_rate
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: |
+                        [[[
+                          var attrs = (entity && entity.attributes) || {};
+                          return attrs.color || '#60a5fa';
+                        ]]]
+                custom_fields:
+                  details: |
                     [[[
-                      var attrs = (entity && entity.attributes) || {};
-                      return attrs.color || '#60a5fa';
+                      var desc = (entity && entity.attributes && entity.attributes.description) || (entity && entity.state) || '--';
+                      var severity = (entity && entity.attributes && entity.attributes.severity) || '--';
+                      var icon = (entity && entity.attributes && entity.attributes.icon) || '';
+                      var color = (entity && entity.attributes && entity.attributes.color) || '#60a5fa';
+                      var temp = parseFloat((states['sensor.ws_temperature'] || {}).state);
+                      var gust = parseFloat((states['sensor.ws_wind_gust'] || {}).state);
+                      var rainRate = parseFloat((states['sensor.ws_rain_rate'] || {}).state) || 0;
+                      var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                      var sevColor = severity === 'Extreme' ? '#991b1b' : severity === 'High' ? '#ef4444' : severity === 'Moderate' ? '#f59e0b' : severity === 'Low' ? '#fbbf24' : '#10b981';
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:22px;font-weight:400;color:' + color + ';">' + desc + '</div>'
+                        + '<div style="display:inline-block;margin-top:6px;padding:2px 10px;border-radius:8px;background:' + sevColor + '22;border:1px solid ' + sevColor + '55;font-size:12px;font-weight:600;color:' + sevColor + ';">Severity: ' + severity + '</div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                        + '<div><strong>Temp:</strong> ' + fmt(temp) + ' °C</div>'
+                        + '<div><strong>Wind Gust:</strong> ' + fmt(gust) + ' m/s</div>'
+                        + (rainRate > 0 ? '<div style="color:#60a5fa;"><strong>Rain:</strong> ' + rainRate.toFixed(1) + ' mm/h</div>' : '')
+                        + '</div></div>';
                     ]]]
-            custom_fields:
-              details: |
-                [[[
-                  var desc = (entity && entity.attributes && entity.attributes.description) || (entity && entity.state) || '--';
-                  var severity = (entity && entity.attributes && entity.attributes.severity) || '--';
-                  var icon = (entity && entity.attributes && entity.attributes.icon) || '';
-                  var color = (entity && entity.attributes && entity.attributes.color) || '#60a5fa';
-                  var temp = parseFloat((states['sensor.ws_temperature'] || {}).state);
-                  var gust = parseFloat((states['sensor.ws_wind_gust'] || {}).state);
-                  var rainRate = parseFloat((states['sensor.ws_rain_rate'] || {}).state) || 0;
-                  var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
-                  var sevColor = severity === 'Extreme' ? '#991b1b' : severity === 'High' ? '#ef4444' : severity === 'Moderate' ? '#f59e0b' : severity === 'Low' ? '#fbbf24' : '#10b981';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:22px;font-weight:400;color:' + color + ';">' + desc + '</div>'
-                    + '<div style="display:inline-block;margin-top:6px;padding:2px 10px;border-radius:8px;background:' + sevColor + '22;border:1px solid ' + sevColor + '55;font-size:12px;font-weight:600;color:' + sevColor + ';">Severity: ' + severity + '</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                    + '<div><strong>Temp:</strong> ' + fmt(temp) + ' °C</div>'
-                    + '<div><strong>Wind Gust:</strong> ' + fmt(gust) + ' m/s</div>'
-                    + (rainRate > 0 ? '<div style="color:#60a5fa;"><strong>Rain:</strong> ' + rainRate.toFixed(1) + ' mm/h</div>' : '')
-                    + '</div></div>';
-                ]]]
 
-          - type: custom:button-card
-            entity: sensor.ws_temperature
-            name: Temperature Detail
-            show_state: false
-            show_icon: true
-            icon: mdi:thermometer
-            triggers_update:
-              - sensor.ws_temperature_high_24h
-              - sensor.ws_temperature_low_24h
-              - sensor.ws_temperature_avg_24h
-              - sensor.ws_feels_like
-              - sensor.ws_dew_point
-              - sensor.ws_humidity
-              - sensor.ws_humidity_level
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#60a5fa'
-            custom_fields:
-              details: |
-                [[[
-                  var current = parseFloat(entity && entity.state);
-                  var feelsLike = parseFloat((states['sensor.ws_feels_like'] || {}).state);
-                  var dew = parseFloat((states['sensor.ws_dew_point'] || {}).state);
-                  var high = parseFloat((states['sensor.ws_temperature_high_24h'] || {}).state);
-                  var low = parseFloat((states['sensor.ws_temperature_low_24h'] || {}).state);
-                  var avg = parseFloat((states['sensor.ws_temperature_avg_24h'] || {}).state);
-                  var humid = parseFloat((states['sensor.ws_humidity'] || {}).state);
-                  var humLevel = (states['sensor.ws_humidity_level'] || {}).state || '';
-                  var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:40px;font-weight:200;color:white;">' + fmt(current) + '\u00b0C</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
-                    + '<div><strong>Feels like:</strong> ' + fmt(feelsLike) + '\u00b0C</div>'
-                    + '<div><strong>Dew point:</strong> ' + fmt(dew) + '\u00b0C</div>'
-                    + '<div><strong>24h High:</strong> <span style="color:#f87171;">' + fmt(high) + '\u00b0C</span></div>'
-                    + '<div><strong>24h Low:</strong> <span style="color:#60a5fa;">' + fmt(low) + '\u00b0C</span></div>'
-                    + '<div><strong>24h Avg:</strong> ' + fmt(avg) + '\u00b0C</div>'
-                    + '<div><strong>Humidity:</strong> ' + (isNaN(humid) ? '--' : humid.toFixed(0)) + '% \u00b7 ' + humLevel + '</div>'
-                    + '</div></div>';
-                ]]]
+              - type: custom:button-card
+                entity: sensor.ws_temperature
+                name: Temperature Detail
+                show_state: false
+                show_icon: true
+                icon: mdi:thermometer
+                triggers_update:
+                  - sensor.ws_temperature_high_24h
+                  - sensor.ws_temperature_low_24h
+                  - sensor.ws_temperature_avg_24h
+                  - sensor.ws_feels_like
+                  - sensor.ws_dew_point
+                  - sensor.ws_humidity
+                  - sensor.ws_humidity_level
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#60a5fa'
+                custom_fields:
+                  details: |
+                    [[[
+                      var current = parseFloat(entity && entity.state);
+                      var feelsLike = parseFloat((states['sensor.ws_feels_like'] || {}).state);
+                      var dew = parseFloat((states['sensor.ws_dew_point'] || {}).state);
+                      var high = parseFloat((states['sensor.ws_temperature_high_24h'] || {}).state);
+                      var low = parseFloat((states['sensor.ws_temperature_low_24h'] || {}).state);
+                      var avg = parseFloat((states['sensor.ws_temperature_avg_24h'] || {}).state);
+                      var humid = parseFloat((states['sensor.ws_humidity'] || {}).state);
+                      var humLevel = (states['sensor.ws_humidity_level'] || {}).state || '';
+                      var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:40px;font-weight:200;color:white;">' + fmt(current) + '\u00b0C</div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
+                        + '<div><strong>Feels like:</strong> ' + fmt(feelsLike) + '\u00b0C</div>'
+                        + '<div><strong>Dew point:</strong> ' + fmt(dew) + '\u00b0C</div>'
+                        + '<div><strong>24h High:</strong> <span style="color:#f87171;">' + fmt(high) + '\u00b0C</span></div>'
+                        + '<div><strong>24h Low:</strong> <span style="color:#60a5fa;">' + fmt(low) + '\u00b0C</span></div>'
+                        + '<div><strong>24h Avg:</strong> ' + fmt(avg) + '\u00b0C</div>'
+                        + '<div><strong>Humidity:</strong> ' + (isNaN(humid) ? '--' : humid.toFixed(0)) + '% \u00b7 ' + humLevel + '</div>'
+                        + '</div></div>';
+                    ]]]
 
-          - type: custom:button-card
-            entity: sensor.ws_temperature_avg_24h
-            name: Temperature Extended
-            show_state: false
-            show_icon: true
-            icon: mdi:thermometer-lines
-            triggers_update:
-              - sensor.ws_wet_bulb
-              - sensor.ws_frost_point
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#7dd3fc'
-            custom_fields:
-              details: |
-                [[[
-                  var avg = parseFloat(entity && entity.state);
-                  var wetBulb = parseFloat((states['sensor.ws_wet_bulb'] || {}).state);
-                  var frost = parseFloat((states['sensor.ws_frost_point'] || {}).state);
-                  var dew = parseFloat((states['sensor.ws_dew_point'] || {}).state);
-                  var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(avg) + '<span style="font-size:16px;color:rgba(255,255,255,0.5);"> \u00b0C avg</span></div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                    + '<div><strong>Dew point:</strong> ' + fmt(dew) + ' \u00b0C</div>'
-                    + '<div><strong>Wet-bulb:</strong> ' + fmt(wetBulb) + ' \u00b0C</div>'
-                    + '<div><strong>Frost point:</strong> ' + fmt(frost) + ' \u00b0C</div>'
-                    + '</div></div>';
-                ]]]
+              - type: custom:button-card
+                entity: sensor.ws_temperature_avg_24h
+                name: Temperature Extended
+                show_state: false
+                show_icon: true
+                icon: mdi:thermometer-lines
+                triggers_update:
+                  - sensor.ws_wet_bulb
+                  - sensor.ws_frost_point
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#7dd3fc'
+                custom_fields:
+                  details: |
+                    [[[
+                      var avg = parseFloat(entity && entity.state);
+                      var wetBulb = parseFloat((states['sensor.ws_wet_bulb'] || {}).state);
+                      var frost = parseFloat((states['sensor.ws_frost_point'] || {}).state);
+                      var dew = parseFloat((states['sensor.ws_dew_point'] || {}).state);
+                      var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(avg) + '<span style="font-size:16px;color:rgba(255,255,255,0.5);"> \u00b0C avg</span></div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                        + '<div><strong>Dew point:</strong> ' + fmt(dew) + ' \u00b0C</div>'
+                        + '<div><strong>Wet-bulb:</strong> ' + fmt(wetBulb) + ' \u00b0C</div>'
+                        + '<div><strong>Frost point:</strong> ' + fmt(frost) + ' \u00b0C</div>'
+                        + '</div></div>';
+                    ]]]
 
-      # ── AIR QUALITY & POLLEN (conditional) ──────────────────────────────────
+          # ── AIR QUALITY & POLLEN (conditional) ──────────────────────────────────
       - type: grid
         column_span: 4
-        columns: 3
+        columns: 1
         card_mod:
           style: |
             ha-card {
@@ -1943,311 +1955,337 @@ views:
               border: none !important;
               padding: 0 !important;
             }
-            #root, .grid {
-              grid-template-columns: repeat(3, 1fr) !important;
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
+
         cards:
           - type: heading
             heading: Wind, Pressure & Rain
             heading_style: title
             icon: mdi:weather-windy
-          - type: custom:button-card
-            entity: sensor.ws_wind_beaufort
-            name: Wind Detail
-            show_state: false
-            show_icon: true
-            icon: mdi:weather-windy
-            triggers_update:
-              - sensor.ws_wind_speed
-              - sensor.ws_wind_gust
-              - sensor.ws_wind_gust_max_24h
-              - sensor.ws_wind_quadrant
-              - sensor.ws_wind_direction
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#93c5fd'
-            custom_fields:
-              details: |
-                [[[
-                  var bft = parseInt(entity && entity.state) || 0;
-                  var attrs = (entity && entity.attributes) || {};
-                  var bftDesc = attrs.description || '';
-                  var speedMs = parseFloat(attrs.speed_ms);
-                  var gustMs = parseFloat(attrs.gust_ms);
-                  var gustMax = parseFloat((states['sensor.ws_wind_gust_max_24h'] || {}).state);
-                  var quadrant = (states['sensor.ws_wind_quadrant'] || {}).state || '--';
-                  var dir = parseFloat((states['sensor.ws_wind_direction'] || {}).state);
-                  var fmt = function(v) { return isNaN(v) ? '--' : parseFloat(v).toFixed(1); };
-                  var toKmh = function(v) { return isNaN(v) ? '--' : (parseFloat(v) * 3.6).toFixed(1); };
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:28px;font-weight:300;color:white;">Bft ' + bft + ' <span style="font-size:14px;color:rgba(255,255,255,0.6);">' + bftDesc + '</span></div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
-                    + '<div><strong>Speed:</strong> ' + fmt(speedMs) + ' m/s (' + toKmh(speedMs) + ' km/h)</div>'
-                    + '<div><strong>Gust:</strong> ' + fmt(gustMs) + ' m/s (' + toKmh(gustMs) + ' km/h)</div>'
-                    + '<div><strong>24h Max Gust:</strong> ' + fmt(gustMax) + ' m/s (' + toKmh(gustMax) + ' km/h)</div>'
-                    + '<div><strong>Direction:</strong> ' + (isNaN(dir) ? '--' : dir.toFixed(0)) + '\u00b0 ' + quadrant + '</div>'
-                    + '</div></div>';
-                ]]]
-
-          - type: custom:button-card
-            entity: sensor.ws_wind_direction
-            name: Wind Direction
-            show_state: false
-            show_icon: true
-            icon: mdi:compass-rose
-            triggers_update:
-              - sensor.ws_wind_direction_smooth
-              - sensor.ws_wind_quadrant
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#a78bfa'
-            custom_fields:
-              details: |
-                [[[
-                  var raw = parseFloat(entity && entity.state);
-                  var smooth = parseFloat((states['sensor.ws_wind_direction_smooth'] || {}).state);
-                  var quadrant = (states['sensor.ws_wind_quadrant'] || {}).state || '--';
-                  var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1) + '\u00b0'; };
-                  var dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-                  var compass = !isNaN(raw) ? dirs[Math.round(raw / 22.5) % 16] : '--';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:40px;font-weight:200;color:white;">' + fmt(raw) + ' <span style="font-size:18px;color:rgba(255,255,255,0.6);">' + compass + '</span></div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                    + '<div><strong>Smoothed:</strong> ' + fmt(smooth) + '</div>'
-                    + '<div><strong>Quadrant:</strong> ' + quadrant + '</div>'
-                    + '</div></div>';
-                ]]]
-
-      # ── PRESSURE & ZAMBRETTI ─────────────────────────────────────────────────
-          - type: custom:button-card
-            entity: sensor.ws_sea_level_pressure
-            name: Pressure Detail
-            show_state: false
-            show_icon: true
-            icon: mdi:gauge
-            triggers_update:
-              - sensor.ws_station_pressure
-              - sensor.ws_pressure_trend
-              - sensor.ws_pressure_change_window
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#a78bfa'
-            custom_fields:
-              details: |
-                [[[
-                  var mslp = parseFloat(entity && entity.state);
-                  var station = parseFloat((states['sensor.ws_station_pressure'] || {}).state);
-                  var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
-                  var change3h = parseFloat((states['sensor.ws_pressure_change_window'] || {}).state);
-                  var zambretti = (states['sensor.ws_zambretti_forecast'] || {}).state || '--';
-                  var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
-                  var changeColor = isNaN(change3h) ? 'white' : change3h > 0.8 ? '#10b981' : change3h < -0.8 ? '#ef4444' : 'rgba(255,255,255,0.7)';
-                  var changeStr = isNaN(change3h) ? '--' : (change3h >= 0 ? '+' : '') + change3h.toFixed(1);
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(mslp) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">hPa</span></div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
-                    + '<div><strong>Station:</strong> ' + fmt(station) + ' hPa</div>'
-                    + '<div><strong>Trend:</strong> ' + trend + ' <span style="color:' + changeColor + ';">(' + changeStr + ' hPa/3h)</span></div>'
-                    + '<div><strong>Forecast:</strong> ' + zambretti + '</div>'
-                    + '</div></div>';
-                ]]]
-
-          - type: custom:button-card
-            entity: sensor.ws_zambretti_forecast
-            name: Zambretti Detail
-            show_state: false
-            show_icon: true
-            icon: mdi:barometer
-            triggers_update:
-              - sensor.ws_zambretti_number
-              - sensor.ws_pressure_trend
-              - sensor.ws_pressure_change_window
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#c084fc'
-            custom_fields:
-              details: |
-                [[[
-                  var forecast = (entity && entity.state) || '--';
-                  var zNum = (states['sensor.ws_zambretti_number'] || {}).state || '--';
-                  var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
-                  var trendRaw = parseFloat((states['sensor.ws_pressure_trend'] || {}).state);
-                  var change = parseFloat((states['sensor.ws_pressure_change_window'] || {}).state);
-                  var trendColor = !isNaN(change) ? (change > 0.8 ? '#10b981' : change < -0.8 ? '#ef4444' : 'rgba(255,255,255,0.7)') : 'rgba(255,255,255,0.7)';
-                  var changeStr = !isNaN(change) ? (change >= 0 ? '+' : '') + change.toFixed(1) + ' hPa/3h' : '--';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:16px;font-weight:500;color:white;line-height:1.3;">' + forecast + '</div>'
-                    + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">Zambretti #' + zNum + '</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:12px;line-height:1.8;">'
-                    + '<div><strong>Trend:</strong> ' + trend + '</div>'
-                    + '<div><strong>Rate:</strong> <span style="color:' + trendColor + ';">' + changeStr + '</span></div>'
-                    + '<div><strong>Raw rate:</strong> ' + (!isNaN(trendRaw) ? trendRaw.toFixed(2) + ' hPa/h' : '--') + '</div>'
-                    + '</div></div>';
-                ]]]
-
-      # ── TEMPERATURE EXTENDED ─────────────────────────────────────────────────
-          - type: custom:button-card
-            entity: sensor.ws_rain_rate
-            name: Rain Accumulations
-            show_state: false
-            show_icon: true
-            icon: mdi:water-outline
-            triggers_update:
-              - sensor.ws_rain_rate
-              - sensor.ws_rain_last_1h
-              - sensor.ws_rain_last_24h
-              - sensor.ws_rain_total
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#38bdf8'
-            custom_fields:
-              details: |
-                [[[
-                  var rate = parseFloat(entity && entity.state) || 0;
-                  var rateRaw = parseFloat((states['sensor.ws_rain_rate'] || {}).state) || 0;
-                  var r1h = parseFloat((states['sensor.ws_rain_last_1h'] || {}).state) || 0;
-                  var r24h = parseFloat((states['sensor.ws_rain_last_24h'] || {}).state) || 0;
-                  var total = parseFloat((states['sensor.ws_rain_total'] || {}).state) || 0;
-                  var rateColor = rate > 5 ? '#3b82f6' : rate > 0 ? '#60a5fa' : 'rgba(255,255,255,0.4)';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:32px;font-weight:200;color:' + rateColor + ';">' + rate.toFixed(1) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> mm/h</span></div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                    + '<div><strong>Raw rate:</strong> ' + rateRaw.toFixed(1) + ' mm/h</div>'
-                    + '<div><strong>Last 1h:</strong> ' + r1h.toFixed(1) + ' mm</div>'
-                    + '<div><strong>Last 24h:</strong> ' + r24h.toFixed(1) + ' mm</div>'
-                    + '<div><strong>Total acc.:</strong> ' + total.toFixed(1) + ' mm</div>'
-                    + '</div></div>';
-                ]]]
-
-          - type: custom:button-card
-            entity: sensor.ws_rain_probability_combined
-            name: Rain Analysis
-            show_state: false
-            show_icon: true
-            icon: mdi:weather-rainy
-            triggers_update:
-              - sensor.ws_dry_streak
-              - sensor.ws_rain_probability
-              - sensor.ws_sea_level_pressure
-              - sensor.ws_pressure_trend
-              - sensor.ws_wind_quadrant
-              - sensor.ws_zambretti_forecast
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+                #root {
+                  align-items: stretch !important;
+                  gap: 8px !important;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: custom:button-card
+                entity: sensor.ws_wind_beaufort
+                name: Wind Detail
+                show_state: false
+                show_icon: true
+                icon: mdi:weather-windy
+                triggers_update:
+                  - sensor.ws_wind_speed
+                  - sensor.ws_wind_gust
+                  - sensor.ws_wind_gust_max_24h
+                  - sensor.ws_wind_quadrant
+                  - sensor.ws_wind_direction
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#93c5fd'
+                custom_fields:
+                  details: |
                     [[[
-                      var prob = parseFloat(entity && entity.state) || 0;
-                      if (prob >= 70) return '#3b82f6';
-                      if (prob >= 40) return '#60a5fa';
-                      return '#10b981';
+                      var bft = parseInt(entity && entity.state) || 0;
+                      var attrs = (entity && entity.attributes) || {};
+                      var bftDesc = attrs.description || '';
+                      var speedMs = parseFloat(attrs.speed_ms);
+                      var gustMs = parseFloat(attrs.gust_ms);
+                      var gustMax = parseFloat((states['sensor.ws_wind_gust_max_24h'] || {}).state);
+                      var quadrant = (states['sensor.ws_wind_quadrant'] || {}).state || '--';
+                      var dir = parseFloat((states['sensor.ws_wind_direction'] || {}).state);
+                      var fmt = function(v) { return isNaN(v) ? '--' : parseFloat(v).toFixed(1); };
+                      var toKmh = function(v) { return isNaN(v) ? '--' : (parseFloat(v) * 3.6).toFixed(1); };
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:28px;font-weight:300;color:white;">Bft ' + bft + ' <span style="font-size:14px;color:rgba(255,255,255,0.6);">' + bftDesc + '</span></div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
+                        + '<div><strong>Speed:</strong> ' + fmt(speedMs) + ' m/s (' + toKmh(speedMs) + ' km/h)</div>'
+                        + '<div><strong>Gust:</strong> ' + fmt(gustMs) + ' m/s (' + toKmh(gustMs) + ' km/h)</div>'
+                        + '<div><strong>24h Max Gust:</strong> ' + fmt(gustMax) + ' m/s (' + toKmh(gustMax) + ' km/h)</div>'
+                        + '<div><strong>Direction:</strong> ' + (isNaN(dir) ? '--' : dir.toFixed(0)) + '\u00b0 ' + quadrant + '</div>'
+                        + '</div></div>';
                     ]]]
-            custom_fields:
-              details: |
-                [[[
-                  var combined = parseFloat(entity && entity.state) || 0;
-                  var attrs = (entity && entity.attributes) || {};
-                  var local = attrs.local_probability_pct || 0;
-                  var tsr = (states['sensor.ws_dry_streak_days'] || {}).state;
-                  var tsrLabel = tsr !== undefined && !isNaN(parseInt(tsr)) ? parseInt(tsr) + 'd dry' : '--';
-                  var prob = parseFloat((states['sensor.ws_rain_probability'] || {}).state) || 0;
-                  var zamb = (states['sensor.ws_zambretti_forecast'] || {}).state || '--';
-                  var probColor = combined >= 70 ? '#3b82f6' : combined >= 40 ? '#60a5fa' : '#10b981';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:40px;font-weight:200;color:' + probColor + ';">' + combined.toFixed(0) + '%</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
-                    + '<div><strong>Local sensors:</strong> ' + local + '%</div>'
-                    + '<div><strong>Dry streak:</strong> ' + tsrLabel + '</div>'
-                    + '<div><strong>Zambretti:</strong> ' + zamb + '</div>'
-                    + '</div></div>';
-                ]]]
+
+              - type: custom:button-card
+                entity: sensor.ws_wind_direction
+                name: Wind Direction
+                show_state: false
+                show_icon: true
+                icon: mdi:compass-rose
+                triggers_update:
+                  - sensor.ws_wind_direction_smooth
+                  - sensor.ws_wind_quadrant
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#a78bfa'
+                custom_fields:
+                  details: |
+                    [[[
+                      var raw = parseFloat(entity && entity.state);
+                      var smooth = parseFloat((states['sensor.ws_wind_direction_smooth'] || {}).state);
+                      var quadrant = (states['sensor.ws_wind_quadrant'] || {}).state || '--';
+                      var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1) + '\u00b0'; };
+                      var dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+                      var compass = !isNaN(raw) ? dirs[Math.round(raw / 22.5) % 16] : '--';
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:40px;font-weight:200;color:white;">' + fmt(raw) + ' <span style="font-size:18px;color:rgba(255,255,255,0.6);">' + compass + '</span></div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                        + '<div><strong>Smoothed:</strong> ' + fmt(smooth) + '</div>'
+                        + '<div><strong>Quadrant:</strong> ' + quadrant + '</div>'
+                        + '</div></div>';
+                    ]]]
+
+          # ── PRESSURE & ZAMBRETTI ─────────────────────────────────────────────────
+              - type: custom:button-card
+                entity: sensor.ws_sea_level_pressure
+                name: Pressure Detail
+                show_state: false
+                show_icon: true
+                icon: mdi:gauge
+                triggers_update:
+                  - sensor.ws_station_pressure
+                  - sensor.ws_pressure_trend
+                  - sensor.ws_pressure_change_window
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#a78bfa'
+                custom_fields:
+                  details: |
+                    [[[
+                      var mslp = parseFloat(entity && entity.state);
+                      var station = parseFloat((states['sensor.ws_station_pressure'] || {}).state);
+                      var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
+                      var change3h = parseFloat((states['sensor.ws_pressure_change_window'] || {}).state);
+                      var zambretti = (states['sensor.ws_zambretti_forecast'] || {}).state || '--';
+                      var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                      var changeColor = isNaN(change3h) ? 'white' : change3h > 0.8 ? '#10b981' : change3h < -0.8 ? '#ef4444' : 'rgba(255,255,255,0.7)';
+                      var changeStr = isNaN(change3h) ? '--' : (change3h >= 0 ? '+' : '') + change3h.toFixed(1);
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(mslp) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">hPa</span></div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
+                        + '<div><strong>Station:</strong> ' + fmt(station) + ' hPa</div>'
+                        + '<div><strong>Trend:</strong> ' + trend + ' <span style="color:' + changeColor + ';">(' + changeStr + ' hPa/3h)</span></div>'
+                        + '<div><strong>Forecast:</strong> ' + zambretti + '</div>'
+                        + '</div></div>';
+                    ]]]
+
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+                #root {
+                  align-items: stretch !important;
+                  gap: 8px !important;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: custom:button-card
+                entity: sensor.ws_zambretti_forecast
+                name: Zambretti Detail
+                show_state: false
+                show_icon: true
+                icon: mdi:barometer
+                triggers_update:
+                  - sensor.ws_zambretti_number
+                  - sensor.ws_pressure_trend
+                  - sensor.ws_pressure_change_window
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#c084fc'
+                custom_fields:
+                  details: |
+                    [[[
+                      var forecast = (entity && entity.state) || '--';
+                      var zNum = (states['sensor.ws_zambretti_number'] || {}).state || '--';
+                      var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
+                      var trendRaw = parseFloat((states['sensor.ws_pressure_trend'] || {}).state);
+                      var change = parseFloat((states['sensor.ws_pressure_change_window'] || {}).state);
+                      var trendColor = !isNaN(change) ? (change > 0.8 ? '#10b981' : change < -0.8 ? '#ef4444' : 'rgba(255,255,255,0.7)') : 'rgba(255,255,255,0.7)';
+                      var changeStr = !isNaN(change) ? (change >= 0 ? '+' : '') + change.toFixed(1) + ' hPa/3h' : '--';
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:16px;font-weight:500;color:white;line-height:1.3;">' + forecast + '</div>'
+                        + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">Zambretti #' + zNum + '</div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:12px;line-height:1.8;">'
+                        + '<div><strong>Trend:</strong> ' + trend + '</div>'
+                        + '<div><strong>Rate:</strong> <span style="color:' + trendColor + ';">' + changeStr + '</span></div>'
+                        + '<div><strong>Raw rate:</strong> ' + (!isNaN(trendRaw) ? trendRaw.toFixed(2) + ' hPa/h' : '--') + '</div>'
+                        + '</div></div>';
+                    ]]]
+
+          # ── TEMPERATURE EXTENDED ─────────────────────────────────────────────────
+              - type: custom:button-card
+                entity: sensor.ws_rain_rate
+                name: Rain Accumulations
+                show_state: false
+                show_icon: true
+                icon: mdi:water-outline
+                triggers_update:
+                  - sensor.ws_rain_rate
+                  - sensor.ws_rain_last_1h
+                  - sensor.ws_rain_last_24h
+                  - sensor.ws_rain_total
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#38bdf8'
+                custom_fields:
+                  details: |
+                    [[[
+                      var rate = parseFloat(entity && entity.state) || 0;
+                      var rateRaw = parseFloat((states['sensor.ws_rain_rate'] || {}).state) || 0;
+                      var r1h = parseFloat((states['sensor.ws_rain_last_1h'] || {}).state) || 0;
+                      var r24h = parseFloat((states['sensor.ws_rain_last_24h'] || {}).state) || 0;
+                      var total = parseFloat((states['sensor.ws_rain_total'] || {}).state) || 0;
+                      var rateColor = rate > 5 ? '#3b82f6' : rate > 0 ? '#60a5fa' : 'rgba(255,255,255,0.4)';
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:32px;font-weight:200;color:' + rateColor + ';">' + rate.toFixed(1) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> mm/h</span></div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                        + '<div><strong>Raw rate:</strong> ' + rateRaw.toFixed(1) + ' mm/h</div>'
+                        + '<div><strong>Last 1h:</strong> ' + r1h.toFixed(1) + ' mm</div>'
+                        + '<div><strong>Last 24h:</strong> ' + r24h.toFixed(1) + ' mm</div>'
+                        + '<div><strong>Total acc.:</strong> ' + total.toFixed(1) + ' mm</div>'
+                        + '</div></div>';
+                    ]]]
+
+              - type: custom:button-card
+                entity: sensor.ws_rain_probability_combined
+                name: Rain Analysis
+                show_state: false
+                show_icon: true
+                icon: mdi:weather-rainy
+                triggers_update:
+                  - sensor.ws_dry_streak
+                  - sensor.ws_rain_probability
+                  - sensor.ws_sea_level_pressure
+                  - sensor.ws_pressure_trend
+                  - sensor.ws_wind_quadrant
+                  - sensor.ws_zambretti_forecast
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: |
+                        [[[
+                          var prob = parseFloat(entity && entity.state) || 0;
+                          if (prob >= 70) return '#3b82f6';
+                          if (prob >= 40) return '#60a5fa';
+                          return '#10b981';
+                        ]]]
+                custom_fields:
+                  details: |
+                    [[[
+                      var combined = parseFloat(entity && entity.state) || 0;
+                      var attrs = (entity && entity.attributes) || {};
+                      var local = attrs.local_probability_pct || 0;
+                      var tsr = (states['sensor.ws_dry_streak_days'] || {}).state;
+                      var tsrLabel = tsr !== undefined && !isNaN(parseInt(tsr)) ? parseInt(tsr) + 'd dry' : '--';
+                      var prob = parseFloat((states['sensor.ws_rain_probability'] || {}).state) || 0;
+                      var zamb = (states['sensor.ws_zambretti_forecast'] || {}).state || '--';
+                      var probColor = combined >= 70 ? '#3b82f6' : combined >= 40 ? '#60a5fa' : '#10b981';
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:40px;font-weight:200;color:' + probColor + ';">' + combined.toFixed(0) + '%</div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
+                        + '<div><strong>Local sensors:</strong> ' + local + '%</div>'
+                        + '<div><strong>Dry streak:</strong> ' + tsrLabel + '</div>'
+                        + '<div><strong>Zambretti:</strong> ' + zamb + '</div>'
+                        + '</div></div>';
+                    ]]]
 
       - type: grid
         column_span: 4
-        columns: 3
+        columns: 1
         card_mod:
           style: |
             ha-card {
@@ -2256,330 +2294,356 @@ views:
               border: none !important;
               padding: 0 !important;
             }
-            #root, .grid {
-              grid-template-columns: repeat(3, 1fr) !important;
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
+
         cards:
           - type: heading
             heading: Sky, Sun & Environment
             heading_style: title
             icon: mdi:weather-sunny
-          - type: custom:button-card
-            entity: sensor.ws_uv_level
-            name: UV Exposure
-            show_state: false
-            show_icon: true
-            icon: mdi:sun-wireless
-            triggers_update:
-              - sensor.ws_uv_index
-              - sensor.ws_illuminance
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#fbbf24'
-            custom_fields:
-              details: |
-                [[[
-                  var level = (entity && entity.state) || '--';
-                  var attrs = (entity && entity.attributes) || {};
-                  var uvi = parseFloat((states['sensor.ws_uv_index'] || {}).state) || parseFloat(attrs.uv_index) || 0;
-                  var burnTime = attrs.burn_time_fair_skin || 'N/A';
-                  var rec = attrs.recommendation || '';
-                  var lux = parseFloat((states['sensor.ws_illuminance'] || {}).state);
-                  var levelColor = level === 'Extreme' ? '#991b1b' : level === 'Very High' ? '#dc2626' : level === 'High' ? '#f97316' : level === 'Moderate' ? '#f59e0b' : '#10b981';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:32px;font-weight:200;color:' + levelColor + ';">' + level + '</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
-                    + '<div><strong>UV Index:</strong> ' + uvi.toFixed(1) + '</div>'
-                    + '<div><strong>Burn time (fair skin):</strong> ' + burnTime + '</div>'
-                    + '<div><strong>Illuminance:</strong> ' + (!isNaN(lux) ? lux.toLocaleString() + ' lx' : '--') + '</div>'
-                    + (rec ? '<div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.5);font-style:italic;">' + rec + '</div>' : '')
-                    + '</div></div>';
-                ]]]
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+                #root {
+                  align-items: stretch !important;
+                  gap: 8px !important;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: custom:button-card
+                entity: sensor.ws_uv_level
+                name: UV Exposure
+                show_state: false
+                show_icon: true
+                icon: mdi:sun-wireless
+                triggers_update:
+                  - sensor.ws_uv_index
+                  - sensor.ws_illuminance
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#fbbf24'
+                custom_fields:
+                  details: |
+                    [[[
+                      var level = (entity && entity.state) || '--';
+                      var attrs = (entity && entity.attributes) || {};
+                      var uvi = parseFloat((states['sensor.ws_uv_index'] || {}).state) || parseFloat(attrs.uv_index) || 0;
+                      var burnTime = attrs.burn_time_fair_skin || 'N/A';
+                      var rec = attrs.recommendation || '';
+                      var lux = parseFloat((states['sensor.ws_illuminance'] || {}).state);
+                      var levelColor = level === 'Extreme' ? '#991b1b' : level === 'Very High' ? '#dc2626' : level === 'High' ? '#f97316' : level === 'Moderate' ? '#f59e0b' : '#10b981';
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:32px;font-weight:200;color:' + levelColor + ';">' + level + '</div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
+                        + '<div><strong>UV Index:</strong> ' + uvi.toFixed(1) + '</div>'
+                        + '<div><strong>Burn time (fair skin):</strong> ' + burnTime + '</div>'
+                        + '<div><strong>Illuminance:</strong> ' + (!isNaN(lux) ? lux.toLocaleString() + ' lx' : '--') + '</div>'
+                        + (rec ? '<div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.5);font-style:italic;">' + rec + '</div>' : '')
+                        + '</div></div>';
+                    ]]]
 
-      # ── RISK SENSORS (conditional) ──────────────────────────────────────────
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_solar_forecast
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_solar_forecast_today
-              name: Solar Forecast
-              show_state: false
-              show_icon: true
-              icon: mdi:solar-power
-              triggers_update:
-                - sensor.ws_solar_forecast_tomorrow
-              styles:
+          # ── RISK SENSORS (conditional) ──────────────────────────────────────────
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_solar_forecast
+                    state: "on"
                 card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: '#fbbf24'
-              custom_fields:
-                details: |
-                  [[[
-                    var today = parseFloat(entity && entity.state);
-                    var tomorrow = parseFloat((states['sensor.ws_solar_forecast_tomorrow'] || {}).state);
-                    var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(2); };
-                    var diff = (!isNaN(today) && !isNaN(tomorrow)) ? (tomorrow - today) : NaN;
-                    var diffColor = !isNaN(diff) ? (diff > 0 ? '#10b981' : diff < 0 ? '#ef4444' : 'rgba(255,255,255,0.5)') : 'rgba(255,255,255,0.5)';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:36px;font-weight:200;color:#fbbf24;">' + fmt(today) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> kWh today</span></div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                      + '<div><strong>Tomorrow:</strong> ' + fmt(tomorrow) + ' kWh</div>'
-                      + (!isNaN(diff) ? '<div><strong>Change:</strong> <span style="color:' + diffColor + ';">' + (diff >= 0 ? '+' : '') + diff.toFixed(2) + ' kWh</span></div>' : '')
-                      + '</div></div>';
-                  ]]]
-
-      # ── ET₀ EVAPOTRANSPIRATION ──────────────────────────────────────────────────
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_moon
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_moon
-              name: Moon Phase
-              show_state: false
-              show_icon: true
-              icon: mdi:moon-waning-crescent
-              triggers_update:
-                - sensor.ws_moon
-                - sensor.ws_moon
-              styles:
-                card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: '#e2e8f0'
-              custom_fields:
-                details: |
-                  [[[
-                    var attrs = (entity && entity.attributes) || {};
-                    var displayState = (entity && entity.state) || '--';
-                    var phase = attrs.phase || displayState;
-                    var illum = parseFloat(attrs.illumination_pct);
-                    if (isNaN(illum)) {
-                      var m = displayState.match(/\((\d+)%\)/);
-                      illum = m ? parseFloat(m[1]) : NaN;
-                    }
-                    var age = attrs.age_days !== undefined ? parseFloat(attrs.age_days).toFixed(1) + 'd' : '--';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:24px;font-weight:200;color:white;line-height:1.3;">' + displayState + '</div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                      + '<div><strong>Illumination:</strong> ' + (!isNaN(illum) ? illum.toFixed(0) + '%' : '--') + '</div>'
-                      + '<div><strong>Age:</strong> ' + age + '</div>'
-                      + '</div></div>';
-                  ]]]
-
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_sea_temp
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_sea_surface_temperature
-              name: Sea Temperature
-              show_state: false
-              show_icon: true
-              icon: mdi:waves
-              styles:
-                card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: |
+                  type: custom:button-card
+                  entity: sensor.ws_solar_forecast_today
+                  name: Solar Forecast
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:solar-power
+                  triggers_update:
+                    - sensor.ws_solar_forecast_tomorrow
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: '#fbbf24'
+                  custom_fields:
+                    details: |
                       [[[
-                        var t = parseFloat(entity && entity.state) || 0;
-                        if (t >= 28) return '#ef4444';
-                        if (t >= 24) return '#f59e0b';
-                        if (t >= 20) return '#10b981';
-                        if (t >= 16) return '#06b6d4';
-                        return '#3b82f6';
+                        var today = parseFloat(entity && entity.state);
+                        var tomorrow = parseFloat((states['sensor.ws_solar_forecast_tomorrow'] || {}).state);
+                        var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(2); };
+                        var diff = (!isNaN(today) && !isNaN(tomorrow)) ? (tomorrow - today) : NaN;
+                        var diffColor = !isNaN(diff) ? (diff > 0 ? '#10b981' : diff < 0 ? '#ef4444' : 'rgba(255,255,255,0.5)') : 'rgba(255,255,255,0.5)';
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:36px;font-weight:200;color:#fbbf24;">' + fmt(today) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> kWh today</span></div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                          + '<div><strong>Tomorrow:</strong> ' + fmt(tomorrow) + ' kWh</div>'
+                          + (!isNaN(diff) ? '<div><strong>Change:</strong> <span style="color:' + diffColor + ';">' + (diff >= 0 ? '+' : '') + diff.toFixed(2) + ' kWh</span></div>' : '')
+                          + '</div></div>';
                       ]]]
-              custom_fields:
-                details: |
-                  [[[
-                    var t = parseFloat(entity && entity.state);
-                    var attrs = (entity && entity.attributes) || {};
-                    var comfort = attrs.comfort || '--';
-                    var comfortColor = comfort === 'Hot' ? '#ef4444' : comfort === 'Warm' ? '#f59e0b' : comfort === 'Comfortable' ? '#10b981' : comfort === 'Cool' ? '#06b6d4' : '#3b82f6';
-                    var hourly = attrs.hourly_forecast || [];
-                    var minT = t, maxT = t;
-                    for (var i = 0; i < hourly.length; i++) {
-                      var v = hourly[i].sst_c;
-                      if (v !== null && v !== undefined) { if (v < minT) minT = v; if (v > maxT) maxT = v; }
-                    }
-                    var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(t) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">\u00b0C</span></div>'
-                      + '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + comfortColor + '22;border:1px solid ' + comfortColor + '55;font-size:13px;font-weight:600;color:' + comfortColor + ';">' + comfort + '</div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:10px;line-height:1.8;">'
-                      + '<div><strong>24h range:</strong> ' + fmt(minT) + ' \u2013 ' + fmt(maxT) + ' \u00b0C</div>'
-                      + '</div></div>';
-                  ]]]
 
-      # ── RAIN DETAIL ─────────────────────────────────────────────────────────
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_air_quality
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_air_quality_index
-              name: Air Quality
-              show_state: false
-              show_icon: true
-              icon: mdi:air-filter
-              triggers_update:
-                - sensor.ws_air_quality_index
-                - sensor.ws_pm2_5
-                - sensor.ws_pm10
-              styles:
+          # ── ET₀ EVAPOTRANSPIRATION ──────────────────────────────────────────────────
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_moon
+                    state: "on"
                 card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: '#34d399'
-              custom_fields:
-                details: |
-                  [[[
-                    var level = (entity && entity.state) || '--';
-                    var aqi = parseFloat((states['sensor.ws_air_quality_index'] || {}).state);
-                    var pm25 = parseFloat((states['sensor.ws_pm2_5'] || {}).state);
-                    var pm10 = parseFloat((states['sensor.ws_pm10'] || {}).state);
-                    var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
-                    var aqiColor = aqi >= 300 ? '#7c3aed' : aqi >= 200 ? '#dc2626' : aqi >= 150 ? '#f97316' : aqi >= 100 ? '#f59e0b' : aqi >= 50 ? '#facc15' : '#10b981';
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:36px;font-weight:200;color:' + aqiColor + ';">' + (!isNaN(aqi) ? aqi.toFixed(0) : '--') + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> AQI</span></div>'
-                      + '<div style="font-size:13px;color:' + aqiColor + ';margin-top:2px;">' + level + '</div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                      + '<div><strong>PM2.5:</strong> ' + fmt(pm25) + ' \u03bcg/m\u00b3</div>'
-                      + '<div><strong>PM10:</strong> ' + fmt(pm10) + ' \u03bcg/m\u00b3</div>'
-                      + '</div></div>';
-                  ]]]
+                  type: custom:button-card
+                  entity: sensor.ws_moon
+                  name: Moon Phase
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:moon-waning-crescent
+                  triggers_update:
+                    - sensor.ws_moon
+                    - sensor.ws_moon
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: '#e2e8f0'
+                  custom_fields:
+                    details: |
+                      [[[
+                        var attrs = (entity && entity.attributes) || {};
+                        var displayState = (entity && entity.state) || '--';
+                        var phase = attrs.phase || displayState;
+                        var illum = parseFloat(attrs.illumination_pct);
+                        if (isNaN(illum)) {
+                          var m = displayState.match(/\((\d+)%\)/);
+                          illum = m ? parseFloat(m[1]) : NaN;
+                        }
+                        var age = attrs.age_days !== undefined ? parseFloat(attrs.age_days).toFixed(1) + 'd' : '--';
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:24px;font-weight:200;color:white;line-height:1.3;">' + displayState + '</div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                          + '<div><strong>Illumination:</strong> ' + (!isNaN(illum) ? illum.toFixed(0) + '%' : '--') + '</div>'
+                          + '<div><strong>Age:</strong> ' + age + '</div>'
+                          + '</div></div>';
+                      ]]]
 
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_pollen
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_pollen_level
-              name: Pollen
-              show_state: false
-              show_icon: true
-              icon: mdi:flower-pollen
-              triggers_update:
-                - sensor.ws_pollen_grass
-                - sensor.ws_pollen_tree
-                - sensor.ws_pollen_weed
-              styles:
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+                #root {
+                  align-items: stretch !important;
+                  gap: 8px !important;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_sea_temp
+                    state: "on"
                 card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                icon:
-                  - width: 48px
-                  - color: '#fde68a'
-              custom_fields:
-                details: |
-                  [[[
-                    var overall = (entity && entity.state) || '--';
-                    var grass = (states['sensor.ws_pollen_grass'] || {}).state || '--';
-                    var tree = (states['sensor.ws_pollen_tree'] || {}).state || '--';
-                    var weed = (states['sensor.ws_pollen_weed'] || {}).state || '--';
-                    var levelColor = function(v) {
-                      if (!v || v === '--') return 'rgba(255,255,255,0.4)';
-                      var s = v.toLowerCase();
-                      return s.includes('very high') || s.includes('extreme') ? '#ef4444' : s.includes('high') ? '#f97316' : s.includes('medium') || s.includes('moderate') ? '#f59e0b' : '#10b981';
-                    };
-                    return '<div style="margin-top:8px;">'
-                      + '<div style="font-size:28px;font-weight:200;color:' + levelColor(overall) + ';">' + overall + '</div>'
-                      + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                      + '<div><strong>Grass:</strong> <span style="color:' + levelColor(grass) + ';">' + grass + '</span></div>'
-                      + '<div><strong>Tree:</strong> <span style="color:' + levelColor(tree) + ';">' + tree + '</span></div>'
-                      + '<div><strong>Weed:</strong> <span style="color:' + levelColor(weed) + ';">' + weed + '</span></div>'
-                      + '</div></div>';
-                  ]]]
+                  type: custom:button-card
+                  entity: sensor.ws_sea_surface_temperature
+                  name: Sea Temperature
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:waves
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: |
+                          [[[
+                            var t = parseFloat(entity && entity.state) || 0;
+                            if (t >= 28) return '#ef4444';
+                            if (t >= 24) return '#f59e0b';
+                            if (t >= 20) return '#10b981';
+                            if (t >= 16) return '#06b6d4';
+                            return '#3b82f6';
+                          ]]]
+                  custom_fields:
+                    details: |
+                      [[[
+                        var t = parseFloat(entity && entity.state);
+                        var attrs = (entity && entity.attributes) || {};
+                        var comfort = attrs.comfort || '--';
+                        var comfortColor = comfort === 'Hot' ? '#ef4444' : comfort === 'Warm' ? '#f59e0b' : comfort === 'Comfortable' ? '#10b981' : comfort === 'Cool' ? '#06b6d4' : '#3b82f6';
+                        var hourly = attrs.hourly_forecast || [];
+                        var minT = t, maxT = t;
+                        for (var i = 0; i < hourly.length; i++) {
+                          var v = hourly[i].sst_c;
+                          if (v !== null && v !== undefined) { if (v < minT) minT = v; if (v > maxT) maxT = v; }
+                        }
+                        var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(t) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">\u00b0C</span></div>'
+                          + '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + comfortColor + '22;border:1px solid ' + comfortColor + '55;font-size:13px;font-weight:600;color:' + comfortColor + ';">' + comfort + '</div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:10px;line-height:1.8;">'
+                          + '<div><strong>24h range:</strong> ' + fmt(minT) + ' \u2013 ' + fmt(maxT) + ' \u00b0C</div>'
+                          + '</div></div>';
+                      ]]]
 
-      # ── MOON & SOLAR FORECAST (conditional) ─────────────────────────────────
+          # ── RAIN DETAIL ─────────────────────────────────────────────────────────
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_air_quality
+                    state: "on"
+                card:
+                  type: custom:button-card
+                  entity: sensor.ws_air_quality_index
+                  name: Air Quality
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:air-filter
+                  triggers_update:
+                    - sensor.ws_air_quality_index
+                    - sensor.ws_pm2_5
+                    - sensor.ws_pm10
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: '#34d399'
+                  custom_fields:
+                    details: |
+                      [[[
+                        var level = (entity && entity.state) || '--';
+                        var aqi = parseFloat((states['sensor.ws_air_quality_index'] || {}).state);
+                        var pm25 = parseFloat((states['sensor.ws_pm2_5'] || {}).state);
+                        var pm10 = parseFloat((states['sensor.ws_pm10'] || {}).state);
+                        var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                        var aqiColor = aqi >= 300 ? '#7c3aed' : aqi >= 200 ? '#dc2626' : aqi >= 150 ? '#f97316' : aqi >= 100 ? '#f59e0b' : aqi >= 50 ? '#facc15' : '#10b981';
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:36px;font-weight:200;color:' + aqiColor + ';">' + (!isNaN(aqi) ? aqi.toFixed(0) : '--') + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> AQI</span></div>'
+                          + '<div style="font-size:13px;color:' + aqiColor + ';margin-top:2px;">' + level + '</div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                          + '<div><strong>PM2.5:</strong> ' + fmt(pm25) + ' \u03bcg/m\u00b3</div>'
+                          + '<div><strong>PM10:</strong> ' + fmt(pm10) + ' \u03bcg/m\u00b3</div>'
+                          + '</div></div>';
+                      ]]]
+
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_pollen
+                    state: "on"
+                card:
+                  type: custom:button-card
+                  entity: sensor.ws_pollen_level
+                  name: Pollen
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:flower-pollen
+                  triggers_update:
+                    - sensor.ws_pollen_grass
+                    - sensor.ws_pollen_tree
+                    - sensor.ws_pollen_weed
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: '#fde68a'
+                  custom_fields:
+                    details: |
+                      [[[
+                        var overall = (entity && entity.state) || '--';
+                        var grass = (states['sensor.ws_pollen_grass'] || {}).state || '--';
+                        var tree = (states['sensor.ws_pollen_tree'] || {}).state || '--';
+                        var weed = (states['sensor.ws_pollen_weed'] || {}).state || '--';
+                        var levelColor = function(v) {
+                          if (!v || v === '--') return 'rgba(255,255,255,0.4)';
+                          var s = v.toLowerCase();
+                          return s.includes('very high') || s.includes('extreme') ? '#ef4444' : s.includes('high') ? '#f97316' : s.includes('medium') || s.includes('moderate') ? '#f59e0b' : '#10b981';
+                        };
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:28px;font-weight:200;color:' + levelColor(overall) + ';">' + overall + '</div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                          + '<div><strong>Grass:</strong> <span style="color:' + levelColor(grass) + ';">' + grass + '</span></div>'
+                          + '<div><strong>Tree:</strong> <span style="color:' + levelColor(tree) + ';">' + tree + '</span></div>'
+                          + '<div><strong>Weed:</strong> <span style="color:' + levelColor(weed) + ';">' + weed + '</span></div>'
+                          + '</div></div>';
+                      ]]]
+
+          # ── MOON & SOLAR FORECAST (conditional) ─────────────────────────────────
       - type: grid
         column_span: 4
-        columns: 3
+        columns: 1
         card_mod:
           style: |
             ha-card {
@@ -2588,153 +2652,159 @@ views:
               border: none !important;
               padding: 0 !important;
             }
-            #root, .grid {
-              grid-template-columns: repeat(3, 1fr) !important;
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
+
         cards:
           - type: heading
             heading: Climate & Trends
             heading_style: title
             icon: mdi:chart-line
-          - type: custom:button-card
-            entity: sensor.ws_temperature_anomaly_30d
-            name: 30-Day Anomaly
-            show_state: false
-            show_icon: true
-            icon: mdi:thermometer-alert
-            triggers_update:
-              - sensor.ws_rain_anomaly_30d
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+                #root {
+                  align-items: stretch !important;
+                  gap: 8px !important;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: custom:button-card
+                entity: sensor.ws_temperature_anomaly_30d
+                name: 30-Day Anomaly
+                show_state: false
+                show_icon: true
+                icon: mdi:thermometer-alert
+                triggers_update:
+                  - sensor.ws_rain_anomaly_30d
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: |
+                        [[[
+                          var v = parseFloat(entity && entity.state);
+                          if (isNaN(v)) return 'rgba(255,255,255,0.4)';
+                          return v > 2 ? '#ef4444' : v < -2 ? '#60a5fa' : '#4ade80';
+                        ]]]
+                custom_fields:
+                  details: |
                     [[[
-                      var v = parseFloat(entity && entity.state);
-                      if (isNaN(v)) return 'rgba(255,255,255,0.4)';
-                      return v > 2 ? '#ef4444' : v < -2 ? '#60a5fa' : '#4ade80';
+                      var tA = parseFloat(entity && entity.state);
+                      var rA = parseFloat((states['sensor.ws_rain_anomaly_30d'] || {}).state);
+                      var fmt = function(v, u) { if (isNaN(v)) return '--'; return (v > 0 ? '+' : '') + v.toFixed(1) + ' ' + u; };
+                      var tc = isNaN(tA) ? 'rgba(255,255,255,0.4)' : (tA > 2 ? '#ef4444' : tA < -2 ? '#60a5fa' : '#4ade80');
+                      var rc = isNaN(rA) ? 'rgba(255,255,255,0.4)' : (rA > 5 ? '#3b82f6' : rA < -5 ? '#fbbf24' : '#4ade80');
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="display:flex;gap:20px;">'
+                        + '<div><div style="font-size:24px;font-weight:200;color:' + tc + ';">' + fmt(tA,'\u00b0C') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Temp anomaly</div></div>'
+                        + '<div><div style="font-size:24px;font-weight:200;color:' + rc + ';">' + fmt(rA,'mm') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Rain anomaly</div></div>'
+                        + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:8px;">vs 30-day rolling average · Enable entity in HA to activate</div>'
+                        + '</div>';
                     ]]]
-            custom_fields:
-              details: |
-                [[[
-                  var tA = parseFloat(entity && entity.state);
-                  var rA = parseFloat((states['sensor.ws_rain_anomaly_30d'] || {}).state);
-                  var fmt = function(v, u) { if (isNaN(v)) return '--'; return (v > 0 ? '+' : '') + v.toFixed(1) + ' ' + u; };
-                  var tc = isNaN(tA) ? 'rgba(255,255,255,0.4)' : (tA > 2 ? '#ef4444' : tA < -2 ? '#60a5fa' : '#4ade80');
-                  var rc = isNaN(rA) ? 'rgba(255,255,255,0.4)' : (rA > 5 ? '#3b82f6' : rA < -5 ? '#fbbf24' : '#4ade80');
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="display:flex;gap:20px;">'
-                    + '<div><div style="font-size:24px;font-weight:200;color:' + tc + ';">' + fmt(tA,'\u00b0C') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Temp anomaly</div></div>'
-                    + '<div><div style="font-size:24px;font-weight:200;color:' + rc + ';">' + fmt(rA,'mm') + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);">Rain anomaly</div></div>'
-                    + '</div><div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:8px;">vs 30-day rolling average · Enable entity in HA to activate</div>'
-                    + '</div>';
-                ]]]
 
 
-      # ── STATION DIAGNOSTICS ──────────────────────────────────────────────────
-          - type: custom:button-card
-            entity: sensor.ws_dry_streak_days
-            name: Streak Counters
-            show_state: false
-            show_icon: true
-            icon: mdi:calendar-range
-            triggers_update:
-              - sensor.ws_heat_streak_days
-              - sensor.ws_frost_streak_days
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#fbbf24'
-            custom_fields:
-              details: |
-                [[[
-                  var dry = parseInt((entity && entity.state) || 0);
-                  var heat = parseInt((states['sensor.ws_heat_streak_days'] || {}).state || 0);
-                  var frost = parseInt((states['sensor.ws_frost_streak_days'] || {}).state || 0);
-                  return '<div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.8);line-height:2.2;">'
-                    + '<div style="display:flex;justify-content:space-between;"><span>Dry</span><span style="font-size:20px;font-weight:300;color:#fbbf24;">' + dry + 'd</span></div>'
-                    + '<div style="display:flex;justify-content:space-between;"><span>Heat</span><span style="font-size:20px;font-weight:300;color:#ef4444;">' + heat + 'd</span></div>'
-                    + '<div style="display:flex;justify-content:space-between;"><span>Frost</span><span style="font-size:20px;font-weight:300;color:#93c5fd;">' + frost + 'd</span></div>'
-                    + '</div>';
-                ]]]
+          # ── STATION DIAGNOSTICS ──────────────────────────────────────────────────
+              - type: custom:button-card
+                entity: sensor.ws_dry_streak_days
+                name: Streak Counters
+                show_state: false
+                show_icon: true
+                icon: mdi:calendar-range
+                triggers_update:
+                  - sensor.ws_heat_streak_days
+                  - sensor.ws_frost_streak_days
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#fbbf24'
+                custom_fields:
+                  details: |
+                    [[[
+                      var dry = parseInt((entity && entity.state) || 0);
+                      var heat = parseInt((states['sensor.ws_heat_streak_days'] || {}).state || 0);
+                      var frost = parseInt((states['sensor.ws_frost_streak_days'] || {}).state || 0);
+                      return '<div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.8);line-height:2.2;">'
+                        + '<div style="display:flex;justify-content:space-between;"><span>Dry</span><span style="font-size:20px;font-weight:300;color:#fbbf24;">' + dry + 'd</span></div>'
+                        + '<div style="display:flex;justify-content:space-between;"><span>Heat</span><span style="font-size:20px;font-weight:300;color:#ef4444;">' + heat + 'd</span></div>'
+                        + '<div style="display:flex;justify-content:space-between;"><span>Frost</span><span style="font-size:20px;font-weight:300;color:#93c5fd;">' + frost + 'd</span></div>'
+                        + '</div>';
+                    ]]]
 
-      # ── 30-DAY CLIMATOLOGY ──────────────────────────────────────────────────
-          - type: custom:button-card
-            entity: sensor.ws_et0_daily
-            name: ET₀ Today
-            show_state: false
-            show_icon: true
-            icon: mdi:sprout
-            triggers_update:
-              - sensor.ws_et0_daily
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: '#4ade80'
-            custom_fields:
-              details: |
-                [[[
-                  var daily = parseFloat(entity && entity.state);
-                  var attrs = (entity && entity.attributes) || {};
-                  var hourly = parseFloat(attrs.et0_hourly_mm);
-                  var method = attrs.method || 'Hargreaves-Samani';
-                  var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(2); };
-                  var fmtH = function(v) { return isNaN(v) ? '--' : v.toFixed(3); };
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:36px;font-weight:200;color:#4ade80;">' + fmt(daily) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> mm/day</span></div>'
-                    + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Water lost by plants & soil today</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:12px;line-height:1.8;">'
-                    + '<div><strong>Hourly rate:</strong> ' + fmtH(hourly) + ' mm/h</div>'
-                    + '<div><strong>Method:</strong> Hargreaves-Samani</div>'
-                    + '<div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:4px;">High value = irrigate soon</div>'
-                    + '</div></div>';
-                ]]]
+          # ── 30-DAY CLIMATOLOGY ──────────────────────────────────────────────────
+              - type: custom:button-card
+                entity: sensor.ws_et0_daily
+                name: ET₀ Today
+                show_state: false
+                show_icon: true
+                icon: mdi:sprout
+                triggers_update:
+                  - sensor.ws_et0_daily
+                styles:
+                  card:
+                    - background: rgba(30,30,30,0.9)
+                    - border-radius: 14px
+                    - padding: 16px
+                    - border: 1px solid rgba(255,255,255,0.1)
+                    - height: 100%
+                    - box-sizing: border-box
+                  name:
+                    - font-size: 16px
+                    - font-weight: 600
+                    - color: white
+                  icon:
+                    - width: 48px
+                    - color: '#4ade80'
+                custom_fields:
+                  details: |
+                    [[[
+                      var daily = parseFloat(entity && entity.state);
+                      var attrs = (entity && entity.attributes) || {};
+                      var hourly = parseFloat(attrs.et0_hourly_mm);
+                      var method = attrs.method || 'Hargreaves-Samani';
+                      var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(2); };
+                      var fmtH = function(v) { return isNaN(v) ? '--' : v.toFixed(3); };
+                      return '<div style="margin-top:8px;">'
+                        + '<div style="font-size:36px;font-weight:200;color:#4ade80;">' + fmt(daily) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> mm/day</span></div>'
+                        + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;">Water lost by plants & soil today</div>'
+                        + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:12px;line-height:1.8;">'
+                        + '<div><strong>Hourly rate:</strong> ' + fmtH(hourly) + ' mm/h</div>'
+                        + '<div><strong>Method:</strong> Hargreaves-Samani</div>'
+                        + '<div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:4px;">High value = irrigate soon</div>'
+                        + '</div></div>';
+                    ]]]
 
-      # ── DISPLAY SENSORS (conditional) ───────────────────────────────────────
+          # ── DISPLAY SENSORS (conditional) ───────────────────────────────────────
       - type: grid
         column_span: 4
         columns: 1
