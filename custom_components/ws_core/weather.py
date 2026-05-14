@@ -37,9 +37,24 @@ from .const import (
     KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
     KEY_PACKAGE_OK,
+    KEY_RAIN_RATE_FILT,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_UV,
 )
+
+# Nowcast taper: local sensor weight for hours 0, 1, 2 of the hourly forecast.
+# By hour 3 the NWP model is fully trusted (weight 0.0).
+_NOWCAST_LOCAL_WEIGHTS = [0.7, 0.4, 0.2]
+
+
+def _nowcast_blend(local_val: float | None, api_val: float | None, local_w: float) -> float | None:
+    """Weighted blend of a local reading and an API value."""
+    if local_val is None:
+        return api_val
+    if api_val is None:
+        return local_val
+    result = local_val * local_w + api_val * (1.0 - local_w)
+    return round(result, 1)
 
 
 def _weathercode_to_condition(code: int | None) -> str | None:
@@ -258,30 +273,82 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         hourly = fc.get("hourly") or []
         if not hourly:
             return None
+
+        # Nowcast: gather current local sensor readings for 0-2h blending
+        local_temp = d.get(KEY_NORM_TEMP_C)
+        local_humidity = d.get(KEY_NORM_HUMIDITY)
+        local_dew = d.get(KEY_DEW_POINT_C)
+        local_apparent = d.get(KEY_FEELS_LIKE_C)
+        local_wind_ms = d.get(KEY_NORM_WIND_SPEED_MS)
+        local_gust_ms = d.get(KEY_NORM_WIND_GUST_MS)
+        local_condition = d.get(KEY_CURRENT_CONDITION)
+        local_rain_rate = d.get(KEY_RAIN_RATE_FILT)  # mm/h  → approx mm in 1h
+        now_hour_iso = datetime.now().strftime("%Y-%m-%dT%H")
+        nowcast_slot = 0  # counts how many hourly slots we've applied local data to
+
         out: list[dict[str, Any]] = []
         for item in hourly:
             dt_s = item.get("datetime")
             if not dt_s:
                 continue
-            # Ensure ISO format with timezone
+            # Ensure ISO format
             dt = f"{dt_s}:00" if len(dt_s) == 16 else dt_s
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
+
+            # Determine if this slot falls within the nowcast window (hours 0-2)
+            is_nowcast = (
+                nowcast_slot < len(_NOWCAST_LOCAL_WEIGHTS)
+                and str(dt_s)[:13] >= now_hour_iso
+            )
+
+            if is_nowcast:
+                lw = _NOWCAST_LOCAL_WEIGHTS[nowcast_slot]
+                temperature = _nowcast_blend(local_temp, item.get("temp_c"), lw)
+                apparent = _nowcast_blend(local_apparent, item.get("apparent_temp_c"), lw)
+                dew = _nowcast_blend(local_dew, item.get("dewpoint_c"), lw)
+                humidity = _nowcast_blend(local_humidity, item.get("humidity"), lw)
+                # Wind: local sensors are more accurate than NWP for immediate hours
+                wind_ms = _nowcast_blend(
+                    local_wind_ms, wind_ms, lw
+                )
+                gust_ms = _nowcast_blend(
+                    local_gust_ms, gust_ms, lw
+                )
+                # For hour 0 use local condition; beyond that use API
+                if nowcast_slot == 0 and local_condition:
+                    condition = self._LOCAL_CONDITION_MAP.get(local_condition, "partlycloudy")
+                else:
+                    condition = _weathercode_to_condition(item.get("weathercode"))
+                # Precipitation: use rain rate as a 1h proxy for slot 0
+                if nowcast_slot == 0 and local_rain_rate is not None:
+                    precip = _nowcast_blend(local_rain_rate, item.get("precip_mm"), lw)
+                else:
+                    precip = item.get("precip_mm")
+                nowcast_slot += 1
+            else:
+                temperature = item.get("temp_c")
+                apparent = item.get("apparent_temp_c")
+                dew = item.get("dewpoint_c")
+                humidity = item.get("humidity")
+                condition = _weathercode_to_condition(item.get("weathercode"))
+                precip = item.get("precip_mm")
+
             out.append(
                 {
                     "datetime": dt,
-                    "temperature": item.get("temp_c"),
-                    "native_apparent_temperature": item.get("apparent_temp_c"),
-                    "native_dew_point": item.get("dewpoint_c"),
+                    "temperature": temperature,
+                    "native_apparent_temperature": apparent,
+                    "native_dew_point": dew,
                     "precipitation_probability": item.get("precip_prob"),
-                    "precipitation": item.get("precip_mm"),
+                    "precipitation": precip,
                     "wind_speed": wind_ms,
                     "native_wind_gust_speed": gust_ms,
-                    "humidity": item.get("humidity"),
+                    "humidity": humidity,
                     "cloud_coverage": item.get("cloud_cover"),
-                    "condition": _weathercode_to_condition(item.get("weathercode")),
+                    "condition": condition,
                     ATTR_ATTRIBUTION: self.attribution,
                 }
             )

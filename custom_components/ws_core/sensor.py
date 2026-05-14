@@ -51,6 +51,7 @@ from .const import (
     KEY_FIRE_RISK_SCORE,
     KEY_FOG_PROBABILITY,
     KEY_FORECAST,
+    KEY_FORECAST_AGREEMENT,
     KEY_FORECAST_SKILL,
     KEY_FORECAST_TILES,
     KEY_FROST_POINT_C,
@@ -923,6 +924,23 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
         attrs_fn=lambda d: {"calibration_days": d.get("_solar_lux_factor_n_days", 0)},
     ),
+    # Forecast agreement: Zambretti vs Open-Meteo
+    WSSensorDescription(
+        key=KEY_FORECAST_AGREEMENT,
+        name="WS Forecast Agreement",
+        icon="mdi:scale-balance",
+        attrs_fn=lambda d: {
+            "zambretti_implied_rain_pct": d.get("_forecast_agreement_z_rain_pct"),
+            "openmeteo_precip_prob": d.get("_forecast_agreement_api_precip_prob"),
+            "delta_pp": d.get("_forecast_agreement_delta"),
+            "zambretti_forecast": d.get(KEY_ZAMBRETTI_FORECAST),
+            "note": (
+                "aligned = both sources agree (<20pp delta); "
+                "diverging = moderate disagreement (20-40pp); "
+                "conflict = sources fundamentally disagree (>40pp)"
+            ),
+        },
+    ),
     # A3 Forecast skill (always on once enough data)
     WSSensorDescription(
         key=KEY_FORECAST_SKILL,
@@ -1034,6 +1052,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_SOLAR_FORECAST_TOMORROW_KWH,
         KEY_ET0_PM_DAILY_MM,
         # v1.2.0 — diagnostic learning sensors hidden by default
+        KEY_FORECAST_AGREEMENT,
         KEY_FORECAST_SKILL,
         KEY_SOLAR_LUX_FACTOR,
         KEY_CLIMATOLOGY_30D,
@@ -1166,6 +1185,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_CLIMATOLOGY_30D: "climatology_30d",
             KEY_TEMP_ANOMALY_30D: "temperature_anomaly_30d",
             KEY_RAIN_ANOMALY_30D: "rain_anomaly_30d",
+            KEY_FORECAST_AGREEMENT: "forecast_agreement",
             KEY_FORECAST_SKILL: "forecast_skill",
             KEY_SOLAR_LUX_FACTOR: "solar_lux_factor",
         }

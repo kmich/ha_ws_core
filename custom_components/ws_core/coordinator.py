@@ -76,6 +76,7 @@ from .algorithms import (
     thunderstorm_risk_index,
     uv_level,
     wind_speed_to_beaufort,
+    ZAMBRETTI_RAIN_PCT,
     zambretti_forecast,
 )
 from .const import (
@@ -194,6 +195,7 @@ from .const import (
     KEY_RAIN_ACCUM_24H,
     KEY_RAIN_ANOMALY_30D,
     KEY_RAIN_DISPLAY,
+    KEY_FORECAST_AGREEMENT,
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
@@ -1058,8 +1060,64 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if pp is not None:
                     api_prob = int(pp)
 
-            combined = combine_rain_probability(local_prob, api_prob, dt_util.now().hour)
+            outcomes = self._learning_state.forecast_outcomes
+            learned_local = self._learning_state.blend_local if len(outcomes) >= 10 else None
+            learned_api = self._learning_state.blend_openmeteo if len(outcomes) >= 10 else None
+            combined = combine_rain_probability(
+                local_prob, api_prob, dt_util.now().hour,
+                learned_local_w=learned_local,
+                learned_api_w=learned_api,
+            )
             data[KEY_RAIN_PROBABILITY_COMBINED] = combined
+
+    def _compute_forecast_agreement(self, data: dict) -> None:
+        """Compare Zambretti local outlook vs Open-Meteo precip probability.
+
+        Derives an implied rain likelihood from the Z-number (using the
+        ZAMBRETTI_RAIN_PCT lookup table) and compares it to Open-Meteo's
+        daily precipitation_probability for today.  The difference drives a
+        three-state agreement sensor:
+          • aligned   — difference < 20 pp  (both sources agree)
+          • diverging — difference 20-40 pp (moderate disagreement)
+          • conflict  — difference > 40 pp  (sources fundamentally disagree)
+
+        When sources conflict, forecasts should be treated with lower
+        confidence; the discrepancy itself is often meaningful (e.g. a
+        rapidly-falling barometer that the NWP model hasn't captured yet).
+        """
+        z_number = data.get(KEY_ZAMBRETTI_NUMBER)
+        if z_number is None:
+            return
+
+        try:
+            z_idx = int(z_number) - 1  # Z-numbers are 1-indexed
+            if not (0 <= z_idx < len(ZAMBRETTI_RAIN_PCT)):
+                return
+            z_rain_pct = ZAMBRETTI_RAIN_PCT[z_idx]
+        except (TypeError, ValueError):
+            return
+
+        fc = getattr(self, "_forecast_cache", None)
+        if not fc or not fc.get("daily"):
+            return
+        api_precip_prob = (fc["daily"][0] or {}).get("precip_prob")
+        if api_precip_prob is None:
+            return
+
+        api_precip_prob = float(api_precip_prob)
+        delta = abs(z_rain_pct - api_precip_prob)
+
+        if delta < 20:
+            state = "aligned"
+        elif delta < 40:
+            state = "diverging"
+        else:
+            state = "conflict"
+
+        data[KEY_FORECAST_AGREEMENT] = state
+        data["_forecast_agreement_z_rain_pct"] = z_rain_pct
+        data["_forecast_agreement_api_precip_prob"] = round(api_precip_prob)
+        data["_forecast_agreement_delta"] = round(delta)
 
     def _compute_et0(self, data: dict, now: Any) -> None:
         """Calculate ET₀ (reference evapotranspiration) via Hargreaves-Samani.  (v0.6.0)
@@ -1635,6 +1693,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         dew_c = self._compute_derived_temperature(data, now, tc, rh, wind_ms)
         trend_3h, mslp = self._compute_derived_pressure(data, now, tc, pressure_hpa, rh)
         self._compute_rain_probability(data, mslp, trend_3h, rh)
+        self._compute_forecast_agreement(data)
 
         flags = self._validate_readings(tc, rh, pressure_hpa, wind_ms, gust_ms, dew_c)
         data[KEY_SENSOR_QUALITY_FLAGS] = flags

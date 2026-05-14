@@ -293,6 +293,38 @@ def pressure_trend_arrow(trend_3h: float) -> str:
 # Zambretti Forecaster (real Negretti & Zambra lookup table)
 # ---------------------------------------------------------------------------
 
+# Implied rain-likelihood (%) per Z-number (1-26, index 0-25).
+# Derived from the qualitative text descriptions — used to compare the
+# Zambretti local-sensor outlook against the Open-Meteo precip_prob.
+ZAMBRETTI_RAIN_PCT: list[int] = [
+    5,   # Z=1  Settled fine
+    10,  # Z=2  Fine weather
+    15,  # Z=3  Becoming fine
+    20,  # Z=4  Fine, becoming less settled
+    30,  # Z=5  Fine, possible showers
+    15,  # Z=6  Fairly fine, improving
+    35,  # Z=7  Fairly fine, possible showers early
+    40,  # Z=8  Fairly fine, showery later
+    35,  # Z=9  Showery early, improving
+    40,  # Z=10 Changeable, mending
+    35,  # Z=11 Fairly fine, possible showers
+    45,  # Z=12 Rather unsettled clearing later
+    50,  # Z=13 Unsettled, probably improving
+    55,  # Z=14 Showery, bright intervals
+    60,  # Z=15 Showery, becoming rather unsettled
+    60,  # Z=16 Changeable, some rain
+    65,  # Z=17 Unsettled, short fine intervals
+    65,  # Z=18 Unsettled, rain later
+    70,  # Z=19 Unsettled, some rain
+    75,  # Z=20 Mostly very unsettled
+    75,  # Z=21 Occasional rain, worsening
+    80,  # Z=22 Rain at times, very unsettled
+    85,  # Z=23 Rain at frequent intervals
+    90,  # Z=24 Rain, very unsettled
+    85,  # Z=25 Stormy, may improve
+    95,  # Z=26 Stormy, much rain
+]
+
 # The 26 Zambretti forecast texts (Z-number 1-26, indices 0-25).
 # Original Negretti & Zambra patent, public domain.
 ZAMBRETTI_TEXTS = [
@@ -537,11 +569,22 @@ def calculate_rain_probability(
     return max(0, min(100, prob))
 
 
-def combine_rain_probability(local_prob: float, api_prob, current_hour: int) -> int:
+def combine_rain_probability(
+    local_prob: float,
+    api_prob,
+    current_hour: int,
+    learned_local_w: float | None = None,
+    learned_api_w: float | None = None,
+) -> int:
     """Blend local sensor-based probability with API forecast probability.
 
-    Weighting logic: local sensors are most valuable for nowcast (0-3h),
-    while NWP model output (API) is better for 6-12h outlook.
+    When Brier-score-derived learned weights are available (≥10 verified
+    outcomes in the rolling 90-day window), those weights are used in place
+    of the fixed hour-of-day heuristic.  The learned weights are adaptive:
+    whichever source has made better-calibrated predictions recently gets a
+    higher weight.
+
+    Fallback (no learned data yet):
     - Hours 6-18 (daytime, convective): local weight 0.5
     - Hours 0-6, 18-24 (stable, frontal): local weight 0.3
     This reflects that local sensors catch convective buildup well
@@ -549,9 +592,15 @@ def combine_rain_probability(local_prob: float, api_prob, current_hour: int) -> 
     """
     if api_prob is None:
         return round(local_prob)
-    # Daytime convective hours -> trust local sensors more
-    local_weight = 0.5 if 6 <= current_hour <= 18 else 0.3
-    return round(local_prob * local_weight + float(api_prob) * (1 - local_weight))
+
+    # Use Brier-derived adaptive weights when available; fall back to
+    # fixed hour-of-day heuristic otherwise.
+    if learned_local_w is not None and learned_api_w is not None:
+        local_weight = learned_local_w
+    else:
+        local_weight = 0.5 if 6 <= current_hour <= 18 else 0.3
+
+    return round(local_prob * local_weight + float(api_prob) * (1.0 - local_weight))
 
 
 def format_rain_display(rain_rate_mmph: float) -> str:
