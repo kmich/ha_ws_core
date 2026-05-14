@@ -15,7 +15,7 @@ Weather Station Core reads raw sensor data from your existing weather station â€
 
 | Weather view | Advanced view |
 |---|---|
-| ![Weather dashboard](screenshots/dashboard_weather.jpg) | ![Advanced dashboard](screenshots/dashboard_advanced.jpg) |
+| ![Weather dashboard](screenshots/dashboard-weather.png) | ![Advanced dashboard](screenshots/dashboard-advanced.png) |
 
 ---
 

@@ -4,9 +4,9 @@
 
 ---
 
-![Weather dashboard](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/dashboard_weather.jpg)
+![Weather dashboard](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/dashboard-weather.png)
 
-![Advanced dashboard](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/dashboard_advanced.jpg)
+![Advanced dashboard](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/dashboard-advanced.png)
 
 ---
 
