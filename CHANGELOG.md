@@ -2,7 +2,7 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [1.0.0] - 2026-05-14
+## [1.0] - 2026-05-14
 
 Initial public release.
 

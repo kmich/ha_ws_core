@@ -283,83 +283,355 @@ Rich visual dashboard requiring these HACS frontend cards:
 
 ---
 
-## Formula Documentation
+## Scientific Documentation
 
-Every derived metric is documented with its source reference, valid input range, and known limitations.
+Every derived metric is documented with its algorithm, source reference, valid input range, and known limitations.
+
+---
 
 ### Dew Point — Magnus Formula (Alduchov & Eskridge 1996)
 
-```
-γ = (a·T)/(b+T) + ln(RH/100)
-Td = (b·γ)/(a-γ)
+The dew point T_d is the temperature at which air becomes saturated if cooled at constant pressure and humidity. Derived by inverting the Magnus saturation vapour pressure formula.
 
-Over water (T ≥ 0 °C): a=17.625, b=243.04
-Over ice  (T < 0 °C):  a=22.587, b=273.86 (Buck 1981)
+```
+γ(T, RH) = (a·T) / (b + T) + ln(RH / 100)
+T_d = (b · γ) / (a − γ)
+
+Over water (T ≥ 0 °C): a = 17.625, b = 243.04 °C   [Alduchov & Eskridge 1996]
+Over ice  (T < 0 °C):  a = 22.587, b = 273.86 °C   [Buck 1981]
 ```
 
-Valid range: −45 °C to +60 °C, 1–100% RH. Max error: < 0.1 °C.
+**Valid range:** −45 °C to +60 °C, 1–100% RH. **Max error:** < 0.1 °C within range.
+**Reference:** Alduchov, O.A. & Eskridge, R.E. (1996). *J. Appl. Meteor.*, 35, 601–609.
+
+---
 
 ### Frost Point — Magnus Formula with Ice Constants (Buck 1981)
 
-Same formula as dew point but always uses ice constants (a=22.587, b=273.86). Only physically meaningful below 0 °C; above 0 °C returns the standard dew point.
+The frost point is the temperature at which ice saturation occurs. Physically distinct from dew point only below 0 °C — above freezing the two are identical. Uses Buck's (1981) ice-phase saturation constants, which are more accurate over ice than the standard Tetens coefficients.
 
-### Wet-Bulb Temperature (Stull 2011)
+Same formula as dew point but always uses ice constants (a = 22.587, b = 273.86). Returns dew point above 0 °C, frost point below 0 °C.
+
+**Reference:** Buck, A.L. (1981). *J. Appl. Meteor.*, 20, 1527–1532.
+
+---
+
+### Wet-Bulb Temperature — Stull (2011)
+
+The wet-bulb temperature T_w is the lowest temperature air can reach by evaporative cooling at constant pressure. Critical for heat stress assessment (heat index, WBGT approximations) and precipitation phase determination.
 
 ```
-Tw = T·atan(0.151977·(RH+8.313659)^0.5) + atan(T+RH)
-     - atan(RH-1.676331) + 0.00391838·RH^1.5·atan(0.023101·RH)
-     - 4.686035
+T_w = T · atan(0.151977 · (RH + 8.313659)^0.5)
+    + atan(T + RH)
+    − atan(RH − 1.676331)
+    + 0.00391838 · RH^1.5 · atan(0.023101 · RH)
+    − 4.686035
 ```
 
-Source: Stull, R. (2011). *J. Appl. Meteor. Climatol.*, 50, 2267–2269.
-Valid range: RH 5–99%, T −20 to +50 °C. Max error: ±0.3 °C.
+**Valid range:** T −20 to +50 °C, RH 5–99%. **Max error:** ±0.3 °C.
+**Reference:** Stull, R. (2011). Wet-Bulb Temperature from Relative Humidity and Air Temperature. *J. Appl. Meteor. Climatol.*, 50, 2267–2269.
+
+---
 
 ### Sea-Level Pressure — Hypsometric Reduction (WMO No. 8)
 
-```
-MSLP = P_stn × exp(elevation / (T_K × 29.263))
-```
-
-Accuracy: ±0.3 hPa below 500 m, ±1 hPa at 2000 m.
-**Limitation**: Uses current temperature only; WMO recommends 12h mean temperature for better accuracy at high elevations.
-
-### Apparent Temperature — Australian BOM (Steadman 1994)
+Station pressure must be reduced to mean sea level to be comparable between stations at different elevations. Uses the hypsometric (barometric) equation with a simplified isothermal column assumption.
 
 ```
-AT = Ta + 0.33·e - 0.70·ws - 4.0
-where e = (RH/100) × 6.105 × exp((17.27·T)/(237.7+T))
+MSLP = P_station × exp(elevation_m / (T_K × R/g))
+     = P_station × exp(elevation_m / (T_K × 29.263))
+
+where R/g = 287.058 / 9.80665 ≈ 29.263 m·K / hPa
+      T_K = temperature in Kelvin
 ```
 
-Valid for any temperature range (unlike NWS wind chill / heat index which have validity bounds).
+**Accuracy:** ±0.3 hPa below 500 m, ±1 hPa at 2000 m.
+**Limitation:** Uses instantaneous temperature. WMO recommends the 12-hour mean temperature for accuracy above 500 m during rapid temperature swings.
+**Reference:** WMO No. 8 — Guide to Meteorological Instruments and Methods of Observation, Annex 3A.
+
+---
+
+### Apparent Temperature — Australian BOM / Steadman (1994)
+
+The physiologically-equivalent temperature accounting for humidity (evaporative heat loss) and wind (convective heat loss). Unlike the NWS wind chill and heat index formulas — which have separate validity ranges and do not overlap — the Australian BOM formula applies continuously across all temperatures.
+
+```
+AT = T_a + 0.33 · e − 0.70 · ws − 4.0
+
+where e = (RH / 100) × 6.105 × exp((17.27 · T) / (237.7 + T))   [vapour pressure, hPa]
+      ws = wind speed at 10 m height [m/s]
+```
+
+**Reference:** Steadman, R.G. (1994). Norms of apparent temperature in Australia. *Aust. Met. Mag.*, 43, 1–16.
+
+---
 
 ### Zambretti Barometric Forecaster (Negretti & Zambra, 1915)
 
-Implements the authentic Negretti & Zambra forecast table with all 26 Z-number entries mapped to their original weather descriptions. The base Z-number is derived from MSLP (950–1050 hPa), then corrected for pressure trend (±4 Z-numbers for rapid change), wind direction (climate-region-aware biases), season, and humidity. The final Z-number indexes the historical lookup table — not a parameterized approximation.
+The Zambretti forecaster is one of the oldest scientifically-grounded local weather prediction methods, developed by Negretti & Zambra for their household barographs. It produces a forecast letter A–Z (Z-number 1–26) from three observable surface quantities, each mapping to a plain-English forecast verified against decades of British Isles climatology.
 
-Wind-direction influence is suppressed at calm conditions (< 1 m/s) where direction is meteorological noise. A sanity guard prevents rain forecasts when MSLP > 1015 hPa with low humidity, no recent rain, and a neutral/rising trend.
+**Algorithm:**
 
-Accuracy: 65–75% for 6–12h forecasts in maritime/Mediterranean climates. Less reliable in continental interiors and tropics.
+1. **Base Z-number from MSLP:** The current mean sea-level pressure is linearly interpolated across the Z-number scale (950–1050 hPa → Z 26–1 for falling, Z 1–26 for rising, separate rising/steady/falling lookup tables).
 
-### Pressure Trend — Least-Squares Linear Regression (WMO No. 306)
+2. **Pressure trend correction (±4 Z-numbers):** Each 0.8 hPa/3h of pressure change shifts the Z-number by ±1 step (capped at ±4), sharpening fair/poor forecasts.
 
-Fits a linear trend to the pressure history buffer (sampled every 15 minutes, configurable window, default 3h) and extrapolates the slope to a 3-hour rate. Classifications follow WMO Table 4680 thresholds: Rising Rapidly (>1.6 hPa/3h), Rising (>0.8), Steady, Falling (<−0.8), Falling Rapidly (<−1.6).
+3. **Wind direction correction (climate-region-aware):** In Atlantic Europe and Scandinavia, SW–W winds are corrected toward fair (negative Z adjustment) while E–NE winds are corrected toward poor (positive), reflecting the dominant synoptic patterns. Mediterranean, continental, and other regions use separate bias tables.
+
+4. **Calm-wind suppression:** At wind speeds < 1 m/s, direction is meteorological noise; the wind correction is suppressed.
+
+5. **Sanity guard:** If MSLP > 1015 hPa, humidity < 60%, no rain in the past 24h, and pressure trend ≥ −1 hPa/3h, the forecast is clamped into the "fairly fine" band (Z ≤ 8) regardless of other factors.
+
+6. **Z-number → forecast text:** The final Z-number indexes the authentic 26-entry Negretti & Zambra lookup table. This is *not* a parameterized regression — it is the original table.
+
+**Output:** `sensor.ws_zambretti_forecast` (text) + `sensor.ws_zambretti_number` (1–26, for automations).
+
+**Accuracy:** 65–75% for 6–12h forecasts in maritime and Mediterranean climates. Accuracy degrades in continental interiors, the tropics, and mountainous terrain where synoptic pressure patterns decouple from local weather.
+
+**References:**
+- Negretti & Zambra (1915). *A Treatise on Meteorological Instruments.* London.
+- Watts, A. (2012). *Instant Wind Forecasting.* Adlard Coles Nautical.
+
+---
+
+### Pressure Trend — Least-Squares Regression (WMO No. 306)
+
+Pressure tendency is one of the strongest short-range forecast predictors. A linear regression is fitted to the pressure history buffer (sampled every 15 minutes, configurable window, default 3h) using ordinary least squares, and the slope is extrapolated to a standardised 3-hour equivalent rate.
+
+```
+slope (hPa/h) = Σ[(t_i − t̄)(P_i − P̄)] / Σ[(t_i − t̄)²]
+change_3h (hPa) = slope × 3
+```
+
+Classification follows WMO synoptic code Table 4680 thresholds:
+
+| Code | Label | 3h change |
+|---|---|---|
+| 0 | Rising Rapidly | > +1.6 hPa |
+| 1 | Rising | +0.8 to +1.6 hPa |
+| 2 | Steady | −0.8 to +0.8 hPa |
+| 3 | Falling | −1.6 to −0.8 hPa |
+| 4 | Falling Rapidly | < −1.6 hPa |
+
+**Reference:** WMO No. 306 — Manual on Codes, Vol. I.1, Table 4680.
+
+---
+
+### Rain Rate — 1D Kalman Filter
+
+Raw rain rate (computed from successive differences in the cumulative rain total sensor) exhibits a spike-and-drop artefact in tipping-bucket gauges: one bucket tip produces a large instantaneous rate, followed by zero until the next tip. The 1D Kalman filter provides optimal recursive smoothing.
+
+```
+Prediction:  x̂_k|k-1 = x̂_k-1|k-1
+             P_k|k-1  = P_k-1|k-1 + Q          (Q = process noise = 0.01)
+
+Update:      K_k      = P_k|k-1 / (P_k|k-1 + R)
+             x̂_k|k   = x̂_k|k-1 + K_k · (z_k − x̂_k|k-1)
+             P_k|k    = (1 − K_k) · P_k|k-1
+
+where R = measurement noise (configurable via number.ws_rain_filter_alpha, default 0.7)
+```
+
+Higher `rain_filter_alpha` = larger R = more smoothing (slower response to real rain events). Lower values = noisier but more responsive.
+
+---
 
 ### Rain Probability — Heuristic Index
 
-**This is NOT a calibrated probability.** It is a composite index (0–100) combining MSLP, pressure trend, humidity, and wind direction using climate-region-specific thresholds. The combined probability blends this local index with Open-Meteo NWP output, weighting local sensors higher during daytime convective hours (6–18h).
+**This is NOT a calibrated probability.** It is a composite index (0–100) combining surface observations using climate-region-specific thresholds. The local index is then blended with Open-Meteo NWP model output.
 
-### Fire Risk Score — Simplified Heuristic
+**Local index inputs:**
+- MSLP (lower pressure → higher index)
+- Pressure trend (falling → higher index)
+- Relative humidity (higher RH → higher index, non-linear)
+- Wind quadrant (region-specific: E/NE winds increase index in Atlantic Europe; N/W increase in Mediterranean)
 
-**NOT the Canadian FWI.** A simplified 0–50 scale inspired by the FWI structure (Van Wagner 1987) but lacking the daily-accumulated moisture codes (FFMC, DMC, DC) required for the real system. Not suitable for operational fire weather decisions. Consult official fire services.
+**NWP blending:** The local index and Open-Meteo precipitation probability are merged using a time-weighted scheme. Local sensors carry higher weight during daytime convective hours (06–18h) when surface observations better capture local buildup; Open-Meteo carries higher weight during nocturnal frontal hours.
 
-### Kalman Filter — Rain Rate Smoothing
+**Caveat:** Treat the output as a relative likelihood indicator, not an absolute probability. It has not been verified against a multi-year station archive.
 
-1D Kalman filter applied to raw rain rate (computed from successive total rainfall readings). Configurable measurement noise coefficient (default 0.7). Eliminates the spike-and-drop pattern common in tipping-bucket rain gauges.
+---
+
+### Fog Probability — Dew-Point Depression Model
+
+Fog forms when air cools to its dew point (100% relative humidity). The dew-point depression (T − T_d) is the primary predictor.
+
+```
+Base probability:
+  Depression < 0.5 °C → 95%
+  Depression < 1.5 °C → 75%
+  Depression < 3.0 °C → 45%
+  Depression < 5.0 °C → 20%
+  Depression ≥ 5.0 °C → 5%
+
+Corrections applied multiplicatively:
+  Wind speed ≥ 5 m/s  → ×0.5   (mechanical mixing disperses fog)
+  Night hours (20–06h) → ×1.3   (radiative cooling enhances fog formation)
+  Rain rate > 0 mm/h  → ×0.3   (precipitation suppresses radiation fog)
+```
+
+**Output:** 0–100% with risk level (Unlikely / Possible / Likely / Very Likely).
+**Limitation:** Does not distinguish radiation fog from advection fog or valley fog. No topographic inputs.
+
+---
+
+### Thunderstorm Risk — Surface Heuristic Index
+
+True thunderstorm forecasting requires upper-atmosphere sounding data (lifted index, K-index, CAPE) unavailable from a personal weather station. This index is a surface-only proxy that detects precursor signatures observable at ground level.
+
+**Inputs and scoring (0–100):**
+- **T − T_d gap (instability proxy):** Large T–T_d gap in hot conditions signals elevated CAPE potential.
+- **High surface temperature:** Extreme surface heating drives convective initiation.
+- **Rapid pressure fall rate:** A fall of > 1 hPa/3h indicates an approaching low or frontal boundary.
+- **Wind acceleration:** Sudden increase in gust speed can indicate outflow boundaries or sea-breeze convergence.
+- **Illuminance drop:** A rapid lux decrease during daylight indicates anvil cloud or cumulonimbus development overhead.
+
+**Important caveat:** This sensor cannot detect elevated convection, nocturnal MCS events, or frontal thunderstorms where surface conditions remain benign. It produces false positives during frontal passages with rapid pressure falls that are not thunderstorm-related.
+
+---
+
+### Fire Risk Score — Simplified Heuristic (Van Wagner 1987, adapted)
+
+**This is NOT the Canadian Forest Fire Weather Index (FWI).** The real FWI requires three daily accumulated moisture codes (FFMC, DMC, DC) that track fuel dryness over days to weeks — impossible to compute from a PWS without a continuous multi-day history seeded from a verified initial condition.
+
+This integration uses a simplified 0–50 surface index inspired by the FWI's input structure (temperature, relative humidity, wind speed) as a rough indicator of elevated fire weather conditions.
+
+**Danger levels:** Low (0–7), Moderate (8–18), High (19–29), Very High (30–49), Extreme (50).
+
+**Disclaimer built into the sensor attributes:** *Not suitable for operational fire weather decisions. Consult official fire services and national fire weather indices.*
+
+**Reference:** Van Wagner, C.E. (1987). Development and structure of the Canadian Forest Fire Weather Index System. *Forestry Technical Report 35.* Canadian Forestry Service.
+
+---
 
 ### ET₀ — Reference Evapotranspiration
 
-- **Hargreaves-Samani 1985** (default): Uses daily temp high/low and latitude. Accuracy ±15–20% vs Penman-Monteith.
-- **FAO-56 Penman-Monteith** (activates when `solar_radiation` W/m² source is mapped): Incorporates net radiation, temperature, humidity, and wind. Accuracy ±5–10% vs lysimeter.
+ET₀ estimates the water demand of a reference grass surface, used for irrigation scheduling and agricultural planning.
+
+**Hargreaves-Samani 1985** (default, always available):
+
+```
+ET₀ = 0.0023 · Ra · (T_mean + 17.8) · (T_max − T_min)^0.5
+
+where Ra = extraterrestrial radiation [MJ·m⁻²·d⁻¹] computed from latitude and day-of-year
+      T_max, T_min = daily temperature extremes [°C]
+```
+
+**Accuracy:** ±15–20% vs Penman-Monteith. Overestimates in humid climates, underestimates in arid conditions.
+**Reference:** Hargreaves, G.H. & Samani, Z.A. (1985). *Appl. Eng. Agric.*, 1, 96–99.
+
+**FAO-56 Penman-Monteith** (activates automatically when a `solar_radiation` W/m² source is mapped):
+
+```
+ET₀ = [0.408·Δ·(Rn − G) + γ·(900/(T+273))·u₂·(eₛ − eₐ)] / [Δ + γ·(1 + 0.34·u₂)]
+
+where Rn  = net radiation [MJ·m⁻²·d⁻¹] (derived from measured solar radiation)
+      G   = soil heat flux (≈ 0 for daily)
+      T   = mean daily temperature [°C]
+      u₂  = wind speed at 2 m height [m/s] (converted from 10 m sensor)
+      eₛ  = saturation vapour pressure [kPa]
+      eₐ  = actual vapour pressure [kPa]
+      Δ   = slope of saturation vapour pressure curve
+      γ   = psychrometric constant
+```
+
+**Accuracy:** ±5–10% vs lysimeter under standard conditions.
+**Reference:** Allen, R.G. et al. (1998). *FAO Irrigation and Drainage Paper 56.* FAO, Rome.
+
+---
+
+### Moon Phase — Meeus Astronomical Algorithms (1998)
+
+Moon phase and illumination are calculated from the Julian Date using Jean Meeus's simplified lunar orbital equations, without external API calls.
+
+**Illumination:**
+```
+Phase angle i = arccos(cos(e_lon − s_lon) · cos(moon_lat))
+Illumination  = (1 + cos(i)) / 2 × 100%
+```
+
+where ecliptic longitudes are computed from the Moon's mean anomaly, argument of latitude, and the Sun's mean anomaly, each corrected for principal periodic perturbations.
+
+**Phase naming:** The illumination fraction and direction of change (waxing/waning) determine the phase label: New Moon, Waxing Crescent, First Quarter, Waxing Gibbous, Full Moon, Waning Gibbous, Last Quarter, Waning Crescent.
+
+**Accuracy:** ±1% illumination, ±0.5 day phase timing.
+**Reference:** Meeus, J. (1998). *Astronomical Algorithms*, 2nd ed. Willmann-Bell. Chapter 48.
+
+---
+
+### UV Index — WMO Scale
+
+The UV index is read directly from the station's UV sensor (if mapped) and classified per the World Health Organization / WMO international UV scale:
+
+| Index | Level | Recommendation |
+|---|---|---|
+| 0 | None | No protection needed |
+| 1–2 | Low | Wear sunscreen in extended outdoor exposure |
+| 3–5 | Moderate | Cover up, wear hat and sunscreen |
+| 6–7 | High | Reduce time in sun around midday |
+| 8–10 | Very High | Take extra precautions |
+| 11+ | Extreme | Unprotected skin burns in minutes |
+
+**Reference:** WHO/WMO/UNEP (2002). *Global Solar UV Index: A Practical Guide.*
+
+---
+
+### Beaufort Wind Scale
+
+Wind speed classified per the original Beaufort scale as standardised for use over land.
+
+| Force | Name | Speed (m/s) | Description |
+|---|---|---|---|
+| 0 | Calm | < 0.3 | Smoke rises vertically |
+| 1 | Light Air | 0.3–1.5 | Wind direction shown by smoke |
+| 2 | Light Breeze | 1.6–3.3 | Wind felt on face, leaves rustle |
+| 3 | Gentle Breeze | 3.4–5.4 | Leaves and small twigs in motion |
+| 4 | Moderate Breeze | 5.5–7.9 | Raises dust and loose paper |
+| 5 | Fresh Breeze | 8.0–10.7 | Small trees begin to sway |
+| 6 | Strong Breeze | 10.8–13.8 | Large branches in motion |
+| 7 | Near Gale | 13.9–17.1 | Whole trees in motion |
+| 8 | Gale | 17.2–20.7 | Breaks twigs off trees |
+| 9 | Strong Gale | 20.8–24.4 | Slight structural damage |
+| 10 | Storm | 24.5–28.4 | Trees uprooted |
+| 11 | Violent Storm | 28.5–32.6 | Widespread structural damage |
+| 12 | Hurricane | ≥ 32.7 | Devastation |
+
+---
+
+### Sensor Drift Detection — Linear Regression (72h)
+
+A persistent monotonic trend in a sensor's readings can indicate calibration drift or sensor degradation. For temperature, humidity, pressure, and rain rate, a 72-hour ordinary least-squares regression is computed every update cycle. A sensor is flagged as drifting if:
+
+1. The regression slope magnitude exceeds a minimum threshold, **and**
+2. The coefficient of determination R² ≥ 0.85 (indicating the trend is monotonic, not random noise)
+
+Rain gauge sticking is detected separately: if rain rate has been non-zero and constant for > 2 hours, a stuck-bucket flag is raised.
+
+---
+
+### Cross-Sensor Consistency Checks
+
+Six physical impossibility checks are evaluated every coordinator update. Any violation raises a quality flag visible in diagnostics:
+
+| Check | Violation condition |
+|---|---|
+| Gust vs wind | Gust speed < sustained wind speed (physically impossible) |
+| Dew point vs temperature | Dew point > air temperature (relative humidity cannot exceed 100%) |
+| UV vs illuminance | UV index > 0 while illuminance < 50 lx (sensor malfunction) |
+| UV vs time of day | UV index > 2 between 22:00–04:00 local time (night UV impossible) |
+| Rain rate vs total | Rain rate > 0 but cumulative rain total unchanged (gauge stuck open) |
+| Pressure stuck | Pressure unchanging for > 3h while wind speed > 2 m/s (transducer fault) |
+
+---
+
+### 30-Day Rolling Climatology
+
+After approximately 14 days of operation, the integration builds a local climate baseline from the station's own history. For each calendar day the station has observed, it tracks the rolling 30-day mean high temperature, mean low temperature, total rain, and number of rain days.
+
+**Temperature anomaly:** today's mean temperature minus the 30-day rolling mean.
+**Rain anomaly:** today's rain total minus the 30-day rolling daily average.
+
+These sensors are enabled by default but registered as `entity_registry_enabled_default: False` — enable them in Settings → Devices & Services → Weather Station Core → entities if you want them on dashboards. They are most meaningful after 30+ days of continuous operation.
 
 ---
 
