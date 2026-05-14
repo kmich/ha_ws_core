@@ -2,6 +2,14 @@
 
 **Turn any personal weather station into a comprehensive, scientifically-grounded weather intelligence hub for Home Assistant.**
 
+---
+
+![Weather dashboard](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/dashboard_weather.jpg)
+
+![Advanced dashboard](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/dashboard_advanced.jpg)
+
+---
+
 ## What it does
 
 Weather Station Core reads raw sensor data from your existing weather station (Ecowitt, Davis, WeatherFlow, Shelly, etc.) and produces 50+ derived meteorological values — all through a guided config flow, no YAML required.
