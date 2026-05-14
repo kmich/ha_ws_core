@@ -3097,7 +3097,7 @@ views:
 
           # ── WIND ROSE & RADAR side by side ──────────────────────────────────────
       - type: grid
-        column_span: 2
+        column_span: 1
         columns: 1
         card_mod:
           style: |
@@ -3151,7 +3151,7 @@ views:
               style: |
                 ha-card { overflow: hidden !important; }
       - type: grid
-        column_span: 2
+        column_span: 3
         columns: 1
         card_mod:
           style: |
@@ -3188,7 +3188,7 @@ views:
             icon: mdi:radar
           - type: iframe
             url: https://www.rainviewer.com/map.html?loc=37.9838,23.7275,9&oFa=1&oC=1&oU=1&oCS=1&oF=0&oAP=1&rmt=4&c=1&o=83&lm=1
-            aspect_ratio: 65%
+            aspect_ratio: 40%
             card_mod:
               style: |
                 ha-card { min-height: 400px !important; }
