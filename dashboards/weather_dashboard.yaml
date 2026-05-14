@@ -1575,7 +1575,7 @@ views:
       # ── CURRENT CONDITIONS & FORECAST ────────────────────────────────────────
       - type: grid
         column_span: 4
-        columns: 1
+        columns: 3
         card_mod:
           style: |
             ha-card {
@@ -1591,6 +1591,8 @@ views:
             heading_style: title
             icon: mdi:alert
           - type: horizontal-stack
+            grid_options:
+              columns: full
             card_mod:
               style: |
                 ha-card {
@@ -1763,7 +1765,7 @@ views:
 
       - type: grid
         column_span: 4
-        columns: 1
+        columns: 3
         card_mod:
           style: |
             ha-card {
@@ -1779,6 +1781,8 @@ views:
             heading_style: title
             icon: mdi:thermometer
           - type: horizontal-stack
+            grid_options:
+              columns: full
             card_mod:
               style: |
                 ha-card {
@@ -1946,7 +1950,7 @@ views:
           # ── AIR QUALITY & POLLEN (conditional) ──────────────────────────────────
       - type: grid
         column_span: 4
-        columns: 1
+        columns: 3
         card_mod:
           style: |
             ha-card {
@@ -1962,6 +1966,8 @@ views:
             heading_style: title
             icon: mdi:weather-windy
           - type: horizontal-stack
+            grid_options:
+              columns: full
             card_mod:
               style: |
                 ha-card {
@@ -2119,6 +2125,8 @@ views:
                     ]]]
 
           - type: horizontal-stack
+            grid_options:
+              columns: full
             card_mod:
               style: |
                 ha-card {
@@ -2285,7 +2293,7 @@ views:
 
       - type: grid
         column_span: 4
-        columns: 1
+        columns: 3
         card_mod:
           style: |
             ha-card {
@@ -2301,6 +2309,8 @@ views:
             heading_style: title
             icon: mdi:weather-sunny
           - type: horizontal-stack
+            grid_options:
+              columns: full
             card_mod:
               style: |
                 ha-card {
@@ -2462,6 +2472,8 @@ views:
                       ]]]
 
           - type: horizontal-stack
+            grid_options:
+              columns: full
             card_mod:
               style: |
                 ha-card {
@@ -2643,7 +2655,7 @@ views:
           # ── MOON & SOLAR FORECAST (conditional) ─────────────────────────────────
       - type: grid
         column_span: 4
-        columns: 1
+        columns: 3
         card_mod:
           style: |
             ha-card {
@@ -2659,6 +2671,8 @@ views:
             heading_style: title
             icon: mdi:chart-line
           - type: horizontal-stack
+            grid_options:
+              columns: full
             card_mod:
               style: |
                 ha-card {
