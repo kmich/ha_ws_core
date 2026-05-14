@@ -1434,7 +1434,7 @@ views:
     subview: true
     sections:
 
-      # ── NAVIGATION ──────────────────────────────────────────────────────────
+      # ── TOP BAR ──────────────────────────────────────────────────────────────
       - type: grid
         column_span: 4
         columns: 1
@@ -1446,47 +1446,130 @@ views:
               border: none !important;
               padding: 0 !important;
             }
-            #root, .grid {
-              display: grid !important;
-              grid-template-columns: 1fr !important;
-              align-items: stretch !important;
-              justify-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              justify-self: stretch !important;
-              width: 100% !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              width: 100% !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
         cards:
-          - type: custom:button-card
-            name: "← Back to Weather"
-            show_icon: false
-            show_state: false
-            tap_action:
-              action: navigate
-              navigation_path: weather
-            styles:
-              card:
-                - background: rgba(30,30,30,0.7)
-                - border-radius: 14px
-                - padding: 10px 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 14px
-                - font-weight: 500
-                - color: rgba(255,255,255,0.7)
-                - justify-self: start
+          - type: horizontal-stack
+            card_mod:
+              style: |
+                ha-card {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  border: none !important;
+                  padding: 0 !important;
+                  margin: 0 0 4px 0 !important;
+                }
+                #root {
+                  align-items: stretch;
+                  gap: 8px;
+                }
+                #root > * {
+                  align-self: stretch !important;
+                }
+                #root > *:first-child {
+                  flex: 0 0 44px !important;
+                  max-width: 44px !important;
+                }
+                #root > *:nth-child(2) {
+                  flex: 1 1 auto !important;
+                }
+                #root > * > ha-card {
+                  height: 100% !important;
+                }
+            cards:
+              - type: custom:button-card
+                icon: mdi:arrow-left
+                show_name: false
+                show_state: false
+                show_icon: true
+                tap_action:
+                  action: navigate
+                  navigation_path: weather
+                styles:
+                  card:
+                    - background: rgba(255,255,255,0.04)
+                    - width: 44px
+                    - min-width: 44px
+                    - max-width: 44px
+                    - display: flex
+                    - justify-content: center
+                    - align-items: center
+                    - border-radius: 18px
+                    - border: 1px solid rgba(255,255,255,0.10)
+                    - box-shadow: 0 4px 16px rgba(0,0,0,0.25)
+                    - height: 100%
+                    - padding: 0
+                    - margin: 0
+                  icon:
+                    - color: rgba(255,255,255,0.75)
+                    - width: 22px
+                    - height: 22px
+              - type: custom:button-card
+                entity: sensor.ws_station_health
+                triggers_update:
+                  - sensor.ws_station_health
+                  - sensor.ws_data_quality_banner
+                  - sensor.ws_battery
+                  - sensor.ws_wu_upload_status
+                  - switch.ws_enable_wunderground
+                show_name: false
+                show_state: false
+                show_icon: false
+                tap_action:
+                  action: more-info
+                custom_fields:
+                  content: |
+                    [[[
+                      const health = (entity && entity.state) || 'Unknown';
+                      const healthColor = health === 'Online' ? '#4ade80' : health === 'Degraded' ? '#fbbf24' : '#ef4444';
+                      const healthIcon = health === 'Online' ? '●' : health === 'Degraded' ? '◐' : '○';
+
+                      const dqEntity = states['sensor.ws_data_quality_banner'] || {};
+                      const dq = (dqEntity.state || 'OK').toString().trim();
+                      const dqColor = dq === 'OK' || dq.startsWith('OK') ? '#4ade80' : dq === 'Warning' || dq.startsWith('WARN') ? '#fbbf24' : '#ef4444';
+                      const dqLabel = dq.replace(/^(OK|WARN|ERROR):\s*/i, '').trim() || dq;
+
+                      const battPct = parseFloat((states['sensor.ws_battery'] || {}).state);
+                      const battColor = battPct > 50 ? '#4ade80' : battPct > 20 ? '#fbbf24' : '#ef4444';
+                      const battAttrs = (states['sensor.ws_battery'] || {}).attributes || {};
+                      const battBars = parseInt(battAttrs.bars) || Math.ceil(battPct / 34);
+                      let battBarHtml = '';
+                      for (let i = 1; i <= 3; i++) {
+                        battBarHtml += `<div style="width:5px;height:${5+i*3}px;background:${battColor};opacity:${i<=battBars?'1':'0.2'};border-radius:1px;"></div>`;
+                      }
+
+                      const wuEnabled = (states['switch.ws_enable_wunderground'] || {}).state === 'on';
+                      const wuState = (states['sensor.ws_wu_upload_status'] || {}).state || '';
+                      const wuOk = wuState.toLowerCase().includes('ok') || wuState.toLowerCase().includes('success') || wuState.toLowerCase().includes('online');
+                      const wuColor = wuOk ? '#4ade80' : '#ef4444';
+
+                      return `
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                          <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:20px;padding:5px 10px;">
+                            <span style="color:${healthColor};font-size:10px;">${healthIcon}</span>
+                            <span style="font-size:11px;font-weight:600;color:${healthColor};text-transform:uppercase;letter-spacing:0.3px;">${health}</span>
+                          </div>
+                          <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:20px;padding:5px 10px;">
+                            <ha-icon icon="mdi:shield-check" style="--mdc-icon-size:12px;color:${dqColor};"></ha-icon>
+                            <span style="font-size:11px;font-weight:600;color:${dqColor};text-transform:uppercase;letter-spacing:0.3px;">${dqLabel}</span>
+                          </div>
+                          ${!isNaN(battPct) ? `<div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:20px;padding:5px 10px;"><div style="display:flex;align-items:flex-end;gap:2px;">${battBarHtml}</div><span style="font-size:11px;font-weight:600;color:${battColor};">${battPct.toFixed(0)}%</span></div>` : ''}
+                          ${wuEnabled ? `<div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:20px;padding:5px 10px;"><ha-icon icon="mdi:weather-cloudy-clock" style="--mdc-icon-size:12px;color:rgba(255,255,255,0.5);"></ha-icon><span style="font-size:11px;color:rgba(255,255,255,0.5);">WU</span><span style="font-size:11px;font-weight:600;color:${wuColor};margin-left:2px;">${wuState}</span></div>` : ''}
+                        </div>
+                      `;
+                    ]]]
+                styles:
+                  card:
+                    - background: rgba(255,255,255,0.04)
+                    - border-radius: 18px
+                    - border: 1px solid rgba(255,255,255,0.10)
+                    - box-shadow: 0 4px 16px rgba(0,0,0,0.25)
+                    - padding: 8px 14px
+                    - height: 100%
+                    - box-sizing: border-box
+                  custom_fields:
+                    content:
+                      - width: 100%
+                      - display: flex
+                      - align-items: center
 
 
       # ── CURRENT CONDITIONS & FORECAST ────────────────────────────────────────
@@ -2645,167 +2728,6 @@ views:
                     + '<div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:4px;">High value = irrigate soon</div>'
                     + '</div></div>';
                 ]]]
-
-      # ── UPLOAD STATUS (conditional) ──────────────────────────────────────────
-      - type: grid
-        column_span: 4
-        columns: 3
-        card_mod:
-          style: |
-            ha-card {
-              background: transparent !important;
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-            }
-            #root, .grid {
-              align-items: stretch !important;
-            }
-            #root > hui-card,
-            .grid > hui-card {
-              align-self: stretch !important;
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-            #root > hui-card > *,
-            .grid > hui-card > * {
-              height: 100% !important;
-              min-height: 0 !important;
-            }
-        cards:
-          - type: heading
-            heading: Station Health
-            heading_style: title
-            icon: mdi:heart-pulse
-          - type: custom:button-card
-            entity: sensor.ws_station_health
-            name: Station Health
-            show_state: false
-            show_icon: true
-            icon: mdi:heart-pulse
-            triggers_update:
-              - sensor.ws_package_status
-              - sensor.ws_alert_state
-              - sensor.ws_alert_message
-              - sensor.ws_battery
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
-                    [[[
-                      var s = (entity && entity.state) || '';
-                      return s === 'Online' ? '#10b981' : s === 'Degraded' ? '#f59e0b' : '#ef4444';
-                    ]]]
-            custom_fields:
-              details: |
-                [[[
-                  var health = (entity && entity.state) || '--';
-                  var pkg = (states['sensor.ws_package_status'] || {}).state || '--';
-                  var alertState = (states['sensor.ws_alert_state'] || {}).state || 'clear';
-                  var alertMsg = (states['sensor.ws_alert_message'] || {}).state || 'All clear';
-                  var bat = parseFloat((states['sensor.ws_battery'] || {}).state);
-                  var healthColor = health === 'Online' ? '#10b981' : health === 'Degraded' ? '#f59e0b' : '#ef4444';
-                  var alertColor = alertState === 'warning' ? '#ef4444' : alertState === 'advisory' ? '#f59e0b' : '#10b981';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:28px;font-weight:300;color:' + healthColor + ';">' + health + '</div>'
-                    + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                    + '<div><strong>Package:</strong> ' + pkg + '</div>'
-                    + '<div><strong>Alert:</strong> <span style="color:' + alertColor + ';">' + alertMsg + '</span></div>'
-                    + (!isNaN(bat) ? '<div><strong>Battery:</strong> ' + bat.toFixed(0) + '%</div>' : '')
-                    + '</div></div>';
-                ]]]
-
-          - type: custom:button-card
-            entity: sensor.ws_data_quality_banner
-            name: Data Quality
-            show_state: false
-            show_icon: true
-            icon: mdi:shield-check
-            triggers_update:
-              - sensor.ws_sensor_quality_flags
-            styles:
-              card:
-                - background: rgba(30,30,30,0.9)
-                - border-radius: 14px
-                - padding: 16px
-                - border: 1px solid rgba(255,255,255,0.1)
-                - height: 100%
-                - box-sizing: border-box
-              name:
-                - font-size: 16px
-                - font-weight: 600
-                - color: white
-              icon:
-                - width: 48px
-                - color: |
-                    [[[
-                      var s = (entity && entity.state) || '';
-                      return s === 'OK' ? '#10b981' : s === 'Warning' ? '#f59e0b' : '#ef4444';
-                    ]]]
-            custom_fields:
-              details: |
-                [[[
-                  var banner = (entity && entity.state) || '--';
-                  var dqAttrs = (entity && entity.attributes) || {};
-                  var summary = dqAttrs.data_quality || '';
-                  var flags = (states['sensor.ws_sensor_quality_flags'] || {});
-                  var flagAttrs = flags.attributes || {};
-                  var flagArray = (flagAttrs.flags && Array.isArray(flagAttrs.flags)) ? flagAttrs.flags : [];
-                  var bannerColor = banner.startsWith('OK') ? '#10b981' : banner.startsWith('WARN') ? '#f59e0b' : '#ef4444';
-                  var flagHtml = flagArray.slice(0, 4).map(function(f) {
-                    return '<div style="color:#f59e0b;">\u26a0 ' + String(f).replace(/_/g,' ') + '</div>';
-                  }).join('');
-                  var allClear = flagAttrs.all_clear === true;
-                  if (allClear && !flagHtml) flagHtml = '<div style="color:#10b981;">\u2713 All sensors OK</div>';
-                  return '<div style="margin-top:8px;">'
-                    + '<div style="font-size:28px;font-weight:300;color:' + bannerColor + ';">' + banner.replace('ERROR: ','').replace('WARN: ','') + '</div>'
-                    + (summary && summary !== banner ? '<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">' + summary + '</div>' : '')
-                    + (flagHtml ? '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.9;">' + flagHtml + '</div>' : '')
-                    + '</div>';
-                ]]]
-
-      # ── RADAR ────────────────────────────────────────────────────────────────
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_wunderground
-                state: "on"
-            card:
-              type: custom:button-card
-              entity: sensor.ws_wu_upload_status
-              name: Weather Underground
-              show_state: true
-              show_icon: true
-              icon: mdi:weather-cloudy-clock
-              styles:
-                card:
-                  - background: rgba(30,30,30,0.9)
-                  - border-radius: 14px
-                  - padding: 16px
-                  - border: 1px solid rgba(255,255,255,0.1)
-                  - height: 100%
-                  - box-sizing: border-box
-                name:
-                  - font-size: 16px
-                  - font-weight: 600
-                  - color: white
-                state:
-                  - font-size: 13px
-                  - color: rgba(255,255,255,0.6)
-                icon:
-                  - width: 48px
-                  - color: '#f59e0b'
 
       # ── DISPLAY SENSORS (conditional) ───────────────────────────────────────
       - type: grid
