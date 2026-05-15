@@ -297,7 +297,7 @@ def pressure_trend_arrow(trend_3h: float) -> str:
 # Derived from the qualitative text descriptions — used to compare the
 # Zambretti local-sensor outlook against the Open-Meteo precip_prob.
 ZAMBRETTI_RAIN_PCT: list[int] = [
-    5,   # Z=1  Settled fine
+    5,  # Z=1  Settled fine
     10,  # Z=2  Fine weather
     15,  # Z=3  Becoming fine
     20,  # Z=4  Fine, becoming less settled

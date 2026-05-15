@@ -299,10 +299,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
 
             # Determine if this slot falls within the nowcast window (hours 0-2)
-            is_nowcast = (
-                nowcast_slot < len(_NOWCAST_LOCAL_WEIGHTS)
-                and str(dt_s)[:13] >= now_hour_iso
-            )
+            is_nowcast = nowcast_slot < len(_NOWCAST_LOCAL_WEIGHTS) and str(dt_s)[:13] >= now_hour_iso
 
             if is_nowcast:
                 lw = _NOWCAST_LOCAL_WEIGHTS[nowcast_slot]
@@ -311,12 +308,8 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                 dew = _nowcast_blend(local_dew, item.get("dewpoint_c"), lw)
                 humidity = _nowcast_blend(local_humidity, item.get("humidity"), lw)
                 # Wind: local sensors are more accurate than NWP for immediate hours
-                wind_ms = _nowcast_blend(
-                    local_wind_ms, wind_ms, lw
-                )
-                gust_ms = _nowcast_blend(
-                    local_gust_ms, gust_ms, lw
-                )
+                wind_ms = _nowcast_blend(local_wind_ms, wind_ms, lw)
+                gust_ms = _nowcast_blend(local_gust_ms, gust_ms, lw)
                 # For hour 0 use local condition; beyond that use API
                 if nowcast_slot == 0 and local_condition:
                     condition = self._LOCAL_CONDITION_MAP.get(local_condition, "partlycloudy")

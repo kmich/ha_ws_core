@@ -1064,7 +1064,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             learned_local = self._learning_state.blend_local if len(outcomes) >= 10 else None
             learned_api = self._learning_state.blend_openmeteo if len(outcomes) >= 10 else None
             combined = combine_rain_probability(
-                local_prob, api_prob, dt_util.now().hour,
+                local_prob,
+                api_prob,
+                dt_util.now().hour,
                 learned_local_w=learned_local,
                 learned_api_w=learned_api,
             )
