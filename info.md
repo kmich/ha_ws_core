@@ -18,7 +18,9 @@ Weather Station Core reads raw sensor data from your existing weather station (E
 
 - **Real Zambretti barometric forecaster** (Negretti & Zambra lookup table, Z-numbers 1–26)
 - **Wet-bulb temperature** (Stull 2011), **frost point** (Buck 1981 ice constants)
-- **Climate-region-aware** rain probability with Open-Meteo blending
+- **Nowcast correction** — local station readings blend into the 0–3h hourly forecast, tapering smoothly to pure NWP by hour 3
+- **Adaptive rain probability** — Brier-score-derived blend weights learn which source (local sensors vs Open-Meteo) has been more accurate recently
+- **Forecast agreement sensor** — compares Zambretti's implied rain outlook to Open-Meteo's precip probability; flags `aligned`, `diverging`, or `conflict`
 - **Kalman-filtered rain rate** for de-noised precipitation readings
 - **36-condition weather classifier** with severity levels
 - **Fog probability** and **thunderstorm risk** surface heuristics
