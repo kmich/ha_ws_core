@@ -93,7 +93,7 @@
           "enable_moon": "Moon phase & illumination",
           "enable_solar_forecast": "Solar PV generation forecast (forecast.solar, free)",
           "_go_back": "← Go back to previous step",
-          "enable_fog_probability": "Fog probability sensor",
+          "enable_fog": "Fog probability sensor",
           "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)"
         }
       },
@@ -240,7 +240,7 @@
           "enable_pollen": "Pollen levels (Open-Meteo, free, no API key)",
           "enable_moon": "Moon phase & illumination",
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)",
-          "enable_fog_probability": "Fog probability sensor",
+          "enable_fog": "Fog probability sensor",
           "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)"
         },
         "data_description": {
