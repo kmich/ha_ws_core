@@ -932,6 +932,173 @@ def uv_burn_time_minutes(uv_index: float, skin_type: int = 2) -> int:
 # ---------------------------------------------------------------------------
 
 
+def compute_fwi(
+    ffmc_prev: float,
+    dmc_prev: float,
+    dc_prev: float,
+    temp_c: float,
+    rh_pct: float,
+    wind_kmh: float,
+    rain_24h_mm: float,
+    month: int,
+) -> dict:
+    """Canadian Forest Fire Weather Index (FWI) system — Van Wagner 1987.
+
+    Computes all seven FWI components from yesterday's moisture codes and
+    today's noon weather observations.
+
+    Standard initial values (start-of-season): FFMC=85, DMC=6, DC=15.
+
+    Reference:
+      Van Wagner, C.E. (1987). Development and structure of the Canadian
+      Forest Fire Weather Index System. Forestry Technical Report 35.
+      Canadian Forestry Service, Ottawa.
+
+    Args:
+        ffmc_prev: Previous day's FFMC (Fine Fuel Moisture Code).
+        dmc_prev:  Previous day's DMC (Duff Moisture Code).
+        dc_prev:   Previous day's DC (Drought Code).
+        temp_c:    Noon temperature (°C).
+        rh_pct:    Noon relative humidity (%).
+        wind_kmh:  Noon wind speed (km/h).
+        rain_24h_mm: 24-hour cumulative rainfall (mm).
+        month:     Calendar month (1=January … 12=December), Northern Hemisphere.
+
+    Returns:
+        dict with keys: ffmc, dmc, dc, isi, bui, fwi, dsr  (all float, rounded to 1 d.p.)
+    """
+    T = float(temp_c)
+    H = max(0.0, min(100.0, float(rh_pct)))
+    W = max(0.0, float(wind_kmh))
+    ro = max(0.0, float(rain_24h_mm))
+    F0 = float(ffmc_prev)
+    P0 = float(dmc_prev)
+    D0 = float(dc_prev)
+    month_i = max(1, min(12, int(month)))
+
+    # -----------------------------------------------------------------------
+    # FFMC — Fine Fuel Moisture Code
+    # -----------------------------------------------------------------------
+    mo = 147.2 * (101.0 - F0) / (59.5 + F0)
+
+    if ro > 0.5:
+        rf = ro - 0.5
+        if mo <= 150.0:
+            mr = mo + 42.5 * rf * math.exp(-100.0 / (251.0 - mo)) * (1.0 - math.exp(-6.93 / rf))
+        else:
+            mr = (
+                mo
+                + 42.5 * rf * math.exp(-100.0 / (251.0 - mo)) * (1.0 - math.exp(-6.93 / rf))
+                + 0.0015 * (mo - 150.0) ** 2 * rf**0.5
+            )
+        mo = min(mr, 250.0)
+
+    Ed = 0.942 * H**0.679 + 11.0 * math.exp((H - 100.0) / 10.0) + 0.18 * (21.1 - T) * (1.0 - math.exp(-0.115 * H))
+    Ew = 0.618 * H**0.753 + 10.0 * math.exp((H - 100.0) / 10.0) + 0.18 * (21.1 - T) * (1.0 - math.exp(-0.115 * H))
+
+    if mo > Ed:
+        kd = (
+            (0.424 * (1.0 - (H / 100.0) ** 1.7) + 0.0694 * W**0.5 * (1.0 - (H / 100.0) ** 8))
+            * 0.581
+            * math.exp(0.0365 * T)
+        )
+        m = Ed + (mo - Ed) * 10.0 ** (-kd)
+    elif mo < Ew:
+        kw = (
+            (0.424 * (1.0 - ((100.0 - H) / 100.0) ** 1.7) + 0.0694 * W**0.5 * (1.0 - ((100.0 - H) / 100.0) ** 8))
+            * 0.581
+            * math.exp(0.0365 * T)
+        )
+        m = Ew - (Ew - mo) * 10.0 ** (-kw)
+    else:
+        m = mo
+
+    ffmc = 59.5 * (250.0 - m) / (147.2 + m)
+    ffmc = max(0.0, min(101.0, ffmc))
+
+    # -----------------------------------------------------------------------
+    # DMC — Duff Moisture Code
+    # -----------------------------------------------------------------------
+    # Day-length adjustment factors by month (Northern Hemisphere)
+    Le = [6.5, 7.5, 9.0, 12.8, 13.9, 13.9, 12.4, 10.9, 9.4, 8.0, 7.0, 6.0]
+
+    if ro > 1.5:
+        re = 0.92 * ro - 1.27
+        mo_dmc = 20.0 + math.exp(5.6348 - P0 / 43.43)
+        if P0 <= 33.0:
+            b = 100.0 / (0.5 + 0.3 * P0)
+        elif P0 <= 65.0:
+            b = 14.0 - 1.3 * math.log(P0)
+        else:
+            b = 6.2 * math.log(P0) - 17.2
+        mr_dmc = mo_dmc + 1000.0 * re / (48.77 + b * re)
+        pr = 244.72 - 43.43 * math.log(mr_dmc - 20.0)
+        P0 = max(pr, 0.0)
+
+    if T > -1.1:
+        K = 1.894 * (T + 1.1) * (100.0 - H) * Le[month_i - 1] * 1e-6
+        dmc = P0 + 100.0 * K
+    else:
+        dmc = P0
+    dmc = max(0.0, dmc)
+
+    # -----------------------------------------------------------------------
+    # DC — Drought Code
+    # -----------------------------------------------------------------------
+    # Day-length drying factors by month (Northern Hemisphere)
+    Lf = [-1.6, -1.6, -1.6, 0.9, 3.8, 5.8, 6.4, 5.0, 2.4, 0.4, -1.6, -1.6]
+
+    if ro > 2.8:
+        rd = 0.83 * ro - 1.27
+        Qo = 800.0 * math.exp(-D0 / 400.0)
+        Qr = Qo + 3.937 * rd
+        Dr = 400.0 * math.log(800.0 / Qr)
+        D0 = max(Dr, 0.0)
+
+    V = max(0.0, 0.36 * (T + 2.8) + Lf[month_i - 1]) if T > -2.8 else max(0.0, Lf[month_i - 1])
+    dc = D0 + 0.5 * V
+    dc = max(0.0, dc)
+
+    # -----------------------------------------------------------------------
+    # ISI — Initial Spread Index
+    # -----------------------------------------------------------------------
+    fm = 147.2 * (101.0 - ffmc) / (59.5 + ffmc)
+    ff = 91.9 * math.exp(-0.1386 * fm) * (1.0 + fm**5.31 / 49300000.0)
+    isi = 0.208 * ff * math.exp(0.05039 * W)
+
+    # -----------------------------------------------------------------------
+    # BUI — Buildup Index
+    # -----------------------------------------------------------------------
+    if dmc <= 0.4 * dc:
+        bui = 0.8 * dmc * dc / (dmc + 0.4 * dc) if (dmc + 0.4 * dc) > 0 else 0.0
+    else:
+        bui = dmc - (1.0 - 0.8 * dc / (dmc + 0.4 * dc)) * (0.92 + (0.0114 * dmc) ** 1.7)
+    bui = max(0.0, bui)
+
+    # -----------------------------------------------------------------------
+    # FWI — Fire Weather Index
+    # -----------------------------------------------------------------------
+    fD = 0.626 * bui**0.809 + 2.0 if bui <= 80.0 else 1000.0 / (25.0 + 108.64 * math.exp(-0.023 * bui))
+    B = 0.1 * isi * fD
+    S = math.exp(2.72 * (0.434 * math.log(B)) ** 0.647) if B > 1.0 else B
+    fwi = S
+
+    # -----------------------------------------------------------------------
+    # DSR — Daily Severity Rating
+    # -----------------------------------------------------------------------
+    dsr = 0.0272 * fwi**1.77
+
+    return {
+        "ffmc": round(ffmc, 1),
+        "dmc": round(dmc, 1),
+        "dc": round(dc, 1),
+        "isi": round(isi, 1),
+        "bui": round(bui, 1),
+        "fwi": round(fwi, 1),
+        "dsr": round(dsr, 2),
+    }
+
+
 def fire_risk_score(temp_c: float, humidity: float, wind_speed_ms: float, rain_24h_mm: float) -> float:
     """Simplified fire risk heuristic (0-50 scale).
 

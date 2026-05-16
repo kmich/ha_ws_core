@@ -53,14 +53,13 @@ from .algorithms import (
     calculate_us_aqi,
     calculate_wet_bulb,
     combine_rain_probability,
+    compute_fwi,
     cross_sensor_consistency_flags,
     determine_current_condition,
     direction_to_quadrant,
     et0_hargreaves,
     et0_hourly_estimate,
     et0_penman_monteith,
-    fire_danger_level,
-    fire_risk_score,
     fog_probability,
     format_rain_display,
     get_condition_severity,
@@ -162,6 +161,13 @@ from .const import (
     KEY_FORECAST_TILES,
     KEY_FROST_POINT_C,
     KEY_FROST_STREAK,
+    KEY_FWI,
+    KEY_FWI_BUI,
+    KEY_FWI_DC,
+    KEY_FWI_DMC,
+    KEY_FWI_DSR,
+    KEY_FWI_FFMC,
+    KEY_FWI_ISI,
     KEY_HEALTH_DISPLAY,
     KEY_HEAT_STREAK,
     KEY_HUMIDITY_LEVEL_DISPLAY,
@@ -1703,12 +1709,78 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_condition(data, tc, rh, wind_ms, gust_ms, rain_rate, dew_c, lux, uv)
         # v0.3.0: removed _compute_activity_scores (laundry, running, stargazing)
         # v0.3.0: removed _compute_degree_days (HDD/CDD)
-        # Fire risk is the only score that survived; computed inline below.
+        # Fire risk: full Canadian FWI system (Van Wagner 1987).
         if self.fire_risk_enabled and tc is not None and rh is not None:
             rain_24h = float(data.get(KEY_RAIN_ACCUM_24H, 0.0) or 0.0)
-            f_score = fire_risk_score(float(tc), float(rh), float(wind_ms or 0), rain_24h)
+            data["_fire_rain_24h_mm"] = rain_24h
+            wind_kmh = float(wind_ms or 0) * 3.6
+
+            # FWI daily update — once per calendar day
+            local_now = dt_util.now()
+            fwi_date_str = local_now.strftime("%Y-%m-%d")
+            fwi_month = local_now.month
+
+            if fwi_date_str != self._learning_state.fwi_last_date:
+                fwi_result = compute_fwi(
+                    ffmc_prev=self._learning_state.fwi_ffmc,
+                    dmc_prev=self._learning_state.fwi_dmc,
+                    dc_prev=self._learning_state.fwi_dc,
+                    temp_c=float(tc),
+                    rh_pct=float(rh),
+                    wind_kmh=wind_kmh,
+                    rain_24h_mm=rain_24h,
+                    month=fwi_month,
+                )
+                self._learning_state.fwi_ffmc = fwi_result["ffmc"]
+                self._learning_state.fwi_dmc = fwi_result["dmc"]
+                self._learning_state.fwi_dc = fwi_result["dc"]
+                self._learning_state.fwi_last_date = fwi_date_str
+            else:
+                # Re-compute ISI/BUI/FWI/DSR with current wind/conditions but
+                # use the already-updated moisture codes for today.
+                fwi_result = compute_fwi(
+                    ffmc_prev=self._learning_state.fwi_ffmc,
+                    dmc_prev=self._learning_state.fwi_dmc,
+                    dc_prev=self._learning_state.fwi_dc,
+                    temp_c=float(tc),
+                    rh_pct=float(rh),
+                    wind_kmh=wind_kmh,
+                    rain_24h_mm=0.0,  # rain already applied today
+                    month=fwi_month,
+                )
+
+            data[KEY_FWI_FFMC] = fwi_result["ffmc"]
+            data[KEY_FWI_DMC] = fwi_result["dmc"]
+            data[KEY_FWI_DC] = fwi_result["dc"]
+            data[KEY_FWI_ISI] = fwi_result["isi"]
+            data[KEY_FWI_BUI] = fwi_result["bui"]
+            data[KEY_FWI] = fwi_result["fwi"]
+            data[KEY_FWI_DSR] = fwi_result["dsr"]
+
+            # Map FWI to 1-10 fire_risk_score for backward sensor compatibility
+            fwi_val = fwi_result["fwi"]
+            if fwi_val < 5.0:
+                f_score = 1
+                danger = "Very Low"
+            elif fwi_val < 12.0:
+                f_score = 2
+                danger = "Low"
+            elif fwi_val < 22.0:
+                f_score = round(3 + (fwi_val - 12.0) / 10.0)
+                danger = "Moderate"
+            elif fwi_val < 33.0:
+                f_score = round(5 + (fwi_val - 22.0) / 11.0)
+                danger = "High"
+            elif fwi_val < 50.0:
+                f_score = round(7 + (fwi_val - 33.0) / 17.0)
+                danger = "Very High"
+            else:
+                f_score = 10
+                danger = "Extreme"
+            f_score = max(1, min(10, f_score))
+
             data[KEY_FIRE_RISK_SCORE] = f_score
-            data["_fire_danger_level"] = fire_danger_level(f_score)
+            data["_fire_danger_level"] = danger
 
         self._compute_et0(data, now)
         self._compute_health(data, now, missing, missing_entities)

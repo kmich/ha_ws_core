@@ -459,6 +459,17 @@ KEY_TEMP_ANOMALY_30D = "temp_anomaly_30d"
 KEY_RAIN_ANOMALY_30D = "rain_anomaly_30d"
 
 # ---------------------------------------------------------------------------
+# v1.3.0 — Canadian FWI (Fire Weather Index) system
+# ---------------------------------------------------------------------------
+KEY_FWI_FFMC = "fwi_ffmc"
+KEY_FWI_DMC = "fwi_dmc"
+KEY_FWI_DC = "fwi_dc"
+KEY_FWI_ISI = "fwi_isi"
+KEY_FWI_BUI = "fwi_bui"
+KEY_FWI = "fwi"
+KEY_FWI_DSR = "fwi_dsr"
+
+# ---------------------------------------------------------------------------
 # Migration — v0.3.0 deprecated entity keys and config keys
 # ---------------------------------------------------------------------------
 DEPRECATED_KEYS_V030 = (

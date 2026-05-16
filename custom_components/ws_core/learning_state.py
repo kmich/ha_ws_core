@@ -63,6 +63,13 @@ class LearningState:
     # Each entry: {date, t_high, t_low, rain_total}
     climatology_days: list = field(default_factory=list)
 
+    # v1.3.0 — Canadian FWI moisture codes (persist across HA restarts)
+    # Standard initial values per Van Wagner 1987 (start-of-season defaults)
+    fwi_ffmc: float = 85.0
+    fwi_dmc: float = 6.0
+    fwi_dc: float = 15.0
+    fwi_last_date: str = ""  # ISO date string of last FWI daily computation
+
     # Internal: last time we pushed a 6h forecast outcome window
     _last_outcome_window: str = ""
 

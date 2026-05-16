@@ -56,6 +56,13 @@ from .const import (
     KEY_FORECAST_TILES,
     KEY_FROST_POINT_C,
     KEY_FROST_STREAK,
+    KEY_FWI,
+    KEY_FWI_BUI,
+    KEY_FWI_DC,
+    KEY_FWI_DMC,
+    KEY_FWI_DSR,
+    KEY_FWI_FFMC,
+    KEY_FWI_ISI,
     KEY_HEALTH_DISPLAY,
     KEY_HEAT_STREAK,
     KEY_HUMIDITY_LEVEL_DISPLAY,
@@ -610,12 +617,115 @@ SENSORS: list[WSSensorDescription] = [
             "temperature_c": d.get(KEY_NORM_TEMP_C),
             "humidity_pct": d.get(KEY_NORM_HUMIDITY),
             "wind_ms": d.get(KEY_NORM_WIND_SPEED_MS),
-            "disclaimer": (
-                "Simplified heuristic (0-50 scale). NOT suitable for operational "
-                "fire weather decisions. Consult official fire services."
-            ),
-            "reference": "Inspired by Canadian FWI structure (Van Wagner 1987). "
-            "Full FWI requires daily FFMC/DMC/DC moisture codes not available from PWS hardware.",
+            "fwi": d.get(KEY_FWI),
+            "bui": d.get(KEY_FWI_BUI),
+            "isi": d.get(KEY_FWI_ISI),
+            "scale": "1-10 (1=Very Low, 2=Low, 3-4=Moderate, 5-6=High, 7-8=Very High, 9-10=Extreme)",
+            "method": "Canadian Forest Fire Weather Index (Van Wagner 1987)",
+            "disclaimer": "NOT suitable for operational fire weather decisions. Consult official fire services.",
+        },
+    ),
+    # =========================================================================
+    # v1.3.0 — Canadian FWI components (all disabled by default)
+    # =========================================================================
+    WSSensorDescription(
+        key=KEY_FWI_FFMC,
+        name="WS FWI Fine Fuel Moisture Code",
+        icon="mdi:leaf",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "description": "Fine Fuel Moisture Code — fine dead surface fuels (litter, grass)",
+            "range": "0-101; lower = drier = more flammable",
+            "method": "Van Wagner 1987",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_FWI_DMC,
+        name="WS FWI Duff Moisture Code",
+        icon="mdi:layers",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "description": "Duff Moisture Code — mid-depth loosely compacted organic layer",
+            "range": "no upper bound; higher = drier",
+            "method": "Van Wagner 1987",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_FWI_DC,
+        name="WS FWI Drought Code",
+        icon="mdi:water-remove",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "description": "Drought Code — deep compact organic layer (seasonal drying)",
+            "range": "no upper bound; higher = drier",
+            "method": "Van Wagner 1987",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_FWI_ISI,
+        name="WS FWI Initial Spread Index",
+        icon="mdi:fire-alert",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "description": "Initial Spread Index — expected fire spread rate (FFMC + wind)",
+            "ffmc": d.get(KEY_FWI_FFMC),
+            "wind_kmh": round(float(d[KEY_NORM_WIND_SPEED_MS]) * 3.6, 1)
+            if d.get(KEY_NORM_WIND_SPEED_MS) is not None
+            else None,
+            "method": "Van Wagner 1987",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_FWI_BUI,
+        name="WS FWI Buildup Index",
+        icon="mdi:fire-hydrant",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "description": "Buildup Index — total fuel available for combustion (DMC + DC)",
+            "dmc": d.get(KEY_FWI_DMC),
+            "dc": d.get(KEY_FWI_DC),
+            "method": "Van Wagner 1987",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_FWI,
+        name="WS Fire Weather Index",
+        icon="mdi:fire-circle",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "description": "Fire Weather Index — overall fire danger number (ISI + BUI)",
+            "isi": d.get(KEY_FWI_ISI),
+            "bui": d.get(KEY_FWI_BUI),
+            "dsr": d.get(KEY_FWI_DSR),
+            "danger_level": d.get("_fire_danger_level"),
+            "reference": "Van Wagner, C.E. (1987). Development and structure of the Canadian "
+            "Forest Fire Weather Index System. Forestry Technical Report 35.",
+            "disclaimer": "NOT suitable for operational fire weather decisions.",
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_FWI_DSR,
+        name="WS FWI Daily Severity Rating",
+        icon="mdi:chart-line",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "description": "Daily Severity Rating — suppression difficulty index (from FWI)",
+            "fwi": d.get(KEY_FWI),
+            "method": "Van Wagner 1987",
         },
     ),
     # =========================================================================
@@ -968,8 +1078,15 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_PRESSURE_TREND_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_HEALTH_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_FORECAST_TILES: CONF_ENABLE_DISPLAY_SENSORS,
-    # Risk sensors
+    # Risk sensors (fire)
     KEY_FIRE_RISK_SCORE: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI_FFMC: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI_DMC: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI_DC: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI_ISI: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI_BUI: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI_DSR: CONF_ENABLE_FIRE_RISK,
     # Sea temperature
     KEY_SEA_SURFACE_TEMP: CONF_ENABLE_SEA_TEMP,
     # Air Quality  (v0.7.0)
@@ -1058,6 +1175,14 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_CLIMATOLOGY_30D,
         KEY_SENSOR_DRIFT_FLAGS,
         KEY_CONSISTENCY_FLAGS,
+        # v1.3.0 — FWI component sensors (disabled by default; main score via KEY_FIRE_RISK_SCORE)
+        KEY_FWI_FFMC,
+        KEY_FWI_DMC,
+        KEY_FWI_DC,
+        KEY_FWI_ISI,
+        KEY_FWI_BUI,
+        KEY_FWI,
+        KEY_FWI_DSR,
     }
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
@@ -1188,6 +1313,14 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_FORECAST_AGREEMENT: "forecast_agreement",
             KEY_FORECAST_SKILL: "forecast_skill",
             KEY_SOLAR_LUX_FACTOR: "solar_lux_factor",
+            # v1.3.0 — FWI components
+            KEY_FWI_FFMC: "fwi_ffmc",
+            KEY_FWI_DMC: "fwi_dmc",
+            KEY_FWI_DC: "fwi_dc",
+            KEY_FWI_ISI: "fwi_isi",
+            KEY_FWI_BUI: "fwi_bui",
+            KEY_FWI: "fwi",
+            KEY_FWI_DSR: "fwi_dsr",
         }
         if key in overrides:
             return overrides[key]
