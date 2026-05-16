@@ -965,7 +965,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u)
                     ),
                     vol.Optional(CONF_STALENESS_S, default=DEFAULT_STALENESS_S): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=60, max=3600, step=60, mode="box", unit_of_measurement="s")
+                        selector.NumberSelectorConfig(min=60, max=86400, step=60, mode="box", unit_of_measurement="s")
                     ),
                     vol.Optional(CONF_RAIN_FILTER_ALPHA, default=DEFAULT_RAIN_FILTER_ALPHA): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="slider")
@@ -1135,7 +1135,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_STALENESS_S, default=g(CONF_STALENESS_S, DEFAULT_STALENESS_S)
                 ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=60, max=3600, step=60, mode="box", unit_of_measurement="s")
+                    selector.NumberSelectorConfig(min=60, max=86400, step=60, mode="box", unit_of_measurement="s")
                 ),
                 vol.Optional(
                     CONF_RAIN_FILTER_ALPHA, default=g(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA)
