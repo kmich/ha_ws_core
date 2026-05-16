@@ -15,7 +15,7 @@ Initial public release.
 - **Pressure trend** — least-squares regression over configurable window (default 3h), classified per WMO Table 4680.
 - **Fog probability** — dew-point depression model with wind-speed and nocturnal corrections.
 - **Thunderstorm risk index** — surface-based heuristic (T–Td gap, pressure fall rate, wind acceleration, illuminance drop).
-- **Fire risk score** — simplified 0–50 heuristic inspired by Canadian FWI structure (Van Wagner 1987). Not suitable for operational fire weather decisions.
+- **Full Canadian FWI system** — complete Van Wagner (1987) implementation: FFMC, DMC, DC (daily moisture codes with persistent carry-over), ISI, BUI, FWI, DSR. `sensor.ws_fire_risk_score` now maps real FWI to a 1–10 danger scale. Seven FWI sub-index sensors available (disabled by default).
 - **Streak counters** — consecutive dry, heat, and frost days, reset at local midnight.
 - **24h rolling statistics** — temperature high/low, wind gust maximum.
 - **Rain accumulation** — 1h and 24h rolling windows, plus today's total.
@@ -31,6 +31,9 @@ Initial public release.
 - **Sensor drift detection** — 72h linear regression flags monotonic drift (R² ≥ 0.85) in temperature, humidity, pressure, and rain rate.
 - **Cross-sensor consistency** — six physical-impossibility checks (dew point > temp, gust < wind speed, UV/lux mismatch, etc.).
 - **Self-adapting solar lux factor** — updates lux→W/m² conversion on clear days near solar noon, improving ET₀ accuracy over time.
+- **Nowcast correction (0–3h)** — local station readings (temperature, humidity, wind, dew point, rain rate, condition) blend into the first three hourly forecast slots using tapering weights (70% local at hour 0, pure NWP by hour 3).
+- **Adaptive rain probability** — `sensor.ws_rain_probability_combined` uses rolling 90-day Brier-score weights that learn which source (local sensors vs Open-Meteo) has been more accurate; falls back to fixed day/night weights until enough data accumulates.
+- **Forecast agreement sensor** — `sensor.ws_forecast_agreement` compares Zambretti Z-number implied rain likelihood to Open-Meteo `precip_prob`; states: `aligned` (< 20 pp delta), `diverging` (20–40 pp), `conflict` (> 40 pp).
 
 ### Integration
 

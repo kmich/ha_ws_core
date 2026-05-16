@@ -31,7 +31,7 @@ Weather Station Core reads raw sensor data from your existing weather station �
 - **Fog probability** — dew-point depression model with wind, night, and rain corrections
 - **Thunderstorm risk index** — surface-based heuristic proxy (T–Td gap, pressure fall rate, wind acceleration)
 - **Streak counters** — consecutive dry days, heat days, and frost days
-- **Fire risk score** — simplified heuristic inspired by Canadian FWI structure
+- **Full Canadian FWI system** — FFMC, DMC, DC, ISI, BUI, FWI, DSR with persistent daily moisture memory (Van Wagner 1987)
 - **7-day daily forecast** via Open-Meteo (free, no API key)
 - **Air Quality Index** via Open-Meteo (free, no API key) — PM2.5, PM10, NO₂, ozone
 - **Pollen levels** (grass, tree, weed) via Tomorrow.io (free API key required)
@@ -62,7 +62,7 @@ A personal weather station integrated into Home Assistant providing **at minimum
 
 **Optional** (improves derived metrics): illuminance (lux), UV index, dew point, battery level, solar radiation (W/m²).
 
-**Home Assistant**: 2026.2+ · **Python**: 3.12+
+**Home Assistant**: 2026.3+ · **Python**: 3.12+
 
 ---
 
@@ -166,11 +166,20 @@ All settings can be changed later via **Configure** (Settings → Devices & Serv
 | `sensor.ws_et0_daily` | mm | Daily ET₀ — Hargreaves-Samani 1985 (±15–20%) |
 | `sensor.ws_et0_pm_daily` | mm | Daily ET₀ — Penman-Monteith (activates when solar radiation sensor is mapped; ±5–10%) |
 
-### Optional: Fire Risk Score (`enable_fire_risk_score`)
+### Optional: Fire Risk & Canadian FWI (`enable_fire_risk_score`)
 
 | Entity | Scale | Description |
 |---|---|---|
-| `sensor.ws_fire_risk_score` | 0–50 | Simplified fire risk heuristic |
+| `sensor.ws_fire_risk_score` | 1–10 | Fire danger level derived from FWI (backward-compatible scale) |
+| `sensor.ws_fwi_ffmc` | 0–101 | Fine Fuel Moisture Code — fine dead fuels / litter |
+| `sensor.ws_fwi_dmc` | ≥ 0 | Duff Moisture Code — mid-depth organic layer |
+| `sensor.ws_fwi_dc` | ≥ 0 | Drought Code — deep compact organic layer |
+| `sensor.ws_fwi_isi` | ≥ 0 | Initial Spread Index — expected rate of fire spread |
+| `sensor.ws_fwi_bui` | ≥ 0 | Buildup Index — total available fuel |
+| `sensor.ws_fwi` | ≥ 0 | Fire Weather Index — intensity of a spreading fire |
+| `sensor.ws_fwi_dsr` | ≥ 0 | Daily Severity Rating — difficulty of fire control |
+
+The seven sub-index sensors are disabled by default; enable them individually on the device page.
 
 ### Optional: Fog Probability (`enable_fog`)
 
@@ -500,15 +509,44 @@ True thunderstorm forecasting requires upper-atmosphere sounding data (lifted in
 
 ---
 
-### Fire Risk Score — Simplified Heuristic (Van Wagner 1987, adapted)
+### Canadian Forest Fire Weather Index System (Van Wagner 1987)
 
-**This is NOT the Canadian Forest Fire Weather Index (FWI).** The real FWI requires three daily accumulated moisture codes (FFMC, DMC, DC) that track fuel dryness over days to weeks — impossible to compute from a PWS without a continuous multi-day history seeded from a verified initial condition.
+The complete Canadian FWI system is implemented using the exact Van Wagner (1987) formulas. It consists of three moisture codes that track cumulative fuel dryness at different depths, two intermediate indices, the FWI itself, and the Daily Severity Rating.
 
-This integration uses a simplified 0–50 surface index inspired by the FWI's input structure (temperature, relative humidity, wind speed) as a rough indicator of elevated fire weather conditions.
+**Moisture codes (updated once per calendar day, persisted across HA restarts):**
 
-**Danger levels:** Low (0–7), Moderate (8–18), High (19–29), Very High (30–49), Extreme (50).
+| Code | Fuel layer | Drying time constant |
+|---|---|---|
+| **FFMC** (0–101) | Fine dead fuels, litter, grass | ~24 h |
+| **DMC** (≥ 0) | Loosely compacted duff, 5–10 cm | ~12 days |
+| **DC** (≥ 0) | Deep compact organic layer, > 10 cm | ~52 days |
 
-**Disclaimer built into the sensor attributes:** *Not suitable for operational fire weather decisions. Consult official fire services and national fire weather indices.*
+**Derived indices:**
+```
+ISI = f(FFMC, wind_speed)          — expected rate of initial spread
+BUI = f(DMC, DC)                   — total fuel available
+FWI = f(ISI, BUI)                  — fire intensity (spreading fire)
+DSR = 0.0272 × FWI^1.77           — operational difficulty of fire control
+```
+
+**Rainfall corrections:** Each moisture code applies a pre-wetting correction when 24h rainfall exceeds its minimum threshold (0.5 mm for FFMC, 1.5 mm for DMC, 2.8 mm for DC), reducing moisture codes to reflect wet fuel.
+
+**Start-of-season initial values:** FFMC = 85, DMC = 6, DC = 15 (Van Wagner 1987 recommended defaults). The system self-corrects within a few days as moisture memory builds up.
+
+**Fire danger mapping (FWI → 1–10 scale):**
+
+| FWI | Level | Score |
+|---|---|---|
+| < 5 | Very Low | 1 |
+| 5–11 | Low | 2 |
+| 12–21 | Moderate | 3–4 |
+| 22–32 | High | 5–6 |
+| 33–49 | Very High | 7–8 |
+| ≥ 50 | Extreme | 10 |
+
+**Inputs required:** temperature (°C), relative humidity (%), wind speed (km/h), 24h cumulative rainfall (mm) — all available from any supported weather station.
+
+**Disclaimer:** Not suitable for operational fire weather decisions. Consult official fire services and national fire weather products.
 
 **Reference:** Van Wagner, C.E. (1987). Development and structure of the Canadian Forest Fire Weather Index System. *Forestry Technical Report 35.* Canadian Forestry Service.
 
@@ -704,7 +742,7 @@ Download diagnostics via Settings → Devices & Services → Weather Station Cor
 1. **Illuminance-based cloud detection** uses raw lux without solar-angle normalization. Accuracy degrades at low sun elevation angles.
 2. **Sea-level pressure** uses current temperature only, not the WMO-recommended 12h mean. Error increases above 500 m during rapid temperature swings.
 3. **Rain probability** is a heuristic index, not a statistically calibrated probability. Treat it as relative likelihood.
-4. **Fire Risk Score** is a simplified heuristic that does NOT implement the full Canadian FWI moisture tracking system.
+4. **FWI moisture codes** are initialised at Van Wagner's standard defaults on first run and self-correct within a few days. Values may be slightly elevated until the moisture memory settles.
 5. **Thunderstorm Risk** is a surface-based proxy only. It cannot detect convective instability from upper-atmosphere profiles, and will miss elevated convection entirely.
 6. **24h statistics** are computed from in-memory rolling windows and reset on HA restart.
 

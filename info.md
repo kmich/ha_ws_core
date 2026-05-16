@@ -24,7 +24,7 @@ Weather Station Core reads raw sensor data from your existing weather station (E
 - **Kalman-filtered rain rate** for de-noised precipitation readings
 - **36-condition weather classifier** with severity levels
 - **Fog probability** and **thunderstorm risk** surface heuristics
-- **Fire risk score**, **streak counters** (dry/heat/frost days)
+- **Full Canadian FWI system** — FFMC, DMC, DC, ISI, BUI, FWI, DSR with persistent daily moisture memory (Van Wagner 1987); **streak counters** (dry/heat/frost days)
 - **7-day forecast** via Open-Meteo (free, no API key)
 - **Air quality, pollen, moon phase, solar PV forecast, sea surface temperature** — all optional
 - **ET₀ evapotranspiration** (Hargreaves-Samani, upgrades to Penman-Monteith with solar radiation sensor)
