@@ -141,6 +141,7 @@ from .const import (
     KEY_ALERT_STATE,
     # v0.7.0
     KEY_AQI,
+    KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
     KEY_CLIMATOLOGY_30D,
@@ -177,6 +178,7 @@ from .const import (
     KEY_MOON_ILLUMINATION_PCT,
     KEY_MOON_NEXT_FULL,
     KEY_MOON_NEXT_NEW,
+    KEY_MOON_PHASE,
     # v0.8.0
     KEY_NO2,
     KEY_NORM_HUMIDITY,
@@ -1862,8 +1864,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.aqi_enabled and self._aqi_cache:
             aq = self._aqi_cache
             data[KEY_AQI] = aq.get("aqi")
-            # v0.3.0: KEY_AQI_LEVEL removed as separate sensor; level lives
-            # as an attribute on the AQI sensor, computed inline in sensor.py.
+            data[KEY_AQI_LEVEL] = aq.get("aqi_level")
             data[KEY_PM2_5] = aq.get("pm2_5")
             data[KEY_PM10] = aq.get("pm10")
             data[KEY_NO2] = aq.get("no2")
@@ -1884,10 +1885,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             phase_key = moon_phase_from_age(age)
             illum_frac = calculate_moon_illumination(local_now.year, local_now.month, local_now.day)
             illum_pct = round(illum_frac * 100)
-            # v0.3.0: phase_key now stored in private "_moon_phase" field
-            # (sensor.py reads it as an attribute on the moon display sensor).
-            # The standalone KEY_MOON_PHASE sensor was cut as redundant.
-            data["_moon_phase"] = phase_key
+            data[KEY_MOON_PHASE] = phase_key
             data[KEY_MOON_ILLUMINATION_PCT] = illum_pct
             data[KEY_MOON_DISPLAY] = moon_display_string(phase_key, illum_pct)
             data[KEY_MOON_AGE_DAYS] = age

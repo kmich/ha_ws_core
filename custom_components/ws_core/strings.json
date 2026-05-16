@@ -183,7 +183,6 @@
           "cal_humidity": "Humidity calibration offset",
           "cal_pressure_hpa": "Pressure calibration offset",
           "cal_wind_ms": "Wind speed calibration offset",
-          "enable_zambretti": "Zambretti forecast & classifier",
           "enable_display_sensors": "Display sensors (levels, trends, health)",
           "enable_fire_risk_score": "Fire risk score",
           "enable_sea_temp": "Sea surface temperature",
@@ -251,7 +250,9 @@
           "enable_air_quality": "Air quality index (Open-Meteo)",
           "enable_pollen": "Pollen levels (Open-Meteo)",
           "enable_moon": "Moon phase & illumination",
-          "enable_solar_forecast": "Solar PV forecast (forecast.solar)"
+          "enable_solar_forecast": "Solar PV forecast (forecast.solar)",
+          "enable_fog": "Enables fog probability sensor (dew-point depression model)",
+          "enable_thunderstorm_risk": "Enables thunderstorm risk sensor (surface heuristic)"
         }
       },
       "sea_temp_opt": {
@@ -334,9 +335,6 @@
       "ws_enable_animations": {
         "name": "Dashboard: Animations"
       },
-      "ws_enable_zambretti": {
-        "name": "Feature: Zambretti Forecast"
-      },
       "ws_enable_display_sensors": {
         "name": "Feature: Display Sensors"
       },
@@ -360,6 +358,12 @@
       },
       "ws_enable_solar_forecast": {
         "name": "Feature: Solar PV Forecast"
+      },
+      "ws_enable_fog": {
+        "name": "Feature: Fog Probability"
+      },
+      "ws_enable_thunderstorm_risk": {
+        "name": "Feature: Thunderstorm Risk"
       }
     },
     "number": {

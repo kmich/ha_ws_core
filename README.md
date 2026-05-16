@@ -34,7 +34,7 @@ Weather Station Core reads raw sensor data from your existing weather station �
 - **Full Canadian FWI system** — FFMC, DMC, DC, ISI, BUI, FWI, DSR with persistent daily moisture memory (Van Wagner 1987)
 - **7-day daily forecast** via Open-Meteo (free, no API key)
 - **Air Quality Index** via Open-Meteo (free, no API key) — PM2.5, PM10, NO₂, ozone
-- **Pollen levels** (grass, tree, weed) via Tomorrow.io (free API key required)
+- **Pollen levels** (grass, tree, weed) via Open-Meteo (free, no API key)
 - **Moon phase & illumination** — calculated astronomically, no API key required
 - **Solar PV forecast** (today + tomorrow kWh) via forecast.solar (free, no API key)
 - **Penman-Monteith ET₀** — activates automatically when a solar radiation sensor is mapped
@@ -211,7 +211,7 @@ The seven sub-index sensors are disabled by default; enable them individually on
 |---|---|---|
 | `sensor.ws_air_quality_index` | AQI | US EPA AQI from Open-Meteo (PM2.5-based) |
 
-### Optional: Pollen (`enable_pollen` + Tomorrow.io API key)
+### Optional: Pollen (`enable_pollen`)
 
 | Entity | Description |
 |---|---|
