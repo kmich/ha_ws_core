@@ -1,0 +1,147 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Weather Station Core — Créer une station météo",
+        "description": "Donnez un nom à votre station météo. Le préfixe sera utilisé pour tous les identifiants d’entités (par ex. le préfixe “ws” crée sensor.ws_temperature).",
+        "data": {
+          "name": "Nom de la station",
+          "prefix": "Préfixe des entités (ex. : ws, jardin, salon)"
+        }
+      },
+      "required_sources": {
+        "title": "Capteurs obligatoires",
+        "description": "Associez chaque mesure requise à une entité existante. Ces 7 capteurs sont obligatoires.",
+        "data": {
+          "temperature": "Capteur de température",
+          "humidity": "Capteur d’humidité relative (%)",
+          "pressure": "Capteur de pression atmosphérique",
+          "wind_speed": "Capteur de vitesse du vent",
+          "wind_gust": "Capteur de rafales de vent",
+          "wind_direction": "Capteur de direction du vent (°)",
+          "rain_total": "Capteur de cumul des précipitations",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "optional_sources": {
+        "title": "Capteurs facultatifs",
+        "description": "Ces capteurs améliorent les calculs, mais ne sont pas requis.",
+        "data": {
+          "illuminance": "Illuminance / rayonnement solaire (lux)",
+          "uv_index": "Index UV",
+          "dew_point": "Point de rosée (calculé si absent)",
+          "battery": "Niveau de batterie (%)",
+          "solar_radiation": "Rayonnement solaire (W/m², pour ET₀ Penman‑Monteith)",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "location": {
+        "title": "Localisation & climat",
+        "description": "Ces paramètres influencent la pression corrigée, les vents Zambretti et la logique saisonnière.",
+        "data": {
+          "hemisphere": "Hémisphère",
+          "climate_region": "Région climatique (pondération Zambretti)",
+          "elevation_m": "Altitude de la station (m)",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "display": {
+        "title": "Unités d’affichage",
+        "description": "Choisissez comment les valeurs sont affichées. ‘Auto’ suit les unités de Home Assistant.",
+        "data": {
+          "units_mode": "Vent / pluie / pression",
+          "temp_unit": "Unité de température",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "forecast": {
+        "title": "Prévisions sur 7 jours",
+        "description": "Prévisions Open‑Meteo (gratuit, sans clé API). Coordonnées basées sur Home Assistant.",
+        "data": {
+          "forecast_enabled": "Activer les prévisions (Open‑Meteo)",
+          "forecast_interval_min": "Intervalle de rafraîchissement",
+          "forecast_lat": "Latitude des prévisions",
+          "forecast_lon": "Longitude des prévisions",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      }
+    },
+    "alerts": {
+      "title": "Alertes & options avancées",
+      "description": "Configurez les seuils d’alerte et les paramètres avancés.",
+      "data": {
+        "thresh_wind_gust_ms": "Seuil d’alerte rafales",
+        "thresh_rain_rate_mmph": "Seuil d’alerte pluie",
+        "thresh_freeze_c": "Seuil d’alerte gel",
+        "staleness_s": "Délai d’inactivité des capteurs",
+        "rain_filter_alpha": "Lissage du débit de pluie (Kalman)",
+        "pressure_trend_window_h": "Fenêtre de tendance de pression",
+        "rain_penalty_light_mmph": "Seuil de pénalité pluie (début)",
+        "rain_penalty_heavy_mmph": "Seuil de pénalité pluie (max)",
+        "_go_back": "← Retour à l'étape précédente"
+      }
+    },
+    "features": {
+      "title": "Fonctionnalités",
+      "description": "Activez les capteurs et services supplémentaires.",
+      "data": {
+        "enable_display_sensors": "Capteurs d’affichage (humidité, UV, pression, état)",
+        "enable_fire_risk_score": "Indice de risque d’incendie",
+        "enable_sea_temp": "Température de surface de la mer",
+        "enable_wunderground": "Envoi vers Weather Underground",
+        "enable_air_quality": "Indice de qualité de l’air",
+        "enable_pollen": "Niveaux de pollen",
+        "enable_moon": "Phase et illumination de la Lune",
+        "enable_solar_forecast": "Prévision de production solaire",
+        "_go_back": "← Retour à l'étape précédente",
+        "enable_fog": "Probabilité de brouillard",
+        "enable_thunderstorm_risk": "Risque d’orage"
+      }
+    },
+    "sea_temp": {
+      "title": "Localisation de la température de mer",
+      "description": "Coordonnées utilisées pour la température de surface de la mer.",
+      "data": {
+        "sea_temp_lat": "Latitude",
+        "sea_temp_lon": "Longitude",
+        "_go_back": "← Retour à l'étape précédente"
+      }
+    },
+    "wunderground": {
+      "title": "Envoi vers Weather Underground",
+      "description": "Envoie les observations vers votre station Weather Underground.",
+      "data": {
+        "wu_station_id": "ID de station (ex. IATHEN123)",
+        "wu_api_key": "Clé API",
+        "wu_interval_min": "Intervalle d’envoi",
+        "_go_back": "← Retour à l'étape précédente"
+      }
+    },
+    "air_quality": {
+      "title": "Qualité de l’air",
+      "description": "{info}",
+      "data": {
+        "aqi_interval_min": "Intervalle d’actualisation",
+        "_go_back": "← Retour à l'étape précédente"
+      }
+    },
+    "pollen": {
+      "title": "Données pollen",
+      "description": "{info}",
+      "data": {
+        "_go_back": "← Retour à l'étape précédente"
+      }
+    },
+    "solar_forecast": {
+      "title": "Prévision solaire",
+      "description": "{info}",
+      "data": {
+        "solar_peak_kw": "Puissance crête (kWp)",
+        "solar_panel_azimuth": "Azimut du panneau",
+        "solar_panel_tilt": "Inclinaison du panneau",
+        "solar_interval_min": "Intervalle d’actualisation",
+        "_go_back": "← Retour à l'étape précédente"
+      }
+    }
+  }
+}
