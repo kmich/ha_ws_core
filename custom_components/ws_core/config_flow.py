@@ -116,6 +116,7 @@ from .const import (
     DEFAULT_WU_INTERVAL_MIN,
     DOMAIN,
     FORECAST_PROVIDER_MET_NO,
+    FORECAST_PROVIDER_METEO_FRANCE,
     FORECAST_PROVIDER_NWS,
     FORECAST_PROVIDER_OPEN_METEO,
     FORECAST_PROVIDER_OWM,
@@ -647,6 +648,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 selector.SelectOptionDict(
                                     value=FORECAST_PROVIDER_PIRATE, label="Pirate Weather (free tier, API key)"
                                 ),
+                                selector.SelectOptionDict(
+                                    value=FORECAST_PROVIDER_METEO_FRANCE, label="Météo France (free tier, API key)"
+                                ),
                             ],
                             mode=selector.SelectSelectorMode.LIST,
                         )
@@ -672,6 +676,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         provider_labels = {
             FORECAST_PROVIDER_OWM: "OpenWeatherMap",
             FORECAST_PROVIDER_PIRATE: "Pirate Weather",
+            FORECAST_PROVIDER_METEO_FRANCE: "Météo France",
         }
         provider_name = provider_labels.get(provider, provider)
 
@@ -1204,6 +1209,9 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                             selector.SelectOptionDict(
                                 value=FORECAST_PROVIDER_PIRATE, label="Pirate Weather (free tier, API key)"
                             ),
+                            selector.SelectOptionDict(
+                                value=FORECAST_PROVIDER_METEO_FRANCE, label="Météo France (free tier, API key)"
+                            ),
                         ],
                         mode=selector.SelectSelectorMode.LIST,
                     )
@@ -1342,6 +1350,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         provider_labels = {
             FORECAST_PROVIDER_OWM: "OpenWeatherMap",
             FORECAST_PROVIDER_PIRATE: "Pirate Weather",
+            FORECAST_PROVIDER_METEO_FRANCE: "Météo France",
         }
         provider_name = provider_labels.get(provider, provider)
         current_key = self._opt.get(CONF_FORECAST_API_KEY, self._get(CONF_FORECAST_API_KEY, ""))

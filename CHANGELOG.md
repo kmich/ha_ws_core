@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.3.0] - 2026-05-18
+
+### New Features
+
+- **Météo France forecast provider** — adds Météo France via the Météo Concept API as a 6th provider option. Free tier available, API key required (get one at api.meteo-concept.com). Full daily (7-day) and hourly (24-hour) support with correct WMO weathercode mapping. Contributed by @Benjamin45590.
+
 ## [1.2.3] - 2026-05-18
 
 ### Bug Fixes

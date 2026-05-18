@@ -66,7 +66,7 @@
           "_go_back": "← Go back to previous step"
         },
         "data_description": {
-          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap and Pirate Weather require a free API key."
+          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key."
         }
       },
       "forecast_api_key": {
@@ -221,8 +221,8 @@
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
           "forecast_lon": "Forecast longitude",
-          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap and Pirate Weather require a free API key.",
-          "forecast_api_key": "API key for the selected forecast provider (required for OpenWeatherMap and Pirate Weather).",
+          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key.",
+          "forecast_api_key": "API key for the selected forecast provider (required for OpenWeatherMap, Pirate Weather, and Météo France).",
           "thresh_wind_gust_ms": "Wind gust alert threshold",
           "thresh_rain_rate_mmph": "Rain rate alert threshold",
           "thresh_freeze_c": "Freeze warning threshold",

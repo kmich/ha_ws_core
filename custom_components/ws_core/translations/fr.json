@@ -66,7 +66,7 @@
           "_go_back": "← Retour à l'étape précédente"
         },
         "data_description": {
-          "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap et Pirate Weather nécessitent une clé API gratuite."
+          "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap, Pirate Weather et Météo France nécessitent une clé API gratuite."
         }
       },
       "forecast_api_key": {
@@ -221,8 +221,8 @@
           "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
           "forecast_lat": "Latitude des prévisions",
           "forecast_lon": "Longitude des prévisions",
-          "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap et Pirate Weather nécessitent une clé API gratuite.",
-          "forecast_api_key": "Clé API pour le fournisseur de prévisions sélectionné (requise pour OpenWeatherMap et Pirate Weather).",
+          "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap, Pirate Weather et Météo France nécessitent une clé API gratuite.",
+          "forecast_api_key": "Clé API pour le fournisseur de prévisions sélectionné (requise pour OpenWeatherMap, Pirate Weather et Météo France).",
           "thresh_wind_gust_ms": "Seuil d'alerte rafales",
           "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
           "thresh_freeze_c": "Seuil d'alerte gel",

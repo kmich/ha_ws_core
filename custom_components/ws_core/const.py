@@ -27,7 +27,8 @@ FORECAST_PROVIDER_MET_NO = "met_no"
 FORECAST_PROVIDER_NWS = "nws_noaa"
 FORECAST_PROVIDER_OWM = "openweathermap"
 FORECAST_PROVIDER_PIRATE = "pirate_weather"
-PROVIDERS_REQUIRING_API_KEY: set[str] = {"openweathermap", "pirate_weather"}
+FORECAST_PROVIDER_METEO_FRANCE = "meteo_france"
+PROVIDERS_REQUIRING_API_KEY: set[str] = {"openweathermap", "pirate_weather", "meteo_france"}
 DEFAULT_FORECAST_PROVIDER = FORECAST_PROVIDER_OPEN_METEO
 
 # Alert & heuristic options (stored in canonical metric units internally)
