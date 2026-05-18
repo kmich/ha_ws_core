@@ -13,6 +13,7 @@ from .nws_noaa import NwsNoaaProvider
 from .open_meteo import OpenMeteoProvider
 from .open_weather_map import OpenWeatherMapProvider
 from .pirate_weather import PirateWeatherProvider
+from .meteo_france import MeteoFranceProvider
 
 __all__ = [
     "ForecastProvider",
@@ -21,6 +22,7 @@ __all__ = [
     "NwsNoaaProvider",
     "OpenWeatherMapProvider",
     "PirateWeatherProvider",
+    "MeteoFranceProvider",
     "PROVIDERS",
     "get_provider",
 ]
@@ -31,6 +33,7 @@ PROVIDERS: dict[str, type[ForecastProvider]] = {
     NwsNoaaProvider.PROVIDER_ID: NwsNoaaProvider,
     OpenWeatherMapProvider.PROVIDER_ID: OpenWeatherMapProvider,
     PirateWeatherProvider.PROVIDER_ID: PirateWeatherProvider,
+    MeteoFranceProvider.PROVIDER_ID: MeteoFranceProvider,
 }
 
 
