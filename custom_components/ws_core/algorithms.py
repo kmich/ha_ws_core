@@ -266,14 +266,14 @@ def least_squares_pressure_trend(pressure_readings: list, interval_minutes: int 
 def pressure_trend_display(trend_3h: float) -> str:
     """Classify 3-hour pressure tendency (WMO No. 306, Table 4680)."""
     if trend_3h >= 1.6:
-        return "Rising Rapidly"
+        return "rising_rapidly"
     if trend_3h >= 0.8:
-        return "Rising"
+        return "rising"
     if trend_3h > -0.8:
-        return "Steady"
+        return "steady"
     if trend_3h > -1.6:
-        return "Falling"
-    return "Falling Rapidly"
+        return "falling"
+    return "falling_rapidly"
 
 
 def pressure_trend_arrow(trend_3h: float) -> str:
@@ -328,32 +328,32 @@ ZAMBRETTI_RAIN_PCT: list[int] = [
 # The 26 Zambretti forecast texts (Z-number 1-26, indices 0-25).
 # Original Negretti & Zambra patent, public domain.
 ZAMBRETTI_TEXTS = [
-    "Settled fine",  # Z=1
-    "Fine weather",  # Z=2
-    "Becoming fine",  # Z=3
-    "Fine, becoming less settled",  # Z=4
-    "Fine, possible showers",  # Z=5
-    "Fairly fine, improving",  # Z=6
-    "Fairly fine, possible showers early",  # Z=7
-    "Fairly fine, showery later",  # Z=8
-    "Showery early, improving",  # Z=9
-    "Changeable, mending",  # Z=10
-    "Fairly fine, possible showers",  # Z=11
-    "Rather unsettled clearing later",  # Z=12
-    "Unsettled, probably improving",  # Z=13
-    "Showery, bright intervals",  # Z=14
-    "Showery, becoming rather unsettled",  # Z=15
-    "Changeable, some rain",  # Z=16
-    "Unsettled, short fine intervals",  # Z=17
-    "Unsettled, rain later",  # Z=18
-    "Unsettled, some rain",  # Z=19
-    "Mostly very unsettled",  # Z=20
-    "Occasional rain, worsening",  # Z=21
-    "Rain at times, very unsettled",  # Z=22
-    "Rain at frequent intervals",  # Z=23
-    "Rain, very unsettled",  # Z=24
-    "Stormy, may improve",  # Z=25
-    "Stormy, much rain",  # Z=26
+    "settled_fine",  # Z=1
+    "fine_weather",  # Z=2
+    "becoming_fine",  # Z=3
+    "fine_becoming_less_settled",  # Z=4
+    "fine_possible_showers",  # Z=5
+    "fairly_fine_improving",  # Z=6
+    "fairly_fine_possible_showers_early",  # Z=7
+    "fairly_fine_showery_later",  # Z=8
+    "showery_early_improving",  # Z=9
+    "changeable_mending",  # Z=10
+    "fairly_fine_possible_showers",  # Z=11
+    "rather_unsettled_clearing_later",  # Z=12
+    "unsettled_probably_improving",  # Z=13
+    "showery_bright_intervals",  # Z=14
+    "showery_becoming_rather_unsettled",  # Z=15
+    "changeable_some_rain",  # Z=16
+    "unsettled_short_fine_intervals",  # Z=17
+    "unsettled_rain_later",  # Z=18
+    "unsettled_some_rain",  # Z=19
+    "mostly_very_unsettled",  # Z=20
+    "occasional_rain_worsening",  # Z=21
+    "rain_at_times_very_unsettled",  # Z=22
+    "rain_at_frequent_intervals",  # Z=23
+    "rain_very_unsettled",  # Z=24
+    "stormy_may_improve",  # Z=25
+    "stormy_much_rain",  # Z=26
 ]
 
 
@@ -684,13 +684,13 @@ def determine_current_condition(
     is_sunset = is_golden_hour and not is_rising
 
     # Severe weather (highest priority)
-    if wind_gust_ms > 32 or "Hurricane" in str(zambretti):
+    if wind_gust_ms > 32 or "stormy" in str(zambretti):
         return "hurricane"
     if wind_gust_ms > 25 and pressure_trend < -3:
         return "severe-storm"
-    if "Storm" in str(zambretti) and rain_rate_mmph > 10:
+    if "stormy" in str(zambretti) and rain_rate_mmph > 10:
         return "thunderstorm"
-    if "Storm" in str(zambretti) or (rain_rate_mmph > 5 and wind_gust_ms > 15):
+    if "stormy" in str(zambretti) or (rain_rate_mmph > 5 and wind_gust_ms > 15):
         return "pre-storm"
 
     # Frozen precipitation
@@ -878,33 +878,33 @@ def get_condition_severity(condition: str) -> str:
 
 def humidity_level(humidity: float) -> str:
     if humidity > 80:
-        return "Very Humid"
+        return "very_humid"
     if humidity > 70:
-        return "Humid"
+        return "humid"
     if humidity > 60:
-        return "Slightly Humid"
+        return "slightly_humid"
     if humidity > 40:
-        return "Comfortable"
+        return "comfortable"
     if humidity > 30:
-        return "Slightly Dry"
+        return "slightly_dry"
     if humidity > 20:
-        return "Dry"
-    return "Very Dry"
+        return "dry"
+    return "very_dry"
 
 
 def uv_level(uv_index: float) -> str:
-    """WMO UV index categories. UV=0 is None (no UV present, e.g. nighttime)."""
+    """WMO UV index categories. UV=0 is none (no UV present, e.g. nighttime)."""
     if uv_index <= 0:
-        return "None"
+        return "none"
     if uv_index >= 11:
-        return "Extreme"
+        return "extreme"
     if uv_index >= 8:
-        return "Very High"
+        return "very_high"
     if uv_index >= 6:
-        return "High"
+        return "high"
     if uv_index >= 3:
-        return "Moderate"
-    return "Low"
+        return "moderate"
+    return "low"
 
 
 def uv_recommendation(uv_index: float) -> str:
@@ -1349,8 +1349,8 @@ def aqi_color(aqi: int) -> str:
 def pollen_level(index: int | None) -> str:
     """Tomorrow.io pollen index (0-5) to level label."""
     if index is None:
-        return "Unknown"
-    labels = ["None", "Very Low", "Low", "Medium", "High", "Very High"]
+        return "unknown"
+    labels = ["none", "very_low", "low", "medium", "high", "very_high"]
     return labels[min(int(index), 5)]
 
 
@@ -1358,7 +1358,7 @@ def pollen_overall(grass: int | None, tree: int | None, weed: int | None) -> str
     """Highest single pollen level across all types."""
     vals = [v for v in (grass, tree, weed) if v is not None]
     if not vals:
-        return "Unknown"
+        return "unknown"
     return pollen_level(max(vals))
 
 

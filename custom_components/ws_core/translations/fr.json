@@ -431,31 +431,33 @@
       "zambretti_forecast": {
         "name": "Prévision Zambretti",
         "state": {
-          "Settled fine": "Beau temps stable",
-          "Fine weather": "Beau temps",
-          "Becoming fine": "En amélioration",
-          "Fine, becoming less settled": "Beau temps, instabilité à venir",
-          "Fine, possible showers": "Beau temps, averses possibles",
-          "Fairly fine, improving": "Assez beau, en amélioration",
-          "Fairly fine, possible showers early": "Assez beau, averses possibles tôt",
-          "Fairly fine, showery later": "Assez beau, averses ensuite",
-          "Showery early, improving": "Averses tôt, amélioration",
-          "Changeable, mending": "Variable, en amélioration",
-          "Rather unsettled clearing later": "Instable, éclaircies ensuite",
-          "Unsettled, probably improving": "Instable, amélioration probable",
-          "Showery, bright intervals": "Averses, éclaircies",
-          "Showery, becoming rather unsettled": "Averses, instabilité croissante",
-          "Changeable, some rain": "Variable, quelques pluies",
-          "Unsettled, short fine intervals": "Instable, courtes éclaircies",
-          "Unsettled, rain later": "Instable, pluie ensuite",
-          "Unsettled, some rain": "Instable, quelques pluies",
-          "Mostly very unsettled": "Très instable",
-          "Occasional rain, worsening": "Pluies occasionnelles, dégradation",
-          "Rain at times, very unsettled": "Pluies intermittentes, très instable",
-          "Rain at frequent intervals": "Pluies fréquentes",
-          "Rain, very unsettled": "Pluvieux, très instable",
-          "Stormy, may improve": "Orageux, amélioration possible",
-          "Stormy, much rain": "Orageux, fortes pluies"
+          "settled_fine": "Beau temps stable",
+          "fine_weather": "Beau temps",
+          "becoming_fine": "En amélioration",
+          "fine_becoming_less_settled": "Beau temps, instabilité à venir",
+          "fine_possible_showers": "Beau temps, averses possibles",
+          "fairly_fine_improving": "Assez beau, en amélioration",
+          "fairly_fine_possible_showers_early": "Assez beau, averses possibles tôt",
+          "fairly_fine_showery_later": "Assez beau, averses ensuite",
+          "showery_early_improving": "Averses tôt, amélioration",
+          "changeable_mending": "Variable, en amélioration",
+          "fairly_fine_possible_showers": "Assez beau, averses possibles",
+          "rather_unsettled_clearing_later": "Instable, éclaircies ensuite",
+          "unsettled_probably_improving": "Instable, amélioration probable",
+          "showery_bright_intervals": "Averses, éclaircies",
+          "showery_becoming_rather_unsettled": "Averses, instabilité croissante",
+          "changeable_some_rain": "Variable, quelques pluies",
+          "unsettled_short_fine_intervals": "Instable, courtes éclaircies",
+          "unsettled_rain_later": "Instable, pluie ensuite",
+          "unsettled_some_rain": "Instable, quelques pluies",
+          "mostly_very_unsettled": "Très instable",
+          "occasional_rain_worsening": "Pluies occasionnelles, dégradation",
+          "rain_at_times_very_unsettled": "Pluies intermittentes, très instable",
+          "rain_at_frequent_intervals": "Pluies fréquentes",
+          "rain_very_unsettled": "Pluvieux, très instable",
+          "stormy_may_improve": "Orageux, amélioration possible",
+          "stormy_much_rain": "Orageux, fortes pluies",
+          "insufficient_data": "Données insuffisantes"
         },
         "state_attributes": {
           "z_number": { "name": "Numéro Z" },
@@ -557,11 +559,11 @@
       "pressure_trend": {
         "name": "Tendance de pression",
         "state": {
-          "Rising Rapidly": "Hausse rapide",
-          "Rising": "En hausse",
-          "Steady": "Stable",
-          "Falling": "En baisse",
-          "Falling Rapidly": "Baisse rapide"
+          "rising_rapidly": "Hausse rapide",
+          "rising": "En hausse",
+          "steady": "Stable",
+          "falling": "En baisse",
+          "falling_rapidly": "Baisse rapide"
         },
         "state_attributes": {
           "change_3h_hpa": { "name": "Variation 3 h (hPa)" },
@@ -575,10 +577,10 @@
       "station_health": {
         "name": "Santé de la station",
         "state": {
-          "Online": "En ligne",
-          "Degraded": "Dégradé",
-          "Stale": "Données obsolètes",
-          "Offline": "Hors ligne"
+          "online": "En ligne",
+          "degraded": "Dégradé",
+          "stale": "Données obsolètes",
+          "offline": "Hors ligne"
         },
         "state_attributes": {
           "color": { "name": "Couleur" },
@@ -600,24 +602,24 @@
       "humidity_level": {
         "name": "Niveau d'humidité",
         "state": {
-          "Very Humid": "Très humide",
-          "Humid": "Humide",
-          "Slightly Humid": "Légèrement humide",
-          "Comfortable": "Confortable",
-          "Slightly Dry": "Légèrement sec",
-          "Dry": "Sec",
-          "Very Dry": "Très sec"
+          "very_humid": "Très humide",
+          "humid": "Humide",
+          "slightly_humid": "Légèrement humide",
+          "comfortable": "Confortable",
+          "slightly_dry": "Légèrement sec",
+          "dry": "Sec",
+          "very_dry": "Très sec"
         }
       },
       "uv_level": {
         "name": "Niveau UV",
         "state": {
-          "None": "Nul",
-          "Low": "Faible",
-          "Moderate": "Modéré",
-          "High": "Élevé",
-          "Very High": "Très élevé",
-          "Extreme": "Extrême"
+          "none": "Nul",
+          "low": "Faible",
+          "moderate": "Modéré",
+          "high": "Élevé",
+          "very_high": "Très élevé",
+          "extreme": "Extrême"
         },
         "state_attributes": {
           "uv_index": { "name": "Indice UV" },
@@ -709,13 +711,13 @@
       "pollen_level": {
         "name": "Niveau de pollen",
         "state": {
-          "Unknown": "Inconnu",
-          "None": "Nul",
-          "Very Low": "Très faible",
-          "Low": "Faible",
-          "Medium": "Moyen",
-          "High": "Élevé",
-          "Very High": "Très élevé"
+          "unknown": "Inconnu",
+          "none": "Nul",
+          "very_low": "Très faible",
+          "low": "Faible",
+          "medium": "Moyen",
+          "high": "Élevé",
+          "very_high": "Très élevé"
         },
         "state_attributes": {
           "grass_index": { "name": "Indice graminées" },
@@ -790,8 +792,8 @@
       "sensor_drift": {
         "name": "Dérive des capteurs",
         "state": {
-          "OK": "OK",
-          "Warning": "Avertissement"
+          "ok": "OK",
+          "warning": "Avertissement"
         },
         "state_attributes": {
           "drifting_sensors": { "name": "Capteurs en dérive" },
@@ -801,8 +803,8 @@
       "sensor_consistency": {
         "name": "Cohérence des capteurs",
         "state": {
-          "OK": "OK",
-          "Warning": "Avertissement"
+          "ok": "OK",
+          "warning": "Avertissement"
         },
         "state_attributes": {
           "flags": { "name": "Indicateurs de cohérence" },

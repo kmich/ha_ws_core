@@ -934,7 +934,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_ZAMBRETTI_FORECAST] = forecast_text
             data[KEY_ZAMBRETTI_NUMBER] = z_number
         else:
-            data[KEY_ZAMBRETTI_FORECAST] = "Insufficient data"
+            data[KEY_ZAMBRETTI_FORECAST] = "insufficient_data"
             data[KEY_ZAMBRETTI_NUMBER] = None
 
         return trend_3h, (mslp or 0.0)
@@ -1206,19 +1206,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         n_healthy = len(self.sources) - n_unavailable - len(stale)
 
         station_health = (
-            "Offline"
+            "offline"
             if n_unavailable >= 3
-            else "Online"
+            else "online"
             if n_healthy >= len(REQUIRED_SOURCES)
-            else "Degraded"
+            else "degraded"
             if n_healthy >= 1
-            else "Stale"
+            else "stale"
         )
         health_color = {
-            "Online": "rgba(74,222,128,0.8)",
-            "Degraded": "rgba(251,191,36,0.9)",
-            "Stale": "rgba(249,115,22,0.9)",
-            "Offline": "rgba(239,68,68,0.9)",
+            "online": "rgba(74,222,128,0.8)",
+            "degraded": "rgba(251,191,36,0.9)",
+            "stale": "rgba(249,115,22,0.9)",
+            "offline": "rgba(239,68,68,0.9)",
         }.get(station_health, "rgba(239,68,68,0.9)")
 
         data[KEY_HEALTH_DISPLAY] = station_health
@@ -1233,14 +1233,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if stale:
             parts.append("Stale: " + ", ".join(stale))
         data[KEY_PACKAGE_OK] = bool(ok)
-        data[KEY_PACKAGE_STATUS] = " | ".join(parts) if parts else "OK"
+        data[KEY_PACKAGE_STATUS] = " | ".join(parts) if parts else "ok"
 
         if missing or missing_entities:
             dq = "ERROR: Weather station not configured (missing sources)"
         elif stale:
             dq = f"WARN: Stale data from {', '.join(stale)}"
         else:
-            dq = "OK"
+            dq = "ok"
         data[KEY_DATA_QUALITY] = dq
 
         # Configurable alerts
@@ -1556,7 +1556,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         }
                     )
 
-        status = "Warning" if flags else "OK"
+        status = "warning" if flags else "ok"
         data[KEY_SENSOR_DRIFT_FLAGS] = status
         data["_drift_details"] = flags
 
@@ -1615,7 +1615,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rain_total_increasing=not rain_total_not_incrementing,
         )
 
-        data[KEY_CONSISTENCY_FLAGS] = "Warning" if flags else "OK"
+        data[KEY_CONSISTENCY_FLAGS] = "warning" if flags else "ok"
         data["_consistency_details"] = flags
 
     # ------------------------------------------------------------------
