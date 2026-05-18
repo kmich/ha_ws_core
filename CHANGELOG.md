@@ -2,6 +2,25 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.1.0] - 2026-05-18
+
+### New Features
+
+- **Full Canadian FWI system** — complete Van Wagner (1987) implementation: FFMC, DMC, DC daily moisture codes with persistent carry-over across HA restarts, ISI, BUI, FWI, DSR. Replaces the previous simplified heuristic. `sensor.ws_fire_risk_score` maps real FWI to a 1–10 danger scale; seven sub-index sensors available (disabled by default).
+- **Nowcast correction (0–3h)** — local station readings (temperature, humidity, wind, dew point, rain rate, condition) blend into the first three hourly forecast slots using tapering weights (70 % local at hour 0, pure NWP by hour 3).
+- **Adaptive rain probability** — `sensor.ws_rain_probability_combined` uses rolling 90-day Brier-score weights that learn which source (local sensors vs Open-Meteo) has been more accurate; falls back to fixed day/night weights until enough data accumulates.
+- **Forecast agreement sensor** — `sensor.ws_forecast_agreement` compares Zambretti Z-number implied rain likelihood to Open-Meteo `precip_prob`; states: `aligned` (< 20 pp delta), `diverging` (20–40 pp), `conflict` (> 40 pp).
+- **French translation** — complete `fr.json` covering config flow, options flow, entity names, and issues (thanks @Benjamin45590).
+
+### Bug Fixes
+
+- **Configure button 500 error on HA 2024.3+** — `async_get_options_flow` updated to `@classmethod` + `@callback`; framework now injects `self.config_entry` automatically (thanks @miczu71, PR #2).
+- **AQI level attribute always `None`** — `KEY_AQI_LEVEL` was never written to the coordinator data dict; now populated from cached AQI data.
+- **Moon phase attribute always `None`** — moon phase was stored under private key `_moon_phase` but sensor read `KEY_MOON_PHASE`; keys aligned.
+- **Staleness timeout selector rejected default** — selector max was 3 600 s but default is 7 200 s; raised to 86 400 s (24 h).
+- **`enable_fog` shown as raw key in config flow** — translation key was `enable_fog_probability`; aligned to `enable_fog` to match the const.
+- **10 additional string/key audit fixes** — orphaned `enable_zambretti` translation, missing `ws_enable_fog` and `ws_enable_thunderstorm_risk` switch entries, missing `features_opt` data descriptions, pollen incorrectly attributed to Tomorrow.io.
+
 ## [1.0.0] - 2026-05-14
 
 Initial public release.
