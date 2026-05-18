@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.1.1] - 2026-05-18
+
+### Bug Fixes
+
+- **All 82 sensor names now translatable** — sensors now use HA's `translation_key` + `has_entity_name` mechanism. Display names update automatically when HA language is changed (e.g. French users see "Température" instead of "WS Temperature"). Entity IDs are unchanged. French translations included out of the box (closes #4, thanks @Benjamin45590).
+
 ## [1.1.0] - 2026-05-18
 
 ### New Features

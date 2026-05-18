@@ -143,6 +143,7 @@ class WSSensorDescription:
     entity_registry_enabled_default: bool = True
     icon: str | None = None
     name: str | None = None
+    translation_key: str | None = None
     native_unit: str | None = None
     state_class: SensorStateClass | None = None
     value_fn: Callable[[dict[str, Any]], Any] | None = None
@@ -155,6 +156,7 @@ SENSORS: list[WSSensorDescription] = [
     # =========================================================================
     WSSensorDescription(
         key=KEY_NORM_TEMP_C,
+        translation_key="temperature",
         name="WS Temperature",
         icon="mdi:thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -163,6 +165,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_DEW_POINT_C,
+        translation_key="dew_point",
         name="WS Dew Point",
         icon="mdi:weather-fog",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -171,6 +174,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_NORM_HUMIDITY,
+        translation_key="humidity",
         name="WS Humidity",
         icon="mdi:water-percent",
         device_class=SensorDeviceClass.HUMIDITY,
@@ -179,6 +183,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_NORM_PRESSURE_HPA,
+        translation_key="station_pressure",
         name="WS Station Pressure",
         icon="mdi:gauge",
         device_class=SensorDeviceClass.PRESSURE,
@@ -187,6 +192,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_SEA_LEVEL_PRESSURE_HPA,
+        translation_key="sea_level_pressure",
         name="WS Sea-Level Pressure",
         icon="mdi:gauge-full",
         device_class=SensorDeviceClass.PRESSURE,
@@ -195,6 +201,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_NORM_WIND_SPEED_MS,
+        translation_key="wind_speed",
         name="WS Wind Speed",
         icon="mdi:weather-windy",
         device_class=SensorDeviceClass.WIND_SPEED,
@@ -203,6 +210,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_NORM_WIND_GUST_MS,
+        translation_key="wind_gust",
         name="WS Wind Gust",
         icon="mdi:weather-windy-variant",
         device_class=SensorDeviceClass.WIND_SPEED,
@@ -211,6 +219,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_NORM_WIND_DIR_DEG,
+        translation_key="wind_direction",
         name="WS Wind Direction",
         icon="mdi:compass",
         device_class=SensorDeviceClass.WIND_DIRECTION,
@@ -219,6 +228,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_NORM_RAIN_TOTAL_MM,
+        translation_key="rain_total",
         name="WS Rain Total",
         icon="mdi:water",
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -227,6 +237,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_RAIN_RATE_FILT,
+        translation_key="rain_rate",
         name="WS Rain Rate",
         icon="mdi:weather-pouring",
         device_class=SensorDeviceClass.PRECIPITATION_INTENSITY,
@@ -235,6 +246,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_LUX,
+        translation_key="illuminance",
         name="WS Illuminance",
         icon="mdi:white-balance-sunny",
         device_class=SensorDeviceClass.ILLUMINANCE,
@@ -243,12 +255,14 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_UV,
+        translation_key="uv_index",
         name="WS UV Index",
         icon="mdi:weather-sunny-alert",
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
         key=KEY_BATTERY_PCT,
+        translation_key="battery",
         name="WS Battery",
         icon="mdi:battery",
         device_class=SensorDeviceClass.BATTERY,
@@ -263,6 +277,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_PRESSURE_TREND_HPAH,
+        translation_key="pressure_trend_raw",
         name="WS Pressure Trend Raw",
         icon="mdi:trending-up",
         native_unit="hPa/h",
@@ -271,6 +286,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_PRESSURE_CHANGE_WINDOW_HPA,
+        translation_key="pressure_change_window",
         name="WS Pressure Change (window)",
         icon="mdi:swap-vertical",
         native_unit="hPa",
@@ -279,18 +295,21 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_DATA_QUALITY,
+        translation_key="data_quality_banner",
         name="WS Data Quality Banner",
         icon="mdi:clipboard-check-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
         key=KEY_PACKAGE_STATUS,
+        translation_key="package_status",
         name="WS Package Status",
         icon="mdi:package-variant-closed",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
         key=KEY_SENSOR_QUALITY_FLAGS,
+        translation_key="sensor_quality_flags",
         name="WS Sensor Quality Flags",
         icon="mdi:shield-alert-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -302,18 +321,21 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_ALERT_STATE,
+        translation_key="alert_state",
         name="WS Alert State",
         icon="mdi:alert-circle-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
         key=KEY_ALERT_MESSAGE,
+        translation_key="alert_message",
         name="WS Alert Message",
         icon="mdi:message-alert-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     WSSensorDescription(
         key=KEY_FORECAST,
+        translation_key="forecast_daily",
         name="WS Forecast Daily",
         icon="mdi:calendar-weather",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -325,6 +347,7 @@ SENSORS: list[WSSensorDescription] = [
     # =========================================================================
     WSSensorDescription(
         key=KEY_FEELS_LIKE_C,
+        translation_key="feels_like",
         name="WS Feels Like",
         icon="mdi:thermometer-lines",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -342,6 +365,7 @@ SENSORS: list[WSSensorDescription] = [
     # Wet-bulb temperature (Stull 2011)
     WSSensorDescription(
         key=KEY_WET_BULB_C,
+        translation_key="wet_bulb_temperature",
         name="WS Wet-Bulb Temperature",
         icon="mdi:thermometer-water",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -355,6 +379,7 @@ SENSORS: list[WSSensorDescription] = [
     # Frost point (below 0 C uses ice constants)
     WSSensorDescription(
         key=KEY_FROST_POINT_C,
+        translation_key="frost_point",
         name="WS Frost Point",
         icon="mdi:snowflake-thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -368,6 +393,7 @@ SENSORS: list[WSSensorDescription] = [
     # Zambretti barometric forecast
     WSSensorDescription(
         key=KEY_ZAMBRETTI_FORECAST,
+        translation_key="zambretti_forecast",
         name="WS Zambretti Forecast",
         icon="mdi:crystal-ball",
         attrs_fn=lambda d: {
@@ -382,6 +408,7 @@ SENSORS: list[WSSensorDescription] = [
     # Zambretti Z-number (numeric, for automations)
     WSSensorDescription(
         key=KEY_ZAMBRETTI_NUMBER,
+        translation_key="zambretti_number",
         name="WS Zambretti Number",
         icon="mdi:numeric",
         state_class=SensorStateClass.MEASUREMENT,
@@ -390,6 +417,7 @@ SENSORS: list[WSSensorDescription] = [
     # Beaufort wind scale
     WSSensorDescription(
         key=KEY_WIND_BEAUFORT,
+        translation_key="wind_beaufort",
         name="WS Wind Beaufort",
         icon="mdi:weather-windy",
         state_class=SensorStateClass.MEASUREMENT,
@@ -407,6 +435,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_WIND_QUADRANT,
+        translation_key="wind_quadrant",
         name="WS Wind Quadrant",
         icon="mdi:compass-rose",
         attrs_fn=lambda d: {
@@ -416,6 +445,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_WIND_DIR_SMOOTH_DEG,
+        translation_key="wind_direction_smoothed",
         name="WS Wind Direction Smoothed",
         icon="mdi:compass",
         native_unit="\u00b0",
@@ -425,6 +455,7 @@ SENSORS: list[WSSensorDescription] = [
     # Current weather condition
     WSSensorDescription(
         key=KEY_CURRENT_CONDITION,
+        translation_key="current_condition",
         name="WS Current Condition",
         icon="mdi:weather-partly-cloudy",
         attrs_fn=lambda d: {
@@ -441,6 +472,7 @@ SENSORS: list[WSSensorDescription] = [
     # Rain probability
     WSSensorDescription(
         key=KEY_RAIN_PROBABILITY,
+        translation_key="rain_probability",
         name="WS Rain Probability",
         icon="mdi:weather-rainy",
         native_unit="%",
@@ -459,6 +491,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_RAIN_PROBABILITY_COMBINED,
+        translation_key="rain_probability_combined",
         name="WS Rain Probability Combined",
         icon="mdi:weather-rainy",
         native_unit="%",
@@ -471,6 +504,7 @@ SENSORS: list[WSSensorDescription] = [
     # Rain / pressure display
     WSSensorDescription(
         key=KEY_RAIN_DISPLAY,
+        translation_key="rain_display",
         name="WS Rain Display",
         icon="mdi:weather-rainy",
         attrs_fn=lambda d: {
@@ -482,6 +516,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_RAIN_ACCUM_1H,
+        translation_key="rain_last_1h",
         name="WS Rain Last 1h",
         icon="mdi:weather-pouring",
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -490,6 +525,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_RAIN_ACCUM_24H,
+        translation_key="rain_last_24h",
         name="WS Rain Last 24h",
         icon="mdi:weather-pouring",
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -498,6 +534,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_PRESSURE_TREND_DISPLAY,
+        translation_key="pressure_trend",
         name="WS Pressure Trend",
         icon="mdi:trending-up",
         attrs_fn=lambda d: {
@@ -527,6 +564,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_HEALTH_DISPLAY,
+        translation_key="station_health",
         name="WS Station Health",
         icon="mdi:heart-pulse",
         attrs_fn=lambda d: {
@@ -537,6 +575,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FORECAST_TILES,
+        translation_key="forecast_tiles",
         name="WS Forecast Tiles",
         icon="mdi:calendar-weather",
         value_fn=lambda d: "available" if d.get(KEY_FORECAST_TILES) else "unavailable",
@@ -550,6 +589,7 @@ SENSORS: list[WSSensorDescription] = [
     # =========================================================================
     WSSensorDescription(
         key=KEY_TEMP_HIGH_24H,
+        translation_key="temperature_high_24h",
         name="WS Temperature High 24h",
         icon="mdi:thermometer-high",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -558,6 +598,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_TEMP_LOW_24H,
+        translation_key="temperature_low_24h",
         name="WS Temperature Low 24h",
         icon="mdi:thermometer-low",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -566,6 +607,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_TEMP_AVG_24H,
+        translation_key="temperature_average_24h",
         name="WS Temperature Average 24h",
         icon="mdi:thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -575,6 +617,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_WIND_GUST_MAX_24H,
+        translation_key="wind_gust_max_24h",
         name="WS Wind Gust Max 24h",
         icon="mdi:weather-windy-variant",
         device_class=SensorDeviceClass.WIND_SPEED,
@@ -584,9 +627,15 @@ SENSORS: list[WSSensorDescription] = [
     # =========================================================================
     # DISPLAY / LEVEL SENSORS
     # =========================================================================
-    WSSensorDescription(key=KEY_HUMIDITY_LEVEL_DISPLAY, name="WS Humidity Level", icon="mdi:water-percent"),
+    WSSensorDescription(
+        key=KEY_HUMIDITY_LEVEL_DISPLAY,
+        translation_key="humidity_level",
+        name="WS Humidity Level",
+        icon="mdi:water-percent",
+    ),
     WSSensorDescription(
         key=KEY_UV_LEVEL_DISPLAY,
+        translation_key="uv_level",
         name="WS UV Level",
         icon="mdi:sun-wireless",
         attrs_fn=lambda d: {
@@ -597,6 +646,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_TEMP_DISPLAY,
+        translation_key="temperature_display",
         name="WS Temperature Display",
         icon="mdi:thermometer",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -607,6 +657,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FIRE_RISK_SCORE,
+        translation_key="fire_risk_score",
         name="WS Fire Risk Score",
         icon="mdi:fire",
         native_unit="score",
@@ -630,6 +681,7 @@ SENSORS: list[WSSensorDescription] = [
     # =========================================================================
     WSSensorDescription(
         key=KEY_FWI_FFMC,
+        translation_key="fwi_ffmc",
         name="WS FWI Fine Fuel Moisture Code",
         icon="mdi:leaf",
         native_unit=None,
@@ -643,6 +695,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FWI_DMC,
+        translation_key="fwi_dmc",
         name="WS FWI Duff Moisture Code",
         icon="mdi:layers",
         native_unit=None,
@@ -656,6 +709,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FWI_DC,
+        translation_key="fwi_dc",
         name="WS FWI Drought Code",
         icon="mdi:water-remove",
         native_unit=None,
@@ -669,6 +723,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FWI_ISI,
+        translation_key="fwi_isi",
         name="WS FWI Initial Spread Index",
         icon="mdi:fire-alert",
         native_unit=None,
@@ -685,6 +740,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FWI_BUI,
+        translation_key="fwi_bui",
         name="WS FWI Buildup Index",
         icon="mdi:fire-hydrant",
         native_unit=None,
@@ -699,6 +755,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FWI,
+        translation_key="fwi",
         name="WS Fire Weather Index",
         icon="mdi:fire-circle",
         native_unit=None,
@@ -717,6 +774,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FWI_DSR,
+        translation_key="fwi_dsr",
         name="WS FWI Daily Severity Rating",
         icon="mdi:chart-line",
         native_unit=None,
@@ -733,6 +791,7 @@ SENSORS: list[WSSensorDescription] = [
     # =========================================================================
     WSSensorDescription(
         key=KEY_SEA_SURFACE_TEMP,
+        translation_key="sea_surface_temperature",
         name="WS Sea Surface Temperature",
         icon="mdi:waves",
         device_class=SensorDeviceClass.TEMPERATURE,
@@ -751,6 +810,7 @@ SENSORS: list[WSSensorDescription] = [
     # ---------------------------------------------------------------
     WSSensorDescription(
         key=KEY_ET0_DAILY_MM,
+        translation_key="et0_daily",
         name="WS ET₀ (Daily)",
         icon="mdi:sprout",
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -764,6 +824,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_ET0_HOURLY_MM,
+        translation_key="et0_hourly",
         name="WS ET₀ (Hourly)",
         icon="mdi:sprout-outline",
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -776,6 +837,7 @@ SENSORS: list[WSSensorDescription] = [
     # ---------------------------------------------------------------
     WSSensorDescription(
         key=KEY_WU_STATUS,
+        translation_key="wu_status",
         name="WS Weather Underground Status",
         icon="mdi:weather-cloudy-clock",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -785,6 +847,7 @@ SENSORS: list[WSSensorDescription] = [
     # ---------------------------------------------------------------
     WSSensorDescription(
         key=KEY_AQI,
+        translation_key="aqi",
         name="WS Air Quality Index",
         icon="mdi:air-filter",
         native_unit="AQI",
@@ -800,6 +863,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_PM2_5,
+        translation_key="pm2_5",
         name="WS PM2.5",
         icon="mdi:smoke",
         native_unit="µg/m³",
@@ -808,6 +872,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_PM10,
+        translation_key="pm10",
         name="WS PM10",
         icon="mdi:smoke",
         native_unit="µg/m³",
@@ -819,6 +884,7 @@ SENSORS: list[WSSensorDescription] = [
     # ---------------------------------------------------------------
     WSSensorDescription(
         key=KEY_POLLEN_OVERALL,
+        translation_key="pollen_level",
         name="WS Pollen Level",
         icon="mdi:flower-pollen",
         attrs_fn=lambda d: {
@@ -834,6 +900,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_POLLEN_GRASS,
+        translation_key="pollen_grass",
         name="WS Pollen Grass",
         icon="mdi:flower-pollen-outline",
         state_class=SensorStateClass.MEASUREMENT,
@@ -841,6 +908,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_POLLEN_TREE,
+        translation_key="pollen_tree",
         name="WS Pollen Tree",
         icon="mdi:tree",
         state_class=SensorStateClass.MEASUREMENT,
@@ -848,6 +916,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_POLLEN_WEED,
+        translation_key="pollen_weed",
         name="WS Pollen Weed",
         icon="mdi:flower-pollen-outline",
         state_class=SensorStateClass.MEASUREMENT,
@@ -858,6 +927,7 @@ SENSORS: list[WSSensorDescription] = [
     # ---------------------------------------------------------------
     WSSensorDescription(
         key=KEY_MOON_DISPLAY,
+        translation_key="moon",
         name="WS Moon",
         icon="mdi:moon-waxing-crescent",
         attrs_fn=lambda d: {
@@ -872,6 +942,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_MOON_ILLUMINATION_PCT,
+        translation_key="moon_illumination",
         name="WS Moon Illumination",
         icon="mdi:moon-full",
         native_unit="%",
@@ -883,6 +954,7 @@ SENSORS: list[WSSensorDescription] = [
     # ---------------------------------------------------------------
     WSSensorDescription(
         key=KEY_SOLAR_FORECAST_TODAY_KWH,
+        translation_key="solar_forecast_today",
         name="WS Solar Forecast Today",
         icon="mdi:solar-power",
         native_unit="kWh",
@@ -895,6 +967,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_SOLAR_FORECAST_TOMORROW_KWH,
+        translation_key="solar_forecast_tomorrow",
         name="WS Solar Forecast Tomorrow",
         icon="mdi:solar-power-variant",
         native_unit="kWh",
@@ -904,6 +977,7 @@ SENSORS: list[WSSensorDescription] = [
     # Penman-Monteith ET₀ (v0.9.0, when solar radiation sensor available)
     WSSensorDescription(
         key=KEY_ET0_PM_DAILY_MM,
+        translation_key="et0_pm_daily",
         name="WS ET₀ Penman-Monteith (Daily)",
         icon="mdi:water-pump",
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -921,6 +995,7 @@ SENSORS: list[WSSensorDescription] = [
     # B1 Fog probability
     WSSensorDescription(
         key=KEY_FOG_PROBABILITY,
+        translation_key="fog_probability",
         name="WS Fog Probability",
         icon="mdi:weather-fog",
         native_unit="%",
@@ -933,6 +1008,7 @@ SENSORS: list[WSSensorDescription] = [
     # B2 Thunderstorm risk
     WSSensorDescription(
         key=KEY_THUNDERSTORM_RISK,
+        translation_key="thunderstorm_risk",
         name="WS Thunderstorm Risk",
         icon="mdi:weather-lightning",
         native_unit=None,
@@ -946,6 +1022,7 @@ SENSORS: list[WSSensorDescription] = [
     # B5 Streak counters
     WSSensorDescription(
         key=KEY_DRY_STREAK,
+        translation_key="dry_streak",
         name="WS Dry Streak",
         icon="mdi:water-off",
         native_unit="d",
@@ -954,6 +1031,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_HEAT_STREAK,
+        translation_key="heat_streak",
         name="WS Heat Streak",
         icon="mdi:thermometer-high",
         native_unit="d",
@@ -962,6 +1040,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_FROST_STREAK,
+        translation_key="frost_streak",
         name="WS Frost Streak",
         icon="mdi:snowflake",
         native_unit="d",
@@ -974,6 +1053,7 @@ SENSORS: list[WSSensorDescription] = [
     # C1 Sensor drift detection
     WSSensorDescription(
         key=KEY_SENSOR_DRIFT_FLAGS,
+        translation_key="sensor_drift",
         name="WS Sensor Drift",
         icon="mdi:chart-timeline-variant-shimmer",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -985,6 +1065,7 @@ SENSORS: list[WSSensorDescription] = [
     # C2 Cross-sensor consistency
     WSSensorDescription(
         key=KEY_CONSISTENCY_FLAGS,
+        translation_key="sensor_consistency",
         name="WS Sensor Consistency",
         icon="mdi:compare-horizontal",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -999,6 +1080,7 @@ SENSORS: list[WSSensorDescription] = [
     # D1 30-day stats
     WSSensorDescription(
         key=KEY_CLIMATOLOGY_30D,
+        translation_key="climatology_30d",
         name="WS Climatology (30-day)",
         icon="mdi:calendar-month",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1007,6 +1089,7 @@ SENSORS: list[WSSensorDescription] = [
     # D2 Anomaly sensors
     WSSensorDescription(
         key=KEY_TEMP_ANOMALY_30D,
+        translation_key="temperature_anomaly_30d",
         name="WS Temperature Anomaly (30-day)",
         icon="mdi:thermometer-alert",
         native_unit=UNIT_TEMP_C,
@@ -1015,6 +1098,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_RAIN_ANOMALY_30D,
+        translation_key="rain_anomaly_30d",
         name="WS Rain Anomaly (30-day)",
         icon="mdi:water-percent-alert",
         native_unit=UNIT_RAIN_MM,
@@ -1027,6 +1111,7 @@ SENSORS: list[WSSensorDescription] = [
     # A4 Solar lux factor (always on)
     WSSensorDescription(
         key=KEY_SOLAR_LUX_FACTOR,
+        translation_key="solar_lux_factor",
         name="WS Solar Lux Factor",
         icon="mdi:sun-wireless",
         native_unit="lx/(W/m²)",
@@ -1037,6 +1122,7 @@ SENSORS: list[WSSensorDescription] = [
     # Forecast agreement: Zambretti vs Open-Meteo
     WSSensorDescription(
         key=KEY_FORECAST_AGREEMENT,
+        translation_key="forecast_agreement",
         name="WS Forecast Agreement",
         icon="mdi:scale-balance",
         attrs_fn=lambda d: {
@@ -1054,6 +1140,7 @@ SENSORS: list[WSSensorDescription] = [
     # A3 Forecast skill (always on once enough data)
     WSSensorDescription(
         key=KEY_FORECAST_SKILL,
+        translation_key="forecast_skill",
         name="WS Forecast Skill",
         icon="mdi:chart-bar",
         state_class=SensorStateClass.MEASUREMENT,
@@ -1139,6 +1226,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
     restart until the coordinator computes a fresh value.
     """
 
+    _attr_has_entity_name = True
+
     # Keys that benefit from restore (slow-to-warm-up or accumulating sensors)
     _RESTORE_KEYS = {
         KEY_ET0_DAILY_MM,
@@ -1194,7 +1283,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
 
         self._attr_unique_id = f"{entry.entry_id}_{desc.key}"
         self._attr_suggested_object_id = f"{prefix}_{self._slug_for_key(desc.key)}"
-        self._attr_name = desc.name
+        if desc.translation_key:
+            self._attr_translation_key = desc.translation_key
+        else:
+            self._attr_name = desc.name
         self._attr_icon = desc.icon
         self._attr_device_class = desc.device_class
         self._attr_native_unit_of_measurement = desc.native_unit
