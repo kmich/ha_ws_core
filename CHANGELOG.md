@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.2.2] - 2026-05-18
+
+### Improvements
+
+- **French translation polish** — 16 copy improvements from native speaker @Benjamin45590: correct term for illuminance (`Éclairement`), missing grammatical articles added, more natural phrasing throughout (`Il pleut`, `Paquet OK`, `Température de surface de la mer`, etc.).
+
 ## [1.2.1] - 2026-05-18
 
 ### Bug Fixes
