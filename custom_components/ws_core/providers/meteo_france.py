@@ -14,14 +14,14 @@ _LOGGER = logging.getLogger(__name__)
 # Météo Concept integer weather codes -> nearest WMO equivalent
 # Full code table: https://api.meteo-concept.com/documentation
 _MF_TO_WMO: dict[int, int] = {
-    0: 0,    # Soleil -> clear sky
-    1: 1,    # Peu nuageux -> mainly clear
-    2: 2,    # Ciel voilé -> partly cloudy
-    3: 2,    # Nuageux -> partly cloudy
-    4: 3,    # Très nuageux -> overcast
-    5: 3,    # Couvert -> overcast
-    6: 45,   # Brouillard -> fog
-    7: 48,   # Brouillard givrant -> depositing rime fog
+    0: 0,  # Soleil -> clear sky
+    1: 1,  # Peu nuageux -> mainly clear
+    2: 2,  # Ciel voilé -> partly cloudy
+    3: 2,  # Nuageux -> partly cloudy
+    4: 3,  # Très nuageux -> overcast
+    5: 3,  # Couvert -> overcast
+    6: 45,  # Brouillard -> fog
+    7: 48,  # Brouillard givrant -> depositing rime fog
     10: 61,  # Pluie faible -> slight rain
     11: 63,  # Pluie modérée -> moderate rain
     12: 65,  # Pluie forte -> heavy rain
@@ -122,32 +122,36 @@ class MeteoFranceProvider(ForecastProvider):
         daily_out: list[dict[str, Any]] = []
         for d in (daily_data.get("forecast") or [])[:7]:
             mf_code = d.get("weather")
-            daily_out.append({
-                "date": d.get("datetime"),
-                "tmax_c": d.get("tmax"),
-                "tmin_c": d.get("tmin"),
-                "precip_mm": d.get("rr10"),
-                "wind_kmh": round(d.get("wind10m", 0) * 3.6, 1) if d.get("wind10m") is not None else None,
-                "gust_kmh": round(d.get("gust10m", 0) * 3.6, 1) if d.get("gust10m") is not None else None,
-                "weathercode": _MF_TO_WMO.get(mf_code) if mf_code is not None else None,
-                "precip_prob": d.get("probarain"),
-            })
+            daily_out.append(
+                {
+                    "date": d.get("datetime"),
+                    "tmax_c": d.get("tmax"),
+                    "tmin_c": d.get("tmin"),
+                    "precip_mm": d.get("rr10"),
+                    "wind_kmh": round(d.get("wind10m", 0) * 3.6, 1) if d.get("wind10m") is not None else None,
+                    "gust_kmh": round(d.get("gust10m", 0) * 3.6, 1) if d.get("gust10m") is not None else None,
+                    "weathercode": _MF_TO_WMO.get(mf_code) if mf_code is not None else None,
+                    "precip_prob": d.get("probarain"),
+                }
+            )
 
         hourly_out: list[dict[str, Any]] = []
         for h in (hourly_data.get("forecast") or [])[:24]:
             mf_code = h.get("weather")
-            hourly_out.append({
-                "datetime": h.get("datetime"),
-                "temp_c": h.get("temp2m"),
-                "apparent_temp_c": None,  # not provided by Météo Concept
-                "dewpoint_c": None,       # not provided by Météo Concept
-                "precip_prob": h.get("probarain"),
-                "precip_mm": h.get("rr1"),
-                "weathercode": _MF_TO_WMO.get(mf_code) if mf_code is not None else None,
-                "wind_kmh": round(h.get("wind10m", 0) * 3.6, 1) if h.get("wind10m") is not None else None,
-                "gust_kmh": round(h.get("gust10m", 0) * 3.6, 1) if h.get("gust10m") is not None else None,
-                "humidity": h.get("rh2m"),
-                "cloud_cover": h.get("nebulosity"),
-            })
+            hourly_out.append(
+                {
+                    "datetime": h.get("datetime"),
+                    "temp_c": h.get("temp2m"),
+                    "apparent_temp_c": None,  # not provided by Météo Concept
+                    "dewpoint_c": None,  # not provided by Météo Concept
+                    "precip_prob": h.get("probarain"),
+                    "precip_mm": h.get("rr1"),
+                    "weathercode": _MF_TO_WMO.get(mf_code) if mf_code is not None else None,
+                    "wind_kmh": round(h.get("wind10m", 0) * 3.6, 1) if h.get("wind10m") is not None else None,
+                    "gust_kmh": round(h.get("gust10m", 0) * 3.6, 1) if h.get("gust10m") is not None else None,
+                    "humidity": h.get("rh2m"),
+                    "cloud_cover": h.get("nebulosity"),
+                }
+            )
 
         return {"provider": self.PROVIDER_ID, "daily": daily_out, "hourly": hourly_out}
