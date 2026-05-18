@@ -99,7 +99,7 @@
         "title": "Fonctionnalités",
         "description": "Activez les capteurs et services supplémentaires. Chaque option peut être modifiée plus tard via Configurer.",
         "data": {
-          "enable_display_sensors": "Capteurs d'affichage (humidité, UV, tendance pression, santé station)",
+          "enable_display_sensors": "Activer l’affichage des capteurs (humidité, UV, tendance pression, santé station)",
           "enable_fire_risk_score": "Indice de risque d'incendie (IFM canadien)",
           "enable_sea_temp": "Température de surface de la mer (Open-Meteo Marine)",
           "enable_wunderground": "Envoi vers Weather Underground",
@@ -200,7 +200,7 @@
           "cal_humidity": "Offset de calibration humidité",
           "cal_pressure_hpa": "Offset de calibration pression",
           "cal_wind_ms": "Offset de calibration vitesse du vent",
-          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_display_sensors": "Activer l’affichage des capteurs (niveaux, tendances, santé)",
           "enable_fire_risk_score": "Indice de risque d'incendie",
           "enable_sea_temp": "Température de surface de la mer",
           "sea_temp_lat": "Latitude température de mer",
@@ -235,7 +235,7 @@
           "cal_humidity": "Offset de calibration humidité",
           "cal_pressure_hpa": "Offset de calibration pression",
           "cal_wind_ms": "Offset de calibration vitesse du vent",
-          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_display_sensors": "Activer l’affichage des capteurs (niveaux, tendances, santé)",
           "enable_fire_risk_score": "Indice de risque d'incendie",
           "enable_sea_temp": "Température de surface de la mer",
           "sea_temp_lat": "Latitude température de mer",
@@ -260,7 +260,7 @@
         "title": "Fonctionnalités",
         "description": "Activez ou désactivez les capteurs et sources de données externes.",
         "data": {
-          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_display_sensors": "Activer l’affichage des capteurs (niveaux, tendances, santé)",
           "enable_fire_risk_score": "Indice de risque d'incendie",
           "enable_sea_temp": "Température de surface de la mer",
           "enable_wunderground": "Envoi vers Weather Underground",
@@ -268,11 +268,11 @@
           "enable_pollen": "Niveaux de pollen (Open-Meteo, gratuit, sans clé API)",
           "enable_moon": "Phase et illumination de la Lune",
           "enable_solar_forecast": "Prévision solaire (forecast.solar)",
-          "enable_fog": "Capteur de probabilité de brouillard",
-          "enable_thunderstorm_risk": "Capteur de risque d'orage (heuristique ; nombreux faux positifs)"
+          "enable_fog": "Probabilité de brouillard",
+          "enable_thunderstorm_risk": "Risque d'orage (heuristique ; nombreux faux positifs)"
         },
         "data_description": {
-          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_display_sensors": "Afficher les capteurs (niveaux, tendances, santé)",
           "enable_fire_risk_score": "Indice de risque d'incendie",
           "enable_sea_temp": "Température de surface de la mer",
           "enable_wunderground": "Envoi vers Weather Underground",
@@ -431,33 +431,31 @@
       "zambretti_forecast": {
         "name": "Prévision Zambretti",
         "state": {
-          "settled_fine": "Beau temps stable",
-          "fine_weather": "Beau temps",
-          "becoming_fine": "En amélioration",
-          "fine_becoming_less_settled": "Beau temps, instabilité à venir",
-          "fine_possible_showers": "Beau temps, averses possibles",
-          "fairly_fine_improving": "Assez beau, en amélioration",
-          "fairly_fine_possible_showers_early": "Assez beau, averses possibles tôt",
-          "fairly_fine_showery_later": "Assez beau, averses ensuite",
-          "showery_early_improving": "Averses tôt, amélioration",
-          "changeable_mending": "Variable, en amélioration",
-          "fairly_fine_possible_showers": "Assez beau, averses possibles",
-          "rather_unsettled_clearing_later": "Instable, éclaircies ensuite",
-          "unsettled_probably_improving": "Instable, amélioration probable",
-          "showery_bright_intervals": "Averses, éclaircies",
-          "showery_becoming_rather_unsettled": "Averses, instabilité croissante",
-          "changeable_some_rain": "Variable, quelques pluies",
-          "unsettled_short_fine_intervals": "Instable, courtes éclaircies",
-          "unsettled_rain_later": "Instable, pluie ensuite",
-          "unsettled_some_rain": "Instable, quelques pluies",
-          "mostly_very_unsettled": "Très instable",
-          "occasional_rain_worsening": "Pluies occasionnelles, dégradation",
-          "rain_at_times_very_unsettled": "Pluies intermittentes, très instable",
-          "rain_at_frequent_intervals": "Pluies fréquentes",
-          "rain_very_unsettled": "Pluvieux, très instable",
-          "stormy_may_improve": "Orageux, amélioration possible",
-          "stormy_much_rain": "Orageux, fortes pluies",
-          "insufficient_data": "Données insuffisantes"
+          "Settled fine": "Beau temps stable",
+          "Fine weather": "Beau temps",
+          "Becoming fine": "En amélioration",
+          "Fine, becoming less settled": "Beau temps, instabilité à venir",
+          "Fine, possible showers": "Beau temps, averses possibles",
+          "Fairly fine, improving": "Assez beau, en amélioration",
+          "Fairly fine, possible showers early": "Assez beau, averses possibles en début de journée",
+          "Fairly fine, showery later": "Assez beau, averses possibles plus tard",
+          "Showery early, improving": "Averses en début de journée, amélioration ensuite",
+          "Changeable, mending": "Variable, en amélioration",
+          "Rather unsettled clearing later": "Instable, éclaircies à venir",
+          "Unsettled, probably improving": "Instable, amélioration probable",
+          "Showery, bright intervals": "Averses, éclaircies",
+          "Showery, becoming rather unsettled": "Averses, temps de plus en plus instable",
+          "Changeable, some rain": "Variable, quelques pluies",
+          "Unsettled, short fine intervals": "Instable, courtes éclaircies",
+          "Unsettled, rain later": "Instable, pluie attendue plus tard",
+          "Unsettled, some rain": "Instable, quelques averses",
+          "Mostly very unsettled": "Très instable",
+          "Occasional rain, worsening": "Pluies occasionnelles, dégradation du temps",
+          "Rain at times, very unsettled": "Pluies intermittentes, très instable",
+          "Rain at frequent intervals": "Pluies fréquentes",
+          "Rain, very unsettled": "Pluvieux, très instable",
+          "Stormy, may improve": "Orageux, amélioration possible",
+          "Stormy, much rain": "Orageux, fortes pluies"
         },
         "state_attributes": {
           "z_number": { "name": "Numéro Z" },
@@ -546,7 +544,7 @@
         }
       },
       "rain_display": {
-        "name": "Affichage pluie",
+        "name": "Pluie (détails)",
         "state_attributes": {
           "rain_rate": { "name": "Taux de précipitation (mm/h)" },
           "rain_today": { "name": "Pluie du jour (mm)" },
@@ -559,11 +557,11 @@
       "pressure_trend": {
         "name": "Tendance de pression",
         "state": {
-          "rising_rapidly": "Hausse rapide",
-          "rising": "En hausse",
-          "steady": "Stable",
-          "falling": "En baisse",
-          "falling_rapidly": "Baisse rapide"
+          "Rising Rapidly": "Hausse rapide",
+          "Rising": "En hausse",
+          "Steady": "Stable",
+          "Falling": "En baisse",
+          "Falling Rapidly": "Baisse rapide"
         },
         "state_attributes": {
           "change_3h_hpa": { "name": "Variation 3 h (hPa)" },
@@ -577,10 +575,10 @@
       "station_health": {
         "name": "Santé de la station",
         "state": {
-          "online": "En ligne",
-          "degraded": "Dégradé",
-          "stale": "Données obsolètes",
-          "offline": "Hors ligne"
+          "Online": "En ligne",
+          "Degraded": "Dégradé",
+          "Stale": "Données obsolètes",
+          "Offline": "Hors ligne"
         },
         "state_attributes": {
           "color": { "name": "Couleur" },
@@ -602,24 +600,24 @@
       "humidity_level": {
         "name": "Niveau d'humidité",
         "state": {
-          "very_humid": "Très humide",
-          "humid": "Humide",
-          "slightly_humid": "Légèrement humide",
-          "comfortable": "Confortable",
-          "slightly_dry": "Légèrement sec",
-          "dry": "Sec",
-          "very_dry": "Très sec"
+          "Very Humid": "Très humide",
+          "Humid": "Humide",
+          "Slightly Humid": "Légèrement humide",
+          "Comfortable": "Confortable",
+          "Slightly Dry": "Légèrement sec",
+          "Dry": "Sec",
+          "Very Dry": "Très sec"
         }
       },
       "uv_level": {
         "name": "Niveau UV",
         "state": {
-          "none": "Nul",
-          "low": "Faible",
-          "moderate": "Modéré",
-          "high": "Élevé",
-          "very_high": "Très élevé",
-          "extreme": "Extrême"
+          "None": "Nul",
+          "Low": "Faible",
+          "Moderate": "Modéré",
+          "High": "Élevé",
+          "Very High": "Très élevé",
+          "Extreme": "Extrême"
         },
         "state_attributes": {
           "uv_index": { "name": "Indice UV" },
@@ -711,13 +709,13 @@
       "pollen_level": {
         "name": "Niveau de pollen",
         "state": {
-          "unknown": "Inconnu",
-          "none": "Nul",
-          "very_low": "Très faible",
-          "low": "Faible",
-          "medium": "Moyen",
-          "high": "Élevé",
-          "very_high": "Très élevé"
+          "Unknown": "Inconnu",
+          "None": "Aucun",
+          "Very Low": "Très faible",
+          "Low": "Faible",
+          "Medium": "Moyen",
+          "High": "Élevé",
+          "Very High": "Très élevé"
         },
         "state_attributes": {
           "grass_index": { "name": "Indice graminées" },
@@ -792,8 +790,8 @@
       "sensor_drift": {
         "name": "Dérive des capteurs",
         "state": {
-          "ok": "OK",
-          "warning": "Avertissement"
+          "OK": "OK",
+          "Warning": "Avertissement"
         },
         "state_attributes": {
           "drifting_sensors": { "name": "Capteurs en dérive" },
@@ -803,8 +801,8 @@
       "sensor_consistency": {
         "name": "Cohérence des capteurs",
         "state": {
-          "ok": "OK",
-          "warning": "Avertissement"
+          "OK": "OK",
+          "Warning": "Avertissement"
         },
         "state_attributes": {
           "flags": { "name": "Indicateurs de cohérence" },
@@ -854,7 +852,7 @@
           "n_outcomes": { "name": "Nombre d'échantillons" }
         }
       },
-      "rain_today": { "name": "Pluie aujourd'hui" },
+      "rain_today": { "name": "Pluie du jour" },
       "no2": { "name": "NO2" },
       "ozone": { "name": "Ozone" }
     },
@@ -873,7 +871,7 @@
         "name": "Tableau de bord : Animations"
       },
       "ws_enable_display_sensors": {
-        "name": "Fonction : Capteurs d'affichage"
+        "name": "Fonction : Activer l’affichage des capteurs"
       },
       "ws_enable_fire_risk_score": {
         "name": "Fonction : Risque d'incendie"
