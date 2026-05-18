@@ -2,6 +2,13 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.2.1] - 2026-05-18
+
+### Bug Fixes
+
+- **Entity attribute labels now translatable** — removed hardcoded English metadata strings (`method`, `reference`, `disclaimer`, etc.) from entity attributes; these were developer-documentation noise that couldn't be localised. All remaining attribute keys (`wind_contribution_ms`, `z_number`, `danger_level`, etc.) now have `state_attributes` translations in `strings.json`, `en.json`, and `fr.json`, so the labels render in the user's language in the HA UI (closes #6, thanks @Benjamin45590).
+- **README updated** — added Forecast Provider section, corrected sensor count, added missing sensors (`ws_rain_today`, `ws_no2`, `ws_ozone`, `ws_forecast_agreement`), and documented the provider contribution path.
+
 ## [1.2.0] - 2026-05-18
 
 ### New Features

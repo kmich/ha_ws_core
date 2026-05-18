@@ -355,7 +355,6 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
-            "method": "Australian Apparent Temperature (BOM standard)",
             "wind_contribution_ms": round(-0.70 * float(d[KEY_NORM_WIND_SPEED_MS]), 1)
             if d.get(KEY_NORM_WIND_SPEED_MS) is not None
             else None,
@@ -372,10 +371,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        attrs_fn=lambda d: {
-            "method": "Stull 2011 approximation (+/- 0.3 C)",
-            "reference": "Stull R. (2011) J. Appl. Meteor. Climatol. 50:2267-2269",
-        },
     ),
     # Frost point (below 0 C uses ice constants)
     WSSensorDescription(
@@ -386,10 +381,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        attrs_fn=lambda d: {
-            "method": "Magnus formula with ice constants (Buck 1981) below 0 C",
-            "note": "Equals dew point when temperature is above 0 C",
-        },
     ),
     # Zambretti barometric forecast
     WSSensorDescription(
@@ -403,7 +394,6 @@ SENSORS: list[WSSensorDescription] = [
             "trend_3h_hpa": d.get(KEY_PRESSURE_TREND_HPAH),
             "wind_quadrant": d.get(KEY_WIND_QUADRANT),
             "pressure_trend_display": d.get(KEY_PRESSURE_TREND_DISPLAY),
-            "method": "Negretti & Zambra lookup table with climate-region wind corrections",
         },
     ),
     # Zambretti Z-number (numeric, for automations)
@@ -483,11 +473,6 @@ SENSORS: list[WSSensorDescription] = [
             "pressure_trend_3h": d.get(KEY_PRESSURE_TREND_HPAH),
             "humidity_pct": d.get(KEY_NORM_HUMIDITY),
             "wind_quadrant": d.get(KEY_WIND_QUADRANT),
-            "method": "Heuristic index (0-100) based on pressure, trend, humidity, wind. Climate-region-aware.",
-            "disclaimer": (
-                "This is a heuristic index, NOT a calibrated probability. "
-                "Accuracy depends on sensor quality and local climate patterns."
-            ),
         },
     ),
     WSSensorDescription(
@@ -499,7 +484,6 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "local_probability_pct": d.get(KEY_RAIN_PROBABILITY),
-            "method": "Time-weighted merge: local sensors + Open-Meteo",
         },
     ),
     # Rain / pressure display
@@ -681,9 +665,6 @@ SENSORS: list[WSSensorDescription] = [
             "fwi": d.get(KEY_FWI),
             "bui": d.get(KEY_FWI_BUI),
             "isi": d.get(KEY_FWI_ISI),
-            "scale": "1-10 (1=Very Low, 2=Low, 3-4=Moderate, 5-6=High, 7-8=Very High, 9-10=Extreme)",
-            "method": "Canadian Forest Fire Weather Index (Van Wagner 1987)",
-            "disclaimer": "NOT suitable for operational fire weather decisions. Consult official fire services.",
         },
     ),
     # =========================================================================
@@ -697,11 +678,6 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=None,
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
-        attrs_fn=lambda d: {
-            "description": "Fine Fuel Moisture Code — fine dead surface fuels (litter, grass)",
-            "range": "0-101; lower = drier = more flammable",
-            "method": "Van Wagner 1987",
-        },
     ),
     WSSensorDescription(
         key=KEY_FWI_DMC,
@@ -711,11 +687,6 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=None,
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
-        attrs_fn=lambda d: {
-            "description": "Duff Moisture Code — mid-depth loosely compacted organic layer",
-            "range": "no upper bound; higher = drier",
-            "method": "Van Wagner 1987",
-        },
     ),
     WSSensorDescription(
         key=KEY_FWI_DC,
@@ -725,11 +696,6 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=None,
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
-        attrs_fn=lambda d: {
-            "description": "Drought Code — deep compact organic layer (seasonal drying)",
-            "range": "no upper bound; higher = drier",
-            "method": "Van Wagner 1987",
-        },
     ),
     WSSensorDescription(
         key=KEY_FWI_ISI,
@@ -740,12 +706,10 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
         attrs_fn=lambda d: {
-            "description": "Initial Spread Index — expected fire spread rate (FFMC + wind)",
             "ffmc": d.get(KEY_FWI_FFMC),
             "wind_kmh": round(float(d[KEY_NORM_WIND_SPEED_MS]) * 3.6, 1)
             if d.get(KEY_NORM_WIND_SPEED_MS) is not None
             else None,
-            "method": "Van Wagner 1987",
         },
     ),
     WSSensorDescription(
@@ -757,10 +721,8 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
         attrs_fn=lambda d: {
-            "description": "Buildup Index — total fuel available for combustion (DMC + DC)",
             "dmc": d.get(KEY_FWI_DMC),
             "dc": d.get(KEY_FWI_DC),
-            "method": "Van Wagner 1987",
         },
     ),
     WSSensorDescription(
@@ -772,14 +734,10 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
         attrs_fn=lambda d: {
-            "description": "Fire Weather Index — overall fire danger number (ISI + BUI)",
             "isi": d.get(KEY_FWI_ISI),
             "bui": d.get(KEY_FWI_BUI),
             "dsr": d.get(KEY_FWI_DSR),
             "danger_level": d.get("_fire_danger_level"),
-            "reference": "Van Wagner, C.E. (1987). Development and structure of the Canadian "
-            "Forest Fire Weather Index System. Forestry Technical Report 35.",
-            "disclaimer": "NOT suitable for operational fire weather decisions.",
         },
     ),
     WSSensorDescription(
@@ -791,9 +749,7 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
         attrs_fn=lambda d: {
-            "description": "Daily Severity Rating — suppression difficulty index (from FWI)",
             "fwi": d.get(KEY_FWI),
-            "method": "Van Wagner 1987",
         },
     ),
     # =========================================================================
@@ -812,7 +768,6 @@ SENSORS: list[WSSensorDescription] = [
             "hourly_forecast": d.get("_sea_temp_hourly"),
             "grid_latitude": d.get("_sea_temp_grid_lat"),
             "grid_longitude": d.get("_sea_temp_grid_lon"),
-            "disclaimer": d.get("_sea_temp_disclaimer"),
         },
     ),
     # ---------------------------------------------------------------
@@ -827,9 +782,7 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="mm",
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
-            "method": "Hargreaves-Samani 1985",
             "et0_hourly_mm": d.get(KEY_ET0_HOURLY_MM),
-            "accuracy_note": "±15-20% vs Penman-Monteith; improves with solar radiation sensor",
         },
     ),
     WSSensorDescription(
@@ -868,7 +821,6 @@ SENSORS: list[WSSensorDescription] = [
             "pm10_ug_m3": d.get(KEY_PM10),
             "no2_ug_m3": d.get(KEY_NO2),
             "ozone_ug_m3": d.get(KEY_OZONE),
-            "scale": "US EPA (0-50 Good, 51-100 Moderate, 101-150 Unhealthy for Sensitive, 151-200 Unhealthy, 201-300 Very Unhealthy, 300+ Hazardous)",
         },
     ),
     WSSensorDescription(
@@ -922,8 +874,6 @@ SENSORS: list[WSSensorDescription] = [
             "tree_level": "None" if d.get(KEY_POLLEN_TREE) == 0 else d.get("_pollen_tree_level"),
             "weed_index": d.get(KEY_POLLEN_WEED),
             "weed_level": "None" if d.get(KEY_POLLEN_WEED) == 0 else d.get("_pollen_weed_level"),
-            "scale": "0=None, 1=Very Low, 2=Low, 3=Medium, 4=High, 5=Very High",
-            "source": "Tomorrow.io",
         },
     ),
     WSSensorDescription(
@@ -964,8 +914,6 @@ SENSORS: list[WSSensorDescription] = [
             "age_days": d.get(KEY_MOON_AGE_DAYS),
             "days_to_full_moon": d.get(KEY_MOON_NEXT_FULL),
             "days_to_new_moon": d.get(KEY_MOON_NEXT_NEW),
-            "method": "Meeus 1998, Astronomical Algorithms Ch. 48 (simplified)",
-            "accuracy": "±1% illumination, ±0.5 day phase timing",
         },
     ),
     WSSensorDescription(
@@ -990,7 +938,6 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "tomorrow_kwh": d.get(KEY_SOLAR_FORECAST_TOMORROW_KWH),
             "status": d.get(KEY_SOLAR_FORECAST_STATUS),
-            "source": "forecast.solar",
         },
     ),
     WSSensorDescription(
@@ -1012,8 +959,6 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="mm",
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
-            "method": "FAO-56 Penman-Monteith (Allen et al. 1998)",
-            "accuracy_note": "±5-10% vs lysimeter; requires solar radiation sensor",
             "hargreaves_et0": d.get(KEY_ET0_DAILY_MM),
         },
     ),
@@ -1158,11 +1103,6 @@ SENSORS: list[WSSensorDescription] = [
             "openmeteo_precip_prob": d.get("_forecast_agreement_api_precip_prob"),
             "delta_pp": d.get("_forecast_agreement_delta"),
             "zambretti_forecast": d.get(KEY_ZAMBRETTI_FORECAST),
-            "note": (
-                "aligned = both sources agree (<20pp delta); "
-                "diverging = moderate disagreement (20-40pp); "
-                "conflict = sources fundamentally disagree (>40pp)"
-            ),
         },
     ),
     # A3 Forecast skill (always on once enough data)
