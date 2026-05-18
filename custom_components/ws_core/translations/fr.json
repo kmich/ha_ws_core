@@ -27,7 +27,7 @@
         "title": "Capteurs facultatifs",
         "description": "Ces capteurs améliorent les calculs, mais ne sont pas requis. Laissez vide pour ignorer.",
         "data": {
-          "illuminance": "Illuminance / rayonnement solaire (lux)",
+          "illuminance": "Éclairement / rayonnement solaire (lux)",
           "uv_index": "Index UV",
           "dew_point": "Point de rosée (calculé si absent)",
           "battery": "Niveau de batterie (%)",
@@ -361,7 +361,7 @@
       "wind_direction": { "name": "Direction du vent" },
       "rain_total": { "name": "Cumul de pluie total" },
       "rain_rate": { "name": "Débit de pluie" },
-      "illuminance": { "name": "Illuminance" },
+      "illuminance": { "name": "Éclairement" },
       "uv_index": { "name": "Index UV" },
       "battery": {
         "name": "Batterie",
@@ -372,9 +372,9 @@
       "pressure_trend_raw": { "name": "Tendance de pression brute" },
       "pressure_change_window": { "name": "Variation de pression (fenêtre)" },
       "data_quality_banner": {
-        "name": "Bannière qualité des données",
+        "name": "Bannière de qualité des données",
         "state_attributes": {
-          "package_ok": { "name": "Paquetage OK" },
+          "package_ok": { "name": "Paquet OK" },
           "data_quality": { "name": "Qualité des données" },
           "alert_state": { "name": "État d'alerte" }
         }
@@ -382,13 +382,13 @@
       "package_status": {
         "name": "État du paquet",
         "state_attributes": {
-          "package_ok": { "name": "Paquetage OK" },
+          "package_ok": { "name": "Paquet OK" },
           "data_quality": { "name": "Qualité des données" },
           "alert_state": { "name": "État d'alerte" }
         }
       },
       "sensor_quality_flags": {
-        "name": "Indicateurs qualité capteurs",
+        "name": "Indicateurs qualité des capteurs",
         "state_attributes": {
           "flags": { "name": "Indicateurs actifs" },
           "all_clear": { "name": "Tout est normal" }
@@ -416,7 +416,7 @@
       "feels_like": {
         "name": "Ressenti",
         "state_attributes": {
-          "wind_contribution_ms": { "name": "Contribution du vent (m/s)" },
+          "wind_contribution_ms": { "name": "Influence du vent (m/s)" },
           "humidity": { "name": "Humidité (%)" },
           "actual_temp_c": { "name": "Température réelle (°C)" }
         }
@@ -484,13 +484,13 @@
         "name": "Affichage pluie",
         "state_attributes": {
           "rain_rate": { "name": "Taux de précipitation (mm/h)" },
-          "rain_today": { "name": "Pluie aujourd'hui (mm)" },
-          "rain_24h": { "name": "Pluie 24 h (mm)" },
-          "is_raining": { "name": "En train de pleuvoir" }
+          "rain_today": { "name": "Pluie du jour (mm)" },
+          "rain_24h": { "name": "Pluie sur 24 h (mm)" },
+          "is_raining": { "name": "Il pleut" }
         }
       },
-      "rain_last_1h": { "name": "Pluie dernière heure" },
-      "rain_last_24h": { "name": "Pluie dernières 24h" },
+      "rain_last_1h": { "name": "Pluie de la dernière heure" },
+      "rain_last_24h": { "name": "Pluie des dernières 24h" },
       "pressure_trend": {
         "name": "Tendance de pression",
         "state_attributes": {
@@ -531,9 +531,9 @@
         }
       },
       "temperature_display": {
-        "name": "Affichage température",
+        "name": "Affichage de la température",
         "state_attributes": {
-          "bar_percent": { "name": "Remplissage barre (%)" },
+          "bar_percent": { "name": "Remplissage de la barre (%)" },
           "color": { "name": "Couleur" }
         }
       },
@@ -643,7 +643,7 @@
           "status": { "name": "Statut" }
         }
       },
-      "solar_forecast_tomorrow": { "name": "Prévision solaire demain" },
+      "solar_forecast_tomorrow": { "name": "Prévision solaire pour demain" },
       "et0_pm_daily": {
         "name": "ET₀ Penman-Monteith (journalière)",
         "state_attributes": {
@@ -760,7 +760,7 @@
         "name": "Fonction : Risque d'incendie"
       },
       "ws_enable_sea_temp": {
-        "name": "Fonction : Température de mer"
+        "name": "Fonction : Température de surface de la mer"
       },
       "ws_enable_wunderground": {
         "name": "Fonction : Weather Underground"
