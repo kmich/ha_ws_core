@@ -104,11 +104,11 @@ class TestUV:
         assert bt < 40
 
     def test_level_labels(self):
-        assert uv_level(0.5) == "Low"
-        assert uv_level(3.0) == "Moderate"
-        assert uv_level(6.0) == "High"
-        assert uv_level(8.0) == "Very High"
-        assert uv_level(11.0) == "Extreme"
+        assert uv_level(0.5) == "low"
+        assert uv_level(3.0) == "moderate"
+        assert uv_level(6.0) == "high"
+        assert uv_level(8.0) == "very_high"
+        assert uv_level(11.0) == "extreme"
 
 
 class TestAQI:
@@ -133,20 +133,20 @@ class TestAQI:
 class TestPollen:
     def test_none_index(self):
         result = pollen_level(None)
-        assert result in ("None", "Unknown")
+        assert result == "unknown"
 
     def test_zero_index(self):
-        assert pollen_level(0) == "None"
+        assert pollen_level(0) == "none"
 
     def test_low(self):
-        assert pollen_level(2) in ("Low", "Very Low")
+        assert pollen_level(2) in ("low", "very_low")
 
     def test_high(self):
-        assert pollen_level(4) in ("High", "Very High")
+        assert pollen_level(4) in ("high", "very_high")
 
     def test_overall_worst(self):
         overall = pollen_overall(1, 4, 0)
-        assert overall in ("High", "Very High")
+        assert overall in ("high", "very_high")
 
 
 class TestMoon:

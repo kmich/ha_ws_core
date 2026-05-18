@@ -302,7 +302,7 @@ class TestComputeHealth:
         now = datetime.now(timezone.utc)
         coord._compute_health(data, now, missing=[], missing_entities=[])
         assert data[KEY_PACKAGE_OK] is True
-        assert data[KEY_HEALTH_DISPLAY] in ("Online", "Degraded")
+        assert data[KEY_HEALTH_DISPLAY] in ("online", "degraded")
 
     def test_missing_sources(self):
         coord = _make_coordinator()
