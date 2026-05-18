@@ -9,7 +9,7 @@ class MeteoFrance(ForecastProvider):
 
     async def async_fetch(self, session, lat, lon, api_key=None):
         if api_key is None:
-            raise ValueError("Météo France requires an API key")
+            raise ValueError("Météo France requiere une clé API")
 
         # 1) Daily forecast (7 days)
         daily_url = (
