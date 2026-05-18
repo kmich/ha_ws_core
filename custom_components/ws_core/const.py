@@ -20,6 +20,15 @@ CONF_FORECAST_ENABLED = "forecast_enabled"
 CONF_FORECAST_LAT = "forecast_lat"
 CONF_FORECAST_LON = "forecast_lon"
 CONF_FORECAST_INTERVAL_MIN = "forecast_interval_min"
+CONF_FORECAST_PROVIDER = "forecast_provider"
+CONF_FORECAST_API_KEY = "forecast_api_key"
+FORECAST_PROVIDER_OPEN_METEO = "open_meteo"
+FORECAST_PROVIDER_MET_NO = "met_no"
+FORECAST_PROVIDER_NWS = "nws_noaa"
+FORECAST_PROVIDER_OWM = "openweathermap"
+FORECAST_PROVIDER_PIRATE = "pirate_weather"
+PROVIDERS_REQUIRING_API_KEY: set[str] = {"openweathermap", "pirate_weather"}
+DEFAULT_FORECAST_PROVIDER = FORECAST_PROVIDER_OPEN_METEO
 
 # Alert & heuristic options (stored in canonical metric units internally)
 CONF_THRESH_WIND_GUST_MS = "thresh_wind_gust_ms"
@@ -221,6 +230,7 @@ KEY_FORECAST_AGREEMENT = "forecast_agreement"
 KEY_RAIN_DISPLAY = "rain_display"
 KEY_RAIN_ACCUM_1H = "rain_accum_1h_mm"
 KEY_RAIN_ACCUM_24H = "rain_accum_24h_mm"
+KEY_RAIN_TODAY_MM = "rain_today_mm"
 KEY_TIME_SINCE_RAIN = "time_since_rain"
 KEY_PRESSURE_TREND_DISPLAY = "pressure_trend_display"
 KEY_HEALTH_DISPLAY = "health_display"

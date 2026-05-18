@@ -56,13 +56,28 @@
       },
       "forecast": {
         "title": "7-day forecast",
-        "description": "Weather Station Core can fetch a 7-day forecast from Open-Meteo (free, no API key required). Coordinates default to your Home Assistant location.",
+        "description": "Weather Station Core can fetch a 7-day forecast. Coordinates default to your Home Assistant location.",
         "data": {
-          "forecast_enabled": "Enable forecast (Open-Meteo)",
+          "forecast_enabled": "Enable forecast",
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
           "forecast_lon": "Forecast longitude",
+          "forecast_provider": "Forecast provider",
           "_go_back": "← Go back to previous step"
+        },
+        "data_description": {
+          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap and Pirate Weather require a free API key."
+        }
+      },
+      "forecast_api_key": {
+        "title": "Forecast Provider API Key",
+        "description": "Enter the API key for {provider_name}. You can get a free key from the provider's website.",
+        "data": {
+          "forecast_api_key": "API Key",
+          "_go_back": "← Go back to previous step"
+        },
+        "data_description": {
+          "forecast_api_key": "Paste your API key here. It will be stored securely in your HA config."
         }
       },
       "alerts": {
@@ -171,6 +186,8 @@
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
           "forecast_lon": "Forecast longitude",
+          "forecast_provider": "Forecast provider",
+          "forecast_api_key": "Forecast API Key",
           "thresh_wind_gust_ms": "Wind gust alert threshold",
           "thresh_rain_rate_mmph": "Rain rate alert threshold",
           "thresh_freeze_c": "Freeze warning threshold",
@@ -204,6 +221,8 @@
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
           "forecast_lon": "Forecast longitude",
+          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap and Pirate Weather require a free API key.",
+          "forecast_api_key": "API key for the selected forecast provider (required for OpenWeatherMap and Pirate Weather).",
           "thresh_wind_gust_ms": "Wind gust alert threshold",
           "thresh_rain_rate_mmph": "Rain rate alert threshold",
           "thresh_freeze_c": "Freeze warning threshold",
@@ -225,6 +244,16 @@
           "wu_station_id": "WU Station ID",
           "wu_api_key": "WU API key",
           "wu_interval_min": "WU upload interval"
+        }
+      },
+      "forecast_api_key_opt": {
+        "title": "Forecast Provider API Key",
+        "description": "Enter the API key for {provider_name}.",
+        "data": {
+          "forecast_api_key": "API Key"
+        },
+        "data_description": {
+          "forecast_api_key": "Paste your API key here."
         }
       },
       "features_opt": {
@@ -403,7 +432,10 @@
       "rain_anomaly_30d": { "name": "Rain Anomaly (30-day)" },
       "solar_lux_factor": { "name": "Solar Lux Factor" },
       "forecast_agreement": { "name": "Forecast Agreement" },
-      "forecast_skill": { "name": "Forecast Skill" }
+      "forecast_skill": { "name": "Forecast Skill" },
+      "rain_today": { "name": "Rain Today" },
+      "no2": { "name": "NO2" },
+      "ozone": { "name": "Ozone" }
     },
     "select": {
       "ws_graph_range": {

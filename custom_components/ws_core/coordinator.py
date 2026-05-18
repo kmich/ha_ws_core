@@ -93,10 +93,12 @@ from .const import (
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_WUNDERGROUND,
+    CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
+    CONF_FORECAST_PROVIDER,
     CONF_HEMISPHERE,
     # Tuning numbers (previously no-op, now wired)
     CONF_PRESSURE_TREND_WINDOW_H,
@@ -125,6 +127,7 @@ from .const import (
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_INTERVAL_MIN,
+    DEFAULT_FORECAST_PROVIDER,
     DEFAULT_HEMISPHERE,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_RAIN_FILTER_ALPHA,
@@ -207,6 +210,7 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
+    KEY_RAIN_TODAY_MM,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -258,6 +262,7 @@ from .const import (
     VALID_TEMP_MIN_C,
     WIND_SMOOTH_ALPHA,
 )
+from .providers import get_provider
 
 try:
     from homeassistant.helpers import issue_registry as ir
@@ -459,6 +464,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(seconds=60),
         )
         self._unsubs: list = []
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def forecast_provider(self) -> str:
+        """Forecast provider ID (default: open_meteo)."""
+        opts = {**self.config_entry.data, **self.config_entry.options}
+        return opts.get(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
+
+    @property
+    def forecast_api_key(self) -> str | None:
+        """API key for forecast providers that require one."""
+        opts = {**self.config_entry.data, **self.config_entry.options}
+        return opts.get(CONF_FORECAST_API_KEY) or None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -1838,6 +1859,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             data[KEY_FORECAST] = None
 
+        # Apply nowcast correction to first 3 hourly slots
+        fc = getattr(self, "_forecast_cache", None)
+        if fc:
+            corrected_hourly = self._apply_nowcast_correction(fc.get("hourly", []), data)
+            if corrected_hourly is not fc.get("hourly"):
+                fc = {**fc, "hourly": corrected_hourly}
+            data[KEY_FORECAST] = fc
+
         # Sea temperature: independent fetch schedule (every forecast interval)
         if self.sea_temp_enabled:
             self._schedule_sea_temp_fetch(now)
@@ -1845,6 +1874,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         fc = getattr(self, "_forecast_cache", None)
         if fc and fc.get("daily"):
             data[KEY_FORECAST_TILES] = self._build_forecast_tiles(fc["daily"])
+
+        # Rain today (resets at local midnight)
+        data[KEY_RAIN_TODAY_MM] = self._rain_today_mm
 
         # Sea surface temperature
         if self.sea_temp_enabled and self._sea_temp_cache:
@@ -2003,98 +2035,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         lat = self.forecast_lat or float(self.hass.config.latitude)
         lon = self.forecast_lon or float(self.hass.config.longitude)
 
-        url = (
-            "https://api.open-meteo.com/v1/forecast"
-            f"?latitude={lat}&longitude={lon}"
-            "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,"
-            "windspeed_10m_max,windgusts_10m_max,weathercode,precipitation_probability_max"
-            "&hourly=temperature_2m,apparent_temperature,dewpoint_2m,"
-            "precipitation_probability,precipitation,"
-            "weathercode,windspeed_10m,windgusts_10m,"
-            "relativehumidity_2m,cloudcover"
-            "&forecast_hours=24"
-            "&timezone=auto"
-        )
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
         session = async_get_clientsession(self.hass)
+        provider = get_provider(self.forecast_provider)
         try:
-            async with session.get(url, timeout=20) as resp:
-                if resp.status != 200:
-                    _LOGGER.warning("Open-Meteo returned HTTP %s", resp.status)
-                    rt.forecast_consecutive_failures += 1
-                    rt.forecast_inflight = False
-                    return
-                js = await resp.json()
+            result = await provider.async_fetch(session, lat, lon, api_key=self.forecast_api_key)
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
-            _LOGGER.warning("Open-Meteo fetch failed: %s", exc)
+            _LOGGER.warning("Forecast fetch failed (%s): %s", provider.PROVIDER_NAME, exc)
             rt.forecast_consecutive_failures += 1
             rt.forecast_inflight = False
+            return
         except Exception as exc:
-            _LOGGER.error("Open-Meteo fetch unexpected error: %s", exc, exc_info=True)
+            _LOGGER.error("Forecast fetch unexpected error (%s): %s", provider.PROVIDER_NAME, exc, exc_info=True)
             rt.forecast_consecutive_failures += 1
             rt.forecast_inflight = False
             return
 
-        daily = js.get("daily") or {}
-        times = daily.get("time") or []
-        tmax = daily.get("temperature_2m_max") or []
-        tmin = daily.get("temperature_2m_min") or []
-        pr = daily.get("precipitation_sum") or []
-        ws = daily.get("windspeed_10m_max") or []
-        wg = daily.get("windgusts_10m_max") or []
-        wc = daily.get("weathercode") or []
-        pp = daily.get("precipitation_probability_max") or []
-
-        out = [
-            {
-                "date": times[i],
-                "tmax_c": tmax[i] if i < len(tmax) else None,
-                "tmin_c": tmin[i] if i < len(tmin) else None,
-                "precip_mm": pr[i] if i < len(pr) else None,
-                "wind_kmh": ws[i] if i < len(ws) else None,
-                "gust_kmh": wg[i] if i < len(wg) else None,
-                "weathercode": wc[i] if i < len(wc) else None,
-                "precip_prob": pp[i] if i < len(pp) else None,
-            }
-            for i in range(min(len(times), 7))
-        ]
-
-        # Parse hourly data (next 24h)
-        hourly = js.get("hourly") or {}
-        h_times = hourly.get("time") or []
-        h_temp = hourly.get("temperature_2m") or []
-        h_app = hourly.get("apparent_temperature") or []
-        h_dew = hourly.get("dewpoint_2m") or []
-        h_pp = hourly.get("precipitation_probability") or []
-        h_precip = hourly.get("precipitation") or []
-        h_wc = hourly.get("weathercode") or []
-        h_ws = hourly.get("windspeed_10m") or []
-        h_wg = hourly.get("windgusts_10m") or []
-        h_rh = hourly.get("relativehumidity_2m") or []
-        h_cc = hourly.get("cloudcover") or []
-
-        hourly_out = [
-            {
-                "datetime": h_times[i],
-                "temp_c": h_temp[i] if i < len(h_temp) else None,
-                "apparent_temp_c": h_app[i] if i < len(h_app) else None,
-                "dewpoint_c": h_dew[i] if i < len(h_dew) else None,
-                "precip_prob": h_pp[i] if i < len(h_pp) else None,
-                "precip_mm": h_precip[i] if i < len(h_precip) else None,
-                "weathercode": h_wc[i] if i < len(h_wc) else None,
-                "wind_kmh": h_ws[i] if i < len(h_ws) else None,
-                "gust_kmh": h_wg[i] if i < len(h_wg) else None,
-                "humidity": h_rh[i] if i < len(h_rh) else None,
-                "cloud_cover": h_cc[i] if i < len(h_cc) else None,
-            }
-            for i in range(min(len(h_times), 24))
-        ]
-
         self._forecast_cache = {
-            "daily": out,
-            "hourly": hourly_out,
-            "provider": "open-meteo",
+            **result,
             "lat": lat,
             "lon": lon,
         }
@@ -2102,6 +2061,45 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         rt.forecast_consecutive_failures = 0
         self.async_set_updated_data(self._compute())
         rt.forecast_inflight = False
+
+    def _apply_nowcast_correction(self, hourly: list[dict], data: dict) -> list[dict]:
+        """Blend current local readings into the first 0-3 hourly forecast slots.
+
+        Tapering weights: 70 % local at hour 0, 40 % at hour 1, 10 % at hour 2,
+        pure NWP from hour 3 onwards. Only numeric fields that both sides supply
+        are blended; missing values are left unchanged.
+        """
+        if not hourly:
+            return hourly
+
+        local_temp = data.get(KEY_NORM_TEMP_C)
+        local_hum = data.get(KEY_NORM_HUMIDITY)
+        local_wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+        local_dew = data.get(KEY_DEW_POINT_C)
+
+        # Nothing to blend if all local readings are missing
+        if all(v is None for v in [local_temp, local_hum, local_wind_ms, local_dew]):
+            return hourly
+
+        local_wind_kmh = local_wind_ms * 3.6 if local_wind_ms is not None else None
+        weights = [0.70, 0.40, 0.10]
+
+        result = []
+        for i, slot in enumerate(hourly):
+            if i < 3:
+                w_local = weights[i]
+                w_nwp = 1.0 - w_local
+                slot = dict(slot)  # copy before mutating
+                if local_temp is not None and slot.get("temp_c") is not None:
+                    slot["temp_c"] = round(w_local * local_temp + w_nwp * slot["temp_c"], 1)
+                if local_hum is not None and slot.get("humidity") is not None:
+                    slot["humidity"] = round(w_local * local_hum + w_nwp * slot["humidity"], 1)
+                if local_wind_kmh is not None and slot.get("wind_kmh") is not None:
+                    slot["wind_kmh"] = round(w_local * local_wind_kmh + w_nwp * slot["wind_kmh"], 1)
+                if local_dew is not None and slot.get("dewpoint_c") is not None:
+                    slot["dewpoint_c"] = round(w_local * local_dew + w_nwp * slot["dewpoint_c"], 1)
+            result.append(slot)
+        return result
 
     async def _async_fetch_sea_temp(self) -> None:
         """Fetch sea surface temperature from Open-Meteo Marine API."""

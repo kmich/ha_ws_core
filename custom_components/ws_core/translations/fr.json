@@ -56,13 +56,28 @@
       },
       "forecast": {
         "title": "Prévisions sur 7 jours",
-        "description": "Prévisions Open-Meteo (gratuit, sans clé API). Coordonnées basées sur Home Assistant.",
+        "description": "Prévisions météo sur 7 jours. Coordonnées basées sur Home Assistant.",
         "data": {
-          "forecast_enabled": "Activer les prévisions (Open-Meteo)",
+          "forecast_enabled": "Activer les prévisions",
           "forecast_interval_min": "Intervalle de rafraîchissement",
           "forecast_lat": "Latitude des prévisions",
           "forecast_lon": "Longitude des prévisions",
+          "forecast_provider": "Fournisseur de prévisions",
           "_go_back": "← Retour à l'étape précédente"
+        },
+        "data_description": {
+          "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap et Pirate Weather nécessitent une clé API gratuite."
+        }
+      },
+      "forecast_api_key": {
+        "title": "Clé API du fournisseur de prévisions",
+        "description": "Entrez la clé API pour {provider_name}. Vous pouvez obtenir une clé gratuite sur le site du fournisseur.",
+        "data": {
+          "forecast_api_key": "Clé API",
+          "_go_back": "← Retour à l'étape précédente"
+        },
+        "data_description": {
+          "forecast_api_key": "Collez votre clé API ici. Elle sera stockée de manière sécurisée dans votre configuration HA."
         }
       },
       "alerts": {
@@ -171,6 +186,8 @@
           "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
           "forecast_lat": "Latitude des prévisions",
           "forecast_lon": "Longitude des prévisions",
+          "forecast_provider": "Fournisseur de prévisions",
+          "forecast_api_key": "Clé API de prévisions",
           "thresh_wind_gust_ms": "Seuil d'alerte rafales",
           "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
           "thresh_freeze_c": "Seuil d'alerte gel",
@@ -204,6 +221,8 @@
           "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
           "forecast_lat": "Latitude des prévisions",
           "forecast_lon": "Longitude des prévisions",
+          "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap et Pirate Weather nécessitent une clé API gratuite.",
+          "forecast_api_key": "Clé API pour le fournisseur de prévisions sélectionné (requise pour OpenWeatherMap et Pirate Weather).",
           "thresh_wind_gust_ms": "Seuil d'alerte rafales",
           "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
           "thresh_freeze_c": "Seuil d'alerte gel",
@@ -225,6 +244,16 @@
           "wu_station_id": "ID station WU",
           "wu_api_key": "Clé API WU",
           "wu_interval_min": "Intervalle d'envoi WU"
+        }
+      },
+      "forecast_api_key_opt": {
+        "title": "Clé API du fournisseur de prévisions",
+        "description": "Entrez la clé API pour {provider_name}.",
+        "data": {
+          "forecast_api_key": "Clé API"
+        },
+        "data_description": {
+          "forecast_api_key": "Collez votre clé API ici."
         }
       },
       "features_opt": {
@@ -403,7 +432,10 @@
       "rain_anomaly_30d": { "name": "Anomalie de pluie (30 jours)" },
       "solar_lux_factor": { "name": "Facteur lux solaire" },
       "forecast_agreement": { "name": "Concordance des prévisions" },
-      "forecast_skill": { "name": "Score de prévision" }
+      "forecast_skill": { "name": "Score de prévision" },
+      "rain_today": { "name": "Pluie aujourd'hui" },
+      "no2": { "name": "NO2" },
+      "ozone": { "name": "Ozone" }
     },
     "select": {
       "ws_graph_range": {

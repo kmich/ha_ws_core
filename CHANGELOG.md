@@ -2,6 +2,15 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.2.0] - 2026-05-18
+
+### New Features
+
+- **Pluggable forecast provider** — `sensor.ws_forecast_daily` and all NWP-derived sensors now use a swappable provider. Select in the config/options flow. Ships with two built-in providers: **Open-Meteo** (default, free, no API key) and **Met.no** (Norwegian Meteorological Institute, free, no API key, strong European coverage). Adding new providers requires only a new Python file + one-line registry entry.
+- **Nowcast correction (0–3 h) — now actually implemented** — local station readings blend into the first three hourly forecast slots with tapering weights (70 % local at h+0, 40 % at h+1, 10 % at h+2, pure NWP from h+3). Blended fields: temperature, humidity, wind speed, dew point.
+- **NO₂ and Ozone sensors** — `sensor.ws_no2` and `sensor.ws_ozone` expose the nitrogen dioxide and ozone values already fetched by the AQI module as standalone sensors (µg/m³, disabled by the Air Quality toggle, diagnostic category).
+- **Rain Today sensor** — `sensor.ws_rain_today` exposes today's accumulated rainfall (resets at local midnight), separate from the 24 h rolling window.
+
 ## [1.1.1] - 2026-05-18
 
 ### Bug Fixes

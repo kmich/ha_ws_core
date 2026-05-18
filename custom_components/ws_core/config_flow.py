@@ -46,10 +46,12 @@ from .const import (
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ENABLE_ZAMBRETTI,
+    CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
+    CONF_FORECAST_PROVIDER,
     CONF_HEMISPHERE,
     CONF_NAME,
     CONF_PREFIX,
@@ -93,6 +95,7 @@ from .const import (
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
+    DEFAULT_FORECAST_PROVIDER,
     DEFAULT_HEMISPHERE,
     DEFAULT_NAME,
     DEFAULT_PREFIX,
@@ -112,8 +115,14 @@ from .const import (
     DEFAULT_UNITS_MODE,
     DEFAULT_WU_INTERVAL_MIN,
     DOMAIN,
+    FORECAST_PROVIDER_MET_NO,
+    FORECAST_PROVIDER_NWS,
+    FORECAST_PROVIDER_OPEN_METEO,
+    FORECAST_PROVIDER_OWM,
+    FORECAST_PROVIDER_PIRATE,
     HEMISPHERE_OPTIONS,
     OPTIONAL_SOURCES,
+    PROVIDERS_REQUIRING_API_KEY,
     REQUIRED_SOURCES,
     SRC_BATTERY,
     SRC_DEW_POINT,
@@ -597,6 +606,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if back:
                 return back
             self._data.update(user_input)
+            if user_input.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
+                return await self.async_step_forecast_api_key()
             return await self.async_step_features()
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
@@ -618,8 +629,64 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_FORECAST_LON, default=round(default_lon, 4)): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")
                     ),
+                    vol.Optional(CONF_FORECAST_PROVIDER, default=DEFAULT_FORECAST_PROVIDER): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[
+                                selector.SelectOptionDict(
+                                    value=FORECAST_PROVIDER_OPEN_METEO, label="Open-Meteo (free, no key)"
+                                ),
+                                selector.SelectOptionDict(
+                                    value=FORECAST_PROVIDER_MET_NO, label="Met.no (free, no key)"
+                                ),
+                                selector.SelectOptionDict(
+                                    value=FORECAST_PROVIDER_NWS, label="NWS/NOAA (free, no key, US only)"
+                                ),
+                                selector.SelectOptionDict(
+                                    value=FORECAST_PROVIDER_OWM, label="OpenWeatherMap (free tier, API key)"
+                                ),
+                                selector.SelectOptionDict(
+                                    value=FORECAST_PROVIDER_PIRATE, label="Pirate Weather (free tier, API key)"
+                                ),
+                            ],
+                            mode=selector.SelectSelectorMode.LIST,
+                        )
+                    ),
                 }
             ),
+            last_step=False,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 6b: API key for providers that require one
+    # ------------------------------------------------------------------
+    async def async_step_forecast_api_key(self, user_input: dict[str, Any] | None = None):
+        """Step: API key for forecast providers that require one."""
+        if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
+            self._data.update(user_input)
+            return await self.async_step_features()
+
+        provider = self._data.get(CONF_FORECAST_PROVIDER, "")
+        provider_labels = {
+            FORECAST_PROVIDER_OWM: "OpenWeatherMap",
+            FORECAST_PROVIDER_PIRATE: "Pirate Weather",
+        }
+        provider_name = provider_labels.get(provider, provider)
+
+        return self._show_step(
+            step_id="forecast_api_key",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_FORECAST_API_KEY,
+                        default=self._data.get(CONF_FORECAST_API_KEY, ""),
+                    ): selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)),
+                    vol.Optional("_go_back", default=False): selector.BooleanSelector(),
+                }
+            ),
+            description_placeholders={"provider_name": provider_name},
             last_step=False,
         )
 
@@ -1056,8 +1123,10 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
                 float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), imperial
             )
-            # Merge into options — features step comes next
+            # Merge into options — features step comes next (API key step if needed)
             self._opt: dict[str, Any] = out
+            if out.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
+                return await self.async_step_forecast_api_key_opt()
             return await self.async_step_features_opt()
 
         return self.async_show_form(
@@ -1117,6 +1186,28 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))
                 ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
+                vol.Optional(
+                    CONF_FORECAST_PROVIDER, default=g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(
+                                value=FORECAST_PROVIDER_OPEN_METEO, label="Open-Meteo (free, no key)"
+                            ),
+                            selector.SelectOptionDict(value=FORECAST_PROVIDER_MET_NO, label="Met.no (free, no key)"),
+                            selector.SelectOptionDict(
+                                value=FORECAST_PROVIDER_NWS, label="NWS/NOAA (free, no key, US only)"
+                            ),
+                            selector.SelectOptionDict(
+                                value=FORECAST_PROVIDER_OWM, label="OpenWeatherMap (free tier, API key)"
+                            ),
+                            selector.SelectOptionDict(
+                                value=FORECAST_PROVIDER_PIRATE, label="Pirate Weather (free tier, API key)"
+                            ),
+                        ],
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
                 vol.Optional(
                     CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, imperial), 1)
                 ): selector.NumberSelector(
@@ -1239,6 +1330,32 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             last_step=False,
+        )
+
+    async def async_step_forecast_api_key_opt(self, user_input: dict[str, Any] | None = None):
+        """Options step: API key for providers that require one."""
+        if user_input is not None:
+            self._opt.update(user_input)
+            return await self.async_step_features_opt()
+
+        provider = self._opt.get(CONF_FORECAST_PROVIDER, "")
+        provider_labels = {
+            FORECAST_PROVIDER_OWM: "OpenWeatherMap",
+            FORECAST_PROVIDER_PIRATE: "Pirate Weather",
+        }
+        provider_name = provider_labels.get(provider, provider)
+        current_key = self._opt.get(CONF_FORECAST_API_KEY, self._get(CONF_FORECAST_API_KEY, ""))
+
+        return self.async_show_form(
+            step_id="forecast_api_key_opt",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_FORECAST_API_KEY, default=current_key): selector.TextSelector(
+                        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                    ),
+                }
+            ),
+            description_placeholders={"provider_name": provider_name},
         )
 
     # ------------------------------------------------------------------

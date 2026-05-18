@@ -100,6 +100,7 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
+    KEY_RAIN_TODAY_MM,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -533,6 +534,15 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
+        key=KEY_RAIN_TODAY_MM,
+        name="WS Rain Today",
+        translation_key="rain_today",
+        icon="mdi:weather-rainy",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit=UNIT_RAIN_MM,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
         key=KEY_PRESSURE_TREND_DISPLAY,
         translation_key="pressure_trend",
         name="WS Pressure Trend",
@@ -879,6 +889,24 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    WSSensorDescription(
+        key=KEY_NO2,
+        name="WS NO2",
+        translation_key="no2",
+        icon="mdi:molecule",
+        native_unit="µg/m³",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_OZONE,
+        name="WS Ozone",
+        translation_key="ozone",
+        icon="mdi:air-filter",
+        native_unit="µg/m³",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     # ---------------------------------------------------------------
     # Pollen  (v0.7.0, Open-Meteo)
     # ---------------------------------------------------------------
@@ -1180,6 +1208,8 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_AQI: CONF_ENABLE_AIR_QUALITY,
     KEY_PM2_5: CONF_ENABLE_AIR_QUALITY,
     KEY_PM10: CONF_ENABLE_AIR_QUALITY,
+    KEY_NO2: CONF_ENABLE_AIR_QUALITY,
+    KEY_OZONE: CONF_ENABLE_AIR_QUALITY,
     # Pollen  (v0.7.0)
     KEY_POLLEN_OVERALL: CONF_ENABLE_POLLEN,
     KEY_POLLEN_GRASS: CONF_ENABLE_POLLEN,
