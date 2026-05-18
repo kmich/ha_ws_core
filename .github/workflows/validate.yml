@@ -22,7 +22,6 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          ignore: brands
 
   lint:
     name: Lint (ruff)
