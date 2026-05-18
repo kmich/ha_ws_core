@@ -361,7 +361,7 @@
       "wind_direction": { "name": "Direction du vent" },
       "rain_total": { "name": "Cumul de pluie total" },
       "rain_rate": { "name": "Débit de pluie" },
-      "illuminance": { "name": "Eclairement" },
+      "illuminance": { "name": "Éclairement" },
       "uv_index": { "name": "Index UV" },
       "battery": {
         "name": "Batterie",
