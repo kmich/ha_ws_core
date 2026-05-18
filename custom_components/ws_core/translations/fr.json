@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Weather Station Core — Créer une station météo",
-        "description": "Donnez un nom à votre station météo. Le préfixe sera utilisé pour tous les identifiants d’entités (par ex. le préfixe “ws” crée sensor.ws_temperature).",
+        "description": "Donnez un nom à votre station météo. Le préfixe sera utilisé pour tous les identifiants d'entités (par ex. le préfixe « ws » crée sensor.ws_temperature).",
         "data": {
           "name": "Nom de la station",
           "prefix": "Préfixe des entités (ex. : ws, jardin, salon)"
@@ -14,7 +14,7 @@
         "description": "Associez chaque mesure requise à une entité existante. Ces 7 capteurs sont obligatoires.",
         "data": {
           "temperature": "Capteur de température",
-          "humidity": "Capteur d’humidité relative (%)",
+          "humidity": "Capteur d'humidité relative (%)",
           "pressure": "Capteur de pression atmosphérique",
           "wind_speed": "Capteur de vitesse du vent",
           "wind_gust": "Capteur de rafales de vent",
@@ -25,19 +25,19 @@
       },
       "optional_sources": {
         "title": "Capteurs facultatifs",
-        "description": "Ces capteurs améliorent les calculs, mais ne sont pas requis.",
+        "description": "Ces capteurs améliorent les calculs, mais ne sont pas requis. Laissez vide pour ignorer.",
         "data": {
           "illuminance": "Illuminance / rayonnement solaire (lux)",
           "uv_index": "Index UV",
           "dew_point": "Point de rosée (calculé si absent)",
           "battery": "Niveau de batterie (%)",
-          "solar_radiation": "Rayonnement solaire (W/m², pour ET₀ Penman‑Monteith)",
+          "solar_radiation": "Rayonnement solaire (W/m², pour ET₀ Penman-Monteith)",
           "_go_back": "← Retour à l'étape précédente"
         }
       },
       "location": {
         "title": "Localisation & climat",
-        "description": "Ces paramètres influencent la pression corrigée, les vents Zambretti et la logique saisonnière.",
+        "description": "Ces paramètres influencent la pression corrigée, les vents Zambretti et la logique saisonnière. L'altitude est pré-remplie depuis Home Assistant.",
         "data": {
           "hemisphere": "Hémisphère",
           "climate_region": "Région climatique (pondération Zambretti)",
@@ -46,8 +46,8 @@
         }
       },
       "display": {
-        "title": "Unités d’affichage",
-        "description": "Choisissez comment les valeurs sont affichées. ‘Auto’ suit les unités de Home Assistant.",
+        "title": "Unités d'affichage",
+        "description": "Choisissez comment les valeurs sont affichées. « Auto » suit les unités de Home Assistant.",
         "data": {
           "units_mode": "Vent / pluie / pression",
           "temp_unit": "Unité de température",
@@ -56,122 +56,270 @@
       },
       "forecast": {
         "title": "Prévisions sur 7 jours",
-        "description": "Prévisions Open‑Meteo (gratuit, sans clé API). Coordonnées basées sur Home Assistant.",
+        "description": "Prévisions Open-Meteo (gratuit, sans clé API). Coordonnées basées sur Home Assistant.",
         "data": {
-          "forecast_enabled": "Activer les prévisions (Open‑Meteo)",
+          "forecast_enabled": "Activer les prévisions (Open-Meteo)",
           "forecast_interval_min": "Intervalle de rafraîchissement",
           "forecast_lat": "Latitude des prévisions",
           "forecast_lon": "Longitude des prévisions",
           "_go_back": "← Retour à l'étape précédente"
         }
+      },
+      "alerts": {
+        "title": "Alertes & options avancées",
+        "description": "Configurez les seuils d'alerte et les paramètres avancés. Les valeurs par défaut conviennent à la plupart des stations.",
+        "data": {
+          "thresh_wind_gust_ms": "Seuil d'alerte rafales",
+          "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
+          "thresh_freeze_c": "Seuil d'alerte gel",
+          "staleness_s": "Délai d'inactivité des capteurs",
+          "rain_filter_alpha": "Lissage du débit de pluie (Kalman)",
+          "pressure_trend_window_h": "Fenêtre de tendance de pression",
+          "rain_penalty_light_mmph": "Début de l'impact de la pluie sur les calculs",
+          "rain_penalty_heavy_mmph": "Impact maximal de la pluie sur les calculs",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "features": {
+        "title": "Fonctionnalités",
+        "description": "Activez les capteurs et services supplémentaires. Chaque option peut être modifiée plus tard via Configurer.",
+        "data": {
+          "enable_display_sensors": "Capteurs d'affichage (humidité, UV, tendance pression, santé station)",
+          "enable_fire_risk_score": "Indice de risque d'incendie (IFM canadien)",
+          "enable_sea_temp": "Température de surface de la mer (Open-Meteo Marine)",
+          "enable_wunderground": "Envoi vers Weather Underground",
+          "enable_air_quality": "Indice de qualité de l'air (Open-Meteo, gratuit, sans clé API)",
+          "enable_pollen": "Niveaux de pollen (Open-Meteo, gratuit, sans clé API)",
+          "enable_moon": "Phase et illumination de la Lune",
+          "enable_solar_forecast": "Prévision de production solaire (forecast.solar, gratuit)",
+          "_go_back": "← Retour à l'étape précédente",
+          "enable_fog": "Capteur de probabilité de brouillard",
+          "enable_thunderstorm_risk": "Capteur de risque d'orage (heuristique ; nombreux faux positifs)"
+        }
+      },
+      "sea_temp": {
+        "title": "Localisation de la température de mer",
+        "description": "Coordonnées utilisées pour la température de surface de la mer. Par défaut, la position de Home Assistant est utilisée.",
+        "data": {
+          "sea_temp_lat": "Latitude",
+          "sea_temp_lon": "Longitude",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "wunderground": {
+        "title": "Envoi vers Weather Underground",
+        "description": "Envoie les observations vers votre station Weather Underground. Vous avez besoin d'un identifiant de station et d'une clé API depuis votre compte wunderground.com. Laissez vide pour ignorer.",
+        "data": {
+          "wu_station_id": "ID de station (ex. IATHEN123) — laisser vide pour ignorer",
+          "wu_api_key": "Clé API — laisser vide pour ignorer",
+          "wu_interval_min": "Intervalle d'envoi",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "air_quality": {
+        "title": "Qualité de l'air",
+        "description": "{info}",
+        "data": {
+          "aqi_interval_min": "Intervalle d'actualisation",
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "pollen": {
+        "title": "Données pollen",
+        "description": "{info}",
+        "data": {
+          "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "solar_forecast": {
+        "title": "Prévision solaire",
+        "description": "{info}",
+        "data": {
+          "solar_peak_kw": "Puissance crête (kWp)",
+          "solar_panel_azimuth": "Azimut du panneau",
+          "solar_panel_tilt": "Inclinaison du panneau",
+          "solar_interval_min": "Intervalle d'actualisation",
+          "_go_back": "← Retour à l'étape précédente"
+        }
       }
     },
-    "alerts": {
-      "title": "Alertes & options avancées",
-      "description": "Configurez les seuils d’alerte et les paramètres avancés.",
-      "data": {
-        "thresh_wind_gust_ms": "Seuil d’alerte rafales",
-        "thresh_rain_rate_mmph": "Seuil d’alerte pluie",
-        "thresh_freeze_c": "Seuil d’alerte gel",
-        "staleness_s": "Délai d’inactivité des capteurs",
-        "rain_filter_alpha": "Lissage du débit de pluie (Kalman)",
-        "pressure_trend_window_h": "Fenêtre de tendance de pression",
-        "rain_penalty_light_mmph": "Début de l’impact de la pluie sur les calculs",
-        "rain_penalty_heavy_mmph": "Impact maximal de la pluie sur les calculs",
-        "_go_back": "← Retour à l'étape précédente"
-      }
-    },
-    "features": {
-      "title": "Fonctionnalités",
-      "description": "Activez les capteurs et services supplémentaires.",
-      "data": {
-        "enable_display_sensors": "Capteurs d’affichage (humidité, UV, pression, état)",
-        "enable_fire_risk_score": "Indice de risque d’incendie",
-        "enable_sea_temp": "Température de surface de la mer",
-        "enable_wunderground": "Envoi vers Weather Underground",
-        "enable_air_quality": "Indice de qualité de l’air",
-        "enable_pollen": "Niveaux de pollen",
-        "enable_moon": "Phase et illumination de la Lune",
-        "enable_solar_forecast": "Prévision de production solaire",
-        "_go_back": "← Retour à l'étape précédente",
-        "enable_fog": "Probabilité de brouillard",
-        "enable_thunderstorm_risk": "Risque d’orage"
-      }
-    },
-    "sea_temp": {
-      "title": "Localisation de la température de mer",
-      "description": "Coordonnées utilisées pour la température de surface de la mer.",
-      "data": {
-        "sea_temp_lat": "Latitude",
-        "sea_temp_lon": "Longitude",
-        "_go_back": "← Retour à l'étape précédente"
-      }
-    },
-    "wunderground": {
-      "title": "Envoi vers Weather Underground",
-      "description": "Envoie les observations vers votre station Weather Underground.",
-      "data": {
-        "wu_station_id": "ID de station (ex. IATHEN123)",
-        "wu_api_key": "Clé API",
-        "wu_interval_min": "Intervalle d’envoi",
-        "_go_back": "← Retour à l'étape précédente"
-      }
-    },
-    "air_quality": {
-      "title": "Qualité de l’air",
-      "description": "{info}",
-      "data": {
-        "aqi_interval_min": "Intervalle d’actualisation",
-        "_go_back": "← Retour à l'étape précédente"
-      }
-    },
-    "pollen": {
-      "title": "Données pollen",
-      "description": "{info}",
-      "data": {
-        "_go_back": "← Retour à l'étape précédente"
-      }
-    },
-    "solar_forecast": {
-      "title": "Prévision solaire",
-      "description": "{info}",
-      "data": {
-        "solar_peak_kw": "Puissance crête (kWp)",
-        "solar_panel_azimuth": "Azimut du panneau",
-        "solar_panel_tilt": "Inclinaison du panneau",
-        "solar_interval_min": "Intervalle d’actualisation",
-        "_go_back": "← Retour à l'étape précédente"
-      }
+    "error": {
+      "entity_not_found": "Entité introuvable dans Home Assistant.",
+      "not_numeric": "La valeur de l'entité n'est pas numérique.",
+      "required": "Ce champ est obligatoire.",
+      "elevation_out_of_range": "L'altitude doit être comprise entre -500 m et 9000 m.",
+      "wind_gust_too_high": "Le seuil de rafales dépasse le record physique mondial.",
+      "temp_out_of_range": "La température dépasse les limites physiques possibles.",
+      "invalid_api_key": "Clé API invalide ou identifiants rejetés.",
+      "cannot_connect": "Impossible de se connecter à l'API — vérifiez le réseau.",
+      "station_not_found": "Station Weather Underground introuvable."
     }
   },
-
-  "error": {
-    "entity_not_found": "Entité introuvable dans Home Assistant.",
-    "not_numeric": "La valeur de l’entité n’est pas numérique.",
-    "required": "Ce champ est obligatoire.",
-    "elevation_out_of_range": "L’altitude doit être comprise entre -500 m et 9000 m.",
-    "wind_gust_too_high": "Le seuil de rafales dépasse le record physique mondial.",
-    "temp_out_of_range": "La température dépasse les limites physiques possibles.",
-    "invalid_api_key": "Clé API invalide ou identifiants rejetés.",
-    "cannot_connect": "Impossible de se connecter à l’API — vérifiez le réseau.",
-    "station_not_found": "Station Weather Underground introuvable."
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paramètres généraux",
+        "description": "Identité, unités, prévisions, alertes et calibration.",
+        "data": {
+          "prefix": "Préfixe des entités",
+          "hemisphere": "Hémisphère",
+          "climate_region": "Région climatique",
+          "elevation_m": "Altitude de la station",
+          "units_mode": "Vent / pluie / pression",
+          "temp_unit": "Unité de température",
+          "forecast_enabled": "Activer les prévisions",
+          "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
+          "forecast_lat": "Latitude des prévisions",
+          "forecast_lon": "Longitude des prévisions",
+          "thresh_wind_gust_ms": "Seuil d'alerte rafales",
+          "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
+          "thresh_freeze_c": "Seuil d'alerte gel",
+          "staleness_s": "Délai d'inactivité des capteurs",
+          "rain_filter_alpha": "Lissage du filtre pluie",
+          "pressure_trend_window_h": "Fenêtre de tendance de pression",
+          "rain_penalty_light_mmph": "Début de l'impact pluie",
+          "rain_penalty_heavy_mmph": "Impact pluie maximum",
+          "cal_temp_c": "Offset de calibration température",
+          "cal_humidity": "Offset de calibration humidité",
+          "cal_pressure_hpa": "Offset de calibration pression",
+          "cal_wind_ms": "Offset de calibration vitesse du vent",
+          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_fire_risk_score": "Indice de risque d'incendie",
+          "enable_sea_temp": "Température de surface de la mer",
+          "sea_temp_lat": "Latitude température de mer",
+          "sea_temp_lon": "Longitude température de mer",
+          "enable_wunderground": "Envoi vers Weather Underground",
+          "wu_station_id": "ID station WU",
+          "wu_api_key": "Clé API WU",
+          "wu_interval_min": "Intervalle d'envoi WU"
+        },
+        "data_description": {
+          "prefix": "Préfixe des entités",
+          "hemisphere": "Hémisphère",
+          "climate_region": "Région climatique",
+          "elevation_m": "Altitude de la station",
+          "units_mode": "Vent / pluie / pression",
+          "temp_unit": "Unité de température",
+          "forecast_enabled": "Activer les prévisions",
+          "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
+          "forecast_lat": "Latitude des prévisions",
+          "forecast_lon": "Longitude des prévisions",
+          "thresh_wind_gust_ms": "Seuil d'alerte rafales",
+          "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
+          "thresh_freeze_c": "Seuil d'alerte gel",
+          "staleness_s": "Délai d'inactivité des capteurs",
+          "rain_filter_alpha": "Lissage du filtre pluie",
+          "pressure_trend_window_h": "Fenêtre de tendance de pression",
+          "rain_penalty_light_mmph": "Début de l'impact pluie",
+          "rain_penalty_heavy_mmph": "Impact pluie maximum",
+          "cal_temp_c": "Offset de calibration température",
+          "cal_humidity": "Offset de calibration humidité",
+          "cal_pressure_hpa": "Offset de calibration pression",
+          "cal_wind_ms": "Offset de calibration vitesse du vent",
+          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_fire_risk_score": "Indice de risque d'incendie",
+          "enable_sea_temp": "Température de surface de la mer",
+          "sea_temp_lat": "Latitude température de mer",
+          "sea_temp_lon": "Longitude température de mer",
+          "enable_wunderground": "Envoi vers Weather Underground",
+          "wu_station_id": "ID station WU",
+          "wu_api_key": "Clé API WU",
+          "wu_interval_min": "Intervalle d'envoi WU"
+        }
+      },
+      "features_opt": {
+        "title": "Fonctionnalités",
+        "description": "Activez ou désactivez les capteurs et sources de données externes.",
+        "data": {
+          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_fire_risk_score": "Indice de risque d'incendie",
+          "enable_sea_temp": "Température de surface de la mer",
+          "enable_wunderground": "Envoi vers Weather Underground",
+          "enable_air_quality": "Indice de qualité de l'air (Open-Meteo)",
+          "enable_pollen": "Niveaux de pollen (Open-Meteo, gratuit, sans clé API)",
+          "enable_moon": "Phase et illumination de la Lune",
+          "enable_solar_forecast": "Prévision solaire (forecast.solar)",
+          "enable_fog": "Capteur de probabilité de brouillard",
+          "enable_thunderstorm_risk": "Capteur de risque d'orage (heuristique ; nombreux faux positifs)"
+        },
+        "data_description": {
+          "enable_display_sensors": "Capteurs d'affichage (niveaux, tendances, santé)",
+          "enable_fire_risk_score": "Indice de risque d'incendie",
+          "enable_sea_temp": "Température de surface de la mer",
+          "enable_wunderground": "Envoi vers Weather Underground",
+          "enable_air_quality": "Indice de qualité de l'air (Open-Meteo)",
+          "enable_pollen": "Niveaux de pollen (Open-Meteo)",
+          "enable_moon": "Phase et illumination de la Lune",
+          "enable_solar_forecast": "Prévision solaire (forecast.solar)",
+          "enable_fog": "Active le capteur de probabilité de brouillard (modèle dépression du point de rosée)",
+          "enable_thunderstorm_risk": "Active le capteur de risque d'orage (heuristique de surface)"
+        }
+      },
+      "sea_temp_opt": {
+        "title": "Température de surface de la mer",
+        "data": {
+          "sea_temp_lat": "Latitude température de mer",
+          "sea_temp_lon": "Longitude température de mer"
+        }
+      },
+      "wunderground_opt": {
+        "title": "Weather Underground",
+        "description": "{info}",
+        "data": {
+          "wu_station_id": "ID de station",
+          "wu_api_key": "Clé API",
+          "wu_interval_min": "Intervalle d'envoi"
+        }
+      },
+      "air_quality_opt": {
+        "title": "Paramètres qualité de l'air",
+        "description": "{info}",
+        "data": {
+          "aqi_interval_min": "Intervalle d'actualisation"
+        }
+      },
+      "pollen_opt": {
+        "title": "Paramètres pollen",
+        "description": "{info}",
+        "data": {}
+      },
+      "solar_forecast_opt": {
+        "title": "Paramètres prévision solaire",
+        "description": "{info}",
+        "data": {
+          "solar_peak_kw": "Puissance crête (kWp)",
+          "solar_panel_azimuth": "Azimut du panneau",
+          "solar_panel_tilt": "Inclinaison du panneau",
+          "solar_interval_min": "Intervalle d'actualisation"
+        }
+      }
+    },
+    "error": {
+      "entity_not_found": "Entité introuvable dans Home Assistant.",
+      "not_numeric": "La valeur de l'entité n'est pas numérique.",
+      "required": "Ce champ est obligatoire.",
+      "elevation_out_of_range": "L'altitude doit être comprise entre -500 m et 9000 m.",
+      "wind_gust_too_high": "Le seuil de rafales dépasse le record physique mondial.",
+      "temp_out_of_range": "La température dépasse les limites physiques possibles.",
+      "invalid_api_key": "Clé API invalide ou identifiants rejetés.",
+      "cannot_connect": "Impossible de se connecter à l'API — vérifiez le réseau.",
+      "station_not_found": "Station Weather Underground introuvable."
+    }
   },
-
   "issues": {
     "missing_source_entities": {
       "title": "Entités source de la station météo introuvables",
-      "description": "Les entités suivantes sont introuvables dans Home Assistant : {entities}. Vérifiez qu’elles existent et ne sont pas désactivées."
+      "description": "Les entités suivantes sont introuvables dans Home Assistant : {entities}. Vérifiez qu'elles existent et ne sont pas désactivées."
     },
     "stale_sensors": {
       "title": "Capteurs de la station météo inactifs",
-      "description": "Les capteurs suivants n’ont pas été mis à jour dans le délai prévu : {sensors}. Vérifiez que votre matériel météo est en ligne."
+      "description": "Les capteurs suivants n'ont pas été mis à jour dans le délai prévu : {sensors}. Vérifiez que votre matériel météo est en ligne et connecté."
     },
     "forecast_api_failures": {
-      "title": "Échecs de l’API de prévisions Open‑Meteo",
-      "description": "L’API Open‑Meteo a échoué {failures} fois de suite. Les données peuvent être obsolètes. Vérifiez votre connexion Internet. L’intégration réessaiera automatiquement."
+      "title": "Échecs de l'API de prévisions Open-Meteo",
+      "description": "L'API Open-Meteo a échoué {failures} fois de suite. Les données peuvent être obsolètes. Vérifiez votre connexion Internet. L'intégration réessaiera automatiquement."
     }
   },
-
   "entity": {
     "select": {
       "ws_graph_range": {
@@ -188,10 +336,10 @@
         "name": "Tableau de bord : Animations"
       },
       "ws_enable_display_sensors": {
-        "name": "Fonction : Capteurs d’affichage"
+        "name": "Fonction : Capteurs d'affichage"
       },
       "ws_enable_fire_risk_score": {
-        "name": "Fonction : Risque d’incendie"
+        "name": "Fonction : Risque d'incendie"
       },
       "ws_enable_sea_temp": {
         "name": "Fonction : Température de mer"
@@ -200,7 +348,7 @@
         "name": "Fonction : Weather Underground"
       },
       "ws_enable_air_quality": {
-        "name": "Fonction : Qualité de l’air"
+        "name": "Fonction : Qualité de l'air"
       },
       "ws_enable_pollen": {
         "name": "Fonction : Pollen"
@@ -215,7 +363,7 @@
         "name": "Fonction : Brouillard"
       },
       "ws_enable_thunderstorm_risk": {
-        "name": "Fonction : Risque d’orage"
+        "name": "Fonction : Risque d'orage"
       }
     },
     "number": {
@@ -241,7 +389,7 @@
         "name": "Calibration : Vitesse du vent"
       },
       "ws_staleness_timeout": {
-        "name": "Réglage : Délai d’inactivité"
+        "name": "Réglage : Délai d'inactivité"
       },
       "ws_rain_filter_alpha": {
         "name": "Réglage : Lissage pluie"
