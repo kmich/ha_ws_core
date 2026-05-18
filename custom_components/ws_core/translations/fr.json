@@ -37,7 +37,7 @@
       },
       "location": {
         "title": "Localisation & climat",
-        "description": "Ces paramètres influencent la pression corrigée, les vents Zambretti et la logique saisonnière. L'altitude est pré-remplie depuis Home Assistant.",
+        "description": "Ces paramètres ajustent la pression, les vents (algorithme Zambretti) et la logique saisonnière. L’altitude est automatiquement récupérée depuis Home Assistant.",
         "data": {
           "hemisphere": "Hémisphère",
           "climate_region": "Région climatique (pondération Zambretti)",
@@ -56,7 +56,7 @@
       },
       "forecast": {
         "title": "Prévisions sur 7 jours",
-        "description": "Prévisions météo sur 7 jours. Coordonnées basées sur Home Assistant.",
+        "description": "Prévisions météo sur 7 jours. Localisation basée sur Home Assistant.",
         "data": {
           "forecast_enabled": "Activer les prévisions",
           "forecast_interval_min": "Intervalle de rafraîchissement",
@@ -70,7 +70,7 @@
         }
       },
       "forecast_api_key": {
-        "title": "Clé API du fournisseur de prévisions",
+        "title": "Clé API du fournisseur de prévisions météo",
         "description": "Entrez la clé API pour {provider_name}. Vous pouvez obtenir une clé gratuite sur le site du fournisseur.",
         "data": {
           "forecast_api_key": "Clé API",
@@ -97,7 +97,7 @@
       },
       "features": {
         "title": "Fonctionnalités",
-        "description": "Activez les capteurs et services supplémentaires. Chaque option peut être modifiée plus tard via Configurer.",
+        "description": "Activez les capteurs et services supplémentaires. Chaque option peut être modifiée plus tard via le menu de configuration.",
         "data": {
           "enable_display_sensors": "Activer l’affichage des capteurs (humidité, UV, tendance pression, santé station)",
           "enable_fire_risk_score": "Indice de risque d'incendie (IFM canadien)",
@@ -280,8 +280,8 @@
           "enable_pollen": "Niveaux de pollen (Open-Meteo)",
           "enable_moon": "Phase et illumination de la Lune",
           "enable_solar_forecast": "Prévision solaire (forecast.solar)",
-          "enable_fog": "Active le capteur de probabilité de brouillard (modèle dépression du point de rosée)",
-          "enable_thunderstorm_risk": "Active le capteur de risque d'orage (heuristique de surface)"
+          "enable_fog": "Active le capteur de probabilité de brouillard (Écart au point de rosée)",
+          "enable_thunderstorm_risk": "Active le capteur de risque d'orage (Modèle basé sur les données de surface)"
         }
       },
       "sea_temp_opt": {
@@ -429,7 +429,7 @@
       "wet_bulb_temperature": { "name": "Température au thermomètre mouillé" },
       "frost_point": { "name": "Point de givre" },
       "zambretti_forecast": {
-        "name": "Prévision Zambretti",
+        "name": "Prévision (algorithme Zambretti)",
         "state": {
           "Settled fine": "Beau temps stable",
           "Fine weather": "Beau temps",
@@ -496,7 +496,7 @@
           "sunrise": "Lever de soleil",
           "sunset": "Coucher de soleil",
           "golden-hour": "Heure dorée",
-          "clearing-after-rain": "Éclaircies après pluie",
+          "clearing-after-rain": "Éclaircies après la pluie",
           "fog": "Brouillard",
           "misty-morning": "Brume matinale",
           "drizzle": "Bruine",
