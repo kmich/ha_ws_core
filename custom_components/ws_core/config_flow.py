@@ -327,9 +327,9 @@ def _convert_temp_to_c(val: float, imperial: bool) -> float:
 class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = CONFIG_VERSION
 
-    @staticmethod
-    def async_get_options_flow(config_entry: config_entries.ConfigEntry):
-        return WSStationOptionsFlowHandler(config_entry)
+    @classmethod
+    def async_get_options_flow(cls, config_entry: config_entries.ConfigEntry):
+        return WSStationOptionsFlowHandler()
 
     def __init__(self):
         self._data: dict[str, Any] = {}
