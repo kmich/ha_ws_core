@@ -170,6 +170,8 @@ async def async_setup_entry(
 class WSToggleSwitch(RestoreEntity, SwitchEntity):
     """A toggle switch owned by the integration."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         entry: ConfigEntry,
@@ -183,7 +185,7 @@ class WSToggleSwitch(RestoreEntity, SwitchEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_suggested_object_id = f"{prefix}_{key}"
-        self._attr_name = name
+        self._attr_translation_key = f"ws_{key}"
         self._attr_icon = icon
         self._attr_is_on = default
 
@@ -226,7 +228,7 @@ class WSFeatureSwitch(SwitchEntity):
     """
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -239,7 +241,7 @@ class WSFeatureSwitch(SwitchEntity):
         # Use the conf_key as the object-id suffix (e.g. enable_air_quality)
         self._attr_unique_id = f"{entry.entry_id}_{desc.conf_key}"
         self._attr_suggested_object_id = f"{prefix}_{desc.conf_key}"
-        self._attr_name = desc.name
+        self._attr_translation_key = f"ws_{desc.conf_key}"
         self._attr_icon = desc.icon
 
     @property

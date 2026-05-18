@@ -195,7 +195,7 @@ class WSConfigNumber(NumberEntity):
     """A number entity backed by a config entry option."""
 
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -207,7 +207,7 @@ class WSConfigNumber(NumberEntity):
         self._desc = desc
         self._attr_unique_id = f"{entry.entry_id}_{desc.key}"
         self._attr_suggested_object_id = f"{prefix}_{desc.key}"
-        self._attr_name = desc.name
+        self._attr_translation_key = f"ws_{desc.key}"
         self._attr_icon = desc.icon
         self._attr_native_min_value = desc.native_min
         self._attr_native_max_value = desc.native_max

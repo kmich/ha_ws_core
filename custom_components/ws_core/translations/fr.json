@@ -821,6 +821,11 @@
       "ws_rain_penalty_heavy": {
         "name": "Réglage : Impact pluie maximum"
       }
+    },
+    "binary_sensor": {
+      "ws_package_ok": {
+        "name": "Paquet OK"
+      }
     }
   }
 }

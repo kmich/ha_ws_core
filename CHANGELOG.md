@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.2.3] - 2026-05-18
+
+### Bug Fixes
+
+- **Switch, number, select, and binary sensor names now translatable** — all non-sensor entity types (feature toggles, config numbers, graph range select, package OK binary sensor) were still using hardcoded English names. Wired up `has_entity_name = True` and `translation_key` on all four entity classes so names render in the user's language. French translations included (closes #8).
+
 ## [1.2.2] - 2026-05-18
 
 ### Improvements

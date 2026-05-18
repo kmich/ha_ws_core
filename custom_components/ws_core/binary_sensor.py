@@ -25,7 +25,8 @@ class WSPackageOK(CoordinatorEntity, BinarySensorEntity):
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_package_ok"
         self._attr_suggested_object_id = f"{prefix}_package_ok"
-        self._attr_name = "WS Package OK"
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "ws_package_ok"
         self._attr_icon = "mdi:check-decagram"
 
     @property

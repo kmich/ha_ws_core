@@ -821,6 +821,11 @@
       "ws_rain_penalty_heavy": {
         "name": "Tuning: Rain Penalty Maximum"
       }
+    },
+    "binary_sensor": {
+      "ws_package_ok": {
+        "name": "Package OK"
+      }
     }
   }
 }
