@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from .base import ForecastProvider
 from .met_no import MetNoProvider
+from .meteo_france import MeteoFranceProvider
 from .nws_noaa import NwsNoaaProvider
 from .open_meteo import OpenMeteoProvider
 from .open_weather_map import OpenWeatherMapProvider
 from .pirate_weather import PirateWeatherProvider
-from .meteo_france import MeteoFranceProvider
 
 __all__ = [
     "ForecastProvider",
