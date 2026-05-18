@@ -19,7 +19,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
 
 from .const import (
@@ -328,6 +328,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = CONFIG_VERSION
 
     @classmethod
+    @callback
     def async_get_options_flow(cls, config_entry: config_entries.ConfigEntry):
         return WSStationOptionsFlowHandler()
 
