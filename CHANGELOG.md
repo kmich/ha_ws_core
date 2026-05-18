@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.3.1] - 2026-05-18
+
+### Improvements
+
+- **Sensor state translations** - all string-state sensors now have translatable values. 11 sensors covered: current condition (29 weather states), Zambretti forecast (25 phrases), pressure trend, alert state, station health, humidity level, UV level, pollen level, forecast agreement, sensor drift, sensor consistency. French translations included throughout.
+
 ## [1.3.0] - 2026-05-18
 
 ### New Features

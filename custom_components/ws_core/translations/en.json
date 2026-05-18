@@ -396,6 +396,11 @@
       },
       "alert_state": {
         "name": "Alert State",
+        "state": {
+          "clear": "Clear",
+          "advisory": "Advisory",
+          "warning": "Warning"
+        },
         "state_attributes": {
           "message": { "name": "Message" },
           "icon": { "name": "Icon" },
@@ -425,6 +430,33 @@
       "frost_point": { "name": "Frost Point" },
       "zambretti_forecast": {
         "name": "Zambretti Forecast",
+        "state": {
+          "Settled fine": "Settled fine",
+          "Fine weather": "Fine weather",
+          "Becoming fine": "Becoming fine",
+          "Fine, becoming less settled": "Fine, becoming less settled",
+          "Fine, possible showers": "Fine, possible showers",
+          "Fairly fine, improving": "Fairly fine, improving",
+          "Fairly fine, possible showers early": "Fairly fine, possible showers early",
+          "Fairly fine, showery later": "Fairly fine, showery later",
+          "Showery early, improving": "Showery early, improving",
+          "Changeable, mending": "Changeable, mending",
+          "Rather unsettled clearing later": "Rather unsettled clearing later",
+          "Unsettled, probably improving": "Unsettled, probably improving",
+          "Showery, bright intervals": "Showery, bright intervals",
+          "Showery, becoming rather unsettled": "Showery, becoming rather unsettled",
+          "Changeable, some rain": "Changeable, some rain",
+          "Unsettled, short fine intervals": "Unsettled, short fine intervals",
+          "Unsettled, rain later": "Unsettled, rain later",
+          "Unsettled, some rain": "Unsettled, some rain",
+          "Mostly very unsettled": "Mostly very unsettled",
+          "Occasional rain, worsening": "Occasional rain, worsening",
+          "Rain at times, very unsettled": "Rain at times, very unsettled",
+          "Rain at frequent intervals": "Rain at frequent intervals",
+          "Rain, very unsettled": "Rain, very unsettled",
+          "Stormy, may improve": "Stormy, may improve",
+          "Stormy, much rain": "Stormy, much rain"
+        },
         "state_attributes": {
           "z_number": { "name": "Z-number" },
           "mslp_hpa": { "name": "Sea-level pressure (hPa)" },
@@ -454,6 +486,37 @@
       "wind_direction_smoothed": { "name": "Wind Direction Smoothed" },
       "current_condition": {
         "name": "Current Condition",
+        "state": {
+          "sunny": "Sunny",
+          "partly-cloudy": "Partly Cloudy",
+          "cloudy": "Cloudy",
+          "overcast": "Overcast",
+          "clear-night": "Clear Night",
+          "overcast-night": "Overcast Night",
+          "sunrise": "Sunrise",
+          "sunset": "Sunset",
+          "golden-hour": "Golden Hour",
+          "clearing-after-rain": "Clearing After Rain",
+          "fog": "Fog",
+          "misty-morning": "Misty Morning",
+          "drizzle": "Drizzle",
+          "rainy": "Rainy",
+          "heavy-rain": "Heavy Rain",
+          "pre-storm": "Pre-Storm",
+          "thunderstorm": "Thunderstorm",
+          "severe-storm": "Severe Storm",
+          "hurricane": "Hurricane",
+          "snow-accumulation": "Snow Accumulation",
+          "snowy": "Snowy",
+          "sleet": "Sleet",
+          "icy-conditions": "Icy Conditions",
+          "windy": "Windy",
+          "windy-night": "Windy Night",
+          "hot": "Hot",
+          "cold": "Cold",
+          "sandstorm": "Sandstorm",
+          "african-dust": "African Dust"
+        },
         "state_attributes": {
           "icon": { "name": "Icon" },
           "mdi_icon": { "name": "MDI icon" },
@@ -493,6 +556,13 @@
       "rain_last_24h": { "name": "Rain Last 24h" },
       "pressure_trend": {
         "name": "Pressure Trend",
+        "state": {
+          "Rising Rapidly": "Rising Rapidly",
+          "Rising": "Rising",
+          "Steady": "Steady",
+          "Falling": "Falling",
+          "Falling Rapidly": "Falling Rapidly"
+        },
         "state_attributes": {
           "change_3h_hpa": { "name": "3 h change (hPa)" },
           "change_3h": { "name": "3 h change (hPa) [alias]" },
@@ -504,6 +574,12 @@
       },
       "station_health": {
         "name": "Station Health",
+        "state": {
+          "Online": "Online",
+          "Degraded": "Degraded",
+          "Stale": "Stale",
+          "Offline": "Offline"
+        },
         "state_attributes": {
           "color": { "name": "Color" },
           "battery_pct": { "name": "Battery (%)" },
@@ -521,9 +597,28 @@
       "temperature_low_24h": { "name": "Temperature Low (24h)" },
       "temperature_average_24h": { "name": "Temperature Average (24h)" },
       "wind_gust_max_24h": { "name": "Wind Gust Max (24h)" },
-      "humidity_level": { "name": "Humidity Level" },
+      "humidity_level": {
+        "name": "Humidity Level",
+        "state": {
+          "Very Humid": "Very Humid",
+          "Humid": "Humid",
+          "Slightly Humid": "Slightly Humid",
+          "Comfortable": "Comfortable",
+          "Slightly Dry": "Slightly Dry",
+          "Dry": "Dry",
+          "Very Dry": "Very Dry"
+        }
+      },
       "uv_level": {
         "name": "UV Level",
+        "state": {
+          "None": "None",
+          "Low": "Low",
+          "Moderate": "Moderate",
+          "High": "High",
+          "Very High": "Very High",
+          "Extreme": "Extreme"
+        },
         "state_attributes": {
           "uv_index": { "name": "UV index" },
           "recommendation": { "name": "Recommendation" },
@@ -613,6 +708,15 @@
       "pm10": { "name": "PM10" },
       "pollen_level": {
         "name": "Pollen Level",
+        "state": {
+          "Unknown": "Unknown",
+          "None": "None",
+          "Very Low": "Very Low",
+          "Low": "Low",
+          "Medium": "Medium",
+          "High": "High",
+          "Very High": "Very High"
+        },
         "state_attributes": {
           "grass_index": { "name": "Grass index" },
           "grass_level": { "name": "Grass level" },
@@ -685,6 +789,10 @@
       },
       "sensor_drift": {
         "name": "Sensor Drift",
+        "state": {
+          "OK": "OK",
+          "Warning": "Warning"
+        },
         "state_attributes": {
           "drifting_sensors": { "name": "Drifting sensors" },
           "all_clear": { "name": "All clear" }
@@ -692,6 +800,10 @@
       },
       "sensor_consistency": {
         "name": "Sensor Consistency",
+        "state": {
+          "OK": "OK",
+          "Warning": "Warning"
+        },
         "state_attributes": {
           "flags": { "name": "Consistency flags" },
           "all_clear": { "name": "All clear" }
@@ -718,6 +830,11 @@
       },
       "forecast_agreement": {
         "name": "Forecast Agreement",
+        "state": {
+          "aligned": "Aligned",
+          "diverging": "Diverging",
+          "conflict": "Conflict"
+        },
         "state_attributes": {
           "zambretti_implied_rain_pct": { "name": "Zambretti implied rain (%)" },
           "openmeteo_precip_prob": { "name": "Open-Meteo precip. prob. (%)" },

@@ -396,6 +396,11 @@
       },
       "alert_state": {
         "name": "État d'alerte",
+        "state": {
+          "clear": "Aucune alerte",
+          "advisory": "Avis",
+          "warning": "Alerte"
+        },
         "state_attributes": {
           "message": { "name": "Message" },
           "icon": { "name": "Icône" },
@@ -425,6 +430,33 @@
       "frost_point": { "name": "Point de givre" },
       "zambretti_forecast": {
         "name": "Prévision Zambretti",
+        "state": {
+          "Settled fine": "Beau temps stable",
+          "Fine weather": "Beau temps",
+          "Becoming fine": "En amélioration",
+          "Fine, becoming less settled": "Beau temps, instabilité à venir",
+          "Fine, possible showers": "Beau temps, averses possibles",
+          "Fairly fine, improving": "Assez beau, en amélioration",
+          "Fairly fine, possible showers early": "Assez beau, averses possibles tôt",
+          "Fairly fine, showery later": "Assez beau, averses ensuite",
+          "Showery early, improving": "Averses tôt, amélioration",
+          "Changeable, mending": "Variable, en amélioration",
+          "Rather unsettled clearing later": "Instable, éclaircies ensuite",
+          "Unsettled, probably improving": "Instable, amélioration probable",
+          "Showery, bright intervals": "Averses, éclaircies",
+          "Showery, becoming rather unsettled": "Averses, instabilité croissante",
+          "Changeable, some rain": "Variable, quelques pluies",
+          "Unsettled, short fine intervals": "Instable, courtes éclaircies",
+          "Unsettled, rain later": "Instable, pluie ensuite",
+          "Unsettled, some rain": "Instable, quelques pluies",
+          "Mostly very unsettled": "Très instable",
+          "Occasional rain, worsening": "Pluies occasionnelles, dégradation",
+          "Rain at times, very unsettled": "Pluies intermittentes, très instable",
+          "Rain at frequent intervals": "Pluies fréquentes",
+          "Rain, very unsettled": "Pluvieux, très instable",
+          "Stormy, may improve": "Orageux, amélioration possible",
+          "Stormy, much rain": "Orageux, fortes pluies"
+        },
         "state_attributes": {
           "z_number": { "name": "Numéro Z" },
           "mslp_hpa": { "name": "Pression au niveau de la mer (hPa)" },
@@ -454,6 +486,37 @@
       "wind_direction_smoothed": { "name": "Direction du vent lissée" },
       "current_condition": {
         "name": "Condition actuelle",
+        "state": {
+          "sunny": "Ensoleillé",
+          "partly-cloudy": "Partiellement nuageux",
+          "cloudy": "Nuageux",
+          "overcast": "Couvert",
+          "clear-night": "Nuit claire",
+          "overcast-night": "Nuit couverte",
+          "sunrise": "Lever de soleil",
+          "sunset": "Coucher de soleil",
+          "golden-hour": "Heure dorée",
+          "clearing-after-rain": "Éclaircies après pluie",
+          "fog": "Brouillard",
+          "misty-morning": "Brume matinale",
+          "drizzle": "Bruine",
+          "rainy": "Pluvieux",
+          "heavy-rain": "Pluie forte",
+          "pre-storm": "Avant-orage",
+          "thunderstorm": "Orage",
+          "severe-storm": "Tempête sévère",
+          "hurricane": "Ouragan",
+          "snow-accumulation": "Chutes de neige",
+          "snowy": "Enneigé",
+          "sleet": "Grésil",
+          "icy-conditions": "Verglas",
+          "windy": "Venteux",
+          "windy-night": "Nuit venteuse",
+          "hot": "Chaud",
+          "cold": "Froid",
+          "sandstorm": "Tempête de sable",
+          "african-dust": "Poussières sahariennes"
+        },
         "state_attributes": {
           "icon": { "name": "Icône" },
           "mdi_icon": { "name": "Icône MDI" },
@@ -493,6 +556,13 @@
       "rain_last_24h": { "name": "Pluie des dernières 24h" },
       "pressure_trend": {
         "name": "Tendance de pression",
+        "state": {
+          "Rising Rapidly": "Hausse rapide",
+          "Rising": "En hausse",
+          "Steady": "Stable",
+          "Falling": "En baisse",
+          "Falling Rapidly": "Baisse rapide"
+        },
         "state_attributes": {
           "change_3h_hpa": { "name": "Variation 3 h (hPa)" },
           "change_3h": { "name": "Variation 3 h (hPa) [alias]" },
@@ -504,6 +574,12 @@
       },
       "station_health": {
         "name": "Santé de la station",
+        "state": {
+          "Online": "En ligne",
+          "Degraded": "Dégradé",
+          "Stale": "Données obsolètes",
+          "Offline": "Hors ligne"
+        },
         "state_attributes": {
           "color": { "name": "Couleur" },
           "battery_pct": { "name": "Batterie (%)" },
@@ -521,9 +597,28 @@
       "temperature_low_24h": { "name": "Température minimale (24h)" },
       "temperature_average_24h": { "name": "Température moyenne (24h)" },
       "wind_gust_max_24h": { "name": "Rafale maximale (24h)" },
-      "humidity_level": { "name": "Niveau d'humidité" },
+      "humidity_level": {
+        "name": "Niveau d'humidité",
+        "state": {
+          "Very Humid": "Très humide",
+          "Humid": "Humide",
+          "Slightly Humid": "Légèrement humide",
+          "Comfortable": "Confortable",
+          "Slightly Dry": "Légèrement sec",
+          "Dry": "Sec",
+          "Very Dry": "Très sec"
+        }
+      },
       "uv_level": {
         "name": "Niveau UV",
+        "state": {
+          "None": "Nul",
+          "Low": "Faible",
+          "Moderate": "Modéré",
+          "High": "Élevé",
+          "Very High": "Très élevé",
+          "Extreme": "Extrême"
+        },
         "state_attributes": {
           "uv_index": { "name": "Indice UV" },
           "recommendation": { "name": "Recommandation" },
@@ -613,6 +708,15 @@
       "pm10": { "name": "PM10" },
       "pollen_level": {
         "name": "Niveau de pollen",
+        "state": {
+          "Unknown": "Inconnu",
+          "None": "Nul",
+          "Very Low": "Très faible",
+          "Low": "Faible",
+          "Medium": "Moyen",
+          "High": "Élevé",
+          "Very High": "Très élevé"
+        },
         "state_attributes": {
           "grass_index": { "name": "Indice graminées" },
           "grass_level": { "name": "Niveau graminées" },
@@ -685,6 +789,10 @@
       },
       "sensor_drift": {
         "name": "Dérive des capteurs",
+        "state": {
+          "OK": "OK",
+          "Warning": "Avertissement"
+        },
         "state_attributes": {
           "drifting_sensors": { "name": "Capteurs en dérive" },
           "all_clear": { "name": "Tout est normal" }
@@ -692,6 +800,10 @@
       },
       "sensor_consistency": {
         "name": "Cohérence des capteurs",
+        "state": {
+          "OK": "OK",
+          "Warning": "Avertissement"
+        },
         "state_attributes": {
           "flags": { "name": "Indicateurs de cohérence" },
           "all_clear": { "name": "Tout est normal" }
@@ -718,6 +830,11 @@
       },
       "forecast_agreement": {
         "name": "Concordance des prévisions",
+        "state": {
+          "aligned": "Concordant",
+          "diverging": "Divergent",
+          "conflict": "En conflit"
+        },
         "state_attributes": {
           "zambretti_implied_rain_pct": { "name": "Pluie implicite Zambretti (%)" },
           "openmeteo_precip_prob": { "name": "Prob. précipitations Open-Meteo (%)" },
