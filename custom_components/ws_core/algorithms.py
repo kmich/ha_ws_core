@@ -604,16 +604,16 @@ def combine_rain_probability(
 
 
 def format_rain_display(rain_rate_mmph: float) -> str:
-    """Human-readable rain intensity description."""
+    """Return a snake_case intensity key for state translation."""
     if rain_rate_mmph > 10:
-        return f"Heavy ({rain_rate_mmph:.1f} mm/h)"
+        return "heavy"
     if rain_rate_mmph > 2:
-        return f"Moderate ({rain_rate_mmph:.1f} mm/h)"
+        return "moderate"
     if rain_rate_mmph > 0.5:
-        return f"Light ({rain_rate_mmph:.1f} mm/h)"
+        return "light"
     if rain_rate_mmph > 0:
-        return "Drizzle"
-    return "Dry"
+        return "drizzle"
+    return "dry"
 
 
 # ---------------------------------------------------------------------------

@@ -547,6 +547,13 @@
       },
       "rain_display": {
         "name": "Rain Display",
+        "state": {
+          "dry": "Dry",
+          "drizzle": "Drizzle",
+          "light": "Light",
+          "moderate": "Moderate",
+          "heavy": "Heavy"
+        },
         "state_attributes": {
           "rain_rate": { "name": "Rain rate (mm/h)" },
           "rain_today": { "name": "Rain today (mm)" },

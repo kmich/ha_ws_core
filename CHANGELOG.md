@@ -2,6 +2,16 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.3.2] - 2026-05-19
+
+### Bug Fixes
+
+- **Rain display state now translatable** — `sensor.ws_rain_display` was returning dynamic strings like `"Heavy (3.5 mm/h)"` which can't be used as translation keys. Fixed to return snake_case intensity keys (`dry`, `drizzle`, `light`, `moderate`, `heavy`) with the numeric rate already available in the `rain_rate` attribute. State translations added to all three translation files (closes #8). Reported by @Benjamin45590.
+
+### Improvements
+
+- **French translation polish** — 12 wording improvements contributed by @Benjamin45590: clearer descriptions for the location step, forecast step, and features options; improved Zambretti state labels (`"averses en début de journée"`, `"instable, éclaircies à venir"`, etc.); `"Pluie du jour"` instead of `"Pluie aujourd'hui"`; fog and thunderstorm risk labels shortened; pollen `"none"` changed from `"Nul"` to `"Aucun"`. PR #11.
+
 ## [1.3.1] - 2026-05-18
 
 ### Improvements
