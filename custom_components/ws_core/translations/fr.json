@@ -485,7 +485,7 @@
           "z_number": { "name": "Numéro Z" },
           "mslp_hpa": { "name": "Pression au niveau de la mer (hPa)" },
           "trend_3h_hpa": { "name": "Tendance 3 h (hPa/h)" },
-          "wind_quadrant": { "name": "Quadrant du vent" },
+          "wind_quadrant": { "name": "Secteur du vent" },
           "pressure_trend_display": { "name": "Tendance barométrique" }
         }
       },
@@ -501,7 +501,7 @@
         }
       },
       "wind_quadrant": {
-        "name": "Quadrant du vent",
+        "name": "Secteur du vent",
         "state_attributes": {
           "degrees": { "name": "Direction (°)" },
           "using_smoothed": { "name": "Direction lissée utilisée" }
@@ -558,7 +558,7 @@
           "mslp_hpa": { "name": "Pression au niveau de la mer (hPa)" },
           "pressure_trend_3h": { "name": "Tendance 3 h" },
           "humidity_pct": { "name": "Humidité (%)" },
-          "wind_quadrant": { "name": "Quadrant du vent" }
+          "wind_quadrant": { "name": "Secteur du vent" }
         }
       },
       "rain_probability_combined": {
