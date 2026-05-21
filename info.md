@@ -12,7 +12,7 @@
 
 ## What it does
 
-Weather Station Core reads raw sensor data from your existing weather station (Ecowitt, Davis, WeatherFlow, Shelly, etc.) and produces 50+ derived meteorological values — all through a guided config flow, no YAML required.
+Weather Station Core reads raw sensor data from your existing weather station (Ecowitt, Davis, WeatherFlow, Shelly, etc.) and produces 84 derived meteorological sensors — all through a guided config flow, no YAML required.
 
 ## Highlights
 
@@ -28,6 +28,9 @@ Weather Station Core reads raw sensor data from your existing weather station (E
 - **7-day forecast** via Open-Meteo (free, no API key)
 - **Air quality, pollen, moon phase, solar PV forecast, sea surface temperature** — all optional
 - **ET₀ evapotranspiration** (Hargreaves-Samani, upgrades to Penman-Monteith with solar radiation sensor)
+- **Pluggable forecast provider** — Open-Meteo (default), Met.no, NWS/NOAA, OpenWeatherMap, Pirate Weather, or Météo France; switch provider from the Configure menu at any time
+- **`apply_calibration` service** — write temperature, humidity, pressure, or wind calibration offsets from an automation or Developer Tools without opening the config flow
+- **Full imperial unit support** — all sensors with a `device_class` auto-convert to °F / mph / inches when HA is set to imperial
 - **Config entities on device page**: all thresholds, calibration offsets, and feature toggles exposed as `number` and `switch` entities — adjust settings directly without entering the config flow
 
 ## Requirements

@@ -206,7 +206,7 @@ The seven sub-index sensors are disabled by default; enable them individually on
 
 | Entity | Description |
 |---|---|
-| `sensor.ws_wu_upload_status` | Last upload status (OK / error message) |
+| `sensor.ws_wu_upload_status` | Upload state: `ok`, `error_http`, `error_network`, `error`, `disabled`; `last_upload` attribute holds the timestamp |
 
 ### Optional: Air Quality (`enable_air_quality`)
 
@@ -681,6 +681,11 @@ Six physical impossibility checks are evaluated every coordinator update. Any vi
 
 After approximately 14 days of operation, the integration builds a local climate baseline from the station's own history. For each calendar day the station has observed, it tracks the rolling 30-day mean high temperature, mean low temperature, total rain, and number of rain days.
 
+| Entity | Unit | Device Class | Description |
+|---|---|---|---|
+| `sensor.ws_temperature_anomaly_30d` | °C | temperature | Today's mean temperature vs. 30-day rolling mean (auto-converts to °F for imperial users) |
+| `sensor.ws_rain_anomaly_30d` | mm | precipitation | Today's rain vs. 30-day rolling daily average (auto-converts to inches for imperial users) |
+
 **Temperature anomaly:** today's mean temperature minus the 30-day rolling mean.
 **Rain anomaly:** today's rain total minus the 30-day rolling daily average.
 
@@ -694,7 +699,6 @@ Example Blueprint automations are provided in `blueprints/`:
 
 - **Frost Alert**: Notify when temperature drops below threshold
 - **Rain Notification**: Alert when rain starts or rain probability exceeds threshold
-- **Laundry Reminder**: Morning notification when conditions are good for outdoor drying
 - **Storm Warning**: Alert on rapid pressure drop with high wind
 
 See `blueprints/README.md` for installation instructions.
@@ -727,6 +731,7 @@ Offsets are applied after unit conversion, before all derived calculations (dew 
 | **NWS/NOAA** | ✅ | ❌ | US only; returns an error outside the continental US |
 | **OpenWeatherMap** | ✅* | ✅ | One Call 3.0 API; free tier requires registration |
 | **Pirate Weather** | ✅* | ✅ | Dark Sky-compatible API; free tier available |
+| **Météo France** | ✅* | ✅ | Météo Concept API; free tier available at api.meteo-concept.com |
 
 Existing installs default to Open-Meteo automatically when upgrading — no action needed.
 
@@ -763,6 +768,7 @@ Download diagnostics via Settings → Devices & Services → Weather Station Cor
 | Service | Description |
 |---|---|
 | `ws_core.reset_rain_baseline` | Reset the internal rain total baseline. Useful after station rain counter resets. |
+| `ws_core.apply_calibration` | Write sensor calibration offsets directly from an automation or Developer Tools. Supports `cal_temp_c` (±10 °C), `cal_humidity` (±20 %), `cal_pressure_hpa` (±20 hPa), `cal_wind_ms` (±5 m/s). Optional `entry_id` targets a specific instance; omit to apply to all. Reloads the entry immediately. |
 
 ---
 
