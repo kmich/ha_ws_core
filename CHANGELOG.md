@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.4.1] - 2026-05-21
+
+### Bug Fixes
+
+- **Patch release to fix v1.4.0 release artifact** — the v1.4.0 GitHub release zip was published before CI fixes were committed, causing `translations/en.json` to contain a trailing comma that prevented the integration from loading. No code changes beyond the version bump; the fix was already on `main`.
+
 ## [1.4.0] - 2026-05-21
 
 ### New Features
