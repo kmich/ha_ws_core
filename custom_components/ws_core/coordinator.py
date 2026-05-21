@@ -1,4 +1,4 @@
-"""Coordinator for Weather Station Core -- v0.3.0.
+"""Coordinator for Weather Station Core -- v1.4.2.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors
@@ -24,8 +24,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json as _json
 import logging
 import math
+import pathlib as _pathlib
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -111,7 +113,10 @@ from .const import (
     CONF_SOLAR_PEAK_KW,
     CONF_SOURCES,
     CONF_STALENESS_S,
+    CONF_THRESH_FREEZE_C,
     CONF_THRESH_HEAT_DAY_C,
+    CONF_THRESH_RAIN_RATE_MMPH,
+    CONF_THRESH_WIND_GUST_MS,
     CONF_UNITS_MODE,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
@@ -136,8 +141,20 @@ from .const import (
     DEFAULT_SOLAR_PANEL_TILT,
     DEFAULT_SOLAR_PEAK_KW,
     DEFAULT_STALENESS_S,
+    DEFAULT_THRESH_FREEZE_C,
     DEFAULT_THRESH_HEAT_DAY_C,
+    DEFAULT_THRESH_RAIN_RATE_MMPH,
+    DEFAULT_THRESH_WIND_GUST_MS,
     DEFAULT_WU_INTERVAL_MIN,
+    DRIFT_R_SQ_THRESH,
+    DRIFT_SLOPE_HUMIDITY_PCT_H,
+    DRIFT_SLOPE_PRESSURE_HPA_H,
+    DRIFT_SLOPE_TEMP_C_H,
+    DRIFT_STUCK_BUCKET_MIN_RATE,
+    DRIFT_STUCK_BUCKET_SAMPLES,
+    DRIFT_STUCK_RATE_RANGE_MAX,
+    FORECAST_AGREEMENT_ALIGNED_PP,
+    FORECAST_AGREEMENT_CONFLICT_PP,
     FORECAST_MAX_RETRY_S,
     FORECAST_MIN_RETRY_S,
     KEY_ALERT_MESSAGE,
@@ -272,6 +289,10 @@ except ImportError:
     HAS_REPAIRS = False
 
 _LOGGER = logging.getLogger(__name__)
+
+_INTEGRATION_VERSION: str = _json.loads(
+    (_pathlib.Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+).get("version", "unknown")
 
 
 # ---------------------------------------------------------------------------
@@ -1138,9 +1159,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         api_precip_prob = float(api_precip_prob)
         delta = abs(z_rain_pct - api_precip_prob)
 
-        if delta < 20:
+        if delta < FORECAST_AGREEMENT_ALIGNED_PP:
             state = "aligned"
-        elif delta < 40:
+        elif delta < FORECAST_AGREEMENT_CONFLICT_PP:
             state = "diverging"
         else:
             state = "conflict"
@@ -1244,9 +1265,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_DATA_QUALITY] = dq
 
         # Configurable alerts
-        gust_thr = float(self.entry_options.get("thresh_wind_gust_ms", 17.0))
-        rain_thr = float(self.entry_options.get("thresh_rain_rate_mmph", 20.0))
-        freeze_thr = float(self.entry_options.get("thresh_freeze_c", 0.0))
+        gust_thr = float(self.entry_options.get(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
+        rain_thr = float(self.entry_options.get(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
+        freeze_thr = float(self.entry_options.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
 
         gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
         rain_rate = data.get(KEY_RAIN_RATE_FILT) or 0.0
@@ -1439,7 +1460,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Daily update (once per calendar day)
         if date_str != self._learning_last_daily_update and t_high is not None and t_low is not None:
             rain_today = float(data.get("_rain_today_mm", 0.0))
-            thresh_freeze = float(self.entry_options.get("thresh_freeze_c", 0.0))
+            thresh_freeze = float(self.entry_options.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
             update_daily_streaks(
                 self._learning_state,
                 date_str,
@@ -1461,7 +1482,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_HEAT_STREAK] = self._learning_state.heat_streak_days
         data["_heat_streak_threshold_c"] = self.thresh_heat_day_c
         data[KEY_FROST_STREAK] = self._learning_state.frost_streak_days
-        data["_frost_streak_threshold_c"] = float(self.entry_options.get("thresh_freeze_c", 0.0))
+        data["_frost_streak_threshold_c"] = float(self.entry_options.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
 
     # ------------------------------------------------------------------
     # v1.2.0 — 30-day rolling climatology
@@ -1535,17 +1556,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     }
                 )
 
-        _check_slope(self._drift_temp, 0.1, 0.85, "temperature", "°C/h")
-        _check_slope(self._drift_humidity, 0.5, 0.85, "humidity", "%/h")
-        _check_slope(self._drift_pressure, 1.5, 0.85, "pressure", "hPa/h")
+        _check_slope(self._drift_temp, DRIFT_SLOPE_TEMP_C_H, DRIFT_R_SQ_THRESH, "temperature", "°C/h")
+        _check_slope(self._drift_humidity, DRIFT_SLOPE_HUMIDITY_PCT_H, DRIFT_R_SQ_THRESH, "humidity", "%/h")
+        _check_slope(self._drift_pressure, DRIFT_SLOPE_PRESSURE_HPA_H, DRIFT_R_SQ_THRESH, "pressure", "hPa/h")
 
         # Stuck rain bucket: rain_rate non-zero but constant at same non-zero value for >4h
-        if len(self._drift_rain_rate) >= 240:
-            recent_rates = [v for _, v in list(self._drift_rain_rate)[-240:]]
-            nonzero = [r for r in recent_rates if r > 0.1]
-            if len(nonzero) >= 240 * 0.8:
+        if len(self._drift_rain_rate) >= DRIFT_STUCK_BUCKET_SAMPLES:
+            recent_rates = [v for _, v in list(self._drift_rain_rate)[-DRIFT_STUCK_BUCKET_SAMPLES:]]
+            nonzero = [r for r in recent_rates if r > DRIFT_STUCK_BUCKET_MIN_RATE]
+            if len(nonzero) >= DRIFT_STUCK_BUCKET_SAMPLES * 0.8:
                 rate_range = max(nonzero) - min(nonzero)
-                if rate_range < 0.1 and len(nonzero) > 50:
+                if rate_range < DRIFT_STUCK_RATE_RANGE_MAX and len(nonzero) > 50:
                     flags.append(
                         {
                             "sensor": "rain_rate",
@@ -2237,7 +2258,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "rainin": _mm_to_in(rain_1h),
             "dailyrainin": _mm_to_in(rain_24h),
             "action": "updateraw",
-            "softwaretype": "ws_core_0.6.0",
+            "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
         }
         if temp_c is not None:
             params["tempf"] = _c_to_f(float(temp_c))

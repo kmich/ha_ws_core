@@ -296,6 +296,21 @@ ZAMBRETTI_LOWER_PRESSURE: float = 950.0
 FORECAST_MIN_RETRY_S: int = 300
 FORECAST_MAX_RETRY_S: int = 3600
 
+# Forecast agreement thresholds (percentage points)
+FORECAST_AGREEMENT_ALIGNED_PP: int = 20  # delta < 20 pp  -> aligned
+FORECAST_AGREEMENT_CONFLICT_PP: int = 40  # delta >= 40 pp -> conflict
+
+# Sensor drift detection — slope thresholds (per hour) and R² floor
+DRIFT_SLOPE_TEMP_C_H: float = 0.1  # °C/h monotonic drift flag
+DRIFT_SLOPE_HUMIDITY_PCT_H: float = 0.5  # %/h
+DRIFT_SLOPE_PRESSURE_HPA_H: float = 1.5  # hPa/h
+DRIFT_R_SQ_THRESH: float = 0.85  # minimum R² to flag as drift
+
+# Stuck rain-bucket detection (samples at ~1 min intervals)
+DRIFT_STUCK_BUCKET_SAMPLES: int = 240  # 4-hour rolling window
+DRIFT_STUCK_BUCKET_MIN_RATE: float = 0.1  # mm/h minimum to count as non-zero
+DRIFT_STUCK_RATE_RANGE_MAX: float = 0.1  # mm/h max spread to flag as stuck
+
 CONFIG_VERSION = 2
 
 # ---------------------------------------------------------------------------

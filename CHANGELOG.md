@@ -2,6 +2,19 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.4.2] - 2026-05-21
+
+### Bug Fixes
+
+- **Weather Underground `softwaretype` was stale** — hardcoded to `"ws_core_0.6.0"` since the initial release. Now reads the version dynamically from `manifest.json` at startup, so WU upload reports the correct software version automatically on every release.
+
+### Cleanup
+
+- **Extracted forecast agreement thresholds to constants** — `FORECAST_AGREEMENT_ALIGNED_PP = 20` and `FORECAST_AGREEMENT_CONFLICT_PP = 40` defined in `const.py`; the `_compute_forecast_agreement` logic now references these instead of bare integers.
+- **Extracted drift detection thresholds to constants** — `DRIFT_SLOPE_TEMP_C_H`, `DRIFT_SLOPE_HUMIDITY_PCT_H`, `DRIFT_SLOPE_PRESSURE_HPA_H`, `DRIFT_R_SQ_THRESH`, `DRIFT_STUCK_BUCKET_SAMPLES`, `DRIFT_STUCK_BUCKET_MIN_RATE`, `DRIFT_STUCK_RATE_RANGE_MAX` added to `const.py`; `_compute_drift_detection` uses them throughout.
+- **Alert threshold lookups now use `CONF_*` / `DEFAULT_*` constants** — three `.entry_options.get("thresh_...", <hardcoded>)` calls replaced with their proper `const.py` symbols (`CONF_THRESH_WIND_GUST_MS`, `CONF_THRESH_RAIN_RATE_MMPH`, `CONF_THRESH_FREEZE_C` and their `DEFAULT_*` counterparts).
+- **Coordinator header version updated** — docstring still referenced `v0.3.0`.
+
 ## [1.4.1] - 2026-05-21
 
 ### Bug Fixes
