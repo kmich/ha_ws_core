@@ -90,8 +90,6 @@
           "staleness_s": "Délai d'inactivité des capteurs",
           "rain_filter_alpha": "Lissage du débit de pluie (Kalman)",
           "pressure_trend_window_h": "Fenêtre de tendance de pression",
-          "rain_penalty_light_mmph": "Début de l'impact de la pluie sur les calculs",
-          "rain_penalty_heavy_mmph": "Impact maximal de la pluie sur les calculs",
           "_go_back": "← Retour à l'étape précédente"
         }
       },
@@ -194,8 +192,6 @@
           "staleness_s": "Délai d'inactivité des capteurs",
           "rain_filter_alpha": "Lissage du filtre pluie",
           "pressure_trend_window_h": "Fenêtre de tendance de pression",
-          "rain_penalty_light_mmph": "Début de l'impact pluie",
-          "rain_penalty_heavy_mmph": "Impact pluie maximum",
           "cal_temp_c": "Offset de calibration température",
           "cal_humidity": "Offset de calibration humidité",
           "cal_pressure_hpa": "Offset de calibration pression",
@@ -229,8 +225,6 @@
           "staleness_s": "Délai d'inactivité des capteurs",
           "rain_filter_alpha": "Lissage du filtre pluie",
           "pressure_trend_window_h": "Fenêtre de tendance de pression",
-          "rain_penalty_light_mmph": "Début de l'impact pluie",
-          "rain_penalty_heavy_mmph": "Impact pluie maximum",
           "cal_temp_c": "Offset de calibration température",
           "cal_humidity": "Offset de calibration humidité",
           "cal_pressure_hpa": "Offset de calibration pression",
@@ -702,7 +696,19 @@
         }
       },
       "et0_hourly": { "name": "ET₀ (horaire)" },
-      "wu_status": { "name": "État Weather Underground" },
+      "wu_status": {
+        "name": "État Weather Underground",
+        "state": {
+          "disabled": "Désactivé",
+          "ok": "OK",
+          "error_http": "Erreur HTTP",
+          "error_network": "Erreur réseau",
+          "error": "Erreur"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Dernier envoi réussi" }
+        }
+      },
       "aqi": {
         "name": "Indice de qualité de l'air",
         "state_attributes": {
@@ -941,12 +947,6 @@
       "ws_pressure_trend_window": {
         "name": "Réglage : Fenêtre tendance pression"
       },
-      "ws_rain_penalty_light": {
-        "name": "Réglage : Début impact pluie"
-      },
-      "ws_rain_penalty_heavy": {
-        "name": "Réglage : Impact pluie maximum"
-      }
     },
     "binary_sensor": {
       "ws_package_ok": {

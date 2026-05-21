@@ -90,8 +90,6 @@
           "staleness_s": "Sensor staleness timeout",
           "rain_filter_alpha": "Rain-rate Kalman filter smoothing",
           "pressure_trend_window_h": "Pressure trend window",
-          "rain_penalty_light_mmph": "Rain penalty start threshold",
-          "rain_penalty_heavy_mmph": "Rain penalty maximum threshold",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -194,8 +192,6 @@
           "staleness_s": "Sensor staleness timeout",
           "rain_filter_alpha": "Rain-rate filter smoothing",
           "pressure_trend_window_h": "Pressure trend window",
-          "rain_penalty_light_mmph": "Rain penalty start",
-          "rain_penalty_heavy_mmph": "Rain penalty maximum",
           "cal_temp_c": "Temperature calibration offset",
           "cal_humidity": "Humidity calibration offset",
           "cal_pressure_hpa": "Pressure calibration offset",
@@ -229,8 +225,6 @@
           "staleness_s": "Sensor staleness timeout",
           "rain_filter_alpha": "Rain-rate filter smoothing",
           "pressure_trend_window_h": "Pressure trend window",
-          "rain_penalty_light_mmph": "Rain penalty start",
-          "rain_penalty_heavy_mmph": "Rain penalty maximum",
           "cal_temp_c": "Temperature calibration offset",
           "cal_humidity": "Humidity calibration offset",
           "cal_pressure_hpa": "Pressure calibration offset",
@@ -702,7 +696,19 @@
         }
       },
       "et0_hourly": { "name": "ET₀ (Hourly)" },
-      "wu_status": { "name": "Weather Underground Status" },
+      "wu_status": {
+        "name": "Weather Underground Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last successful upload" }
+        }
+      },
       "aqi": {
         "name": "Air Quality Index",
         "state_attributes": {
@@ -940,12 +946,6 @@
       },
       "ws_pressure_trend_window": {
         "name": "Tuning: Pressure Trend Window"
-      },
-      "ws_rain_penalty_light": {
-        "name": "Tuning: Rain Penalty Start"
-      },
-      "ws_rain_penalty_heavy": {
-        "name": "Tuning: Rain Penalty Maximum"
       }
     },
     "binary_sensor": {

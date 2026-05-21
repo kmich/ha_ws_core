@@ -996,12 +996,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_RAIN_FILTER_ALPHA] = float(user_input[CONF_RAIN_FILTER_ALPHA])
                 self._data[CONF_PRESSURE_TREND_WINDOW_H] = int(user_input[CONF_PRESSURE_TREND_WINDOW_H])
                 self._data[CONF_STALENESS_S] = int(user_input[CONF_STALENESS_S])
-                self._data[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
-                    float(user_input[CONF_RAIN_PENALTY_LIGHT_MMPH]), imperial
-                )
-                self._data[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
-                    float(user_input[CONF_RAIN_PENALTY_HEAVY_MMPH]), imperial
-                )
 
                 title = self._data.get(CONF_NAME, DEFAULT_NAME)
                 return self.async_create_entry(title=title, data=self._data)
@@ -1046,18 +1040,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_PRESSURE_TREND_WINDOW_H, default=DEFAULT_PRESSURE_TREND_WINDOW_H
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
-                    ),
-                    vol.Optional(
-                        CONF_RAIN_PENALTY_LIGHT_MMPH,
-                        default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_LIGHT_MMPH, imperial), 2),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u)
-                    ),
-                    vol.Optional(
-                        CONF_RAIN_PENALTY_HEAVY_MMPH,
-                        default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_HEAVY_MMPH, imperial), 1),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
                     ),
                 }
             ),
@@ -1147,8 +1129,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         cur_gust_ms = float(g(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
         cur_rain_mmph = float(g(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
         cur_freeze_c = float(g(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
-        cur_light_mmph = float(g(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH))
-        cur_heavy_mmph = float(g(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH))
         return vol.Schema(
             {
                 vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
@@ -1244,16 +1224,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     default=g(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
-                ),
-                vol.Optional(
-                    CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(cur_light_mmph, imperial), 2)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u)
-                ),
-                vol.Optional(
-                    CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(cur_heavy_mmph, imperial), 1)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
                 ),
                 vol.Optional(CONF_CAL_TEMP_C, default=g(CONF_CAL_TEMP_C, DEFAULT_CAL_TEMP_C)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="°C")

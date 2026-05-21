@@ -2,6 +2,27 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.4.0] - 2026-05-21
+
+### New Features
+
+- **`apply_calibration` service action** — write sensor calibration offsets directly from an automation or the Developer Tools UI without opening the config flow. Supports `cal_temp_c`, `cal_humidity`, `cal_pressure_hpa`, `cal_wind_ms`; reloads the entry immediately. Documented in `services.yaml` with full field selectors.
+- **`temperature_anomaly_30d` and `rain_anomaly_30d` now unit-aware** — added `device_class=TEMPERATURE` and `device_class=PRECIPITATION` respectively so HA auto-converts values to °F / inches for imperial users, just like every other sensor.
+
+### Bug Fixes
+
+- **`wu_status` now translatable** — replaced dynamic strings like `"OK 14:32"` and `"Error HTTP 403: ..."` with enum state keys (`disabled`, `ok`, `error_http`, `error_network`, `error`). Last successful upload timestamp moved to the `last_upload` state attribute. State translations added in English and French.
+
+### Cleanup
+
+- **Removed dead `laundry_reminder.yaml` blueprint** — `sensor.ws_laundry_drying_score` was removed in v0.3.0; this blueprint has been broken for years. `blueprints/README.md` updated accordingly.
+- **Removed dead config constants** — `CONF_ENABLE_LAUNDRY`, `CONF_ENABLE_STARGAZING`, `CONF_ENABLE_RUNNING`, `CONF_ENABLE_METAR`, `CONF_METAR_*`, `CONF_ENABLE_CWOP`, `CONF_CWOP_*`, `CONF_ENABLE_EXPORT`, `CONF_EXPORT_*`, `CONF_ENABLE_DEGREE_DAYS`, `CONF_DEGREE_DAY_BASE_C`, `CONF_ENABLE_ACTIVITY_SCORES`, `CONF_ENABLE_EXTENDED_SENSORS` and their corresponding defaults removed from `const.py`. All are already listed in `DEPRECATED_CONF_KEYS_V030` for migration.
+- **Removed dead `rain_penalty` config fields** — `rain_penalty_light_mmph` and `rain_penalty_heavy_mmph` were config flow fields for the removed laundry/activity score feature. Removed from `config_flow.py`, `strings.json`, `en.json`, `fr.json`, and `number.py` comment.
+- **Removed empty tracked files** — `git` and `ruff` (zero-byte files accidentally committed) removed from the repo.
+- **Added `.ruff_cache/` to `.gitignore`** — the ruff cache directory was not gitignored.
+- **Dashboard version headers updated** — `weather_dashboard.yaml` and `weather_dashboard_vanilla.yaml` were still labelled `v1.0.0`.
+- **Entity map regenerated** — `docs/entity_map.html` was showing `WS Core 1.1.0`; regenerated at v1.4.0 (84 sensors, 11 switches).
+
 ## [1.3.2] - 2026-05-19
 
 ### Bug Fixes

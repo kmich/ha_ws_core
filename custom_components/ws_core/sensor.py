@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v0.5.0."""
+"""Sensors for Weather Station Core -- v1.4.0."""
 
 from __future__ import annotations
 
@@ -804,6 +804,7 @@ SENSORS: list[WSSensorDescription] = [
         name="WS Weather Underground Status",
         icon="mdi:weather-cloudy-clock",
         entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_wu_last_upload")},
     ),
     # ---------------------------------------------------------------
     # Air Quality  (v0.7.0, Open-Meteo AQI API)
@@ -1065,6 +1066,7 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="temperature_anomaly_30d",
         name="WS Temperature Anomaly (30-day)",
         icon="mdi:thermometer-alert",
+        device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {"normal_30d_c": d.get("_temp_normal_30d")},
@@ -1074,6 +1076,7 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="rain_anomaly_30d",
         name="WS Rain Anomaly (30-day)",
         icon="mdi:water-percent-alert",
+        device_class=SensorDeviceClass.PRECIPITATION,
         native_unit=UNIT_RAIN_MM,
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {"normal_30d_avg_mm": d.get("_rain_normal_30d_avg")},

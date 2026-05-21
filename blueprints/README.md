@@ -15,11 +15,9 @@ These are Home Assistant Blueprint automations that work with Weather Station Co
 |---|---|---|
 | `frost_alert.yaml` | Temperature below threshold | Notify when frost risk is detected |
 | `rain_notification.yaml` | Rain rate or probability | Notify when rain starts or is imminent |
-| `laundry_reminder.yaml` | Daily time check | Morning notification when drying conditions are excellent |
 | `storm_warning.yaml` | Rapid pressure drop + high wind | Alert when a storm front approaches |
 
 ## Notes
 
-- The **laundry reminder** requires activity scores to be enabled in the integration options.
 - All blueprints default to `notify.persistent_notification`. Change to your mobile app notification service for push alerts.
 - Entity IDs assume the default `ws` prefix. Adjust if you used a different prefix.

@@ -40,6 +40,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Tool caches
+.ruff_cache/
+
 # Environments
 .env
 .venv

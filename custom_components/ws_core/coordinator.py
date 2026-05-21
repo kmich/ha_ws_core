@@ -393,7 +393,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.wu_api_key: str = str(_get(CONF_WU_API_KEY, "") or "")
         self.wu_interval_min = int(_get(CONF_WU_INTERVAL_MIN, DEFAULT_WU_INTERVAL_MIN))
         self._wu_last_upload: Any = None
-        self._wu_status: str = "Disabled"
+        self._wu_status: str = "disabled"
 
         # Air Quality + Pollen (Open-Meteo Air Quality API, single fetch)
         self.aqi_enabled = bool(_get(CONF_ENABLE_AIR_QUALITY, DEFAULT_ENABLE_AIR_QUALITY))
@@ -1887,10 +1887,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_sea_temp_grid_lon"] = self._sea_temp_cache.get("grid_lon")
             data["_sea_temp_disclaimer"] = self._sea_temp_cache.get("disclaimer")
 
-        # v0.3.0 cleanup: removed METAR cross-validation, CWOP/export status blocks.
-        # Weather Underground status retained but disabled-by-default for v0.6 roadmap.
         if self.wu_enabled:
             data[KEY_WU_STATUS] = self._wu_status
+            data["_wu_last_upload"] = (
+                self._wu_last_upload.isoformat() if self._wu_last_upload else None
+            )
 
         # Air Quality (Open-Meteo Air Quality API)
         if self.aqi_enabled and self._aqi_cache:
@@ -2256,16 +2257,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 body = await resp.text()
                 if resp.status == 200 and "success" in body.lower():
                     self._wu_last_upload = now_utc
-                    self._wu_status = f"OK {self._wu_last_upload.strftime('%H:%M')}"
+                    self._wu_status = "ok"
                     _LOGGER.debug("WUnderground upload OK")
                 else:
-                    self._wu_status = f"Error HTTP {resp.status}: {body[:60]}"
+                    self._wu_status = "error_http"
                     _LOGGER.warning("WUnderground upload failed HTTP %d: %s", resp.status, body[:120])
         except (aiohttp.ClientError, TimeoutError) as exc:
-            self._wu_status = f"Error: {exc}"
+            self._wu_status = "error_network"
             _LOGGER.warning("WUnderground upload error: %s", exc)
         except Exception as exc:
-            self._wu_status = f"Error: {exc}"
+            self._wu_status = "error"
             _LOGGER.error("WUnderground upload unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------

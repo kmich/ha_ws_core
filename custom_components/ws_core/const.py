@@ -37,48 +37,22 @@ CONF_THRESH_RAIN_RATE_MMPH = "thresh_rain_rate_mmph"
 CONF_THRESH_FREEZE_C = "thresh_freeze_c"
 CONF_RAIN_FILTER_ALPHA = "rain_filter_alpha"
 CONF_PRESSURE_TREND_WINDOW_H = "pressure_trend_window_h"
-CONF_ENABLE_ACTIVITY_SCORES = "enable_activity_scores"
-CONF_ENABLE_EXTENDED_SENSORS = "enable_extended_sensors"
 
-# Granular feature toggles (override the coarse group toggles above)
+# Feature toggles
 CONF_ENABLE_ZAMBRETTI = "enable_zambretti"
 CONF_ENABLE_DISPLAY_SENSORS = "enable_display_sensors"
-CONF_ENABLE_LAUNDRY = "enable_laundry_score"
-CONF_ENABLE_STARGAZING = "enable_stargazing_score"
 CONF_ENABLE_FIRE_RISK = "enable_fire_risk_score"
-CONF_ENABLE_RUNNING = "enable_running_score"
 CONF_ENABLE_SEA_TEMP = "enable_sea_temp"
 CONF_SEA_TEMP_LAT = "sea_temp_lat"
 CONF_SEA_TEMP_LON = "sea_temp_lon"
 CONF_RAIN_PENALTY_LIGHT_MMPH = "rain_penalty_light_mmph"
 CONF_RAIN_PENALTY_HEAVY_MMPH = "rain_penalty_heavy_mmph"
 
-# Degree days (v0.5.0)
-CONF_ENABLE_DEGREE_DAYS = "enable_degree_days"
-CONF_DEGREE_DAY_BASE_C = "degree_day_base_c"
-
-# METAR cross-validation (v0.5.0)
-CONF_ENABLE_METAR = "enable_metar"
-CONF_METAR_ICAO = "metar_icao"
-CONF_METAR_INTERVAL_MIN = "metar_interval_min"
-
-# v0.6.0 CWOP upload
-CONF_ENABLE_CWOP = "enable_cwop"
-CONF_CWOP_CALLSIGN = "cwop_callsign"
-CONF_CWOP_PASSCODE = "cwop_passcode"
-CONF_CWOP_INTERVAL_MIN = "cwop_interval_min"
-
-# v0.6.0 Weather Underground upload
+# Weather Underground upload
 CONF_ENABLE_WUNDERGROUND = "enable_wunderground"
 CONF_WU_STATION_ID = "wu_station_id"
 CONF_WU_API_KEY = "wu_api_key"
 CONF_WU_INTERVAL_MIN = "wu_interval_min"
-
-# v0.6.0 CSV/JSON export
-CONF_ENABLE_EXPORT = "enable_export"
-CONF_EXPORT_PATH = "export_path"
-CONF_EXPORT_FORMAT = "export_format"
-CONF_EXPORT_INTERVAL_MIN = "export_interval_min"
 
 # Calibration offsets (applied after unit conversion, in canonical metric units)
 CONF_CAL_TEMP_C = "cal_temp_c"
@@ -105,35 +79,15 @@ DEFAULT_THRESH_RAIN_RATE_MMPH = 20.0
 DEFAULT_THRESH_FREEZE_C = 0.0
 DEFAULT_RAIN_FILTER_ALPHA = 0.7
 DEFAULT_PRESSURE_TREND_WINDOW_H = 3
-DEFAULT_ENABLE_ACTIVITY_SCORES = False
-DEFAULT_ENABLE_EXTENDED_SENSORS = True
-
 DEFAULT_ENABLE_ZAMBRETTI = True
 DEFAULT_ENABLE_DISPLAY_SENSORS = True
-DEFAULT_ENABLE_LAUNDRY = False
-DEFAULT_ENABLE_STARGAZING = False
 DEFAULT_ENABLE_FIRE_RISK = False
-DEFAULT_ENABLE_RUNNING = False
 DEFAULT_ENABLE_SEA_TEMP = False
 DEFAULT_RAIN_PENALTY_LIGHT_MMPH = 0.2
 DEFAULT_RAIN_PENALTY_HEAVY_MMPH = 5.0
 
-# Degree days defaults
-DEFAULT_ENABLE_DEGREE_DAYS = False
-DEFAULT_DEGREE_DAY_BASE_C = 18.0
-
-# METAR defaults
-DEFAULT_ENABLE_METAR = False
-DEFAULT_METAR_INTERVAL_MIN = 60
-
-# v0.6.0 defaults
-DEFAULT_ENABLE_CWOP = False
-DEFAULT_CWOP_INTERVAL_MIN = 10
 DEFAULT_ENABLE_WUNDERGROUND = False
 DEFAULT_WU_INTERVAL_MIN = 5
-DEFAULT_ENABLE_EXPORT = False
-DEFAULT_EXPORT_FORMAT = "csv"
-DEFAULT_EXPORT_INTERVAL_MIN = 60
 
 DEFAULT_CAL_TEMP_C = 0.0
 DEFAULT_CAL_HUMIDITY = 0.0
