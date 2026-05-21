@@ -1573,6 +1573,20 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_FWI_BUI: "fwi_bui",
             KEY_FWI: "fwi",
             KEY_FWI_DSR: "fwi_dsr",
+            # v1.5.0 — comfort indices + agrometeorological
+            KEY_HEAT_INDEX: "heat_index",
+            KEY_WIND_CHILL: "wind_chill",
+            KEY_HUMIDEX: "humidex",
+            KEY_VPD: "vpd",
+            KEY_ABSOLUTE_HUMIDITY: "absolute_humidity",
+            KEY_DELTA_T: "delta_t",
+            KEY_THW_INDEX: "thw_index",
+            KEY_THSW_INDEX: "thsw_index",
+            KEY_WIND_RUN_KM: "wind_run",
+            KEY_CHILL_HOURS_TODAY: "chill_hours_today",
+            KEY_CHILL_HOURS_SEASON: "chill_hours_season",
+            KEY_CLEARNESS_INDEX: "clearness_index",
+            KEY_CLOUD_COVER_PCT: "cloud_cover",
         }
         if key in overrides:
             return overrides[key]

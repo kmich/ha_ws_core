@@ -7,7 +7,7 @@
 
 **Turn any personal weather station into a comprehensive, scientifically-grounded weather intelligence hub for Home Assistant.**
 
-Weather Station Core reads raw sensor data from your existing weather station — Ecowitt, Davis, WeatherFlow, Shelly, or any HA-integrated PWS — and produces 80+ derived meteorological values through a guided config flow. No YAML required.
+Weather Station Core reads raw sensor data from your existing weather station — Ecowitt, Davis, WeatherFlow, Shelly, or any HA-integrated PWS — and produces 95+ derived meteorological values through a guided config flow. No YAML required.
 
 ---
 
@@ -19,10 +19,25 @@ Weather Station Core reads raw sensor data from your existing weather station �
 
 ---
 
+## What's New in 1.5.0
+
+**13 new comfort & agrometeorological sensors**, all behind the new **Comfort Indices** feature toggle (enabled by default; the individual entities ship *disabled* in the entity registry — enable the ones you want on the device page).
+
+- **Heat stress**: Heat Index (NWS Rothfusz), Humidex (Environment Canada), Davis THW & THSW indices
+- **Cold stress**: Wind Chill (WMO 2001)
+- **Humidity/vapour**: Vapour Pressure Deficit (kPa), Absolute Humidity (g/m³)
+- **Agronomy**: Delta-T spray window, Wind Run (daily km), Chill Hours (today + season)
+- **Solar/cloud**: Clearness Index (Kt), Cloud Cover % — both from an optional solar radiation sensor
+
+See [Optional: Comfort Indices](#optional-comfort-indices-enable_comfort_indices) below and the [CHANGELOG](CHANGELOG.md) for full details.
+
+---
+
 ## Features
 
 - **Real Zambretti barometric forecaster** — Negretti & Zambra lookup table (Z-numbers 1–26), climate-region-aware wind corrections, seasonal adjustment
 - **Wet-bulb temperature** (Stull 2011, ±0.3 °C) and **frost point** (Buck 1981 ice constants)
+- **Comfort & heat-stress indices** — Heat Index (NWS Rothfusz), Wind Chill (WMO 2001), Humidex (Environment Canada), Davis THW/THSW; plus VPD, absolute humidity, Delta-T spray window, wind run, chill hours, and solar-derived clearness index & cloud cover
 - **Nowcast correction (0–3 h)** — local station readings blend into the first three hourly forecast slots with tapering weights (70 % local at h+0, 40 % at h+1, 10 % at h+2, pure NWP from h+3); fields: temperature, humidity, dew point, wind speed
 - **Adaptive rain probability** — `sensor.ws_rain_probability_combined` uses Brier-score-derived blend weights that learn over a rolling 90-day window which source (local heuristic vs NWP) has historically been more accurate; falls back to fixed day/night weights until enough data accumulates
 - **Forecast agreement sensor** — `sensor.ws_forecast_agreement` compares Zambretti's Z-number-implied rain likelihood against the NWP provider's `precip_prob`; states: `aligned` (< 20 pp delta), `diverging` (20–40 pp), `conflict` (> 40 pp) — useful for surfacing low-confidence forecasts in dashboards or automations
@@ -42,7 +57,7 @@ Weather Station Core reads raw sensor data from your existing weather station �
 - **Weather Underground upload** with credential validation at setup
 - **30-day rolling climatology** — local temperature and rain anomalies built from station history
 - **Sensor drift & consistency monitoring** — 72h regression drift detection, cross-sensor physics checks
-- **Full translations** — all 80+ entity names are translatable; French ships out of the box, more community translations welcome
+- **Full translations** — all 95+ entity names are translatable; French ships out of the box, more community translations welcome
 - **Full options flow** — every setting reconfigurable post-install via the Configure button, no reinstall needed
 
 ---
@@ -97,7 +112,7 @@ The setup wizard walks you through:
 | 4. Location & climate | Hemisphere, climate region, elevation (auto-detected from HA) |
 | 5. Display units | Temperature, wind, rain, pressure unit preferences |
 | 6. Forecast | Enable/disable 7-day forecast, coordinates, **forecast provider** (Open-Meteo / Met.no / NWS/NOAA / OpenWeatherMap / Pirate Weather); API key sub-step appears automatically for providers that require one |
-| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast |
+| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices |
 | 7a–7c | Per-feature sub-steps for Weather Underground (credentials), Solar Forecast (panel config), Sea Temp (lat/lon override) |
 | 8. Alerts | Wind/rain/freeze thresholds |
 
@@ -239,6 +254,26 @@ The seven sub-index sensors are disabled by default; enable them individually on
 | `sensor.ws_solar_forecast_today` | kWh | Estimated PV generation today |
 | `sensor.ws_solar_forecast_tomorrow` | kWh | Estimated PV generation tomorrow |
 
+### Optional: Comfort Indices (`enable_comfort_indices`)
+
+Enabled by default, but each entity ships **disabled in the entity registry** to avoid clutter — enable the ones you want via Settings → Devices & Services → Weather Station Core → entities. THSW, clearness index, and cloud cover require an optional `solar_radiation` (W/m²) source to be mapped.
+
+| Entity | Unit | Description |
+|---|---|---|
+| `sensor.ws_heat_index` | °C | NWS Heat Index (Rothfusz); active only when T ≥ 27 °C and RH ≥ 40 % |
+| `sensor.ws_wind_chill` | °C | WMO/NWS Wind Chill (2001); active only when T ≤ 10 °C and wind > 1.34 m/s |
+| `sensor.ws_humidex` | °C | Canadian Humidex (Environment Canada); active only when above ambient temperature |
+| `sensor.ws_thw_index` | °C | Davis THW index — Heat Index with wind cooling |
+| `sensor.ws_thsw_index` | °C | Davis THSW index — THW plus solar heating (needs solar radiation sensor) |
+| `sensor.ws_vpd` | kPa | Vapour Pressure Deficit — greenhouse / irrigation control |
+| `sensor.ws_absolute_humidity` | g/m³ | Mass of water vapour per m³ of air |
+| `sensor.ws_delta_t` | °C | Dry-bulb minus wet-bulb; spray-application window. `spray_suitability` attribute: `ideal` (2–8 °C) / too low / too high |
+| `sensor.ws_wind_run` | km | Daily accumulated wind travel; resets at local midnight |
+| `sensor.ws_chill_hours_today` | h | Hours today at or below the chill base temperature (default 7.2 °C) |
+| `sensor.ws_chill_hours_season` | h | Season-to-date chill hours; resets on configured date (default 1 July) |
+| `sensor.ws_clearness_index` | — | Clearness index Kt = observed / clear-sky solar radiation (needs solar radiation sensor) |
+| `sensor.ws_cloud_cover` | % | Approximate cloud cover derived from the clearness index |
+
 ### Other Entities
 
 | Entity | Type | Description |
@@ -281,6 +316,7 @@ All configurable parameters are exposed as entities on the device page so you ca
 | `switch.ws_enable_pollen` | Pollen levels |
 | `switch.ws_enable_moon` | Moon phase & illumination |
 | `switch.ws_enable_solar_forecast` | Solar PV forecast |
+| `switch.ws_enable_comfort_indices` | Comfort & agrometeorological indices |
 
 ---
 
@@ -387,6 +423,140 @@ where e = (RH / 100) × 6.105 × exp((17.27 · T) / (237.7 + T))   [vapour press
 ```
 
 **Reference:** Steadman, R.G. (1994). Norms of apparent temperature in Australia. *Aust. Met. Mag.*, 43, 1–16.
+
+---
+
+### Heat Index — NWS Rothfusz Regression (1990)
+
+The US National Weather Service "apparent temperature" for hot, humid conditions. A multiple regression fit to Steadman's 1979 heat-stress tables.
+
+```
+HI = −42.379 + 2.04901523·T + 10.14333127·RH − 0.22475541·T·RH
+     − 0.00683783·T² − 0.05481717·RH² + 0.00122874·T²·RH
+     + 0.00085282·T·RH² − 0.00000199·T²·RH²       (T in °F)
+```
+
+**Valid range:** T ≥ 27 °C (80 °F) and RH ≥ 40 %. Outside this envelope the sensor reports nothing (the formula is not defined and returns `None`).
+**Reference:** Rothfusz, L.P. (1990). *The Heat Index Equation.* NWS Technical Attachment SR 90-23.
+
+---
+
+### Wind Chill — WMO / NWS Joint Index (2001)
+
+The current North American/WMO wind chill, based on a model of facial heat loss with wind at 1.5 m face height.
+
+```
+WCT = 13.12 + 0.6215·T − 11.37·V^0.16 + 0.3965·T·V^0.16
+      (T in °C, V = wind speed in km/h)
+```
+
+**Valid range:** T ≤ 10 °C and wind > 1.34 m/s (4.8 km/h). Returns `None` otherwise.
+**Reference:** Environment Canada / NWS (2001). New wind chill equivalent temperature index.
+
+---
+
+### Humidex — Environment Canada (Masterton & Richardson 1979)
+
+The Canadian humidity-discomfort index, derived from the dew point rather than relative humidity.
+
+```
+e = 6.1078 · exp[5417.7530 · (1/273.16 − 1/(273.16 + T_d))]
+Humidex = T + 0.5555 · (e − 10)        (T, T_d in °C; e in hPa)
+```
+
+**Output:** reported only when the result exceeds the ambient temperature (otherwise `None`).
+**Reference:** Masterton, J.M. & Richardson, F.A. (1979). *Humidex: A method of quantifying human discomfort due to excessive heat and humidity.* Environment Canada, CLI 1-79.
+
+---
+
+### Davis THW & THSW Indices
+
+Davis Instruments' proprietary comfort indices used by Vantage Pro stations. **THW** (Temperature-Humidity-Wind) extends the Heat Index with a wind-cooling term; **THSW** (Temperature-Humidity-Sun-Wind) adds a solar-heating term and therefore requires a mapped solar radiation sensor.
+
+```
+THW  = HeatIndex − 1.072 · V          (V in mph)
+THSW = THW + 0.01 · solar_radiation    (solar in W/m²)
+```
+
+Both inherit the Heat Index validity envelope (T ≥ 27 °C, RH ≥ 40 %) and return `None` outside it.
+**Reference:** Davis Instruments WeatherLink documentation; Steadman (1979).
+
+---
+
+### Vapour Pressure Deficit (VPD)
+
+The difference between how much moisture the air can hold at saturation and how much it currently holds — the primary driver of plant transpiration and a key greenhouse/irrigation control variable.
+
+```
+e_s = 0.6108 · exp(17.27·T / (T + 237.3))     (saturation, kPa)
+e_a = e_s · RH/100                              (actual, kPa)
+VPD = e_s − e_a
+```
+
+**Reference:** Allen, R.G. et al. (1998). *FAO Irrigation and Drainage Paper 56*, Tetens/Murray formulation.
+
+---
+
+### Absolute Humidity
+
+The actual mass of water vapour per cubic metre of air, from the ideal gas law for water vapour.
+
+```
+e_s = 611.2 · exp(17.67·T / (T + 243.5))        (Pa)
+AH  = (e_s · RH/100) / (461.5 · (T + 273.15)) · 1000     (g/m³)
+```
+
+---
+
+### Delta-T — Spray Application Index
+
+Dry-bulb minus wet-bulb temperature, the standard index for deciding when conditions are suitable for spraying (evaporation and droplet-drift risk).
+
+```
+Delta-T = T − T_wetbulb
+```
+
+| Delta-T | Suitability |
+|---|---|
+| < 2 °C | Unsuitable (too humid — slow drying, drift) |
+| 2–8 °C | Ideal spray window |
+| > 8 °C | Unsuitable (too dry — rapid evaporation, poor coverage) |
+
+The classification is exposed in the `spray_suitability` state attribute.
+**Reference:** Australian Pesticides and Veterinary Medicines Authority (APVMA) spraying guidelines.
+
+---
+
+### Wind Run
+
+The total distance of air that has passed the station, accumulated over the day and reset at local midnight. A traditional agrometeorological measure of daily ventilation.
+
+```
+WindRun (km) += wind_speed (m/s) × Δt (s) / 1000
+```
+
+---
+
+### Chill Hours
+
+The number of hours spent at or below a base temperature (default 7.2 °C / 45 °F) — used to predict dormancy break and bloom timing for deciduous fruit and nut trees. Tracked both for today and cumulatively across the dormant season (resets on a configurable date, default 1 July for the Northern Hemisphere).
+
+**Reference:** Weinberger, J.H. (1950) chill-hours model; base temperature configurable via the chill-hour settings.
+
+---
+
+### Clearness Index & Cloud Cover
+
+The clearness index Kt compares observed solar radiation to the theoretical clear-sky value for the current sun elevation; cloud cover is a linear inversion of Kt. Both require a mapped solar radiation (W/m²) sensor.
+
+```
+Rs_clear = 1361 · sin(sun_elevation) · 0.75      (W/m²)
+Kt       = observed_solar / Rs_clear              (clamped 0–1)
+CloudCover% = (1 − Kt) · 100
+```
+
+**Valid range:** sun elevation ≥ 5° (returns `None` near the horizon to avoid noise).
+**Reference:** Duffie, J.A. & Beckman, W.A. (2013). *Solar Engineering of Thermal Processes*, 4th ed.
 
 ---
 
@@ -787,7 +957,7 @@ Download diagnostics via Settings → Devices & Services → Weather Station Cor
 
 Contributions are welcome! Please open an issue first to discuss what you'd like to change.
 
-- **Translations**: English and French ship out of the box. Additional community translations are very welcome — copy `custom_components/ws_core/translations/en.json` to a new locale file (e.g. `de.json`) and open a PR. All 80+ entity names, config flow strings, and entity attribute labels are covered.
+- **Translations**: English and French ship out of the box. Additional community translations are very welcome — copy `custom_components/ws_core/translations/en.json` to a new locale file (e.g. `de.json`) and open a PR. All 95+ entity names, config flow strings, and entity attribute labels are covered.
 - **Bug reports**: Use the GitHub issue template and include your diagnostics export.
 - **Weather stations**: If your station brand needs special handling, open an issue with your entity details.
 

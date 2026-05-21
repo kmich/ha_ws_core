@@ -13,6 +13,10 @@ from custom_components.ws_core.algorithms import (
     calculate_moon_phase, calculate_moon_illumination, moon_display_string,
     et0_hargreaves, et0_penman_monteith,
     KalmanFilter,
+    calculate_heat_index, calculate_wind_chill, calculate_humidex,
+    calculate_vpd, calculate_absolute_humidity, calculate_delta_t,
+    calculate_thw_index, calculate_thsw_index,
+    calculate_clearness_index, clearness_to_cloud_cover,
 )
 
 
@@ -204,6 +208,96 @@ class TestKalman:
         kf.update(2.0)
         val = kf.update(100.0)
         assert val < 80.0
+
+
+class TestHeatIndex:
+    def test_hot_humid(self):
+        hi = calculate_heat_index(32.0, 70.0)
+        assert hi is not None and 36.0 < hi < 44.0
+
+    def test_below_threshold_returns_none(self):
+        assert calculate_heat_index(20.0, 70.0) is None
+
+    def test_dry_returns_none(self):
+        assert calculate_heat_index(30.0, 30.0) is None
+
+
+class TestWindChill:
+    def test_cold_windy(self):
+        wc = calculate_wind_chill(-5.0, 5.0)
+        assert wc is not None and -12.0 < wc < -9.0
+
+    def test_warm_returns_none(self):
+        assert calculate_wind_chill(15.0, 5.0) is None
+
+    def test_calm_returns_none(self):
+        assert calculate_wind_chill(-5.0, 1.0) is None
+
+
+class TestHumidex:
+    def test_hot_humid(self):
+        hx = calculate_humidex(30.0, 22.0)
+        assert hx is not None and 37.0 < hx < 43.0
+
+    def test_not_above_ambient_returns_none(self):
+        assert calculate_humidex(10.0, -5.0) is None
+
+
+class TestVPD:
+    def test_typical(self):
+        vpd = calculate_vpd(25.0, 50.0)
+        assert 1.5 < vpd < 1.65
+
+    def test_saturated_is_zero(self):
+        assert calculate_vpd(25.0, 100.0) == 0.0
+
+
+class TestAbsoluteHumidity:
+    def test_typical(self):
+        ah = calculate_absolute_humidity(25.0, 50.0)
+        assert 10.5 < ah < 12.5
+
+
+class TestDeltaT:
+    def test_basic(self):
+        assert calculate_delta_t(30.0, 22.0) == 8.0
+
+
+class TestTHW:
+    def test_wind_cools(self):
+        hi = calculate_heat_index(32.0, 70.0)
+        thw = calculate_thw_index(32.0, 70.0, 3.0)
+        assert thw is not None and thw < hi
+
+    def test_below_threshold_returns_none(self):
+        assert calculate_thw_index(20.0, 70.0, 3.0) is None
+
+
+class TestTHSW:
+    def test_solar_warms(self):
+        thw = calculate_thw_index(32.0, 70.0, 3.0)
+        thsw = calculate_thsw_index(32.0, 70.0, 3.0, 800.0)
+        assert thsw is not None and thsw > thw
+
+    def test_below_threshold_returns_none(self):
+        assert calculate_thsw_index(20.0, 70.0, 3.0, 800.0) is None
+
+
+class TestClearnessIndex:
+    def test_clear_sky(self):
+        kt = calculate_clearness_index(600.0, 45.0)
+        assert kt is not None and 0.75 < kt < 0.9
+
+    def test_low_sun_returns_none(self):
+        assert calculate_clearness_index(600.0, 2.0) is None
+
+    def test_clamped_to_one(self):
+        assert calculate_clearness_index(5000.0, 45.0) == 1.0
+
+    def test_cloud_cover_inversion(self):
+        assert clearness_to_cloud_cover(0.83) == 17
+        assert clearness_to_cloud_cover(1.0) == 0
+        assert clearness_to_cloud_cover(0.0) == 100
 
 
 if __name__ == "__main__":

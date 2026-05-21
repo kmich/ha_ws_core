@@ -134,6 +134,20 @@ def _make_coordinator(
     coord.forecast_lon = None
     coord.forecast_interval_min = 30
 
+    # v1.5.0 comfort indices + agrometeorological accumulators
+    coord.comfort_indices_enabled = True
+    coord._chill_hour_base_c = 7.2
+    coord._chill_season_reset_month = 7
+    coord._chill_season_reset_day = 1
+    coord._wind_run_km = 0.0
+    coord._wind_run_date = ""
+    coord._wind_run_last_ts = None
+    coord._chill_hours_today = 0.0
+    coord._chill_hours_today_date = ""
+    coord._chill_hours_season = 0.0
+    coord._chill_hours_season_date = ""
+    coord._chill_hours_last_ts = None
+
     from custom_components.ws_core.coordinator import WSStationRuntime
     coord.runtime = WSStationRuntime()
 

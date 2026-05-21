@@ -12,7 +12,7 @@
 
 ## What it does
 
-Weather Station Core reads raw sensor data from your existing weather station (Ecowitt, Davis, WeatherFlow, Shelly, etc.) and produces 84 derived meteorological sensors — all through a guided config flow, no YAML required.
+Weather Station Core reads raw sensor data from your existing weather station (Ecowitt, Davis, WeatherFlow, Shelly, etc.) and produces 97 derived meteorological sensors — all through a guided config flow, no YAML required.
 
 ## Highlights
 
@@ -24,6 +24,7 @@ Weather Station Core reads raw sensor data from your existing weather station (E
 - **Kalman-filtered rain rate** for de-noised precipitation readings
 - **36-condition weather classifier** with severity levels
 - **Fog probability** and **thunderstorm risk** surface heuristics
+- **Comfort & agronomy indices** — Heat Index, Wind Chill, Humidex, Davis THW/THSW, VPD, absolute humidity, Delta-T spray window, wind run, chill hours, clearness index & cloud cover
 - **Full Canadian FWI system** — FFMC, DMC, DC, ISI, BUI, FWI, DSR with persistent daily moisture memory (Van Wagner 1987); **streak counters** (dry/heat/frost days)
 - **7-day forecast** via Open-Meteo (free, no API key)
 - **Air quality, pollen, moon phase, solar PV forecast, sea surface temperature** — all optional
