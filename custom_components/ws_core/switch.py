@@ -22,6 +22,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     CONF_ENABLE_AIR_QUALITY,
+    CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_FOG,
@@ -33,6 +34,7 @@ from .const import (
     CONF_ENABLE_WUNDERGROUND,
     CONF_PREFIX,
     DEFAULT_ENABLE_AIR_QUALITY,
+    DEFAULT_ENABLE_COMFORT_INDICES,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
@@ -126,6 +128,13 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_SOLAR_FORECAST,
         name="Feature: Solar PV Forecast",
         icon="mdi:solar-power",
+    ),
+    # v1.5.0
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_COMFORT_INDICES,
+        default=DEFAULT_ENABLE_COMFORT_INDICES,
+        name="Feature: Comfort Indices",
+        icon="mdi:thermometer-check",
     ),
 )
 

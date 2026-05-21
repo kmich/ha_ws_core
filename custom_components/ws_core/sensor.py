@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v1.4.0."""
+"""Sensors for Weather Station Core -- v1.5.0."""
 
 from __future__ import annotations
 
@@ -17,6 +17,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     # v0.7.0
     CONF_ENABLE_AIR_QUALITY,
+    # v1.5.0
+    CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     # v1.2.0
@@ -31,16 +33,23 @@ from .const import (
     CONF_PREFIX,
     DEFAULT_PREFIX,
     DOMAIN,
+    # v1.5.0
+    KEY_ABSOLUTE_HUMIDITY,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     # v0.7.0
     KEY_AQI,
     KEY_AQI_LEVEL,
     KEY_BATTERY_PCT,
+    KEY_CHILL_HOURS_SEASON,
+    KEY_CHILL_HOURS_TODAY,
+    KEY_CLEARNESS_INDEX,
     KEY_CLIMATOLOGY_30D,
+    KEY_CLOUD_COVER_PCT,
     KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
     KEY_DATA_QUALITY,
+    KEY_DELTA_T,
     KEY_DEW_POINT_C,
     KEY_DRY_STREAK,
     # v0.6.0
@@ -64,7 +73,9 @@ from .const import (
     KEY_FWI_FFMC,
     KEY_FWI_ISI,
     KEY_HEALTH_DISPLAY,
+    KEY_HEAT_INDEX,
     KEY_HEAT_STREAK,
+    KEY_HUMIDEX,
     KEY_HUMIDITY_LEVEL_DISPLAY,
     KEY_LUX,
     KEY_MOON_AGE_DAYS,
@@ -115,15 +126,20 @@ from .const import (
     KEY_TEMP_DISPLAY,
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
+    KEY_THSW_INDEX,
     KEY_THUNDERSTORM_RISK,
+    KEY_THW_INDEX,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
+    KEY_VPD,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
+    KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
+    KEY_WIND_RUN_KM,
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
@@ -381,6 +397,159 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # =========================================================================
+    # v1.5.0 COMFORT / COMFORT STRESS INDICES
+    # =========================================================================
+    # NWS Heat Index (Rothfusz, valid T >= 27 C and RH >= 40 %)
+    WSSensorDescription(
+        key=KEY_HEAT_INDEX,
+        translation_key="heat_index",
+        name="WS Heat Index",
+        icon="mdi:thermometer-high",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # WMO / NWS Wind Chill (2001, valid T <= 10 C and wind > 1.34 m/s)
+    WSSensorDescription(
+        key=KEY_WIND_CHILL,
+        translation_key="wind_chill",
+        name="WS Wind Chill",
+        icon="mdi:thermometer-minus",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # Canadian Humidex
+    WSSensorDescription(
+        key=KEY_HUMIDEX,
+        translation_key="humidex",
+        name="WS Humidex",
+        icon="mdi:water-thermometer",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # Vapour Pressure Deficit (kPa)
+    WSSensorDescription(
+        key=KEY_VPD,
+        translation_key="vpd",
+        name="WS Vapour Pressure Deficit",
+        icon="mdi:water-percent-alert",
+        native_unit="kPa",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # Absolute Humidity (g/m³)
+    WSSensorDescription(
+        key=KEY_ABSOLUTE_HUMIDITY,
+        translation_key="absolute_humidity",
+        name="WS Absolute Humidity",
+        icon="mdi:water",
+        native_unit="g/m³",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # Delta-T (dry-bulb minus wet-bulb)
+    WSSensorDescription(
+        key=KEY_DELTA_T,
+        translation_key="delta_t",
+        name="WS Delta-T",
+        icon="mdi:thermometer-lines",
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        attrs_fn=lambda d: {
+            "spray_suitability": (
+                "unsuitable_too_low"
+                if (d.get(KEY_DELTA_T) or 0) < 2.0
+                else "ideal"
+                if (d.get(KEY_DELTA_T) or 0) <= 8.0
+                else "unsuitable_too_high"
+            )
+        },
+    ),
+    # Davis THW Index (Heat Index + wind cooling)
+    WSSensorDescription(
+        key=KEY_THW_INDEX,
+        translation_key="thw_index",
+        name="WS THW Index",
+        icon="mdi:thermometer-lines",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # Davis THSW Index (THW + solar radiation)
+    WSSensorDescription(
+        key=KEY_THSW_INDEX,
+        translation_key="thsw_index",
+        name="WS THSW Index",
+        icon="mdi:sun-thermometer",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # =========================================================================
+    # v1.5.0 AGROMETEOROLOGICAL / ACCUMULATION SENSORS
+    # =========================================================================
+    # Wind Run (daily km accumulator)
+    WSSensorDescription(
+        key=KEY_WIND_RUN_KM,
+        translation_key="wind_run",
+        name="WS Wind Run",
+        icon="mdi:weather-windy",
+        native_unit="km",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_registry_enabled_default=False,
+    ),
+    # Chill Hours Today
+    WSSensorDescription(
+        key=KEY_CHILL_HOURS_TODAY,
+        translation_key="chill_hours_today",
+        name="WS Chill Hours Today",
+        icon="mdi:snowflake",
+        native_unit="h",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_registry_enabled_default=False,
+    ),
+    # Chill Hours Season
+    WSSensorDescription(
+        key=KEY_CHILL_HOURS_SEASON,
+        translation_key="chill_hours_season",
+        name="WS Chill Hours Season",
+        icon="mdi:snowflake-variant",
+        native_unit="h",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_registry_enabled_default=False,
+    ),
+    # =========================================================================
+    # v1.5.0 SOLAR / CLOUD SENSORS
+    # =========================================================================
+    # Clearness Index (Kt) — requires solar radiation sensor
+    WSSensorDescription(
+        key=KEY_CLEARNESS_INDEX,
+        translation_key="clearness_index",
+        name="WS Clearness Index",
+        icon="mdi:white-balance-sunny",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+    ),
+    # Cloud Cover Percent — derived from clearness index
+    WSSensorDescription(
+        key=KEY_CLOUD_COVER_PCT,
+        translation_key="cloud_cover",
+        name="WS Cloud Cover",
+        icon="mdi:cloud-percent",
+        native_unit="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
     ),
     # Zambretti barometric forecast
     WSSensorDescription(
@@ -1171,6 +1340,20 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # v1.3.0: streaks are ungated (always on, no switch required)
     # KEY_GDD_TODAY, KEY_GDD_SEASON removed (degree days cut in v1.3.0)
     # KEY_LEARNED_*, KEY_CAL_SUGGESTION_* removed (METAR cut in v1.3.0)
+    # v1.5.0 — comfort indices + agrometeorological sensors
+    KEY_HEAT_INDEX: CONF_ENABLE_COMFORT_INDICES,
+    KEY_WIND_CHILL: CONF_ENABLE_COMFORT_INDICES,
+    KEY_HUMIDEX: CONF_ENABLE_COMFORT_INDICES,
+    KEY_VPD: CONF_ENABLE_COMFORT_INDICES,
+    KEY_ABSOLUTE_HUMIDITY: CONF_ENABLE_COMFORT_INDICES,
+    KEY_DELTA_T: CONF_ENABLE_COMFORT_INDICES,
+    KEY_THW_INDEX: CONF_ENABLE_COMFORT_INDICES,
+    KEY_THSW_INDEX: CONF_ENABLE_COMFORT_INDICES,
+    KEY_WIND_RUN_KM: CONF_ENABLE_COMFORT_INDICES,
+    KEY_CHILL_HOURS_TODAY: CONF_ENABLE_COMFORT_INDICES,
+    KEY_CHILL_HOURS_SEASON: CONF_ENABLE_COMFORT_INDICES,
+    KEY_CLEARNESS_INDEX: CONF_ENABLE_COMFORT_INDICES,
+    KEY_CLOUD_COVER_PCT: CONF_ENABLE_COMFORT_INDICES,
 }
 
 
@@ -1211,6 +1394,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_RAIN_ACCUM_1H,
         KEY_RAIN_ACCUM_24H,
         # v1.3.0: removed cut keys (HDD/CDD/METAR) from restore set
+        # v1.5.0: accumulation sensors
+        KEY_WIND_RUN_KM,
+        KEY_CHILL_HOURS_TODAY,
+        KEY_CHILL_HOURS_SEASON,
     }
 
     _DISABLED_BY_DEFAULT = {

@@ -2,6 +2,31 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.5.0] - 2026-05-21
+
+### New Features
+
+- **NWS Heat Index** (`sensor.ws_heat_index_c`) - Rothfusz regression, valid when T >= 27 C and RH >= 40 %. Returns `None` outside that envelope. Disabled by default; enable via the Comfort Indices feature switch.
+- **WMO Wind Chill** (`sensor.ws_wind_chill_c`) - 2001 joint WMO/NWS formula, valid when T <= 10 C and wind > 1.34 m/s. Returns `None` otherwise.
+- **Canadian Humidex** (`sensor.ws_humidex`) - Environment Canada formula using dew point. Returns `None` when humidex does not exceed ambient temperature.
+- **Vapour Pressure Deficit** (`sensor.ws_vpd_kpa`) - Saturation minus actual vapour pressure in kPa. Essential for greenhouse control and irrigation scheduling.
+- **Absolute Humidity** (`sensor.ws_absolute_humidity_gm3`) - Mass of water vapour per m³ of air (g/m³).
+- **Delta-T** (`sensor.ws_delta_t_c`) - Dry-bulb minus wet-bulb temperature; the standard spray-application suitability index. State attribute `spray_suitability` classifies as `unsuitable_too_low` (< 2 C), `ideal` (2-8 C), or `unsuitable_too_high` (> 8 C).
+- **Davis THW Index** (`sensor.ws_thw_index_c`) - Heat index with wind-cooling adjustment (Davis Instruments formula).
+- **Davis THSW Index** (`sensor.ws_thsw_index_c`) - THW plus solar radiation heating effect; requires the optional solar radiation sensor.
+- **Wind Run** (`sensor.ws_wind_run_km`) - Daily accumulated wind travel in km; resets at local midnight.
+- **Chill Hours Today** (`sensor.ws_chill_hours_today`) - Hours spent at or below the configured base temperature today (default 7.2 C).
+- **Chill Hours Season** (`sensor.ws_chill_hours_season`) - Season-to-date chill hour accumulation; season resets on the configured month/day (default July 1 for Northern Hemisphere).
+- **Clearness Index Kt** (`sensor.ws_clearness_index_kt`) - Ratio of observed to theoretical clear-sky solar radiation; requires the optional solar radiation sensor. Returns `None` when sun elevation < 5 deg.
+- **Cloud Cover %** (`sensor.ws_cloud_cover_pct`) - Approximate cloud cover percentage derived from the clearness index.
+- **Feature: Comfort Indices** - New feature switch that gates all 13 sensors above. Default: **on** (sensors created disabled by default; enable individually in the entity registry).
+
+### Changes
+
+- **Config flow** updated with `enable_comfort_indices` option on the features step.
+- New constants in `const.py`: `CONF_ENABLE_COMFORT_INDICES`, `CONF_CHILL_HOUR_BASE_C`, `CONF_CHILL_SEASON_RESET_MONTH`, `CONF_CHILL_SEASON_RESET_DAY` and their `DEFAULT_*` counterparts; 13 new `KEY_*` data constants.
+- French translations added for all 13 new sensors and the new feature switch.
+
 ## [1.4.2] - 2026-05-21
 
 ### Bug Fixes

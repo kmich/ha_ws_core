@@ -107,7 +107,8 @@
           "enable_solar_forecast": "Solar PV generation forecast (forecast.solar, free)",
           "_go_back": "← Go back to previous step",
           "enable_fog": "Fog probability sensor",
-          "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)"
+          "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)",
+          "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)"
         }
       },
       "sea_temp": {
@@ -263,7 +264,8 @@
           "enable_moon": "Moon phase & illumination",
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)",
           "enable_fog": "Fog probability sensor",
-          "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)"
+          "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)",
+          "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -275,7 +277,8 @@
           "enable_moon": "Moon phase & illumination",
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)",
           "enable_fog": "Enables fog probability sensor (dew-point depression model)",
-          "enable_thunderstorm_risk": "Enables thunderstorm risk sensor (surface heuristic)"
+          "enable_thunderstorm_risk": "Enables thunderstorm risk sensor (surface heuristic)",
+          "enable_comfort_indices": "Enables comfort indices and agrometeorological sensors"
         }
       },
       "sea_temp_opt": {
@@ -495,6 +498,55 @@
       },
       "frost_point": {
         "name": "Frost Point"
+      },
+      "heat_index": {
+        "name": "Heat Index"
+      },
+      "wind_chill": {
+        "name": "Wind Chill"
+      },
+      "humidex": {
+        "name": "Humidex"
+      },
+      "vpd": {
+        "name": "Vapour Pressure Deficit"
+      },
+      "absolute_humidity": {
+        "name": "Absolute Humidity"
+      },
+      "delta_t": {
+        "name": "Delta-T",
+        "state_attributes": {
+          "spray_suitability": {
+            "name": "Spray suitability",
+            "state": {
+              "unsuitable_too_low": "Unsuitable (too humid)",
+              "ideal": "Ideal spray window",
+              "unsuitable_too_high": "Unsuitable (too dry)"
+            }
+          }
+        }
+      },
+      "thw_index": {
+        "name": "THW Index"
+      },
+      "thsw_index": {
+        "name": "THSW Index"
+      },
+      "wind_run": {
+        "name": "Wind Run"
+      },
+      "chill_hours_today": {
+        "name": "Chill Hours Today"
+      },
+      "chill_hours_season": {
+        "name": "Chill Hours Season"
+      },
+      "clearness_index": {
+        "name": "Clearness Index"
+      },
+      "cloud_cover": {
+        "name": "Cloud Cover"
       },
       "zambretti_forecast": {
         "name": "Zambretti Forecast",
@@ -1256,6 +1308,9 @@
       },
       "ws_enable_thunderstorm_risk": {
         "name": "Feature: Thunderstorm Risk"
+      },
+      "ws_enable_comfort_indices": {
+        "name": "Feature: Comfort Indices"
       }
     },
     "number": {

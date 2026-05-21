@@ -1,4 +1,4 @@
-"""Coordinator for Weather Station Core -- v1.4.2.
+"""Coordinator for Weather Station Core -- v1.5.0.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors
@@ -47,13 +47,23 @@ from .algorithms import (
     KalmanFilter,
     aqi_level,
     beaufort_description,
+    calculate_absolute_humidity,
     calculate_apparent_temperature,
+    calculate_clearness_index,
+    calculate_delta_t,
     calculate_dew_point,
     calculate_frost_point,
+    calculate_heat_index,
+    calculate_humidex,
     calculate_moon_illumination,
     calculate_rain_probability,
+    calculate_thsw_index,
+    calculate_thw_index,
     calculate_us_aqi,
+    calculate_vpd,
     calculate_wet_bulb,
+    calculate_wind_chill,
+    clearness_to_cloud_cover,
     combine_rain_probability,
     compute_fwi,
     cross_sensor_consistency_flags,
@@ -82,9 +92,13 @@ from .algorithms import (
 )
 from .const import (
     CONF_AQI_INTERVAL_MIN,
+    CONF_CHILL_HOUR_BASE_C,
+    CONF_CHILL_SEASON_RESET_DAY,
+    CONF_CHILL_SEASON_RESET_MONTH,
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
     CONF_ENABLE_AIR_QUALITY,
+    CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_FIRE_RISK,
     # v0.6.0 new
     # v0.5.0 new
@@ -122,8 +136,12 @@ from .const import (
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
     DEFAULT_AQI_INTERVAL_MIN,
+    DEFAULT_CHILL_HOUR_BASE_C,
+    DEFAULT_CHILL_SEASON_RESET_DAY,
+    DEFAULT_CHILL_SEASON_RESET_MONTH,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ENABLE_AIR_QUALITY,
+    DEFAULT_ENABLE_COMFORT_INDICES,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_MOON,
@@ -157,6 +175,8 @@ from .const import (
     FORECAST_AGREEMENT_CONFLICT_PP,
     FORECAST_MAX_RETRY_S,
     FORECAST_MIN_RETRY_S,
+    # v1.5.0
+    KEY_ABSOLUTE_HUMIDITY,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     # v0.7.0
@@ -164,10 +184,15 @@ from .const import (
     KEY_AQI_LEVEL,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
+    KEY_CHILL_HOURS_SEASON,
+    KEY_CHILL_HOURS_TODAY,
+    KEY_CLEARNESS_INDEX,
     KEY_CLIMATOLOGY_30D,
+    KEY_CLOUD_COVER_PCT,
     KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
     KEY_DATA_QUALITY,
+    KEY_DELTA_T,
     KEY_DEW_POINT_C,
     KEY_DRY_STREAK,
     KEY_ET0_DAILY_MM,
@@ -190,7 +215,9 @@ from .const import (
     KEY_FWI_FFMC,
     KEY_FWI_ISI,
     KEY_HEALTH_DISPLAY,
+    KEY_HEAT_INDEX,
     KEY_HEAT_STREAK,
+    KEY_HUMIDEX,
     KEY_HUMIDITY_LEVEL_DISPLAY,
     KEY_LUX,
     KEY_MOON_AGE_DAYS,
@@ -242,15 +269,20 @@ from .const import (
     KEY_TEMP_DISPLAY,
     KEY_TEMP_HIGH_24H,
     KEY_TEMP_LOW_24H,
+    KEY_THSW_INDEX,
     KEY_THUNDERSTORM_RISK,
+    KEY_THW_INDEX,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
+    KEY_VPD,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
+    KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
+    KEY_WIND_RUN_KM,
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
@@ -439,6 +471,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Risk feature toggles (all default-off, opt-in via wizard)
         self.fog_enabled = bool(_get(CONF_ENABLE_FOG, DEFAULT_ENABLE_FOG))
         self.thunderstorm_enabled = bool(_get(CONF_ENABLE_THUNDERSTORM, DEFAULT_ENABLE_THUNDERSTORM))
+
+        # v1.5.0 Comfort indices + agrometeorological sensors
+        self.comfort_indices_enabled = bool(_get(CONF_ENABLE_COMFORT_INDICES, DEFAULT_ENABLE_COMFORT_INDICES))
+        self._chill_hour_base_c = float(_get(CONF_CHILL_HOUR_BASE_C, DEFAULT_CHILL_HOUR_BASE_C))
+        self._chill_season_reset_month = int(_get(CONF_CHILL_SEASON_RESET_MONTH, DEFAULT_CHILL_SEASON_RESET_MONTH))
+        self._chill_season_reset_day = int(_get(CONF_CHILL_SEASON_RESET_DAY, DEFAULT_CHILL_SEASON_RESET_DAY))
+
+        # Wind run accumulator — resets at local midnight (like rain_today)
+        self._wind_run_km: float = 0.0
+        self._wind_run_date: str = ""
+        self._wind_run_last_ts: Any = None
+
+        # Chill hour accumulators
+        self._chill_hours_today: float = 0.0
+        self._chill_hours_today_date: str = ""
+        self._chill_hours_season: float = 0.0
+        self._chill_hours_season_date: str = ""  # date of last season-reset check
+        self._chill_hours_last_ts: Any = None
 
         # Streak threshold (kept; was previously bundled with degree days)
         self.thresh_heat_day_c = float(_get(CONF_THRESH_HEAT_DAY_C, DEFAULT_THRESH_HEAT_DAY_C))
@@ -884,6 +934,23 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         uv_val = data.get(KEY_UV)
         if uv_val is not None:
             data[KEY_UV_LEVEL_DISPLAY] = uv_level(float(uv_val))
+
+        # --- v1.5.0 comfort / humidity / vapour indices ---
+        if self.comfort_indices_enabled and tc is not None and rh is not None:
+            data[KEY_HEAT_INDEX] = calculate_heat_index(float(tc), float(rh))
+            data[KEY_VPD] = calculate_vpd(float(tc), float(rh))
+            data[KEY_ABSOLUTE_HUMIDITY] = calculate_absolute_humidity(float(tc), float(rh))
+            if dew_c is not None:
+                data[KEY_HUMIDEX] = calculate_humidex(float(tc), float(dew_c))
+            if wind_ms is not None:
+                data[KEY_WIND_CHILL] = calculate_wind_chill(float(tc), float(wind_ms))
+                data[KEY_THW_INDEX] = calculate_thw_index(float(tc), float(rh), float(wind_ms))
+                solar_rad = self._get_solar_radiation()
+                if solar_rad is not None:
+                    data[KEY_THSW_INDEX] = calculate_thsw_index(float(tc), float(rh), float(wind_ms), float(solar_rad))
+            wet_bulb = data.get(KEY_WET_BULB_C)
+            if wet_bulb is not None:
+                data[KEY_DELTA_T] = calculate_delta_t(float(tc), float(wet_bulb))
 
         return dew_c
 
@@ -1975,6 +2042,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
                 data[KEY_ET0_PM_DAILY_MM] = et0_pm
 
+        # --- v1.5.0 wind run, chill hours, clearness index ---
+        if self.comfort_indices_enabled:
+            self._compute_wind_run(data, now)
+            self._compute_chill_hours(data, now)
+            self._compute_clearness_and_cloud(data)
+
         self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
         return data
 
@@ -2291,6 +2364,78 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
     # CSV / JSON export  (v0.6.0)
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # v1.5.0 — Wind run, chill hours, clearness / cloud cover
+    # ------------------------------------------------------------------
+
+    def _compute_wind_run(self, data: dict, now: Any) -> None:
+        """Accumulate daily wind run (km).  Resets at local midnight."""
+        local_now = dt_util.now()
+        date_str = local_now.strftime("%Y-%m-%d")
+
+        if date_str != self._wind_run_date:
+            self._wind_run_km = 0.0
+            self._wind_run_date = date_str
+            self._wind_run_last_ts = None
+
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+        if wind_ms is not None and self._wind_run_last_ts is not None:
+            dt_s = (now - self._wind_run_last_ts).total_seconds()
+            self._wind_run_km += float(wind_ms) * dt_s / 1000.0  # m/s * s → m → km
+        if wind_ms is not None:
+            self._wind_run_last_ts = now
+
+        data[KEY_WIND_RUN_KM] = round(self._wind_run_km, 2)
+
+    def _compute_chill_hours(self, data: dict, now: Any) -> None:
+        """Accumulate chill hours today and season.
+
+        A chill hour is one hour spent at or below ``_chill_hour_base_c``.
+        Fractional hours are accumulated using actual elapsed seconds.
+        Season counter resets on ``_chill_season_reset_month``/``_chill_season_reset_day``.
+        """
+        local_now = dt_util.now()
+        date_str = local_now.strftime("%Y-%m-%d")
+        season_reset_key = f"{local_now.year}-{self._chill_season_reset_month:02d}-{self._chill_season_reset_day:02d}"
+
+        # Daily reset
+        if date_str != self._chill_hours_today_date:
+            self._chill_hours_today = 0.0
+            self._chill_hours_today_date = date_str
+
+        # Season reset (once per year on the configured date)
+        if season_reset_key != self._chill_hours_season_date and date_str == season_reset_key:
+            self._chill_hours_season = 0.0
+            self._chill_hours_season_date = season_reset_key
+
+        tc = data.get(KEY_NORM_TEMP_C)
+        if tc is not None and self._chill_hours_last_ts is not None:
+            dt_h = (now - self._chill_hours_last_ts).total_seconds() / 3600.0
+            if float(tc) <= self._chill_hour_base_c:
+                self._chill_hours_today += dt_h
+                self._chill_hours_season += dt_h
+        if tc is not None:
+            self._chill_hours_last_ts = now
+
+        data[KEY_CHILL_HOURS_TODAY] = round(self._chill_hours_today, 2)
+        data[KEY_CHILL_HOURS_SEASON] = round(self._chill_hours_season, 1)
+
+    def _compute_clearness_and_cloud(self, data: dict) -> None:
+        """Compute clearness index Kt and approximate cloud cover %."""
+        solar_rad = self._get_solar_radiation()
+        if solar_rad is None:
+            return
+
+        sun_state = self.hass.states.get("sun.sun")
+        if sun_state is None:
+            return
+        sun_elev = float(sun_state.attributes.get("elevation", 0))
+
+        kt = calculate_clearness_index(float(solar_rad), sun_elev)
+        if kt is not None:
+            data[KEY_CLEARNESS_INDEX] = kt
+            data[KEY_CLOUD_COVER_PCT] = clearness_to_cloud_cover(kt)
 
     # ------------------------------------------------------------------
     # v0.9.0 — Solar radiation source helper

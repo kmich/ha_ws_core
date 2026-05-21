@@ -33,15 +33,13 @@ from .const import (
     CONF_ELEVATION_M,
     # v0.7.0
     CONF_ENABLE_AIR_QUALITY,
+    CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
-    # v1.2.0
     CONF_ENABLE_FOG,
-    # v0.8.0
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
-    # v0.9.0
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_WUNDERGROUND,
@@ -84,6 +82,7 @@ from .const import (
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ELEVATION_M,
     DEFAULT_ENABLE_AIR_QUALITY,
+    DEFAULT_ENABLE_COMFORT_INDICES,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
@@ -715,6 +714,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_ENABLE_POLLEN] = bool(user_input.get(CONF_ENABLE_POLLEN, False))
             self._data[CONF_ENABLE_MOON] = bool(user_input.get(CONF_ENABLE_MOON, False))
             self._data[CONF_ENABLE_SOLAR_FORECAST] = bool(user_input.get(CONF_ENABLE_SOLAR_FORECAST, False))
+            self._data[CONF_ENABLE_COMFORT_INDICES] = bool(
+                user_input.get(CONF_ENABLE_COMFORT_INDICES, DEFAULT_ENABLE_COMFORT_INDICES)
+            )
             if self._data[CONF_ENABLE_SEA_TEMP]:
                 return await self.async_step_sea_temp()
             if self._data[CONF_ENABLE_WUNDERGROUND]:
@@ -750,6 +752,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_ENABLE_MOON, default=DEFAULT_ENABLE_MOON): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_SOLAR_FORECAST, default=DEFAULT_ENABLE_SOLAR_FORECAST
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_COMFORT_INDICES, default=DEFAULT_ENABLE_COMFORT_INDICES
                     ): selector.BooleanSelector(),
                 }
             ),
@@ -1304,6 +1309,10 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_SOLAR_FORECAST,
                         default=g(CONF_ENABLE_SOLAR_FORECAST, DEFAULT_ENABLE_SOLAR_FORECAST),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_COMFORT_INDICES,
+                        default=g(CONF_ENABLE_COMFORT_INDICES, DEFAULT_ENABLE_COMFORT_INDICES),
                     ): selector.BooleanSelector(),
                 }
             ),

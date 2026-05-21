@@ -450,6 +450,45 @@ KEY_FWI = "fwi"
 KEY_FWI_DSR = "fwi_dsr"
 
 # ---------------------------------------------------------------------------
+# v1.5.0 — Extended comfort / agrometeorological sensors
+# ---------------------------------------------------------------------------
+
+# Config keys
+CONF_ENABLE_COMFORT_INDICES = "enable_comfort_indices"
+CONF_CHILL_HOUR_BASE_C = "chill_hour_base_c"
+CONF_CHILL_SEASON_RESET_MONTH = "chill_season_reset_month"
+CONF_CHILL_SEASON_RESET_DAY = "chill_season_reset_day"
+
+# Defaults
+DEFAULT_ENABLE_COMFORT_INDICES = True
+DEFAULT_CHILL_HOUR_BASE_C = 7.2  # standard base for apple/pear chill models
+DEFAULT_CHILL_SEASON_RESET_MONTH = 7  # July 1 for Northern Hemisphere
+DEFAULT_CHILL_SEASON_RESET_DAY = 1
+
+# Data keys — heat / cold stress indices
+KEY_HEAT_INDEX = "heat_index_c"
+KEY_WIND_CHILL = "wind_chill_c"
+KEY_HUMIDEX = "humidex"
+
+# Data keys — humidity / vapour
+KEY_VPD = "vpd_kpa"
+KEY_ABSOLUTE_HUMIDITY = "absolute_humidity_gm3"
+
+# Data keys — agrometeorological
+KEY_DELTA_T = "delta_t_c"
+KEY_WIND_RUN_KM = "wind_run_km"
+KEY_CHILL_HOURS_TODAY = "chill_hours_today"
+KEY_CHILL_HOURS_SEASON = "chill_hours_season"
+
+# Data keys — Davis comfort indices
+KEY_THW_INDEX = "thw_index_c"
+KEY_THSW_INDEX = "thsw_index_c"
+
+# Data keys — solar / cloud
+KEY_CLEARNESS_INDEX = "clearness_index_kt"
+KEY_CLOUD_COVER_PCT = "cloud_cover_pct"
+
+# ---------------------------------------------------------------------------
 # Migration — v0.3.0 deprecated entity keys and config keys
 # ---------------------------------------------------------------------------
 DEPRECATED_KEYS_V030 = (
