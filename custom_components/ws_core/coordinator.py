@@ -1889,9 +1889,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if self.wu_enabled:
             data[KEY_WU_STATUS] = self._wu_status
-            data["_wu_last_upload"] = (
-                self._wu_last_upload.isoformat() if self._wu_last_upload else None
-            )
+            data["_wu_last_upload"] = self._wu_last_upload.isoformat() if self._wu_last_upload else None
 
         # Air Quality (Open-Meteo Air Quality API)
         if self.aqi_enabled and self._aqi_cache:
