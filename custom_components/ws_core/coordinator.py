@@ -431,6 +431,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._rain_today_mm: float = 0.0
         self._rain_today_date: str = ""
         self._rain_today_last_total: float | None = None
+        # Completed (previous) day snapshot — captured at midnight rollover so
+        # streak counters can evaluate the finished day's final rain total
+        # rather than the freshly-reset current day (issue #15).
+        self._rain_prev_day_mm: float = 0.0
+        self._rain_prev_day_date: str = ""
 
         # --- Tuning parameters (wired from number entities) ---
         rain_filter_alpha = float(_get(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA))
@@ -515,7 +520,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._learning_state: Any = _LS()
         self._learning_store: Any = None
         self._learning_last_save: Any = None
-        self._learning_last_daily_update: str = ""
+        # v1.6.6: streak once-per-day guard now persisted in LearningState
+        # (streak_last_counted_date); the old in-memory guard was lost on
+        # restart, causing repeated increments within one day (issue #15).
 
         # v1.2.0 Drift detection buffers (timestamp, value) — 72-h in-memory
         self._drift_temp: deque = deque(maxlen=288)
@@ -1146,6 +1153,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
         date_str = dt_util.now().strftime("%Y-%m-%d")
         if date_str != self._rain_today_date:
+            # Day rolled over — snapshot the day that just ended (with its final
+            # rain total) so streak counters can evaluate the completed day
+            # before we zero the running total (issue #15).
+            if self._rain_today_date:
+                self._rain_prev_day_date = self._rain_today_date
+                self._rain_prev_day_mm = self._rain_today_mm
             self._rain_today_mm = 0.0
             self._rain_today_date = date_str
             self._rain_today_last_total = rain_total_mm
@@ -1568,34 +1581,42 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         was removed in v0.3.0 because the baselines were never properly seeded
         (they reset to install date rather than Jan 1 / season start).
         """
-        from homeassistant.util import dt as _dt
-
         from .learning_state import update_daily_streaks
-
-        local_now = _dt.now()
-        date_str = local_now.strftime("%Y-%m-%d")
 
         t_high = data.get(KEY_TEMP_HIGH_24H)
         t_low = data.get(KEY_TEMP_LOW_24H)
 
-        # Daily update (once per calendar day)
-        if date_str != self._learning_last_daily_update and t_high is not None and t_low is not None:
-            rain_today = float(data.get("_rain_today_mm", 0.0))
+        # Streaks are evaluated for the COMPLETED calendar day, using that day's
+        # final rain total snapshotted at the midnight rollover. This fixes two
+        # bugs (issue #15):
+        #   1. Reading the freshly-reset current-day rain (~0) right after
+        #      midnight, so a rainy day never reset the dry streak.
+        #   2. Re-counting the same day after a restart, because the guard was
+        #      an in-memory field that reset on reload.
+        # The guard (streak_last_counted_date) is now persisted in LearningState.
+        prev_date = self._rain_prev_day_date
+        if (
+            prev_date
+            and prev_date != self._learning_state.streak_last_counted_date
+            and t_high is not None
+            and t_low is not None
+        ):
+            rain_completed = float(self._rain_prev_day_mm)
             thresh_freeze = float(self.entry_options.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
             update_daily_streaks(
                 self._learning_state,
-                date_str,
+                prev_date,
                 t_high=float(t_high),
                 t_low=float(t_low),
-                rain_today_mm=rain_today,
+                rain_today_mm=rain_completed,
                 thresh_heat_c=self.thresh_heat_day_c,
                 thresh_freeze_c=thresh_freeze,
             )
-            self._learning_last_daily_update = date_str
-            # Also update climatology (still tracks 30-day rolling for anomalies)
+            self._learning_state.streak_last_counted_date = prev_date
+            # Also update climatology (30-day rolling buffer for anomalies)
             from .learning_state import update_climatology
 
-            update_climatology(self._learning_state, date_str, float(t_high), float(t_low), rain_today)
+            update_climatology(self._learning_state, prev_date, float(t_high), float(t_low), rain_completed)
 
         # Publish streak counters
         data[KEY_DRY_STREAK] = self._learning_state.dry_streak_days

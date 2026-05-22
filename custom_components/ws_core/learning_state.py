@@ -58,6 +58,9 @@ class LearningState:
     heat_streak_last_hot_date: str = ""
     frost_streak_days: int = 0
     frost_streak_last_frost_date: str = ""
+    # v1.6.6: persisted guard so streaks are counted exactly once per completed
+    # calendar day, surviving restarts/reloads (replaces in-memory guard)
+    streak_last_counted_date: str = ""
 
     # Rolling 30-day climatology buffer
     # Each entry: {date, t_high, t_low, rain_total}

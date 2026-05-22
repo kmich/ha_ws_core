@@ -2,6 +2,15 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.6.6] - 2026-05-22
+
+### Bug Fixes
+
+- **Dry streak (`sensor.ws_dry_streak`) no longer ignores rain and no longer over-counts (issue #15).** Two bugs were corrected:
+  - The streak was evaluated right after midnight against the *current* day's rain total — which had just reset to 0 — so a completed rainy day was never seen and the streak kept climbing (e.g. 12 mm fell but the streak still rose to 25). Streaks are now evaluated for the **completed** calendar day, using that day's final rain total snapshotted at the midnight rollover. A day with ≥ 1 mm now correctly resets the streak to 0.
+  - The "once per day" guard was held in memory and reset on every Home Assistant restart or integration reload, so the streak could increment multiple times in a single day. The guard is now persisted in the learning state (`streak_last_counted_date`), so each calendar day is counted exactly once regardless of restarts.
+- Added unit tests covering rain-resets-streak, dry-day-increments-by-one, and restart-does-not-double-count.
+
 ## [1.6.5] - 2026-05-22
 
 ### Dashboard
