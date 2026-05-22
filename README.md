@@ -21,7 +21,7 @@ Weather Station Core reads raw sensor data from your existing weather station �
 
 ## What's New in 1.5.0
 
-**13 new comfort & agrometeorological sensors**, all behind the new **Comfort Indices** feature toggle (enabled by default; the individual entities ship *disabled* in the entity registry — enable the ones you want on the device page).
+**13 new comfort & agrometeorological sensors**, behind the new **Comfort Indices** feature toggle. Opt-in: enable via the **Comfort Indices** switch on the device page, or via Configure -> Features.
 
 - **Heat stress**: Heat Index (NWS Rothfusz), Humidex (Environment Canada), Davis THW & THSW indices
 - **Cold stress**: Wind Chill (WMO 2001)
@@ -256,7 +256,7 @@ The seven sub-index sensors are disabled by default; enable them individually on
 
 ### Optional: Comfort Indices (`enable_comfort_indices`)
 
-Enabled by default, but each entity ships **disabled in the entity registry** to avoid clutter — enable the ones you want via Settings → Devices & Services → Weather Station Core → entities. THSW, clearness index, and cloud cover require an optional `solar_radiation` (W/m²) source to be mapped.
+Disabled by default (opt-in). Enable via the **Comfort Indices** switch (`switch.ws_enable_comfort_indices`) on the device page, or via Configure -> Features. Once enabled, all 13 sensors appear immediately. THSW, clearness index, and cloud cover require an optional `solar_radiation` (W/m²) source to be mapped.
 
 | Entity | Unit | Description |
 |---|---|---|

@@ -2,6 +2,13 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.5.1] - 2026-05-22
+
+### Bug Fixes
+
+- **Comfort indices now opt-in** - `DEFAULT_ENABLE_COMFORT_INDICES` corrected from `True` to `False`, consistent with every other optional feature group (fog, thunderstorm, air quality, pollen, moon, solar forecast, sea temp). For existing installs, the `CONF_ENABLE_COMFORT_INDICES` key was absent from stored options, so the sensor filter's `False` fallback meant the 13 sensors were never created regardless of the README claim. Enable via the **Comfort Indices** switch on the device page, or via Configure -> Features.
+- **Removed dead `entity_registry_enabled_default=False` lines** from all 13 comfort sensor descriptors. The field is not read by `WSSensorEntity.__init__` (only `_DISABLED_BY_DEFAULT` is checked), so these lines had no effect. Removed to eliminate confusion.
+
 ## [1.5.0] - 2026-05-21
 
 ### New Features
@@ -19,7 +26,7 @@ All notable changes to Weather Station Core are documented here.
 - **Chill Hours Season** (`sensor.ws_chill_hours_season`) - Season-to-date chill hour accumulation; season resets on the configured month/day (default July 1 for Northern Hemisphere).
 - **Clearness Index Kt** (`sensor.ws_clearness_index_kt`) - Ratio of observed to theoretical clear-sky solar radiation; requires the optional solar radiation sensor. Returns `None` when sun elevation < 5 deg.
 - **Cloud Cover %** (`sensor.ws_cloud_cover_pct`) - Approximate cloud cover percentage derived from the clearness index.
-- **Feature: Comfort Indices** - New feature switch that gates all 13 sensors above. Default: **on** (sensors created disabled by default; enable individually in the entity registry).
+- **Feature: Comfort Indices** - New feature switch that gates all 13 sensors above. Default: **off** (opt-in). Enable via the Comfort Indices switch on the device page, or via Configure -> Features.
 
 ### Changes
 

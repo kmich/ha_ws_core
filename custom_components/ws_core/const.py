@@ -460,7 +460,7 @@ CONF_CHILL_SEASON_RESET_MONTH = "chill_season_reset_month"
 CONF_CHILL_SEASON_RESET_DAY = "chill_season_reset_day"
 
 # Defaults
-DEFAULT_ENABLE_COMFORT_INDICES = True
+DEFAULT_ENABLE_COMFORT_INDICES = False
 DEFAULT_CHILL_HOUR_BASE_C = 7.2  # standard base for apple/pear chill models
 DEFAULT_CHILL_SEASON_RESET_MONTH = 7  # July 1 for Northern Hemisphere
 DEFAULT_CHILL_SEASON_RESET_DAY = 1

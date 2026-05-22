@@ -1,4 +1,4 @@
-"""Coordinator for Weather Station Core -- v1.5.0.
+"""Coordinator for Weather Station Core -- v1.5.1.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors

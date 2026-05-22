@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v1.5.0."""
+"""Sensors for Weather Station Core -- v1.5.1."""
 
 from __future__ import annotations
 
@@ -410,7 +410,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # WMO / NWS Wind Chill (2001, valid T <= 10 C and wind > 1.34 m/s)
     WSSensorDescription(
@@ -421,7 +420,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # Canadian Humidex
     WSSensorDescription(
@@ -432,7 +430,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # Vapour Pressure Deficit (kPa)
     WSSensorDescription(
@@ -442,7 +439,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:water-percent-alert",
         native_unit="kPa",
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # Absolute Humidity (g/m³)
     WSSensorDescription(
@@ -452,7 +448,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:water",
         native_unit="g/m³",
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # Delta-T (dry-bulb minus wet-bulb)
     WSSensorDescription(
@@ -462,7 +457,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:thermometer-lines",
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
         attrs_fn=lambda d: {
             "spray_suitability": (
                 "unsuitable_too_low"
@@ -482,7 +476,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # Davis THSW Index (THW + solar radiation)
     WSSensorDescription(
@@ -493,7 +486,6 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # =========================================================================
     # v1.5.0 AGROMETEOROLOGICAL / ACCUMULATION SENSORS
@@ -506,7 +498,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:weather-windy",
         native_unit="km",
         state_class=SensorStateClass.TOTAL_INCREASING,
-        entity_registry_enabled_default=False,
     ),
     # Chill Hours Today
     WSSensorDescription(
@@ -516,7 +507,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:snowflake",
         native_unit="h",
         state_class=SensorStateClass.TOTAL_INCREASING,
-        entity_registry_enabled_default=False,
     ),
     # Chill Hours Season
     WSSensorDescription(
@@ -526,7 +516,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:snowflake-variant",
         native_unit="h",
         state_class=SensorStateClass.TOTAL_INCREASING,
-        entity_registry_enabled_default=False,
     ),
     # =========================================================================
     # v1.5.0 SOLAR / CLOUD SENSORS
@@ -539,7 +528,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:white-balance-sunny",
         native_unit=None,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # Cloud Cover Percent — derived from clearness index
     WSSensorDescription(
@@ -549,7 +537,6 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:cloud-percent",
         native_unit="%",
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
     ),
     # Zambretti barometric forecast
     WSSensorDescription(
