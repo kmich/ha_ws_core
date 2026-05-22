@@ -494,7 +494,9 @@ views:
                       const condColor = condAttrs.color || '#FCD34D';
                       const condState = states['sensor.ws_current_condition']?.state || 'Unknown';
 
-                      const forecast = entity?.state || 'Loading...';
+                      if (!window._zl) window._zl = {settled_fine:'Settled fine',fine_weather:'Fine weather',becoming_fine:'Becoming fine',fine_becoming_less_settled:'Fine, becoming less settled',fine_possible_showers:'Fine, possible showers',fairly_fine_improving:'Fairly fine, improving',fairly_fine_possible_showers_early:'Fairly fine, possible showers early',fairly_fine_showery_later:'Fairly fine, showery later',showery_early_improving:'Showery early, improving',changeable_mending:'Changeable, mending',fairly_fine_possible_showers:'Fairly fine, possible showers',rather_unsettled_clearing_later:'Rather unsettled clearing later',unsettled_probably_improving:'Unsettled, probably improving',showery_bright_intervals:'Showery, bright intervals',showery_becoming_rather_unsettled:'Showery, becoming rather unsettled',changeable_some_rain:'Changeable, some rain',unsettled_short_fine_intervals:'Unsettled, short fine intervals',unsettled_rain_later:'Unsettled, rain later',unsettled_some_rain:'Unsettled, some rain',mostly_very_unsettled:'Mostly very unsettled',occasional_rain_worsening:'Occasional rain, worsening',rain_at_times_very_unsettled:'Rain at times, very unsettled',rain_at_frequent_intervals:'Rain at frequent intervals',rain_very_unsettled:'Rain, very unsettled',stormy_may_improve:'Stormy, may improve',stormy_much_rain:'Stormy, much rain'};
+                      const forecastRaw = entity?.state || '';
+                      const forecast = window._zl[forecastRaw] || forecastRaw.replace(/_/g, ' ') || 'Loading...';
                       const forecastAttrs = entity?.attributes || {};
                       // Derive confidence from Zambretti z_number: 1-5 (settled/fine) or 22-26 (stormy) = high confidence
                       const zNum = parseInt(forecastAttrs.z_number) || 0;
@@ -2225,7 +2227,8 @@ views:
                       var station = parseFloat((states['sensor.ws_station_pressure'] || {}).state);
                       var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
                       var change3h = parseFloat((states['sensor.ws_pressure_change_window'] || {}).state);
-                      var zambretti = (states['sensor.ws_zambretti_forecast'] || {}).state || '--';
+                      var zambrettiRaw = (states['sensor.ws_zambretti_forecast'] || {}).state || '';
+                      var zambretti = (window._zl && window._zl[zambrettiRaw]) || zambrettiRaw.replace(/_/g, ' ') || '--';
                       var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
                       var changeColor = isNaN(change3h) ? 'white' : change3h > 0.8 ? '#10b981' : change3h < -0.8 ? '#ef4444' : 'rgba(255,255,255,0.7)';
                       var changeStr = isNaN(change3h) ? '--' : (change3h >= 0 ? '+' : '') + change3h.toFixed(1);
@@ -2297,7 +2300,8 @@ views:
                 custom_fields:
                   details: |
                     [[[
-                      var forecast = (entity && entity.state) || '--';
+                      var forecastRaw2 = (entity && entity.state) || '';
+                      var forecast = (window._zl && window._zl[forecastRaw2]) || forecastRaw2.replace(/_/g, ' ') || '--';
                       var zNum = (states['sensor.ws_zambretti_number'] || {}).state || '--';
                       var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
                       var trendRaw = parseFloat((states['sensor.ws_pressure_trend'] || {}).state);
@@ -2421,7 +2425,8 @@ views:
                       var tsr = (states['sensor.ws_dry_streak_days'] || {}).state;
                       var tsrLabel = tsr !== undefined && !isNaN(parseInt(tsr)) ? parseInt(tsr) + 'd dry' : '--';
                       var prob = parseFloat((states['sensor.ws_rain_probability'] || {}).state) || 0;
-                      var zamb = (states['sensor.ws_zambretti_forecast'] || {}).state || '--';
+                      var zambRaw = (states['sensor.ws_zambretti_forecast'] || {}).state || '';
+                      var zamb = (window._zl && window._zl[zambRaw]) || zambRaw.replace(/_/g, ' ') || '--';
                       var probColor = combined >= 70 ? '#3b82f6' : combined >= 40 ? '#60a5fa' : '#10b981';
                       return '<div style="margin-top:8px;">'
                         + '<div style="font-size:40px;font-weight:200;color:' + probColor + ';">' + combined.toFixed(0) + '%</div>'
