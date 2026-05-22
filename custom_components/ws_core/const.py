@@ -507,6 +507,21 @@ KEY_VIGILANCE_MAX_LEVEL = "vigilance_max_level"  # overall worst: vert/jaune/ora
 KEY_RIVER_LEVEL_M = "river_level_m"
 
 # ---------------------------------------------------------------------------
+# v1.6.2 — Opt-in toggles for previously disabled-by-default sensor groups
+# ---------------------------------------------------------------------------
+# Replaces the old _DISABLED_BY_DEFAULT mechanism (which created dead entities
+# that had to be manually enabled). These toggles gate entity creation instead:
+# off = not created (no clutter, no recorder cost); on = created and working.
+CONF_ENABLE_DIAGNOSTICS = (
+    "enable_diagnostics"  # drift/consistency/quality, forecast skill/agreement, solar lux factor, climatology 30d
+)
+CONF_ENABLE_FWI_COMPONENTS = "enable_fwi_components"  # FWI intermediate codes (FFMC/DMC/DC/ISI/BUI); needs fire risk
+CONF_ENABLE_ADVANCED_SENSORS = "enable_advanced_sensors"  # Zambretti number, ET0 hourly, wind direction smoothed
+DEFAULT_ENABLE_DIAGNOSTICS = False
+DEFAULT_ENABLE_FWI_COMPONENTS = False
+DEFAULT_ENABLE_ADVANCED_SENSORS = False
+
+# ---------------------------------------------------------------------------
 # Migration — v0.3.0 deprecated entity keys and config keys
 # ---------------------------------------------------------------------------
 DEPRECATED_KEYS_V030 = (

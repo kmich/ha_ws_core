@@ -31,12 +31,15 @@ from .const import (
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
+    CONF_ENABLE_ADVANCED_SENSORS,
     # v0.7.0
     CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_COMFORT_INDICES,
+    CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_FOG,
+    CONF_ENABLE_FWI_COMPONENTS,
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
@@ -83,11 +86,14 @@ from .const import (
     DEFAULT_CAL_WIND_MS,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ELEVATION_M,
+    DEFAULT_ENABLE_ADVANCED_SENSORS,
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_COMFORT_INDICES,
+    DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
+    DEFAULT_ENABLE_FWI_COMPONENTS,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SEA_TEMP,
@@ -723,6 +729,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             self._data[CONF_ENABLE_VIGILANCE_METEO] = bool(user_input.get(CONF_ENABLE_VIGILANCE_METEO, False))
             self._data[CONF_ENABLE_VIGICRUES] = bool(user_input.get(CONF_ENABLE_VIGICRUES, False))
+            self._data[CONF_ENABLE_DIAGNOSTICS] = bool(user_input.get(CONF_ENABLE_DIAGNOSTICS, False))
+            self._data[CONF_ENABLE_FWI_COMPONENTS] = bool(user_input.get(CONF_ENABLE_FWI_COMPONENTS, False))
+            self._data[CONF_ENABLE_ADVANCED_SENSORS] = bool(user_input.get(CONF_ENABLE_ADVANCED_SENSORS, False))
             if self._data[CONF_ENABLE_SEA_TEMP]:
                 return await self.async_step_sea_temp()
             if self._data[CONF_ENABLE_WUNDERGROUND]:
@@ -766,6 +775,15 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_ENABLE_VIGILANCE_METEO, default=DEFAULT_ENABLE_VIGILANCE_METEO
                     ): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_VIGICRUES, default=DEFAULT_ENABLE_VIGICRUES): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_DIAGNOSTICS, default=DEFAULT_ENABLE_DIAGNOSTICS
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_FWI_COMPONENTS, default=DEFAULT_ENABLE_FWI_COMPONENTS
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_ADVANCED_SENSORS, default=DEFAULT_ENABLE_ADVANCED_SENSORS
+                    ): selector.BooleanSelector(),
                 }
             ),
             last_step=False,
@@ -1331,6 +1349,18 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_VIGICRUES,
                         default=g(CONF_ENABLE_VIGICRUES, DEFAULT_ENABLE_VIGICRUES),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_DIAGNOSTICS,
+                        default=g(CONF_ENABLE_DIAGNOSTICS, DEFAULT_ENABLE_DIAGNOSTICS),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_FWI_COMPONENTS,
+                        default=g(CONF_ENABLE_FWI_COMPONENTS, DEFAULT_ENABLE_FWI_COMPONENTS),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_ADVANCED_SENSORS,
+                        default=g(CONF_ENABLE_ADVANCED_SENSORS, DEFAULT_ENABLE_ADVANCED_SENSORS),
                     ): selector.BooleanSelector(),
                 }
             ),

@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v1.6.1."""
+"""Sensors for Weather Station Core -- v1.6.2."""
 
 from __future__ import annotations
 
@@ -15,14 +15,20 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    # v1.6.2
+    CONF_ENABLE_ADVANCED_SENSORS,
     # v0.7.0
     CONF_ENABLE_AIR_QUALITY,
     # v1.5.0
     CONF_ENABLE_COMFORT_INDICES,
+    # v1.6.2
+    CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     # v1.2.0
     CONF_ENABLE_FOG,
+    # v1.6.2
+    CONF_ENABLE_FWI_COMPONENTS,
     # v0.8.0
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
@@ -1329,15 +1335,17 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_PRESSURE_TREND_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_HEALTH_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_FORECAST_TILES: CONF_ENABLE_DISPLAY_SENSORS,
-    # Risk sensors (fire)
+    # Risk sensors (fire). FWI composite + DSR are primary outputs (with fire
+    # risk); the 5 intermediate codes are gated separately (v1.6.2) and need
+    # fire risk enabled to produce data.
     KEY_FIRE_RISK_SCORE: CONF_ENABLE_FIRE_RISK,
-    KEY_FWI_FFMC: CONF_ENABLE_FIRE_RISK,
-    KEY_FWI_DMC: CONF_ENABLE_FIRE_RISK,
-    KEY_FWI_DC: CONF_ENABLE_FIRE_RISK,
-    KEY_FWI_ISI: CONF_ENABLE_FIRE_RISK,
-    KEY_FWI_BUI: CONF_ENABLE_FIRE_RISK,
     KEY_FWI: CONF_ENABLE_FIRE_RISK,
     KEY_FWI_DSR: CONF_ENABLE_FIRE_RISK,
+    KEY_FWI_FFMC: CONF_ENABLE_FWI_COMPONENTS,
+    KEY_FWI_DMC: CONF_ENABLE_FWI_COMPONENTS,
+    KEY_FWI_DC: CONF_ENABLE_FWI_COMPONENTS,
+    KEY_FWI_ISI: CONF_ENABLE_FWI_COMPONENTS,
+    KEY_FWI_BUI: CONF_ENABLE_FWI_COMPONENTS,
     # Sea temperature
     KEY_SEA_SURFACE_TEMP: CONF_ENABLE_SEA_TEMP,
     # Air Quality  (v0.7.0)
@@ -1381,6 +1389,18 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # v1.6.0 French regional
     KEY_VIGILANCE_MAX_LEVEL: CONF_ENABLE_VIGILANCE_METEO,
     KEY_RIVER_LEVEL_M: CONF_ENABLE_VIGICRUES,
+    # v1.6.2 — station diagnostics (opt-in)
+    KEY_SENSOR_DRIFT_FLAGS: CONF_ENABLE_DIAGNOSTICS,
+    KEY_CONSISTENCY_FLAGS: CONF_ENABLE_DIAGNOSTICS,
+    KEY_SENSOR_QUALITY_FLAGS: CONF_ENABLE_DIAGNOSTICS,
+    KEY_FORECAST_SKILL: CONF_ENABLE_DIAGNOSTICS,
+    KEY_FORECAST_AGREEMENT: CONF_ENABLE_DIAGNOSTICS,
+    KEY_SOLAR_LUX_FACTOR: CONF_ENABLE_DIAGNOSTICS,
+    KEY_CLIMATOLOGY_30D: CONF_ENABLE_DIAGNOSTICS,
+    # v1.6.2 — advanced / derived representations (opt-in)
+    KEY_ZAMBRETTI_NUMBER: CONF_ENABLE_ADVANCED_SENSORS,
+    KEY_ET0_HOURLY_MM: CONF_ENABLE_ADVANCED_SENSORS,
+    KEY_WIND_DIR_SMOOTH_DEG: CONF_ENABLE_ADVANCED_SENSORS,
 }
 
 
@@ -1427,31 +1447,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_CHILL_HOURS_SEASON,
     }
 
-    _DISABLED_BY_DEFAULT = {
-        # Display / derivative sensors — only useful in specific dashboard setups
-        KEY_TEMP_DISPLAY,
-        KEY_WIND_DIR_SMOOTH_DEG,
-        KEY_ZAMBRETTI_NUMBER,
-        KEY_ET0_HOURLY_MM,
-        # Diagnostic / learning sensors — advanced use only
-        KEY_SENSOR_QUALITY_FLAGS,
-        KEY_FORECAST_AGREEMENT,
-        KEY_FORECAST_SKILL,
-        KEY_SOLAR_LUX_FACTOR,
-        KEY_CLIMATOLOGY_30D,
-        KEY_SENSOR_DRIFT_FLAGS,
-        KEY_CONSISTENCY_FLAGS,
-        # v1.3.0 — FWI intermediate components only (FFMC/DMC/DC/ISI/BUI);
-        # FWI composite and DSR are primary outputs, enabled when fire risk is on
-        KEY_FWI_FFMC,
-        KEY_FWI_DMC,
-        KEY_FWI_DC,
-        KEY_FWI_ISI,
-        KEY_FWI_BUI,
-        # PM2.5/PM10, pollen breakdown, moon illumination, solar tomorrow,
-        # and ET0-PM are primary outputs of their feature groups — enabled by
-        # default so they work as soon as the parent feature switch is turned on
-    }
+    # v1.6.2: _DISABLED_BY_DEFAULT removed. Previously-disabled sensors are now
+    # gated by opt-in feature toggles (enable_diagnostics, enable_fwi_components,
+    # enable_advanced_sensors) via _FEATURE_TOGGLE_MAP, so they are created and
+    # working when their group is enabled rather than created in a dead state.
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
         super().__init__(coordinator)
@@ -1472,8 +1471,6 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         self._attr_state_class = desc.state_class
         if desc.entity_category is not None:
             self._attr_entity_category = desc.entity_category
-        if desc.key in self._DISABLED_BY_DEFAULT:
-            self._attr_entity_registry_enabled_default = False
 
     @property
     def device_info(self):

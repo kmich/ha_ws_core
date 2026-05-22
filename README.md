@@ -109,7 +109,7 @@ The setup wizard walks you through:
 | 4. Location & climate | Hemisphere, climate region, elevation (auto-detected from HA) |
 | 5. Display units | Temperature, wind, rain, pressure unit preferences |
 | 6. Forecast | Enable/disable 7-day forecast, coordinates, **forecast provider** (Open-Meteo / Met.no / NWS/NOAA / OpenWeatherMap / Pirate Weather); API key sub-step appears automatically for providers that require one |
-| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices, Meteo Vigilance, Vigicrues |
+| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices, Meteo Vigilance, Vigicrues, station diagnostics, FWI components, advanced sensors |
 | 7a–7c | Per-feature sub-steps for Weather Underground (credentials), Solar Forecast (panel config), Sea Temp (lat/lon override) |
 | 8. Alerts | Wind/rain/freeze thresholds |
 
@@ -286,6 +286,42 @@ France only. No API key required. Enable via the **Vigicrues River Level** featu
 | Entity | Unit | Description |
 |---|---|---|
 | `sensor.ws_river_level` | m | Real-time water height at the nearest station. State attributes: `station`, `river`, `station_code`, `observed_at` |
+
+### Optional: Station Diagnostics (`enable_diagnostics`)
+
+Opt-in. Enable via the **Station Diagnostics** switch or Configure -> Features. Off by default to keep the recorder database and entity pickers clean.
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_sensor_drift` | Per-sensor monotonic drift detection flags |
+| `sensor.ws_sensor_consistency` | Cross-sensor physical consistency flags |
+| `sensor.ws_sensor_quality_flags` | Aggregate sensor validation flags |
+| `sensor.ws_forecast_skill` | Learned forecast skill score |
+| `sensor.ws_forecast_agreement` | Agreement between internal heuristics and the external forecast |
+| `sensor.ws_solar_lux_factor` | Learned lux -> W/m² conversion factor |
+| `sensor.ws_climatology_30d` | Rolling 30-day climatology summary |
+
+### Optional: FWI Components (`enable_fwi_components`)
+
+Opt-in. The five intermediate codes of the Canadian Forest Fire Weather Index. **Requires Fire Risk enabled** to produce data (the composite Fire Weather Index and Daily Severity Rating come with Fire Risk itself).
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_fwi_ffmc` | Fine Fuel Moisture Code |
+| `sensor.ws_fwi_dmc` | Duff Moisture Code |
+| `sensor.ws_fwi_dc` | Drought Code |
+| `sensor.ws_fwi_isi` | Initial Spread Index |
+| `sensor.ws_fwi_bui` | Buildup Index |
+
+### Optional: Advanced Sensors (`enable_advanced_sensors`)
+
+Opt-in. Alternate/derived representations of data already exposed elsewhere - useful for automations.
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_zambretti_number` | Numeric form of the Zambretti forecast (for automations) |
+| `sensor.ws_et0_hourly` | Hourly ET₀ rate (finer grain than the daily total) |
+| `sensor.ws_wind_direction_smooth` | EMA-smoothed wind direction in degrees |
 
 ### Other Entities
 

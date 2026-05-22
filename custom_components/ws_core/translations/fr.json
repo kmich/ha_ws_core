@@ -110,7 +110,10 @@
           "enable_thunderstorm_risk": "Risque d'orage (heuristique ; nombreux faux positifs)",
           "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, DPV, delta-T, parcours du vent, heures de froid, nébulosité)",
           "enable_vigilance_meteo": "Vigilance Météo (France, sans clé API)",
-          "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)"
+          "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)",
+          "enable_diagnostics": "Diagnostics de la station (dérive des capteurs, cohérence, indicateurs de qualité, fiabilité des prévisions, facteur lux solaire, climatologie 30 jours)",
+          "enable_fwi_components": "Composantes IFM (FFMC, DMC, DC, ISI, IGI — nécessite le risque d'incendie activé)",
+          "enable_advanced_sensors": "Capteurs avancés/dérivés (numéro Zambretti, ET₀ horaire, direction du vent lissée)"
         }
       },
       "sea_temp": {
@@ -269,7 +272,10 @@
           "enable_thunderstorm_risk": "Risque d'orage (heuristique ; nombreux faux positifs)",
           "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, DPV, delta-T, parcours du vent, heures de froid, nébulosité)",
           "enable_vigilance_meteo": "Vigilance Météo (France, sans clé API)",
-          "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)"
+          "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)",
+          "enable_diagnostics": "Diagnostics (dérive, cohérence, qualité, fiabilité prévisions)",
+          "enable_fwi_components": "Composantes IFM (nécessite le risque d'incendie)",
+          "enable_advanced_sensors": "Capteurs avancés/dérivés"
         },
         "data_description": {
           "enable_display_sensors": "Activer l'affichage des capteurs (niveaux, tendances, santé)",
@@ -284,7 +290,10 @@
           "enable_thunderstorm_risk": "Active le capteur de risque d'orage (Modèle basé sur les données de surface)",
           "enable_comfort_indices": "Active les indices de confort et capteurs agrométéorologiques",
           "enable_vigilance_meteo": "Active les alertes Vigilance Météo France (niveau départemental)",
-          "enable_vigicrues": "Active la hauteur d'eau de la rivière la plus proche (Hub'Eau v2)"
+          "enable_vigicrues": "Active la hauteur d'eau de la rivière la plus proche (Hub'Eau v2)",
+          "enable_diagnostics": "Dérive des capteurs, cohérence inter-capteurs, indicateurs de qualité, fiabilité des prévisions, facteur lux solaire, climatologie 30 jours",
+          "enable_fwi_components": "Codes intermédiaires IFM (FFMC/DMC/DC/ISI/IGI). Nécessite le risque d'incendie activé pour produire des données",
+          "enable_advanced_sensors": "Numéro Zambretti (forme numérique), ET₀ horaire, direction du vent lissée"
         }
       },
       "sea_temp_opt": {
@@ -967,6 +976,15 @@
       },
       "ws_enable_vigicrues": {
         "name": "Fonction : Vigicrues (niveau de rivière)"
+      },
+      "ws_enable_diagnostics": {
+        "name": "Fonction : Diagnostics de la station"
+      },
+      "ws_enable_fwi_components": {
+        "name": "Fonction : Composantes IFM"
+      },
+      "ws_enable_advanced_sensors": {
+        "name": "Fonction : Capteurs avancés"
       }
     },
     "number": {

@@ -2,6 +2,23 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.6.2] - 2026-05-22
+
+### New Features
+
+- **Three new opt-in feature toggles replace the old "disabled by default" mechanism.** Previously, a set of sensors were created in the entity registry in a *disabled* state, meaning they were inert and had to be manually enabled one by one — and nothing ever enabled them automatically. They are now gated by proper feature switches: off = the entity is never created (no clutter, no recorder cost); on = the entity is created and works immediately.
+  - **Station Diagnostics** (`switch.ws_enable_diagnostics`) — gates Sensor Drift, Sensor Consistency, Sensor Quality Flags, Forecast Skill, Forecast Agreement, Solar Lux Factor, and 30-day Climatology.
+  - **FWI Components** (`switch.ws_enable_fwi_components`) — gates the 5 Canadian FWI intermediate codes (FFMC, DMC, DC, ISI, BUI). Requires **Fire Risk** enabled to produce data; the composite FWI and Daily Severity Rating remain tied to Fire Risk.
+  - **Advanced Sensors** (`switch.ws_enable_advanced_sensors`) — gates Zambretti Number (numeric form of the text forecast), hourly ET₀, and smoothed wind direction.
+- All three default to **off** (opt-in), consistent with every other optional feature. Enable via Configure -> Features or the switches on the device page.
+
+### Changes
+
+- **Removed `_DISABLED_BY_DEFAULT`** from `sensor.py` entirely. Temperature Display, which was double-gated (behind the Display Sensors toggle *and* disabled-by-default), now works correctly as soon as Display Sensors is enabled.
+- New constants in `const.py`: `CONF_ENABLE_DIAGNOSTICS`, `CONF_ENABLE_FWI_COMPONENTS`, `CONF_ENABLE_ADVANCED_SENSORS` and their `DEFAULT_*` counterparts.
+
+> **Existing installs:** the affected sensors were already disabled in your registry, so nothing was working before. After upgrading, enable the relevant feature toggle (Configure -> Features) to create the sensors fresh. Old disabled registry entries can be safely deleted.
+
 ## [1.6.1] - 2026-05-22
 
 ### Bug Fixes

@@ -21,11 +21,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
+    CONF_ENABLE_ADVANCED_SENSORS,
     CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_COMFORT_INDICES,
+    CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_FOG,
+    CONF_ENABLE_FWI_COMPONENTS,
     CONF_ENABLE_MOON,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
@@ -35,11 +38,14 @@ from .const import (
     CONF_ENABLE_VIGILANCE_METEO,
     CONF_ENABLE_WUNDERGROUND,
     CONF_PREFIX,
+    DEFAULT_ENABLE_ADVANCED_SENSORS,
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_COMFORT_INDICES,
+    DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
+    DEFAULT_ENABLE_FWI_COMPONENTS,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SEA_TEMP,
@@ -152,6 +158,25 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_VIGICRUES,
         name="Feature: Vigicrues River Level",
         icon="mdi:waves",
+    ),
+    # v1.6.2
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_DIAGNOSTICS,
+        default=DEFAULT_ENABLE_DIAGNOSTICS,
+        name="Feature: Station Diagnostics",
+        icon="mdi:stethoscope",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_FWI_COMPONENTS,
+        default=DEFAULT_ENABLE_FWI_COMPONENTS,
+        name="Feature: FWI Components",
+        icon="mdi:fire-circle",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_ADVANCED_SENSORS,
+        default=DEFAULT_ENABLE_ADVANCED_SENSORS,
+        name="Feature: Advanced Sensors",
+        icon="mdi:tune-variant",
     ),
 )
 

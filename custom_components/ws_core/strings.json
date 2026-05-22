@@ -110,7 +110,10 @@
           "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)",
           "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)",
           "enable_vigilance_meteo": "Meteo Vigilance alerts (France, no API key)",
-          "enable_vigicrues": "Vigicrues river level (France, no API key)"
+          "enable_vigicrues": "Vigicrues river level (France, no API key)",
+          "enable_diagnostics": "Station diagnostics (sensor drift, consistency, quality flags, forecast skill/agreement, solar lux factor, 30-day climatology)",
+          "enable_fwi_components": "FWI components (FFMC, DMC, DC, ISI, BUI — requires Fire Risk enabled)",
+          "enable_advanced_sensors": "Advanced/derived sensors (Zambretti number, ET₀ hourly, smoothed wind direction)"
         }
       },
       "sea_temp": {
@@ -269,7 +272,10 @@
           "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)",
           "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)",
           "enable_vigilance_meteo": "Meteo Vigilance alerts (France, no API key)",
-          "enable_vigicrues": "Vigicrues river level (France, no API key)"
+          "enable_vigicrues": "Vigicrues river level (France, no API key)",
+          "enable_diagnostics": "Station diagnostics (drift, consistency, quality, forecast skill)",
+          "enable_fwi_components": "FWI components (needs Fire Risk)",
+          "enable_advanced_sensors": "Advanced/derived sensors"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -284,7 +290,10 @@
           "enable_thunderstorm_risk": "Enables thunderstorm risk sensor (surface heuristic)",
           "enable_comfort_indices": "Enables comfort indices and agrometeorological sensors",
           "enable_vigilance_meteo": "Enables Meteo-France departmental weather alerts (Vigilance Meteo)",
-          "enable_vigicrues": "Enables nearest river level from Vigicrues (Hub'Eau v2)"
+          "enable_vigicrues": "Enables nearest river level from Vigicrues (Hub'Eau v2)",
+          "enable_diagnostics": "Sensor drift, cross-sensor consistency, quality flags, forecast skill/agreement, solar lux factor, 30-day climatology",
+          "enable_fwi_components": "FWI intermediate codes (FFMC/DMC/DC/ISI/BUI). Requires Fire Risk enabled to produce data",
+          "enable_advanced_sensors": "Zambretti number (numeric form), hourly ET₀, smoothed wind direction"
         }
       },
       "sea_temp_opt": {
@@ -1335,6 +1344,15 @@
       },
       "ws_enable_vigicrues": {
         "name": "Feature: Vigicrues River Level"
+      },
+      "ws_enable_diagnostics": {
+        "name": "Feature: Station Diagnostics"
+      },
+      "ws_enable_fwi_components": {
+        "name": "Feature: FWI Components"
+      },
+      "ws_enable_advanced_sensors": {
+        "name": "Feature: Advanced Sensors"
       }
     },
     "number": {
