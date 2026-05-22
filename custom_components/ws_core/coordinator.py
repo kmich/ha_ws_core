@@ -1,4 +1,4 @@
-"""Coordinator for Weather Station Core -- v1.5.1.
+"""Coordinator for Weather Station Core -- v1.6.0.
 
 The _compute() method is broken into focused sub-methods:
   _compute_raw_readings()          Unit conversion of all source sensors
@@ -100,6 +100,8 @@ from .const import (
     CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_FIRE_RISK,
+    CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_VIGICRUES,
     # v0.6.0 new
     # v0.5.0 new
     CONF_ENABLE_FOG,
@@ -143,6 +145,8 @@ from .const import (
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_COMFORT_INDICES,
     DEFAULT_ENABLE_FIRE_RISK,
+    DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
@@ -283,6 +287,8 @@ from .const import (
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
     KEY_WIND_RUN_KM,
+    KEY_RIVER_LEVEL_M,
+    KEY_VIGILANCE_MAX_LEVEL,
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
@@ -478,6 +484,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._chill_season_reset_month = int(_get(CONF_CHILL_SEASON_RESET_MONTH, DEFAULT_CHILL_SEASON_RESET_MONTH))
         self._chill_season_reset_day = int(_get(CONF_CHILL_SEASON_RESET_DAY, DEFAULT_CHILL_SEASON_RESET_DAY))
 
+        # v1.6.0 French regional sources
+        self.vigilance_meteo_enabled = bool(_get(CONF_ENABLE_VIGILANCE_METEO, DEFAULT_ENABLE_VIGILANCE_METEO))
+        self._vigilance_cache: dict[str, Any] | None = None
+
+        self.vigicrues_enabled = bool(_get(CONF_ENABLE_VIGICRUES, DEFAULT_ENABLE_VIGICRUES))
+        self._vigicrues_cache: dict[str, Any] | None = None
+        self._vigicrues_station_code: str | None = None
+        self._vigicrues_station_name: str | None = None
+        self._vigicrues_river_name: str | None = None
+
         # Wind run accumulator — resets at local midnight (like rain_today)
         self._wind_run_km: float = 0.0
         self._wind_run_date: str = ""
@@ -633,6 +649,44 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("ws_core: deferred solar forecast fetch failed (will retry): %s", err)
 
             self.hass.async_create_task(_deferred_solar())
+
+        # Météo Vigilance periodic fetch (every 30 min; alerts rarely change faster)
+        if self.vigilance_meteo_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_vigilance()),
+                    timedelta(minutes=30),
+                )
+            )
+
+            async def _deferred_vigilance():
+                await asyncio.sleep(45)
+                try:
+                    await self._async_fetch_vigilance()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("ws_core: deferred vigilance fetch failed (will retry): %s", err)
+
+            self.hass.async_create_task(_deferred_vigilance())
+
+        # Vigicrues periodic fetch (every 15 min; river levels update frequently)
+        if self.vigicrues_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_vigicrues()),
+                    timedelta(minutes=15),
+                )
+            )
+
+            async def _deferred_vigicrues():
+                await asyncio.sleep(60)
+                try:
+                    await self._async_fetch_vigicrues()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("ws_core: deferred Vigicrues fetch failed (will retry): %s", err)
+
+            self.hass.async_create_task(_deferred_vigicrues())
 
         # Defer first refresh by 5s so config entry creation completes before any network calls.
         async def _deferred_refresh():
@@ -1997,6 +2051,23 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_POLLEN_WEED] = pol.get("weed_index")
             data[KEY_POLLEN_OVERALL] = pol.get("overall_level")
 
+        # v1.6.0 — Météo Vigilance (France only, no API key)
+        if self.vigilance_meteo_enabled and self._vigilance_cache:
+            vc = self._vigilance_cache
+            data[KEY_VIGILANCE_MAX_LEVEL] = vc.get("max_color")
+            data["_vigilance_phenomena"] = vc.get("phenomena", {})
+            data["_vigilance_dept"] = vc.get("dept")
+            data["_vigilance_fetched_at"] = vc.get("fetched_at")
+
+        # v1.6.0 — Vigicrues (France only, no API key)
+        if self.vigicrues_enabled and self._vigicrues_cache:
+            vr = self._vigicrues_cache
+            data[KEY_RIVER_LEVEL_M] = vr.get("level_m")
+            data["_river_station_name"] = vr.get("station_name")
+            data["_river_name"] = vr.get("river_name")
+            data["_river_obs_time"] = vr.get("obs_time")
+            data["_river_station_code"] = vr.get("station_code")
+
         # Moon (pure calculation, no external API)
         if self.moon_enabled:
             local_now = dt_util.now()
@@ -2633,3 +2704,188 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.error("ws_core solar forecast unexpected error: %s", exc, exc_info=True)
             if self._solar_cache:
                 self._solar_cache["status"] = f"Error: {exc}"
+
+    # ------------------------------------------------------------------
+    # v1.6.0 — Météo Vigilance (France, OpenDataSoft, no key)
+    # ------------------------------------------------------------------
+
+    async def _async_fetch_vigilance(self) -> None:
+        """Fetch Météo-France Vigilance alerts for the configured department.
+
+        Uses the OpenDataSoft public dataset (no API key required).
+        Extracts the worst alert level across all phenomena and stores
+        per-phenomenon levels as attributes.
+        """
+        if not (self.forecast_lat is not None and self.forecast_lon is not None):
+            return
+
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+
+        # Step 1: reverse-geocode to French department code via BAN API
+        ban_url = f"https://api-adresse.data.gouv.fr/reverse/?lon={lon}&lat={lat}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(ban_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status != 200:
+                        _LOGGER.debug("ws_core vigilance: BAN geocode failed HTTP %s", resp.status)
+                        return
+                    geo = await resp.json()
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            _LOGGER.debug("ws_core vigilance: BAN geocode error: %s", exc)
+            return
+
+        features = geo.get("features", [])
+        if not features:
+            _LOGGER.debug("ws_core vigilance: no BAN result for lat=%s lon=%s (not in France?)", lat, lon)
+            return
+
+        # context = "75, Paris, Ile-de-France" — dept is the first token
+        context = features[0].get("properties", {}).get("context", "")
+        dept = context.split(",")[0].strip() if context else None
+        if not dept:
+            _LOGGER.debug("ws_core vigilance: could not extract dept from context=%r", context)
+            return
+
+        # Step 2: query Météo Vigilance dataset for today's alerts (echeance=J)
+        ods_url = (
+            "https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
+            "weatherref-france-vigilance-meteo-departement/records"
+            f"?where=domain_id%3D%22{dept}%22%20AND%20echeance%3D%22J%22"
+            "&limit=20&select=phenomenon_id,phenomenon,color_id,color"
+        )
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(ods_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        _LOGGER.warning("ws_core vigilance: ODS fetch failed HTTP %s", resp.status)
+                        return
+                    raw = await resp.json()
+        except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
+            _LOGGER.warning("ws_core vigilance: ODS fetch error: %s", exc)
+            return
+
+        records = raw.get("results", [])
+        if not records:
+            _LOGGER.debug("ws_core vigilance: no records for dept=%s (may be outside France)", dept)
+            return
+
+        # color_id: 1=vert, 2=jaune, 3=orange, 4=rouge
+        _COLOR_RANK = {"vert": 1, "jaune": 2, "orange": 3, "rouge": 4}
+        phenomena: dict[str, str] = {}
+        max_rank = 1
+        max_color = "vert"
+        for rec in records:
+            ph = (rec.get("phenomenon") or "").strip()
+            color = (rec.get("color") or "vert").strip()
+            rank = rec.get("color_id") or _COLOR_RANK.get(color, 1)
+            if ph:
+                phenomena[ph] = color
+            if rank > max_rank:
+                max_rank = rank
+                max_color = color
+
+        self._vigilance_cache = {
+            "max_color": max_color,
+            "max_rank": max_rank,
+            "phenomena": phenomena,
+            "dept": dept,
+            "fetched_at": dt_util.utcnow().isoformat(),
+        }
+        _LOGGER.debug(
+            "ws_core vigilance fetched: dept=%s max=%s phenomena=%s",
+            dept, max_color, list(phenomena.keys()),
+        )
+        await self.async_request_refresh()
+
+    # ------------------------------------------------------------------
+    # v1.6.0 — Vigicrues (Hub'Eau v2, France, no key)
+    # ------------------------------------------------------------------
+
+    async def _async_fetch_vigicrues(self) -> None:
+        """Fetch real-time water level from the nearest Hub'Eau hydrometric station.
+
+        Two-step:
+          1. Find nearest active station within 50 km (cached after first successful lookup)
+          2. Fetch latest H-observation (water level in mm; stored as m for display)
+        """
+        if not (self.forecast_lat is not None and self.forecast_lon is not None):
+            return
+
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Step 1: find nearest station (only if not yet cached)
+                if not self._vigicrues_station_code:
+                    stations_url = (
+                        "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations"
+                        f"?format=json&longitude={lon}&latitude={lat}&distance=50"
+                        "&en_service=true&size=1"
+                        "&fields=code_station,libelle_station,longitude_station,latitude_station"
+                        ",code_cours_eau,libelle_cours_eau"
+                    )
+                    async with session.get(stations_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                        if resp.status != 200:
+                            _LOGGER.warning("ws_core Vigicrues: station lookup HTTP %s", resp.status)
+                            return
+                        sdata = await resp.json()
+                    stations = sdata.get("data", [])
+                    if not stations:
+                        _LOGGER.debug("ws_core Vigicrues: no station found within 50 km (not in France?)")
+                        return
+                    st = stations[0]
+                    self._vigicrues_station_code = st.get("code_station")
+                    self._vigicrues_station_name = st.get("libelle_station") or self._vigicrues_station_code
+                    self._vigicrues_river_name = st.get("libelle_cours_eau") or ""
+                    _LOGGER.debug(
+                        "ws_core Vigicrues: nearest station %s (%s) on %s",
+                        self._vigicrues_station_code, self._vigicrues_station_name, self._vigicrues_river_name,
+                    )
+
+                if not self._vigicrues_station_code:
+                    return
+
+                # Step 2: fetch latest water level (grandeur_hydro=H)
+                obs_url = (
+                    "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr"
+                    f"?format=json&code_entite={self._vigicrues_station_code}"
+                    "&grandeur_hydro=H&size=1"
+                    "&fields=code_station,date_obs,resultat_obs"
+                )
+                async with session.get(obs_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        _LOGGER.warning("ws_core Vigicrues: observations HTTP %s", resp.status)
+                        return
+                    odata = await resp.json()
+
+        except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
+            _LOGGER.warning("ws_core Vigicrues fetch error: %s", exc)
+            return
+        except Exception as exc:
+            _LOGGER.error("ws_core Vigicrues unexpected error: %s", exc, exc_info=True)
+            return
+
+        observations = odata.get("data", [])
+        if not observations:
+            _LOGGER.debug("ws_core Vigicrues: no observations for station %s", self._vigicrues_station_code)
+            return
+
+        obs = observations[0]
+        raw_mm = obs.get("resultat_obs")  # Hub'Eau returns mm for H
+        level_m = round(float(raw_mm) / 1000.0, 3) if raw_mm is not None else None
+
+        self._vigicrues_cache = {
+            "level_m": level_m,
+            "station_code": self._vigicrues_station_code,
+            "station_name": self._vigicrues_station_name,
+            "river_name": self._vigicrues_river_name,
+            "obs_time": obs.get("date_obs"),
+            "fetched_at": dt_util.utcnow().isoformat(),
+        }
+        _LOGGER.debug(
+            "ws_core Vigicrues: %s level=%.3f m at %s",
+            self._vigicrues_station_name, level_m or 0, obs.get("date_obs"),
+        )
+        await self.async_request_refresh()

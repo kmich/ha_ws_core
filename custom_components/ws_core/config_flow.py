@@ -42,6 +42,8 @@ from .const import (
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
+    CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ENABLE_ZAMBRETTI,
     CONF_FORECAST_API_KEY,
@@ -91,6 +93,8 @@ from .const import (
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
+    DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
@@ -717,6 +721,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_ENABLE_COMFORT_INDICES] = bool(
                 user_input.get(CONF_ENABLE_COMFORT_INDICES, DEFAULT_ENABLE_COMFORT_INDICES)
             )
+            self._data[CONF_ENABLE_VIGILANCE_METEO] = bool(user_input.get(CONF_ENABLE_VIGILANCE_METEO, False))
+            self._data[CONF_ENABLE_VIGICRUES] = bool(user_input.get(CONF_ENABLE_VIGICRUES, False))
             if self._data[CONF_ENABLE_SEA_TEMP]:
                 return await self.async_step_sea_temp()
             if self._data[CONF_ENABLE_WUNDERGROUND]:
@@ -755,6 +761,12 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_COMFORT_INDICES, default=DEFAULT_ENABLE_COMFORT_INDICES
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_VIGILANCE_METEO, default=DEFAULT_ENABLE_VIGILANCE_METEO
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_VIGICRUES, default=DEFAULT_ENABLE_VIGICRUES
                     ): selector.BooleanSelector(),
                 }
             ),
@@ -1313,6 +1325,14 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_COMFORT_INDICES,
                         default=g(CONF_ENABLE_COMFORT_INDICES, DEFAULT_ENABLE_COMFORT_INDICES),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_VIGILANCE_METEO,
+                        default=g(CONF_ENABLE_VIGILANCE_METEO, DEFAULT_ENABLE_VIGILANCE_METEO),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_VIGICRUES,
+                        default=g(CONF_ENABLE_VIGICRUES, DEFAULT_ENABLE_VIGICRUES),
                     ): selector.BooleanSelector(),
                 }
             ),

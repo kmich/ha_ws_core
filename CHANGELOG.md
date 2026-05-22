@@ -2,6 +2,21 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.6.0] - 2026-05-22
+
+### New Features
+
+- **Meteo Vigilance** (`sensor.ws_vigilance`) - Worst departmental alert colour from Meteo-France Vigilance (vert/jaune/orange/rouge). State attributes include a full breakdown by weather phenomenon (rain, wind, flood, snow, thunderstorm, fog, heat, cold, avalanche, waves). France only. No API key required. Opt-in via the **Meteo Vigilance** feature switch.
+- **Vigicrues River Level** (`sensor.ws_river_level`) - Real-time water height (m) from the nearest gauging station to your configured location, via Hub'Eau v2 API. State attributes include station name, river name, station code, and observation timestamp. France only. No API key required. Opt-in via the **Vigicrues River Level** feature switch.
+- **Feature: Meteo Vigilance** (`switch.ws_enable_vigilance_meteo`) - Enables Meteo Vigilance. Fetches every 30 minutes with a 45-second startup delay. Uses BAN reverse geocoding to detect your department automatically.
+- **Feature: Vigicrues River Level** (`switch.ws_enable_vigicrues`) - Enables Vigicrues. Fetches every 15 minutes with a 60-second startup delay. Nearest station looked up once then cached.
+
+### Changes
+
+- Config flow and options flow updated with `enable_vigilance_meteo` and `enable_vigicrues` on the features step.
+- New constants in `const.py`: `CONF_ENABLE_VIGILANCE_METEO`, `CONF_ENABLE_VIGICRUES`, `DEFAULT_ENABLE_VIGILANCE_METEO`, `DEFAULT_ENABLE_VIGICRUES`, `KEY_VIGILANCE_MAX_LEVEL`, `KEY_RIVER_LEVEL_M`.
+- French and English translations added for both new sensors and feature switches.
+
 ## [1.5.1] - 2026-05-22
 
 ### Bug Fixes

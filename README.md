@@ -19,17 +19,14 @@ Weather Station Core reads raw sensor data from your existing weather station �
 
 ---
 
-## What's New in 1.5.0
+## What's New in 1.6.0
 
-**13 new comfort & agrometeorological sensors**, behind the new **Comfort Indices** feature toggle. Opt-in: enable via the **Comfort Indices** switch on the device page, or via Configure -> Features.
+**Two new French regional data sources** (no API key required):
 
-- **Heat stress**: Heat Index (NWS Rothfusz), Humidex (Environment Canada), Davis THW & THSW indices
-- **Cold stress**: Wind Chill (WMO 2001)
-- **Humidity/vapour**: Vapour Pressure Deficit (kPa), Absolute Humidity (g/m³)
-- **Agronomy**: Delta-T spray window, Wind Run (daily km), Chill Hours (today + season)
-- **Solar/cloud**: Clearness Index (Kt), Cloud Cover % — both from an optional solar radiation sensor
+- **Meteo Vigilance** - Meteo-France departmental weather alert level (vert/jaune/orange/rouge) with per-phenomenon breakdown. Enable via the **Meteo Vigilance** feature switch.
+- **Vigicrues River Level** - Real-time water height (m) at the nearest gauging station to your location, via Hub'Eau v2. Enable via the **Vigicrues River Level** feature switch.
 
-See [Optional: Comfort Indices](#optional-comfort-indices-enable_comfort_indices) below and the [CHANGELOG](CHANGELOG.md) for full details.
+See the [CHANGELOG](CHANGELOG.md) for full details.
 
 ---
 
@@ -112,7 +109,7 @@ The setup wizard walks you through:
 | 4. Location & climate | Hemisphere, climate region, elevation (auto-detected from HA) |
 | 5. Display units | Temperature, wind, rain, pressure unit preferences |
 | 6. Forecast | Enable/disable 7-day forecast, coordinates, **forecast provider** (Open-Meteo / Met.no / NWS/NOAA / OpenWeatherMap / Pirate Weather); API key sub-step appears automatically for providers that require one |
-| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices |
+| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices, Meteo Vigilance, Vigicrues |
 | 7a–7c | Per-feature sub-steps for Weather Underground (credentials), Solar Forecast (panel config), Sea Temp (lat/lon override) |
 | 8. Alerts | Wind/rain/freeze thresholds |
 
@@ -273,6 +270,22 @@ Disabled by default (opt-in). Enable via the **Comfort Indices** switch (`switch
 | `sensor.ws_chill_hours_season` | h | Season-to-date chill hours; resets on configured date (default 1 July) |
 | `sensor.ws_clearness_index` | — | Clearness index Kt = observed / clear-sky solar radiation (needs solar radiation sensor) |
 | `sensor.ws_cloud_cover` | % | Approximate cloud cover derived from the clearness index |
+
+### Optional: Meteo Vigilance (`enable_vigilance_meteo`)
+
+France only. No API key required. Enable via the **Meteo Vigilance** feature switch. The integration auto-detects your department from your Home Assistant coordinates using BAN reverse geocoding.
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_vigilance` | Worst departmental alert colour: `vert` / `jaune` / `orange` / `rouge`. State attributes: `phenomena` (dict of phenomenon to colour), `department` (INSEE code), `fetched_at` |
+
+### Optional: Vigicrues River Level (`enable_vigicrues`)
+
+France only. No API key required. Enable via the **Vigicrues River Level** feature switch. The nearest gauging station is looked up once from your HA coordinates and cached.
+
+| Entity | Unit | Description |
+|---|---|---|
+| `sensor.ws_river_level` | m | Real-time water height at the nearest station. State attributes: `station`, `river`, `station_code`, `observed_at` |
 
 ### Other Entities
 

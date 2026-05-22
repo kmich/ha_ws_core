@@ -31,6 +31,8 @@ from .const import (
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
+    CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_WUNDERGROUND,
     CONF_PREFIX,
     DEFAULT_ENABLE_AIR_QUALITY,
@@ -43,6 +45,8 @@ from .const import (
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
+    DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_PREFIX,
     DOMAIN,
@@ -135,6 +139,19 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_COMFORT_INDICES,
         name="Feature: Comfort Indices",
         icon="mdi:thermometer-check",
+    ),
+    # v1.6.0
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_VIGILANCE_METEO,
+        default=DEFAULT_ENABLE_VIGILANCE_METEO,
+        name="Feature: Meteo Vigilance",
+        icon="mdi:alert-octagon",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_VIGICRUES,
+        default=DEFAULT_ENABLE_VIGICRUES,
+        name="Feature: Vigicrues River Level",
+        icon="mdi:waves",
     ),
 )
 

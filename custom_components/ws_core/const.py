@@ -489,6 +489,24 @@ KEY_CLEARNESS_INDEX = "clearness_index_kt"
 KEY_CLOUD_COVER_PCT = "cloud_cover_pct"
 
 # ---------------------------------------------------------------------------
+# v1.6.0 — French regional data sources (no API key required)
+# ---------------------------------------------------------------------------
+
+# Feature toggles
+CONF_ENABLE_VIGILANCE_METEO = "enable_vigilance_meteo"
+CONF_ENABLE_VIGICRUES = "enable_vigicrues"
+
+# Defaults
+DEFAULT_ENABLE_VIGILANCE_METEO = False
+DEFAULT_ENABLE_VIGICRUES = False
+
+# Data keys — Météo-France Vigilance (department-level weather alerts)
+KEY_VIGILANCE_MAX_LEVEL = "vigilance_max_level"   # overall worst: vert/jaune/orange/rouge
+
+# Data keys — Vigicrues (real-time river level via Hub'Eau v2)
+KEY_RIVER_LEVEL_M = "river_level_m"
+
+# ---------------------------------------------------------------------------
 # Migration — v0.3.0 deprecated entity keys and config keys
 # ---------------------------------------------------------------------------
 DEPRECATED_KEYS_V030 = (

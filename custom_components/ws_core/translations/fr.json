@@ -108,7 +108,9 @@
           "_go_back": "← Retour à l'étape précédente",
           "enable_fog": "Probabilité de brouillard",
           "enable_thunderstorm_risk": "Risque d'orage (heuristique ; nombreux faux positifs)",
-          "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, DPV, delta-T, parcours du vent, heures de froid, nébulosité)"
+          "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, DPV, delta-T, parcours du vent, heures de froid, nébulosité)",
+          "enable_vigilance_meteo": "Vigilance Météo (France, sans clé API)",
+          "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)"
         }
       },
       "sea_temp": {
@@ -265,7 +267,9 @@
           "enable_solar_forecast": "Prévision solaire (forecast.solar)",
           "enable_fog": "Probabilité de brouillard",
           "enable_thunderstorm_risk": "Risque d'orage (heuristique ; nombreux faux positifs)",
-          "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, DPV, delta-T, parcours du vent, heures de froid, nébulosité)"
+          "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, DPV, delta-T, parcours du vent, heures de froid, nébulosité)",
+          "enable_vigilance_meteo": "Vigilance Météo (France, sans clé API)",
+          "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)"
         },
         "data_description": {
           "enable_display_sensors": "Activer l'affichage des capteurs (niveaux, tendances, santé)",
@@ -278,7 +282,9 @@
           "enable_solar_forecast": "Prévision solaire (forecast.solar)",
           "enable_fog": "Active le capteur de probabilité de brouillard (Écart au point de rosée)",
           "enable_thunderstorm_risk": "Active le capteur de risque d'orage (Modèle basé sur les données de surface)",
-          "enable_comfort_indices": "Active les indices de confort et capteurs agrométéorologiques"
+          "enable_comfort_indices": "Active les indices de confort et capteurs agrométéorologiques",
+          "enable_vigilance_meteo": "Active les alertes Vigilance Météo France (niveau départemental)",
+          "enable_vigicrues": "Active la hauteur d'eau de la rivière la plus proche (Hub'Eau v2)"
         }
       },
       "sea_temp_opt": {
@@ -450,6 +456,16 @@
       "chill_hours_season": { "name": "Heures de froid (saison)" },
       "clearness_index": { "name": "Indice d'ensoleillement" },
       "cloud_cover": { "name": "Couverture nuageuse" },
+      "vigilance_max_level": {
+        "name": "Vigilance Météo",
+        "state": {
+          "vert": "Vert (pas de risque)",
+          "jaune": "Jaune (soyez attentifs)",
+          "orange": "Orange (soyez très vigilants)",
+          "rouge": "Rouge (vigilance absolue)"
+        }
+      },
+      "river_level": { "name": "Niveau de rivière" },
       "zambretti_forecast": {
         "name": "Prévision locale (algorithme Zambretti)",
         "state": {
@@ -945,6 +961,12 @@
       },
       "ws_enable_comfort_indices": {
         "name": "Fonction : Indices de confort"
+      },
+      "ws_enable_vigilance_meteo": {
+        "name": "Fonction : Vigilance Météo"
+      },
+      "ws_enable_vigicrues": {
+        "name": "Fonction : Vigicrues (niveau de rivière)"
       }
     },
     "number": {

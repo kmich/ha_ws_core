@@ -148,6 +148,15 @@ def _make_coordinator(
     coord._chill_hours_season_date = ""
     coord._chill_hours_last_ts = None
 
+    # v1.6.0 French regional data sources
+    coord.vigilance_meteo_enabled = False
+    coord._vigilance_cache = None
+    coord.vigicrues_enabled = False
+    coord._vigicrues_cache = None
+    coord._vigicrues_station_code = None
+    coord._vigicrues_station_name = None
+    coord._vigicrues_river_name = None
+
     from custom_components.ws_core.coordinator import WSStationRuntime
     coord.runtime = WSStationRuntime()
 

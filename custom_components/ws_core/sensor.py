@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v1.5.1."""
+"""Sensors for Weather Station Core -- v1.6.0."""
 
 from __future__ import annotations
 
@@ -30,6 +30,9 @@ from .const import (
     # v0.9.0
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
+    # v1.6.0
+    CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_VIGICRUES,
     CONF_PREFIX,
     DEFAULT_PREFIX,
     DOMAIN,
@@ -138,6 +141,8 @@ from .const import (
     KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_GUST_MAX_24H,
+    KEY_RIVER_LEVEL_M,
+    KEY_VIGILANCE_MAX_LEVEL,
     KEY_WIND_QUADRANT,
     KEY_WIND_RUN_KM,
     KEY_WU_STATUS,
@@ -537,6 +542,38 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:cloud-percent",
         native_unit="%",
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # =========================================================================
+    # v1.6.0 FRENCH REGIONAL SENSORS (Météo Vigilance + Vigicrues)
+    # =========================================================================
+    # Météo-France Vigilance — worst alert level for the station's department
+    WSSensorDescription(
+        key=KEY_VIGILANCE_MAX_LEVEL,
+        translation_key="vigilance_max_level",
+        name="WS Vigilance Météo",
+        icon="mdi:alert-octagon",
+        state_class=None,
+        native_unit=None,
+        attrs_fn=lambda d: {
+            "phenomena": d.get("_vigilance_phenomena", {}),
+            "department": d.get("_vigilance_dept"),
+            "fetched_at": d.get("_vigilance_fetched_at"),
+        },
+    ),
+    # Vigicrues — real-time water level at nearest hydrometric station
+    WSSensorDescription(
+        key=KEY_RIVER_LEVEL_M,
+        translation_key="river_level",
+        name="WS River Level",
+        icon="mdi:waves",
+        native_unit="m",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "station": d.get("_river_station_name"),
+            "river": d.get("_river_name"),
+            "station_code": d.get("_river_station_code"),
+            "observed_at": d.get("_river_obs_time"),
+        },
     ),
     # Zambretti barometric forecast
     WSSensorDescription(
@@ -1341,6 +1378,9 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_CHILL_HOURS_SEASON: CONF_ENABLE_COMFORT_INDICES,
     KEY_CLEARNESS_INDEX: CONF_ENABLE_COMFORT_INDICES,
     KEY_CLOUD_COVER_PCT: CONF_ENABLE_COMFORT_INDICES,
+    # v1.6.0 French regional
+    KEY_VIGILANCE_MAX_LEVEL: CONF_ENABLE_VIGILANCE_METEO,
+    KEY_RIVER_LEVEL_M: CONF_ENABLE_VIGICRUES,
 }
 
 
@@ -1574,6 +1614,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_CHILL_HOURS_SEASON: "chill_hours_season",
             KEY_CLEARNESS_INDEX: "clearness_index",
             KEY_CLOUD_COVER_PCT: "cloud_cover",
+            KEY_VIGILANCE_MAX_LEVEL: "vigilance",
+            KEY_RIVER_LEVEL_M: "river_level",
         }
         if key in overrides:
             return overrides[key]

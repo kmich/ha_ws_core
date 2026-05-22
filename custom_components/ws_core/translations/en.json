@@ -108,7 +108,9 @@
           "_go_back": "← Go back to previous step",
           "enable_fog": "Fog probability sensor",
           "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)",
-          "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)"
+          "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)",
+          "enable_vigilance_meteo": "Meteo Vigilance alerts (France, no API key)",
+          "enable_vigicrues": "Vigicrues river level (France, no API key)"
         }
       },
       "sea_temp": {
@@ -265,7 +267,9 @@
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)",
           "enable_fog": "Fog probability sensor",
           "enable_thunderstorm_risk": "Thunderstorm risk sensor (heuristic; many false positives)",
-          "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)"
+          "enable_comfort_indices": "Comfort indices (heat index, wind chill, humidex, VPD, delta-T, wind run, chill hours, cloud cover)",
+          "enable_vigilance_meteo": "Meteo Vigilance alerts (France, no API key)",
+          "enable_vigicrues": "Vigicrues river level (France, no API key)"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -278,7 +282,9 @@
           "enable_solar_forecast": "Solar PV forecast (forecast.solar)",
           "enable_fog": "Enables fog probability sensor (dew-point depression model)",
           "enable_thunderstorm_risk": "Enables thunderstorm risk sensor (surface heuristic)",
-          "enable_comfort_indices": "Enables comfort indices and agrometeorological sensors"
+          "enable_comfort_indices": "Enables comfort indices and agrometeorological sensors",
+          "enable_vigilance_meteo": "Enables Meteo-France departmental weather alerts (Vigilance Meteo)",
+          "enable_vigicrues": "Enables nearest river level from Vigicrues (Hub'Eau v2)"
         }
       },
       "sea_temp_opt": {
@@ -450,6 +456,16 @@
       "chill_hours_season": { "name": "Chill Hours Season" },
       "clearness_index": { "name": "Clearness Index" },
       "cloud_cover": { "name": "Cloud Cover" },
+      "vigilance_max_level": {
+        "name": "Meteo Vigilance",
+        "state": {
+          "vert": "Green (no hazard)",
+          "jaune": "Yellow (be attentive)",
+          "orange": "Orange (be on alert)",
+          "rouge": "Red (absolute vigilance required)"
+        }
+      },
+      "river_level": { "name": "River Level" },
       "zambretti_forecast": {
         "name": "Zambretti Forecast",
         "state": {
@@ -945,6 +961,12 @@
       },
       "ws_enable_comfort_indices": {
         "name": "Feature: Comfort Indices"
+      },
+      "ws_enable_vigilance_meteo": {
+        "name": "Feature: Meteo Vigilance"
+      },
+      "ws_enable_vigicrues": {
+        "name": "Feature: Vigicrues River Level"
       }
     },
     "number": {
