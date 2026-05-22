@@ -42,8 +42,8 @@ from .const import (
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
-    CONF_ENABLE_VIGILANCE_METEO,
     CONF_ENABLE_VIGICRUES,
+    CONF_ENABLE_VIGILANCE_METEO,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ENABLE_ZAMBRETTI,
     CONF_FORECAST_API_KEY,
@@ -93,8 +93,8 @@ from .const import (
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
-    DEFAULT_ENABLE_VIGILANCE_METEO,
     DEFAULT_ENABLE_VIGICRUES,
+    DEFAULT_ENABLE_VIGILANCE_METEO,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
@@ -765,9 +765,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_ENABLE_VIGILANCE_METEO, default=DEFAULT_ENABLE_VIGILANCE_METEO
                     ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_VIGICRUES, default=DEFAULT_ENABLE_VIGICRUES
-                    ): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_VIGICRUES, default=DEFAULT_ENABLE_VIGICRUES): selector.BooleanSelector(),
                 }
             ),
             last_step=False,

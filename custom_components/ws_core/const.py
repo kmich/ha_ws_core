@@ -501,7 +501,7 @@ DEFAULT_ENABLE_VIGILANCE_METEO = False
 DEFAULT_ENABLE_VIGICRUES = False
 
 # Data keys — Météo-France Vigilance (department-level weather alerts)
-KEY_VIGILANCE_MAX_LEVEL = "vigilance_max_level"   # overall worst: vert/jaune/orange/rouge
+KEY_VIGILANCE_MAX_LEVEL = "vigilance_max_level"  # overall worst: vert/jaune/orange/rouge
 
 # Data keys — Vigicrues (real-time river level via Hub'Eau v2)
 KEY_RIVER_LEVEL_M = "river_level_m"

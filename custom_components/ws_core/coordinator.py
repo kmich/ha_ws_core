@@ -100,8 +100,6 @@ from .const import (
     CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_FIRE_RISK,
-    CONF_ENABLE_VIGILANCE_METEO,
-    CONF_ENABLE_VIGICRUES,
     # v0.6.0 new
     # v0.5.0 new
     CONF_ENABLE_FOG,
@@ -110,6 +108,8 @@ from .const import (
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
+    CONF_ENABLE_VIGICRUES,
+    CONF_ENABLE_VIGILANCE_METEO,
     CONF_ENABLE_WUNDERGROUND,
     CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
@@ -145,13 +145,13 @@ from .const import (
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_COMFORT_INDICES,
     DEFAULT_ENABLE_FIRE_RISK,
-    DEFAULT_ENABLE_VIGILANCE_METEO,
-    DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
+    DEFAULT_ENABLE_VIGICRUES,
+    DEFAULT_ENABLE_VIGILANCE_METEO,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_FORECAST_PROVIDER,
@@ -259,6 +259,7 @@ from .const import (
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
     KEY_RAIN_TODAY_MM,
+    KEY_RIVER_LEVEL_M,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -278,6 +279,7 @@ from .const import (
     KEY_THW_INDEX,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
+    KEY_VIGILANCE_MAX_LEVEL,
     KEY_VPD,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
@@ -287,8 +289,6 @@ from .const import (
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
     KEY_WIND_RUN_KM,
-    KEY_RIVER_LEVEL_M,
-    KEY_VIGILANCE_MAX_LEVEL,
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
@@ -2794,7 +2794,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         _LOGGER.debug(
             "ws_core vigilance fetched: dept=%s max=%s phenomena=%s",
-            dept, max_color, list(phenomena.keys()),
+            dept,
+            max_color,
+            list(phenomena.keys()),
         )
         await self.async_request_refresh()
 
@@ -2841,7 +2843,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._vigicrues_river_name = st.get("libelle_cours_eau") or ""
                     _LOGGER.debug(
                         "ws_core Vigicrues: nearest station %s (%s) on %s",
-                        self._vigicrues_station_code, self._vigicrues_station_name, self._vigicrues_river_name,
+                        self._vigicrues_station_code,
+                        self._vigicrues_station_name,
+                        self._vigicrues_river_name,
                     )
 
                 if not self._vigicrues_station_code:
@@ -2886,6 +2890,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         _LOGGER.debug(
             "ws_core Vigicrues: %s level=%.3f m at %s",
-            self._vigicrues_station_name, level_m or 0, obs.get("date_obs"),
+            self._vigicrues_station_name,
+            level_m or 0,
+            obs.get("date_obs"),
         )
         await self.async_request_refresh()
