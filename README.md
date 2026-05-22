@@ -19,12 +19,16 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 
 ---
 
-## What's New in 1.6.0
+## What's New in 1.7.0
 
-**Two new French regional data sources** (no API key required):
+**Precipitation nowcast** (opt-in, no API key) - short-term "is it about to rain" intelligence from Open-Meteo's 15-minute precipitation buckets, independent of your chosen forecast provider:
 
-- **Meteo Vigilance** - Meteo-France departmental weather alert level (vert/jaune/orange/rouge) with per-phenomenon breakdown. Enable via the **Meteo Vigilance** feature switch.
-- **Vigicrues River Level** - Real-time water height (m) at the nearest gauging station to your location, via Hub'Eau v2. Enable via the **Vigicrues River Level** feature switch.
+- `sensor.ws_minutes_until_rain` / `sensor.ws_minutes_until_dry` - minutes until rain starts / stops.
+- `sensor.ws_rain_next_60min` - total mm expected in the next hour.
+- `sensor.ws_nowcast_intensity` - none / light / moderate / heavy.
+- `binary_sensor.ws_rain_expected_1h` - on when rain is expected within the hour.
+
+Enable via the **Precipitation Nowcast** feature switch.
 
 See the [CHANGELOG](CHANGELOG.md) for full details.
 
@@ -109,7 +113,7 @@ The setup wizard walks you through:
 | 4. Location & climate | Hemisphere, climate region, elevation (auto-detected from HA) |
 | 5. Display units | Temperature, wind, rain, pressure unit preferences |
 | 6. Forecast | Enable/disable 7-day forecast, coordinates, **forecast provider** (Open-Meteo / Met.no / NWS/NOAA / OpenWeatherMap / Pirate Weather); API key sub-step appears automatically for providers that require one |
-| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices, Meteo Vigilance, Vigicrues, station diagnostics, FWI components, advanced sensors |
+| 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices, Meteo Vigilance, Vigicrues, station diagnostics, FWI components, advanced sensors, precipitation nowcast |
 | 7a-7c | Per-feature sub-steps for Weather Underground (credentials), Solar Forecast (panel config), Sea Temp (lat/lon override) |
 | 8. Alerts | Wind/rain/freeze thresholds |
 
@@ -322,6 +326,18 @@ Opt-in. Alternate/derived representations of data already exposed elsewhere - us
 | `sensor.ws_zambretti_number` | Numeric form of the Zambretti forecast (for automations) |
 | `sensor.ws_et0_hourly` | Hourly ET₀ rate (finer grain than the daily total) |
 | `sensor.ws_wind_direction_smooth` | EMA-smoothed wind direction in degrees |
+
+### Optional: Precipitation Nowcast (`enable_nowcast`)
+
+Opt-in. Short-term rain timing from Open-Meteo's 15-minute precipitation buckets (free, no API key, independent of the chosen forecast provider). Refreshes every 15 minutes.
+
+| Entity | Unit | Description |
+|---|---|---|
+| `sensor.ws_minutes_until_rain` | min | Minutes until rain is expected to start (unknown when none in window) |
+| `sensor.ws_minutes_until_dry` | min | Minutes until rain is expected to stop (when raining) |
+| `sensor.ws_rain_next_60min` | mm | Total precipitation expected in the next hour |
+| `sensor.ws_nowcast_intensity` | - | none / light / moderate / heavy (peak rate in the next hour) |
+| `binary_sensor.ws_rain_expected_1h` | - | On when measurable rain is expected within 60 minutes |
 
 ### Other Entities
 

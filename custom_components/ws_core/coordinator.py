@@ -43,6 +43,7 @@ from .algorithms import (
     CONDITION_COLORS,
     CONDITION_DESCRIPTIONS,
     CONDITION_ICONS,
+    NOWCAST_BUCKET_THRESHOLD_MM,
     ZAMBRETTI_RAIN_PCT,
     KalmanFilter,
     aqi_level,
@@ -67,6 +68,7 @@ from .algorithms import (
     combine_rain_probability,
     compute_fwi,
     cross_sensor_consistency_flags,
+    derive_nowcast,
     determine_current_condition,
     direction_to_quadrant,
     et0_hargreaves,
@@ -104,6 +106,7 @@ from .const import (
     # v0.5.0 new
     CONF_ENABLE_FOG,
     CONF_ENABLE_MOON,
+    CONF_ENABLE_NOWCAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
@@ -118,6 +121,7 @@ from .const import (
     CONF_FORECAST_LON,
     CONF_FORECAST_PROVIDER,
     CONF_HEMISPHERE,
+    CONF_NOWCAST_INTERVAL_MIN,
     # Tuning numbers (previously no-op, now wired)
     CONF_PRESSURE_TREND_WINDOW_H,
     CONF_RAIN_FILTER_ALPHA,
@@ -147,6 +151,7 @@ from .const import (
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_MOON,
+    DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
@@ -156,6 +161,7 @@ from .const import (
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_FORECAST_PROVIDER,
     DEFAULT_HEMISPHERE,
+    DEFAULT_NOWCAST_INTERVAL_MIN,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_RAIN_FILTER_ALPHA,
     DEFAULT_SOLAR_INTERVAL_MIN,
@@ -224,6 +230,8 @@ from .const import (
     KEY_HUMIDEX,
     KEY_HUMIDITY_LEVEL_DISPLAY,
     KEY_LUX,
+    KEY_MINUTES_UNTIL_DRY,
+    KEY_MINUTES_UNTIL_RAIN,
     KEY_MOON_AGE_DAYS,
     KEY_MOON_DISPLAY,
     KEY_MOON_ILLUMINATION_PCT,
@@ -239,6 +247,7 @@ from .const import (
     KEY_NORM_WIND_DIR_DEG,
     KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
+    KEY_NOWCAST_INTENSITY,
     KEY_OZONE,
     KEY_PACKAGE_OK,
     KEY_PACKAGE_STATUS,
@@ -255,6 +264,8 @@ from .const import (
     KEY_RAIN_ACCUM_24H,
     KEY_RAIN_ANOMALY_30D,
     KEY_RAIN_DISPLAY,
+    KEY_RAIN_EXPECTED_1H,
+    KEY_RAIN_NEXT_60MIN,
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
@@ -499,6 +510,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._vigicrues_station_name: str | None = None
         self._vigicrues_river_name: str | None = None
 
+        # v1.7.0 Precipitation nowcast (Open-Meteo minutely_15, independent of provider)
+        self.nowcast_enabled = bool(_get(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST))
+        self.nowcast_interval_min = int(_get(CONF_NOWCAST_INTERVAL_MIN, DEFAULT_NOWCAST_INTERVAL_MIN))
+        self._nowcast_cache: dict[str, Any] | None = None
+
         # Wind run accumulator - resets at local midnight (like rain_today)
         self._wind_run_km: float = 0.0
         self._wind_run_date: str = ""
@@ -694,6 +710,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("ws_core: deferred Vigicrues fetch failed (will retry): %s", err)
 
             self.hass.async_create_task(_deferred_vigicrues())
+
+        # v1.7.0 Precipitation nowcast (Open-Meteo minutely_15; refresh often)
+        if self.nowcast_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_nowcast()),
+                    timedelta(minutes=self.nowcast_interval_min),
+                )
+            )
+
+            async def _deferred_nowcast():
+                await asyncio.sleep(20)
+                try:
+                    await self._async_fetch_nowcast()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("ws_core: deferred nowcast fetch failed (will retry): %s", err)
+
+            self.hass.async_create_task(_deferred_nowcast())
 
         # Defer first refresh by 5s so config entry creation completes before any network calls.
         async def _deferred_refresh():
@@ -2089,6 +2124,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_river_obs_time"] = vr.get("obs_time")
             data["_river_station_code"] = vr.get("station_code")
 
+        # v1.7.0 - Precipitation nowcast (Open-Meteo minutely_15)
+        if self.nowcast_enabled and self._nowcast_cache:
+            nc = self._nowcast_cache
+            data[KEY_RAIN_NEXT_60MIN] = nc.get("next_60min_mm")
+            data[KEY_MINUTES_UNTIL_RAIN] = nc.get("minutes_until_rain")
+            data[KEY_MINUTES_UNTIL_DRY] = nc.get("minutes_until_dry")
+            data[KEY_NOWCAST_INTENSITY] = nc.get("intensity")
+            data[KEY_RAIN_EXPECTED_1H] = nc.get("rain_expected_1h")
+            data["_nowcast_peak_rate_mmph"] = nc.get("peak_rate_mmph")
+            data["_nowcast_raining_now"] = nc.get("raining_now")
+            data["_nowcast_fetched_at"] = nc.get("fetched_at")
+
         # Moon (pure calculation, no external API)
         if self.moon_enabled:
             local_now = dt_util.now()
@@ -2369,6 +2416,57 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.error("Open-Meteo Marine fetch unexpected error: %s", exc, exc_info=True)
         finally:
             rt.sea_temp_inflight = False
+
+    # ------------------------------------------------------------------
+    # v1.7.0 - Precipitation nowcast (Open-Meteo minutely_15, free/no key)
+    # ------------------------------------------------------------------
+    async def _async_fetch_nowcast(self) -> None:
+        """Fetch 15-minute precipitation buckets and derive a nowcast.
+
+        Uses Open-Meteo's forecast API directly (independent of the chosen
+        forecast provider) so "rain starts/stops in N minutes" works even when
+        the user selected Met.no / NWS / OWM as their main provider. Any
+        failure is swallowed so it can never break the main coordinator update.
+        """
+        try:
+            lat = self.forecast_lat
+            lon = self.forecast_lon
+            if lat is None or lon is None:
+                return
+
+            url = (
+                "https://api.open-meteo.com/v1/forecast"
+                f"?latitude={lat}&longitude={lon}"
+                "&minutely_15=precipitation"
+                "&forecast_minutely_15=24"
+                "&timezone=auto"
+            )
+            from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+            session = async_get_clientsession(self.hass)
+            async with session.get(url, timeout=20) as resp:
+                if resp.status != 200:
+                    _LOGGER.warning("Open-Meteo nowcast returned HTTP %s", resp.status)
+                    return
+                js = await resp.json()
+
+            minutely = js.get("minutely_15") or {}
+            times = minutely.get("time") or []
+            precip = minutely.get("precipitation") or []
+            if not times or not precip:
+                _LOGGER.debug("ws_core: nowcast returned no minutely_15 data")
+                return
+
+            nc = derive_nowcast(times, precip, dt_util.now())
+            nc["rain_expected_1h"] = bool(nc.get("next_60min_mm", 0.0) >= NOWCAST_BUCKET_THRESHOLD_MM)
+            nc["fetched_at"] = dt_util.now().isoformat()
+            self._nowcast_cache = nc
+            self.async_set_updated_data(self._compute())
+
+        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
+            _LOGGER.warning("Open-Meteo nowcast fetch failed: %s", exc)
+        except Exception as exc:
+            _LOGGER.error("Open-Meteo nowcast fetch unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
     # METAR cross-validation  (v0.5.0)
