@@ -41,6 +41,7 @@ from .const import (
     CONF_ENABLE_FOG,
     CONF_ENABLE_FWI_COMPONENTS,
     CONF_ENABLE_MOON,
+    CONF_ENABLE_NOWCAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
@@ -95,6 +96,7 @@ from .const import (
     DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_FWI_COMPONENTS,
     DEFAULT_ENABLE_MOON,
+    DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_SOLAR_FORECAST,
@@ -732,6 +734,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_ENABLE_DIAGNOSTICS] = bool(user_input.get(CONF_ENABLE_DIAGNOSTICS, False))
             self._data[CONF_ENABLE_FWI_COMPONENTS] = bool(user_input.get(CONF_ENABLE_FWI_COMPONENTS, False))
             self._data[CONF_ENABLE_ADVANCED_SENSORS] = bool(user_input.get(CONF_ENABLE_ADVANCED_SENSORS, False))
+            self._data[CONF_ENABLE_NOWCAST] = bool(user_input.get(CONF_ENABLE_NOWCAST, False))
             if self._data[CONF_ENABLE_SEA_TEMP]:
                 return await self.async_step_sea_temp()
             if self._data[CONF_ENABLE_WUNDERGROUND]:
@@ -784,6 +787,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_ENABLE_ADVANCED_SENSORS, default=DEFAULT_ENABLE_ADVANCED_SENSORS
                     ): selector.BooleanSelector(),
+                    vol.Optional(CONF_ENABLE_NOWCAST, default=DEFAULT_ENABLE_NOWCAST): selector.BooleanSelector(),
                 }
             ),
             last_step=False,
@@ -1361,6 +1365,10 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_ADVANCED_SENSORS,
                         default=g(CONF_ENABLE_ADVANCED_SENSORS, DEFAULT_ENABLE_ADVANCED_SENSORS),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_NOWCAST,
+                        default=g(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST),
                     ): selector.BooleanSelector(),
                 }
             ),

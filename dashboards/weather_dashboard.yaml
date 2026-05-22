@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION DASHBOARD v1.6.6 (ws_core integration)
+# WEATHER STATION DASHBOARD v1.7.0 (ws_core integration)
 # =============================================================================
 # Two-page dashboard: Weather (main) + Advanced (subview, inline navigation)
 #
@@ -1983,6 +1983,89 @@ views:
                           + (river ? '<div><strong>' + river + '</strong></div>' : '')
                           + '<div style="color:rgba(255,255,255,0.5);">' + station + '</div>'
                           + (timeStr ? '<div style="color:rgba(255,255,255,0.35);">Obs: ' + timeStr + '</div>' : '')
+                          + '</div></div>';
+                      ]]]
+
+              - type: conditional
+                card_mod:
+                  style: |
+                    :host {
+                      height: 100%;
+                      display: flex;
+                      flex-direction: column;
+                    }
+                    * {
+                      flex: 1;
+                      min-height: 0;
+                    }
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_nowcast
+                    state: "on"
+                card:
+                  type: custom:button-card
+                  card_mod:
+                    style: |
+                      :host {
+                        height: 100%;
+                        display: block;
+                      }
+                      ha-card {
+                        height: 100% !important;
+                      }
+                  entity: sensor.ws_rain_next_60min
+                  name: "Rain Nowcast"
+                  show_state: false
+                  show_icon: true
+                  icon: mdi:weather-pouring
+                  triggers_update:
+                    - sensor.ws_minutes_until_rain
+                    - sensor.ws_minutes_until_dry
+                    - sensor.ws_nowcast_intensity
+                  styles:
+                    card:
+                      - background: rgba(30,30,30,0.9)
+                      - border-radius: 14px
+                      - padding: 16px
+                      - border: 1px solid rgba(255,255,255,0.1)
+                      - height: 100%
+                      - box-sizing: border-box
+                    name:
+                      - font-size: 16px
+                      - font-weight: 600
+                      - color: white
+                    icon:
+                      - width: 48px
+                      - color: |
+                          [[[
+                            var inten = (states['sensor.ws_nowcast_intensity'] || {}).state || 'none';
+                            return inten === 'heavy' ? '#ef4444' : inten === 'moderate' ? '#3b82f6' : inten === 'light' ? '#60a5fa' : 'rgba(255,255,255,0.4)';
+                          ]]]
+                  custom_fields:
+                    details: |
+                      [[[
+                        var next60 = parseFloat(entity && entity.state);
+                        var untilRain = parseFloat((states['sensor.ws_minutes_until_rain'] || {}).state);
+                        var untilDry = parseFloat((states['sensor.ws_minutes_until_dry'] || {}).state);
+                        var inten = (states['sensor.ws_nowcast_intensity'] || {}).state || 'none';
+                        var intenCol = inten === 'heavy' ? '#ef4444' : inten === 'moderate' ? '#3b82f6' : inten === 'light' ? '#60a5fa' : 'rgba(255,255,255,0.4)';
+                        var intenLabel = { none: 'No rain', light: 'Light', moderate: 'Moderate', heavy: 'Heavy' }[inten] || inten;
+                        var headline, headCol;
+                        if (!isNaN(untilDry)) {
+                          headline = untilDry <= 0 ? 'Stopping now' : 'Stops in ' + untilDry.toFixed(0) + ' min';
+                          headCol = '#60a5fa';
+                        } else if (!isNaN(untilRain)) {
+                          headline = untilRain <= 0 ? 'Raining now' : 'Rain in ' + untilRain.toFixed(0) + ' min';
+                          headCol = intenCol;
+                        } else {
+                          headline = 'No rain in the next hour';
+                          headCol = '#10b981';
+                        }
+                        return '<div style="margin-top:8px;">'
+                          + '<div style="font-size:24px;font-weight:300;color:' + headCol + ';">' + headline + '</div>'
+                          + '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + intenCol + '22;border:1px solid ' + intenCol + '55;font-size:13px;font-weight:600;color:' + intenCol + ';">' + intenLabel + '</div>'
+                          + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
+                          + '<div><strong>Next 60 min:</strong> ' + (isNaN(next60) ? '--' : next60.toFixed(1)) + ' mm</div>'
                           + '</div></div>';
                       ]]]
 

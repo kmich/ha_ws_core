@@ -17,7 +17,7 @@ References:
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ---------------------------------------------------------------------------
 # Moon phase UI helpers
@@ -1975,3 +1975,124 @@ def cross_sensor_consistency_flags(
         )
 
     return flags
+
+
+# ===========================================================================
+# v1.7.0 - Precipitation nowcast (from Open-Meteo 15-minute buckets)
+# ===========================================================================
+
+# Rain-rate intensity bands (mm/h), standard meteorological classification.
+NOWCAST_LIGHT_MMH = 2.5
+NOWCAST_HEAVY_MMH = 7.6
+# A 15-minute bucket counts as "wet" at or above this many mm.
+NOWCAST_BUCKET_THRESHOLD_MM = 0.1
+
+
+def derive_nowcast(
+    times: list[str],
+    precip: list[float | None],
+    now: datetime,
+    threshold_mm: float = NOWCAST_BUCKET_THRESHOLD_MM,
+) -> dict:
+    """Derive a precipitation nowcast from 15-minute buckets.
+
+    Parameters
+    ----------
+    times : list[str]
+        ISO timestamps (local, naive) at the START of each 15-minute bucket,
+        as returned by Open-Meteo ``minutely_15`` with ``timezone=auto``.
+    precip : list[float | None]
+        Precipitation total (mm) for each corresponding bucket.
+    now : datetime
+        Reference time (naive local). Tz-aware values are coerced to naive.
+    threshold_mm : float
+        Minimum mm in a 15-minute bucket to count as rain.
+
+    Returns
+    -------
+    dict with keys:
+        raining_now (bool), minutes_until_rain (int | None),
+        minutes_until_dry (int | None), next_60min_mm (float),
+        peak_rate_mmph (float), intensity (str: none/light/moderate/heavy).
+
+    A None ``minutes_until_*`` means "not within the available window".
+    """
+    if now.tzinfo is not None:
+        now = now.replace(tzinfo=None)
+
+    # Parse buckets into (start_dt, mm) pairs, skipping malformed/missing.
+    buckets: list[tuple[datetime, float]] = []
+    for i, t in enumerate(times or []):
+        if i >= len(precip or []):
+            break
+        p = precip[i]
+        if p is None:
+            p = 0.0
+        try:
+            start = datetime.fromisoformat(str(t))
+        except (ValueError, TypeError):
+            continue
+        if start.tzinfo is not None:
+            start = start.replace(tzinfo=None)
+        buckets.append((start, float(p)))
+
+    result = {
+        "raining_now": False,
+        "minutes_until_rain": None,
+        "minutes_until_dry": None,
+        "next_60min_mm": 0.0,
+        "peak_rate_mmph": 0.0,
+        "intensity": "none",
+    }
+    if not buckets:
+        return result
+
+    BUCKET_MIN = 15
+
+    def _minutes_from_now(dt_: datetime) -> int:
+        return int(round((dt_ - now).total_seconds() / 60.0))
+
+    # Current bucket = the one whose [start, start+15min) window contains now.
+    raining_now = False
+    for start, mm in buckets:
+        if start <= now < start + timedelta(minutes=BUCKET_MIN):
+            raining_now = mm >= threshold_mm
+            break
+    result["raining_now"] = raining_now
+
+    # Future buckets (start at or after now), in chronological order.
+    future = [(s, mm) for (s, mm) in buckets if s >= now - timedelta(minutes=BUCKET_MIN)]
+
+    # next 60 minutes: buckets starting within [now, now+60min)
+    next_hour = [(s, mm) for (s, mm) in buckets if now <= s < now + timedelta(minutes=60)]
+    next_60 = round(sum(mm for _, mm in next_hour), 2)
+    # Only buckets that clear the rain threshold drive intensity, so a trace
+    # (e.g. 0.05 mm) does not register as "light".
+    peak_bucket = max((mm for _, mm in next_hour if mm >= threshold_mm), default=0.0)
+    peak_rate = round(peak_bucket * (60.0 / BUCKET_MIN), 2)  # 15-min mm -> mm/h
+    result["next_60min_mm"] = next_60
+    result["peak_rate_mmph"] = peak_rate
+    if peak_rate <= 0.0:
+        result["intensity"] = "none"
+    elif peak_rate < NOWCAST_LIGHT_MMH:
+        result["intensity"] = "light"
+    elif peak_rate < NOWCAST_HEAVY_MMH:
+        result["intensity"] = "moderate"
+    else:
+        result["intensity"] = "heavy"
+
+    if raining_now:
+        result["minutes_until_rain"] = 0
+        # First future bucket that is dry => when it stops.
+        for start, mm in future:
+            if start >= now and mm < threshold_mm:
+                result["minutes_until_dry"] = max(0, _minutes_from_now(start))
+                break
+    else:
+        # First future bucket that is wet => when it starts.
+        for start, mm in future:
+            if start >= now and mm >= threshold_mm:
+                result["minutes_until_rain"] = max(0, _minutes_from_now(start))
+                break
+
+    return result

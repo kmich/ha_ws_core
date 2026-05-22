@@ -2,6 +2,18 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.7.0] - 2026-05-22
+
+### New Features
+
+- **Precipitation nowcast** (opt-in, no API key). Adds short-term "is it about to rain" intelligence derived from Open-Meteo's 15-minute precipitation buckets. This is a dedicated fetch independent of your chosen forecast provider, so it works even if you use Met.no / NWS / OpenWeatherMap as your main provider. New entities (created when the **Precipitation Nowcast** feature is enabled):
+  - `sensor.ws_minutes_until_rain` - minutes until rain is expected to start (unknown when no rain is in the window).
+  - `sensor.ws_minutes_until_dry` - minutes until rain is expected to stop (when currently raining).
+  - `sensor.ws_rain_next_60min` - total precipitation expected in the next hour (mm).
+  - `sensor.ws_nowcast_intensity` - none / light / moderate / heavy, from the peak rate in the next hour.
+  - `binary_sensor.ws_rain_expected_1h` - on when measurable rain is expected within 60 minutes (handy for automations).
+  - Enable via the **Precipitation Nowcast** switch or Configure -> Features. Refreshes every 15 minutes. A conditional "Rain Nowcast" dashboard tile is included.
+
 ## [1.6.6] - 2026-05-22
 
 ### Bug Fixes

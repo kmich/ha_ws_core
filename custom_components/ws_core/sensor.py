@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v1.6.6."""
+"""Sensors for Weather Station Core -- v1.7.0."""
 
 from __future__ import annotations
 
@@ -31,6 +31,8 @@ from .const import (
     CONF_ENABLE_FWI_COMPONENTS,
     # v0.8.0
     CONF_ENABLE_MOON,
+    # v1.7.0
+    CONF_ENABLE_NOWCAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
     # v0.9.0
@@ -87,6 +89,8 @@ from .const import (
     KEY_HUMIDEX,
     KEY_HUMIDITY_LEVEL_DISPLAY,
     KEY_LUX,
+    KEY_MINUTES_UNTIL_DRY,
+    KEY_MINUTES_UNTIL_RAIN,
     KEY_MOON_AGE_DAYS,
     KEY_MOON_DISPLAY,
     KEY_MOON_ILLUMINATION_PCT,
@@ -102,6 +106,7 @@ from .const import (
     KEY_NORM_WIND_DIR_DEG,
     KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
+    KEY_NOWCAST_INTENSITY,
     KEY_OZONE,
     KEY_PACKAGE_STATUS,
     KEY_PM2_5,
@@ -117,6 +122,7 @@ from .const import (
     KEY_RAIN_ACCUM_24H,
     KEY_RAIN_ANOMALY_30D,
     KEY_RAIN_DISPLAY,
+    KEY_RAIN_NEXT_60MIN,
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
@@ -579,6 +585,49 @@ SENSORS: list[WSSensorDescription] = [
             "river": d.get("_river_name"),
             "station_code": d.get("_river_station_code"),
             "observed_at": d.get("_river_obs_time"),
+        },
+    ),
+    # v1.7.0 - Precipitation nowcast (Open-Meteo minutely_15)
+    WSSensorDescription(
+        key=KEY_RAIN_NEXT_60MIN,
+        translation_key="rain_next_60min",
+        name="WS Rain Next 60 min",
+        icon="mdi:weather-pouring",
+        native_unit="mm",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "peak_rate_mmph": d.get("_nowcast_peak_rate_mmph"),
+            "intensity": d.get(KEY_NOWCAST_INTENSITY),
+            "raining_now": d.get("_nowcast_raining_now"),
+            "fetched_at": d.get("_nowcast_fetched_at"),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_MINUTES_UNTIL_RAIN,
+        translation_key="minutes_until_rain",
+        name="WS Minutes Until Rain",
+        icon="mdi:weather-rainy",
+        native_unit="min",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_MINUTES_UNTIL_DRY,
+        translation_key="minutes_until_dry",
+        name="WS Minutes Until Dry",
+        icon="mdi:weather-partly-rainy",
+        native_unit="min",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_NOWCAST_INTENSITY,
+        translation_key="nowcast_intensity",
+        name="WS Nowcast Intensity",
+        icon="mdi:weather-pouring",
+        state_class=None,
+        native_unit=None,
+        attrs_fn=lambda d: {
+            "peak_rate_mmph": d.get("_nowcast_peak_rate_mmph"),
+            "next_60min_mm": d.get(KEY_RAIN_NEXT_60MIN),
         },
     ),
     # Zambretti barometric forecast
@@ -1401,6 +1450,11 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_ZAMBRETTI_NUMBER: CONF_ENABLE_ADVANCED_SENSORS,
     KEY_ET0_HOURLY_MM: CONF_ENABLE_ADVANCED_SENSORS,
     KEY_WIND_DIR_SMOOTH_DEG: CONF_ENABLE_ADVANCED_SENSORS,
+    # v1.7.0 - precipitation nowcast (opt-in)
+    KEY_RAIN_NEXT_60MIN: CONF_ENABLE_NOWCAST,
+    KEY_MINUTES_UNTIL_RAIN: CONF_ENABLE_NOWCAST,
+    KEY_MINUTES_UNTIL_DRY: CONF_ENABLE_NOWCAST,
+    KEY_NOWCAST_INTENSITY: CONF_ENABLE_NOWCAST,
 }
 
 
@@ -1605,6 +1659,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_CLOUD_COVER_PCT: "cloud_cover",
             KEY_VIGILANCE_MAX_LEVEL: "vigilance",
             KEY_RIVER_LEVEL_M: "river_level",
+            KEY_RAIN_NEXT_60MIN: "rain_next_60min",
         }
         if key in overrides:
             return overrides[key]

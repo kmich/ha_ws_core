@@ -522,6 +522,23 @@ DEFAULT_ENABLE_FWI_COMPONENTS = False
 DEFAULT_ENABLE_ADVANCED_SENSORS = False
 
 # ---------------------------------------------------------------------------
+# v1.7.0 - Precipitation nowcast (Open-Meteo minutely_15, free/no key)
+# ---------------------------------------------------------------------------
+# Independent of the chosen forecast provider: always hits Open-Meteo for
+# 15-minute precipitation buckets to derive "rain starts/stops in N minutes".
+CONF_ENABLE_NOWCAST = "enable_nowcast"
+CONF_NOWCAST_INTERVAL_MIN = "nowcast_interval_min"
+DEFAULT_ENABLE_NOWCAST = False
+DEFAULT_NOWCAST_INTERVAL_MIN = 15
+
+# Data keys - nowcast
+KEY_RAIN_NEXT_60MIN = "rain_next_60min_mm"
+KEY_MINUTES_UNTIL_RAIN = "minutes_until_rain"
+KEY_MINUTES_UNTIL_DRY = "minutes_until_dry"
+KEY_NOWCAST_INTENSITY = "nowcast_intensity"
+KEY_RAIN_EXPECTED_1H = "rain_expected_1h"
+
+# ---------------------------------------------------------------------------
 # Migration - v0.3.0 deprecated entity keys and config keys
 # ---------------------------------------------------------------------------
 DEPRECATED_KEYS_V030 = (
