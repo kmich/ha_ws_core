@@ -2,12 +2,6 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [1.6.7] - 2026-05-22
-
-### Changes
-
-- Replaced all long dashes (en/em dashes) with plain hyphens across the codebase, translations, dashboard, and docs for consistent typography. No functional change.
-
 ## [1.6.6] - 2026-05-22
 
 ### Bug Fixes
