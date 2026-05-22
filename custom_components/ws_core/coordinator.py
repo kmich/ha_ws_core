@@ -427,11 +427,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # v0.3.0: Fire risk score (kept; opt-in via wizard)
         self.fire_risk_enabled = bool(_get(CONF_ENABLE_FIRE_RISK, DEFAULT_ENABLE_FIRE_RISK))
 
-        # Rain today — resets at local midnight
+        # Rain today - resets at local midnight
         self._rain_today_mm: float = 0.0
         self._rain_today_date: str = ""
         self._rain_today_last_total: float | None = None
-        # Completed (previous) day snapshot — captured at midnight rollover so
+        # Completed (previous) day snapshot - captured at midnight rollover so
         # streak counters can evaluate the finished day's final rain total
         # rather than the freshly-reset current day (issue #15).
         self._rain_prev_day_mm: float = 0.0
@@ -499,7 +499,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._vigicrues_station_name: str | None = None
         self._vigicrues_river_name: str | None = None
 
-        # Wind run accumulator — resets at local midnight (like rain_today)
+        # Wind run accumulator - resets at local midnight (like rain_today)
         self._wind_run_km: float = 0.0
         self._wind_run_date: str = ""
         self._wind_run_last_ts: Any = None
@@ -524,7 +524,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # (streak_last_counted_date); the old in-memory guard was lost on
         # restart, causing repeated increments within one day (issue #15).
 
-        # v1.2.0 Drift detection buffers (timestamp, value) — 72-h in-memory
+        # v1.2.0 Drift detection buffers (timestamp, value) - 72-h in-memory
         self._drift_temp: deque = deque(maxlen=288)
         self._drift_humidity: deque = deque(maxlen=288)
         self._drift_pressure: deque = deque(maxlen=288)
@@ -972,21 +972,21 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Display strings
         if tc is not None:
             data[KEY_TEMP_DISPLAY] = f"{float(tc):.1f}\u00b0C"
-            # bar_percent: map temperature onto a -20°C…+40°C scale (0–100%)
+            # bar_percent: map temperature onto a -20°C…+40°C scale (0-100%)
             _t = float(tc)
             _pct = max(0.0, min(100.0, (_t - (-20.0)) / 60.0 * 100.0))
             data["_temp_bar_percent"] = round(_pct, 1)
             # color ramp: cold → cool → comfortable → warm → hot
             if _t <= 0:
-                data["_temp_color"] = "#60A5FA"  # cold – blue
+                data["_temp_color"] = "#60A5FA"  # cold - blue
             elif _t <= 10:
-                data["_temp_color"] = "#34D399"  # cool – teal
+                data["_temp_color"] = "#34D399"  # cool - teal
             elif _t <= 20:
-                data["_temp_color"] = "#4ADE80"  # comfortable – green
+                data["_temp_color"] = "#4ADE80"  # comfortable - green
             elif _t <= 30:
-                data["_temp_color"] = "#FBBF24"  # warm – amber
+                data["_temp_color"] = "#FBBF24"  # warm - amber
             else:
-                data["_temp_color"] = "#EF4444"  # hot – red
+                data["_temp_color"] = "#EF4444"  # hot - red
         if rh is not None:
             data[KEY_HUMIDITY_LEVEL_DISPLAY] = humidity_level(float(rh))
         # v0.3.0 fix: previously `if uv := data.get(KEY_UV):` was a truthy check,
@@ -1054,13 +1054,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Color ramp: rising=green, steady=white/grey, falling=amber/red
         _pt_color: str
         if trend_3h >= 0.8:
-            _pt_color = "#4ADE80"  # rising — green
+            _pt_color = "#4ADE80"  # rising - green
         elif trend_3h > -0.8:
-            _pt_color = "rgba(255,255,255,0.75)"  # steady — white
+            _pt_color = "rgba(255,255,255,0.75)"  # steady - white
         elif trend_3h > -1.6:
-            _pt_color = "#FBBF24"  # falling — amber
+            _pt_color = "#FBBF24"  # falling - amber
         else:
-            _pt_color = "#EF4444"  # falling rapidly — red
+            _pt_color = "#EF4444"  # falling rapidly - red
         data["_pressure_trend_color"] = _pt_color
 
         # Zambretti forecast (real N&Z lookup table)
@@ -1149,11 +1149,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_RAIN_ACCUM_1H] = round(self._rain_accum_window_from_totals(rt.rain_total_history_24h, now, 1.0), 1)
             data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rt.rain_total_history_24h), 1)
 
-        # Rain today — resets at local midnight (use local time, not UTC)
+        # Rain today - resets at local midnight (use local time, not UTC)
         rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
         date_str = dt_util.now().strftime("%Y-%m-%d")
         if date_str != self._rain_today_date:
-            # Day rolled over — snapshot the day that just ended (with its final
+            # Day rolled over - snapshot the day that just ended (with its final
             # rain total) so streak counters can evaluate the completed day
             # before we zero the running total (issue #15).
             if self._rain_today_date:
@@ -1263,9 +1263,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ZAMBRETTI_RAIN_PCT lookup table) and compares it to Open-Meteo's
         daily precipitation_probability for today.  The difference drives a
         three-state agreement sensor:
-          • aligned   — difference < 20 pp  (both sources agree)
-          • diverging — difference 20-40 pp (moderate disagreement)
-          • conflict  — difference > 40 pp  (sources fundamentally disagree)
+          • aligned   - difference < 20 pp  (both sources agree)
+          • diverging - difference 20-40 pp (moderate disagreement)
+          • conflict  - difference > 40 pp  (sources fundamentally disagree)
 
         When sources conflict, forecasts should be treated with lower
         confidence; the discrepancy itself is often meaningful (e.g. a
@@ -1326,7 +1326,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Hargreaves needs valid t_max, t_min, t_mean
         if None in (t_max, t_min, t_mean):
             return
-        if t_max <= t_min:  # pathological — sensor noise
+        if t_max <= t_min:  # pathological - sensor noise
             return
 
         doy = now.timetuple().tm_yday
@@ -1503,7 +1503,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
 
     # ------------------------------------------------------------------
-    # v1.2.0 — Fog, precipitation type, thunderstorm index
+    # v1.2.0 - Fog, precipitation type, thunderstorm index
     # ------------------------------------------------------------------
 
     def _compute_fog_and_thunderstorm(
@@ -1571,7 +1571,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     # ------------------------------------------------------------------
-    # v1.2.0 — GDD accumulation, streak counters
+    # v1.2.0 - GDD accumulation, streak counters
     # ------------------------------------------------------------------
 
     def _compute_streaks(self, data: dict, now: Any) -> None:
@@ -1627,7 +1627,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_frost_streak_threshold_c"] = float(self.entry_options.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
 
     # ------------------------------------------------------------------
-    # v1.2.0 — 30-day rolling climatology
+    # v1.2.0 - 30-day rolling climatology
     # ------------------------------------------------------------------
 
     def _compute_climatology(self, data: dict) -> None:
@@ -1658,7 +1658,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_rain_normal_30d_avg"] = rain_avg
 
     # ------------------------------------------------------------------
-    # v1.2.0 — Sensor drift detection (C1)
+    # v1.2.0 - Sensor drift detection (C1)
     # ------------------------------------------------------------------
 
     def _compute_drift_detection(self, data: dict, now: Any) -> None:
@@ -1724,7 +1724,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_drift_details"] = flags
 
     # ------------------------------------------------------------------
-    # v1.2.0 — Cross-sensor consistency checks (C2)
+    # v1.2.0 - Cross-sensor consistency checks (C2)
     # ------------------------------------------------------------------
 
     def _compute_consistency_checks(self, data: dict, now: Any) -> None:
@@ -1782,7 +1782,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_consistency_details"] = flags
 
     # ------------------------------------------------------------------
-    # v1.2.0 — Learning sensors: publish EMA results into data dict
+    # v1.2.0 - Learning sensors: publish EMA results into data dict
     # ------------------------------------------------------------------
 
     def _compute_learning_sensors(self, data: dict) -> None:
@@ -1814,7 +1814,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_solar_lux_factor_n_days"] = self._learning_state.solar_factor_n
 
     # ------------------------------------------------------------------
-    # v1.2.0 — Learning state persistence (called from _compute)
+    # v1.2.0 - Learning state persistence (called from _compute)
     # ------------------------------------------------------------------
 
     def _update_forecast_skill_window(self, data: dict, now: Any) -> None:
@@ -1901,7 +1901,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_fire_rain_24h_mm"] = rain_24h
             wind_kmh = float(wind_ms or 0) * 3.6
 
-            # FWI daily update — once per calendar day
+            # FWI daily update - once per calendar day
             local_now = dt_util.now()
             fwi_date_str = local_now.strftime("%Y-%m-%d")
             fwi_month = local_now.month
@@ -2072,7 +2072,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_POLLEN_WEED] = pol.get("weed_index")
             data[KEY_POLLEN_OVERALL] = pol.get("overall_level")
 
-        # v1.6.0 — Météo Vigilance (France only, no API key)
+        # v1.6.0 - Météo Vigilance (France only, no API key)
         if self.vigilance_meteo_enabled and self._vigilance_cache:
             vc = self._vigilance_cache
             data[KEY_VIGILANCE_MAX_LEVEL] = vc.get("max_color")
@@ -2080,7 +2080,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_vigilance_dept"] = vc.get("dept")
             data["_vigilance_fetched_at"] = vc.get("fetched_at")
 
-        # v1.6.0 — Vigicrues (France only, no API key)
+        # v1.6.0 - Vigicrues (France only, no API key)
         if self.vigicrues_enabled and self._vigicrues_cache:
             vr = self._vigicrues_cache
             data[KEY_RIVER_LEVEL_M] = vr.get("level_m")
@@ -2110,7 +2110,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_FORECAST_TOMORROW_KWH] = sol.get("tomorrow_kwh")
             data[KEY_SOLAR_FORECAST_STATUS] = sol.get("status", "OK")
 
-        # Penman-Monteith ET₀ — uses solar radiation sensor if configured
+        # Penman-Monteith ET₀ - uses solar radiation sensor if configured
         # v0.3.0: ungated from removed degree_days_enabled flag; runs whenever
         # forecast_lat is configured and the required inputs are available.
         if self.forecast_lat is not None:
@@ -2192,7 +2192,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rt.forecast_inflight = True
             self.hass.async_create_task(self._async_fetch_forecast())
         except RuntimeError:
-            # Event loop shutting down — reset flag so next tick can retry.
+            # Event loop shutting down - reset flag so next tick can retry.
             rt.forecast_inflight = False
 
         return cached
@@ -2458,7 +2458,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     # ------------------------------------------------------------------
-    # v1.5.0 — Wind run, chill hours, clearness / cloud cover
+    # v1.5.0 - Wind run, chill hours, clearness / cloud cover
     # ------------------------------------------------------------------
 
     def _compute_wind_run(self, data: dict, now: Any) -> None:
@@ -2530,7 +2530,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_CLOUD_COVER_PCT] = clearness_to_cloud_cover(kt)
 
     # ------------------------------------------------------------------
-    # v0.9.0 — Solar radiation source helper
+    # v0.9.0 - Solar radiation source helper
     # ------------------------------------------------------------------
 
     def _get_solar_radiation(self) -> float | None:
@@ -2543,7 +2543,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self._num(self.hass, eid)
 
     # ------------------------------------------------------------------
-    # v0.7.0 — Air Quality fetch (Open-Meteo AQI API, free, no key)
+    # v0.7.0 - Air Quality fetch (Open-Meteo AQI API, free, no key)
     # ------------------------------------------------------------------
 
     async def _async_fetch_aqi(self) -> None:
@@ -2661,7 +2661,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.error("ws_core AQI/pollen fetch unexpected error: %s", exc, exc_info=True)
 
     # ------------------------------------------------------------------
-    # v0.9.0 — Solar forecast fetch (forecast.solar, free, no key)
+    # v0.9.0 - Solar forecast fetch (forecast.solar, free, no key)
     # ------------------------------------------------------------------
 
     async def _async_fetch_solar_forecast(self) -> None:
@@ -2727,7 +2727,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._solar_cache["status"] = f"Error: {exc}"
 
     # ------------------------------------------------------------------
-    # v1.6.0 — Météo Vigilance (France, OpenDataSoft, no key)
+    # v1.6.0 - Météo Vigilance (France, OpenDataSoft, no key)
     # ------------------------------------------------------------------
 
     async def _async_fetch_vigilance(self) -> None:
@@ -2761,7 +2761,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("ws_core vigilance: no BAN result for lat=%s lon=%s (not in France?)", lat, lon)
             return
 
-        # context = "75, Paris, Ile-de-France" — dept is the first token
+        # context = "75, Paris, Ile-de-France" - dept is the first token
         context = features[0].get("properties", {}).get("context", "")
         dept = context.split(",")[0].strip() if context else None
         if not dept:
@@ -2822,7 +2822,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_request_refresh()
 
     # ------------------------------------------------------------------
-    # v1.6.0 — Vigicrues (Hub'Eau v2, France, no key)
+    # v1.6.0 - Vigicrues (Hub'Eau v2, France, no key)
     # ------------------------------------------------------------------
 
     async def _async_fetch_vigicrues(self) -> None:

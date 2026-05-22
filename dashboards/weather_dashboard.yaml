@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION DASHBOARD v1.6.5 (ws_core integration)
+# WEATHER STATION DASHBOARD v1.6.7 (ws_core integration)
 # =============================================================================
 # Two-page dashboard: Weather (main) + Advanced (subview, inline navigation)
 #
@@ -11,7 +11,7 @@
 #   - card-mod (for CSS styling)
 #   - kiosk-mode (for clean fullscreen look)
 #
-# Required Helpers: NONE — all entities are auto-created by the integration.
+# Required Helpers: NONE - all entities are auto-created by the integration.
 #   - select.ws_graph_range (graph time range: 6h/24h/3d)
 #   - switch.ws_enable_animations (dashboard animation toggle)
 #
@@ -122,7 +122,7 @@ views:
                 - font-weight: 600
                 - letter-spacing: 0.3px
 
-          # STORM BANNER (v0.5.0) — shows when Beaufort >= 7 OR thunderstorm condition
+          # STORM BANNER (v0.5.0) - shows when Beaufort >= 7 OR thunderstorm condition
           - type: custom:button-card
             entity: sensor.ws_wind_beaufort
             triggers_update:
@@ -151,9 +151,9 @@ views:
                 const isThunder = cond.toLowerCase().includes('thunder') || cond.toLowerCase().includes('storm');
                 const rr = parseFloat((states['sensor.ws_rain_rate'] || {}).state);
                 if (isThunder) return 'THUNDERSTORM DETECTED' + (isNaN(rr) ? '' : ' · Rain: ' + rr.toFixed(1) + ' mm/h');
-                if (bf >= 10) return 'STORM WARNING — Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
-                if (bf >= 8) return 'GALE WARNING — Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
-                return 'NEAR-GALE — Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
+                if (bf >= 10) return 'STORM WARNING - Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
+                if (bf >= 8) return 'GALE WARNING - Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
+                return 'NEAR-GALE - Beaufort ' + bf + (isNaN(gust) ? '' : ' · Gust: ' + gust.toFixed(1) + ' m/s');
               ]]]
             styles:
               card:
@@ -525,7 +525,7 @@ views:
                       const probColor = rainProb >= 70 ? '#3B82F6' : rainProb >= 40 ? '#60A5FA' : '#4ADE80';
 
                       const windSpeed = parseFloat(states['sensor.ws_wind_speed']?.state) || 0;
-                      const cardinal = states['sensor.ws_wind_quadrant']?.state || '—';
+                      const cardinal = states['sensor.ws_wind_quadrant']?.state || '-';
 
                       const sunAttrs = states['sun.sun']?.attributes || {};
                       const _toHHMM = iso => { try { return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false}); } catch(e) { return '--:--'; } };
@@ -887,7 +887,7 @@ views:
                       else if (t >= 20)   { comfort = 'Cool';        color = '#06B6D4'; }
                       else                { comfort = 'Cold';        color = '#3B82F6'; }
 
-                      // SVG sparkline from history — last 8 state changes on entity
+                      // SVG sparkline from history - last 8 state changes on entity
                       const hist = entity?.state !== undefined
                         ? (hass?.states?.['sensor.iopool_lagonisi_temperature']?.last_changed || '')
                         : '';
@@ -1205,7 +1205,7 @@ views:
                       const label = d.label || 'Day ' + (i+1);
                       const tHigh = (d.tmax !== undefined) ? d.tmax : (d.tmax_c !== undefined ? d.tmax_c : d.temperature);
                       const tLow = (d.tmin !== undefined) ? d.tmin : (d.tmin_c !== undefined ? d.tmin_c : d.templow);
-                      const range = (tHigh !== null && tLow !== null) ? Math.round(tHigh)+"° / "+Math.round(tLow)+"°" : (tHigh!==null?Math.round(tHigh)+"°":"—");
+                      const range = (tHigh !== null && tLow !== null) ? Math.round(tHigh)+"° / "+Math.round(tLow)+"°" : (tHigh!==null?Math.round(tHigh)+"°":"-");
                       const precip = parseFloat(d.precip_mm) || 0;
                       const prob = parseInt(d.precip_prob || d.precipitation_probability) || 0;
 
@@ -1422,7 +1422,7 @@ views:
                         }
                       }
   # SECOND PAGE: ADVANCED FEATURES
-  # Clean 2-column layout — every section uses columns: 2
+  # Clean 2-column layout - every section uses columns: 2
   # Sections: Nav | Sky | Activity Scores | Rain Detail | Wind Detail |
   #           Pressure & Zambretti | Temperature Extended | Air & Pollen |
   #           Moon & Solar | ET₀ & Degree Days | Upload Status |
@@ -1677,7 +1677,7 @@ views:
                           + '<div style="font-size:36px;font-weight:200;color:' + col + ';">' + (isNaN(prob) ? '--' : prob.toFixed(0)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> %</span></div>'
                           + '<div style="font-size:14px;color:' + col + ';margin-top:4px;">' + level + '</div>'
                           + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                          + (dep !== undefined ? '<div><strong>T–Td:</strong> ' + parseFloat(dep).toFixed(1) + '°C</div>' : '')
+                          + (dep !== undefined ? '<div><strong>T-Td:</strong> ' + parseFloat(dep).toFixed(1) + '°C</div>' : '')
                           + '<div><strong>Humidity:</strong> ' + humidity + '%</div>'
                           + '</div></div>';
                       ]]]
@@ -3353,7 +3353,7 @@ views:
                       return '<div style="margin-top:8px;">'
                         + '<div style="font-size:36px;font-weight:200;color:white;">' + (isNaN(v) ? '--' : v.toFixed(1)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> °C</span></div>'
                         + '<div style="font-size:13px;color:' + col + ';margin-top:4px;">' + s.replace(/_/g,' ') + '</div>'
-                        + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">Ideal: 2–8 °C</div>'
+                        + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">Ideal: 2-8 °C</div>'
                         + '</div>';
                     ]]]
               # Absolute Humidity
@@ -3736,7 +3736,7 @@ views:
             }
         cards:
           - type: heading
-            heading: Wind Rose — 24h
+            heading: Wind Rose - 24h
             heading_style: title
             icon: mdi:compass-rose
           - type: custom:windrose-card

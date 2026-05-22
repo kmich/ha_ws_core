@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Weather Station Core — Créer une station météo",
+        "title": "Weather Station Core - Créer une station météo",
         "description": "Donnez un nom à votre station météo. Le préfixe sera utilisé pour tous les identifiants d'entités (par ex. le préfixe « ws » crée sensor.ws_temperature).",
         "data": {
           "name": "Nom de la station",
@@ -112,7 +112,7 @@
           "enable_vigilance_meteo": "Vigilance Météo (France, sans clé API)",
           "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)",
           "enable_diagnostics": "Diagnostics de la station (dérive des capteurs, cohérence, indicateurs de qualité, fiabilité des prévisions, facteur lux solaire, climatologie 30 jours)",
-          "enable_fwi_components": "Composantes IFM (FFMC, DMC, DC, ISI, IGI — nécessite le risque d'incendie activé)",
+          "enable_fwi_components": "Composantes IFM (FFMC, DMC, DC, ISI, IGI - nécessite le risque d'incendie activé)",
           "enable_advanced_sensors": "Capteurs avancés/dérivés (numéro Zambretti, ET₀ horaire, direction du vent lissée)"
         }
       },
@@ -129,8 +129,8 @@
         "title": "Envoi vers Weather Underground",
         "description": "Envoie les observations vers votre station Weather Underground. Laissez vide pour ignorer.",
         "data": {
-          "wu_station_id": "ID de station (ex. IATHEN123) — laisser vide pour ignorer",
-          "wu_api_key": "Clé API — laisser vide pour ignorer",
+          "wu_station_id": "ID de station (ex. IATHEN123) - laisser vide pour ignorer",
+          "wu_api_key": "Clé API - laisser vide pour ignorer",
           "wu_interval_min": "Intervalle d'envoi",
           "_go_back": "← Retour à l'étape précédente"
         }
@@ -170,7 +170,7 @@
       "wind_gust_too_high": "Le seuil de rafales dépasse le record physique mondial.",
       "temp_out_of_range": "La température dépasse les limites physiques possibles.",
       "invalid_api_key": "Clé API invalide ou identifiants rejetés.",
-      "cannot_connect": "Impossible de se connecter à l'API — vérifiez le réseau.",
+      "cannot_connect": "Impossible de se connecter à l'API - vérifiez le réseau.",
       "station_not_found": "Station Weather Underground introuvable."
     }
   },
@@ -343,7 +343,7 @@
       "wind_gust_too_high": "Le seuil de rafales dépasse le record physique mondial.",
       "temp_out_of_range": "La température dépasse les limites physiques possibles.",
       "invalid_api_key": "Clé API invalide ou identifiants rejetés.",
-      "cannot_connect": "Impossible de se connecter à l'API — vérifiez le réseau.",
+      "cannot_connect": "Impossible de se connecter à l'API - vérifiez le réseau.",
       "station_not_found": "Station Weather Underground introuvable."
     }
   },
@@ -794,9 +794,9 @@
           "weed_level": { "name": "Niveau herbacées" }
         }
       },
-      "pollen_grass": { "name": "Pollen — graminées" },
-      "pollen_tree": { "name": "Pollen — arbres" },
-      "pollen_weed": { "name": "Pollen — herbacées" },
+      "pollen_grass": { "name": "Pollen - graminées" },
+      "pollen_tree": { "name": "Pollen - arbres" },
+      "pollen_weed": { "name": "Pollen - herbacées" },
       "moon": {
         "name": "Lune",
         "state_attributes": {

@@ -112,7 +112,7 @@
           "enable_vigilance_meteo": "Meteo Vigilance alerts (France, no API key)",
           "enable_vigicrues": "Vigicrues river level (France, no API key)",
           "enable_diagnostics": "Station diagnostics (sensor drift, consistency, quality flags, forecast skill/agreement, solar lux factor, 30-day climatology)",
-          "enable_fwi_components": "FWI components (FFMC, DMC, DC, ISI, BUI — requires Fire Risk enabled)",
+          "enable_fwi_components": "FWI components (FFMC, DMC, DC, ISI, BUI - requires Fire Risk enabled)",
           "enable_advanced_sensors": "Advanced/derived sensors (Zambretti number, ET₀ hourly, smoothed wind direction)"
         }
       },
@@ -129,8 +129,8 @@
         "title": "Weather Underground upload",
         "description": "Upload observations to your Weather Underground Personal Weather Station. You need a station ID and API key from your Weather Underground account (wunderground.com/member/devices). Leave both fields blank to skip and configure later.",
         "data": {
-          "wu_station_id": "Station ID (e.g. IATHEN123) — leave blank to skip",
-          "wu_api_key": "API key — leave blank to skip",
+          "wu_station_id": "Station ID (e.g. IATHEN123) - leave blank to skip",
+          "wu_api_key": "API key - leave blank to skip",
           "wu_interval_min": "Upload interval",
           "_go_back": "← Go back to previous step"
         }
@@ -170,7 +170,7 @@
       "wind_gust_too_high": "Wind gust threshold exceeds the physical world record.",
       "temp_out_of_range": "Temperature is outside the physically possible range.",
       "invalid_api_key": "Invalid API key or credentials rejected",
-      "cannot_connect": "Could not connect to API — check network and try again",
+      "cannot_connect": "Could not connect to API - check network and try again",
       "station_not_found": "Weather Underground station ID not found"
     }
   },
@@ -343,7 +343,7 @@
       "wind_gust_too_high": "Wind gust threshold exceeds the physical world record.",
       "temp_out_of_range": "Temperature is outside the physically possible range.",
       "invalid_api_key": "Invalid API key or credentials rejected",
-      "cannot_connect": "Could not connect to API — check network and try again",
+      "cannot_connect": "Could not connect to API - check network and try again",
       "station_not_found": "Weather Underground station ID not found"
     }
   },

@@ -128,7 +128,7 @@ class TestComputeStreaksDayBoundary:
         coord._compute_streaks(data, None)
         assert data[KEY_DRY_STREAK] == 6
         # Second run for the SAME completed day (e.g. after a restart) must not
-        # increment again — the guard is persisted in LearningState.
+        # increment again - the guard is persisted in LearningState.
         coord._compute_streaks(data, None)
         assert data[KEY_DRY_STREAK] == 6
 

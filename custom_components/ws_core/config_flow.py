@@ -1,13 +1,13 @@
 """Config flow for Weather Station Core.
 
 Setup wizard walks the user through:
-  Step 1 (user)            – Station name & entity prefix
-  Step 2 (required_sources)– Map the 7 required sensors
-  Step 3 (optional_sources)– Map optional sensors (lux, UV, dew point, battery)
-  Step 4 (location)        – Hemisphere, climate region, elevation (auto-detected)
-  Step 5 (display)         – Units / temperature display preference
-  Step 6 (forecast)        – Open-Meteo forecast options
-  Step 7 (alerts)          – Alert thresholds & advanced options
+  Step 1 (user)            - Station name & entity prefix
+  Step 2 (required_sources)- Map the 7 required sensors
+  Step 3 (optional_sources)- Map optional sensors (lux, UV, dew point, battery)
+  Step 4 (location)        - Hemisphere, climate region, elevation (auto-detected)
+  Step 5 (display)         - Units / temperature display preference
+  Step 6 (forecast)        - Open-Meteo forecast options
+  Step 7 (alerts)          - Alert thresholds & advanced options
 
 The Options flow (Configure button) exposes all settings for post-install changes.
 """
@@ -501,7 +501,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 4: Location — hemisphere, climate region, elevation
+    # Step 4: Location - hemisphere, climate region, elevation
     # ------------------------------------------------------------------
     async def async_step_location(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
@@ -848,7 +848,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             station_id = str(user_input.get(CONF_WU_STATION_ID, "")).strip()
             api_key = str(user_input.get(CONF_WU_API_KEY, "")).strip()
             if not station_id or not api_key:
-                # Missing credentials — silently disable WU and skip
+                # Missing credentials - silently disable WU and skip
                 self._data[CONF_ENABLE_WUNDERGROUND] = False
                 self._data[CONF_WU_STATION_ID] = ""
                 self._data[CONF_WU_API_KEY] = ""
@@ -896,7 +896,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # v0.7.0 — Air Quality (Open-Meteo, free, no API key)
+    # v0.7.0 - Air Quality (Open-Meteo, free, no API key)
     # ------------------------------------------------------------------
     async def async_step_air_quality(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
@@ -926,13 +926,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # v0.7.0 — Pollen (Open-Meteo, free, no API key)
+    # v0.7.0 - Pollen (Open-Meteo, free, no API key)
     # ------------------------------------------------------------------
     async def async_step_pollen(self, user_input: dict[str, Any] | None = None):
         """Pollen confirmation step.
 
         v0.3.0: pollen now comes from Open-Meteo Air Quality API (free, no key).
-        It piggybacks on the AQI fetch — no separate API call needed.
+        It piggybacks on the AQI fetch - no separate API call needed.
         """
         if user_input is not None:
             back = await self._handle_back(user_input)
@@ -956,7 +956,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # v0.9.0 — Solar forecast (forecast.solar, free, no key)
+    # v0.9.0 - Solar forecast (forecast.solar, free, no key)
     # ------------------------------------------------------------------
     async def async_step_solar_forecast(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
@@ -1097,13 +1097,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
-    """Multi-step options flow — mirrors the config flow so every setting is accessible post-install."""
+    """Multi-step options flow - mirrors the config flow so every setting is accessible post-install."""
 
     def _get(self, key: str, default: Any) -> Any:
         return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
 
     # ------------------------------------------------------------------
-    # Step 1: Core — identity, location, units, forecast, calibration, alerts
+    # Step 1: Core - identity, location, units, forecast, calibration, alerts
     # ------------------------------------------------------------------
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         units_mode = str(self._get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
@@ -1143,7 +1143,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
                 float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), imperial
             )
-            # Merge into options — features step comes next (API key step if needed)
+            # Merge into options - features step comes next (API key step if needed)
             self._opt: dict[str, Any] = out
             if out.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
                 return await self.async_step_forecast_api_key_opt()
@@ -1280,7 +1280,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     # ------------------------------------------------------------------
-    # Step 2: Features — all feature toggles
+    # Step 2: Features - all feature toggles
     # ------------------------------------------------------------------
     async def async_step_features_opt(self, user_input: dict[str, Any] | None = None):
         g = self._get

@@ -1,4 +1,4 @@
-# Weather Station Core — Example Blueprints
+# Weather Station Core - Example Blueprints
 
 These are Home Assistant Blueprint automations that work with Weather Station Core sensors.
 

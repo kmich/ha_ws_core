@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate docs/entity_map.html — a visual entity map for WS Core.
+"""Generate docs/entity_map.html - a visual entity map for WS Core.
 
 Derives everything from source code (sensor.py, switch.py, manifest.json).
 Injects: version, generation timestamp, sensor count.
@@ -251,7 +251,7 @@ def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WS Core {version} — Entity Map</title>
+<title>WS Core {version} - Entity Map</title>
 <style>
 *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
 body{{background:#0f1117;color:#e2e8f0;font-family:system-ui,sans-serif;padding:24px 20px;max-width:1050px;margin:0 auto}}
@@ -279,7 +279,7 @@ small{{font-size:10px}}
 </head>
 <body>
 <header>
-  <h1>⛅ Weather Station Core — Entity Map</h1>
+  <h1>⛅ Weather Station Core - Entity Map</h1>
   <div class="meta">
     <span>🔖 v{version}</span>
     <span>📦 {len(sensors)} sensor entities + {len(switches)} switches</span>
