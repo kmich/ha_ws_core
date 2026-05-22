@@ -553,7 +553,7 @@
         }
       },
       "rain_probability": {
-        "name": "Probabilité de pluie (Météo) ",
+        "name": "Probabilité de pluie (Météo)",
         "state_attributes": {
           "mslp_hpa": { "name": "Pression atmosphérique (hPa)" },
           "pressure_trend_3h": { "name": "Tendance sur 3h" },
@@ -741,7 +741,7 @@
         "name": "Indice de qualité de l'air",
         "state_attributes": {
           "level": { "name": "Indice" },
-          "pm2_5_ug_m3": { "name": "PM2,5)" },
+          "pm2_5_ug_m3": { "name": "PM2,5" },
           "pm10_ug_m3": { "name": "PM10" },
           "no2_ug_m3": { "name": "NO₂" },
           "ozone_ug_m3": { "name": "Ozone" }
