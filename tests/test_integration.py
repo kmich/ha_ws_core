@@ -340,24 +340,22 @@ class TestAPIResponseHandling:
 class TestSensorEntities:
     """Verify sensor descriptors and entity registration."""
 
-    def test_feature_toggle_map_no_zambretti(self):
-        """Zambretti should NOT be in the feature toggle map (always enabled)."""
-        try:
-            from custom_components.ws_core.sensor import _FEATURE_TOGGLE_MAP
-            from custom_components.ws_core.const import (
-                KEY_ZAMBRETTI_FORECAST,
-                KEY_ZAMBRETTI_NUMBER,
-                KEY_CURRENT_CONDITION,
-            )
-            assert KEY_ZAMBRETTI_FORECAST not in _FEATURE_TOGGLE_MAP
-            assert KEY_ZAMBRETTI_NUMBER not in _FEATURE_TOGGLE_MAP
-            assert KEY_CURRENT_CONDITION not in _FEATURE_TOGGLE_MAP
-        except (ImportError, AttributeError):
-            # Fallback: check source code directly
-            with open("custom_components/ws_core/sensor.py") as f:
-                content = f.read()
-            toggle_block = content[content.find("_FEATURE_TOGGLE_MAP"):content.find("toggle_key = ")]
-            assert "KEY_ZAMBRETTI" not in toggle_block
+    def test_feature_toggle_map_zambretti_gating(self):
+        """The Zambretti forecast text and current condition are always enabled
+        (not gated). The Zambretti number is opt-in via Advanced Sensors (v1.6.2)."""
+        from custom_components.ws_core.sensor import _FEATURE_TOGGLE_MAP
+        from custom_components.ws_core.const import (
+            KEY_ZAMBRETTI_FORECAST,
+            KEY_ZAMBRETTI_NUMBER,
+            KEY_CURRENT_CONDITION,
+            CONF_ENABLE_ADVANCED_SENSORS,
+        )
+
+        # Forecast text + current condition stay always-on
+        assert KEY_ZAMBRETTI_FORECAST not in _FEATURE_TOGGLE_MAP
+        assert KEY_CURRENT_CONDITION not in _FEATURE_TOGGLE_MAP
+        # Numeric Zambretti is now gated by the Advanced Sensors toggle
+        assert _FEATURE_TOGGLE_MAP.get(KEY_ZAMBRETTI_NUMBER) == CONF_ENABLE_ADVANCED_SENSORS
 
     def test_all_sensor_keys_have_unique_slugs(self):
         """Every sensor slug override should be unique."""
