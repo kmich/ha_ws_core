@@ -2,6 +2,21 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.6.1] - 2026-05-22
+
+### Bug Fixes
+
+- **Primary sub-sensors no longer disabled by default.** The following sensors were incorrectly placed in `_DISABLED_BY_DEFAULT`, meaning they were created in a disabled state in the entity registry even when their parent feature was enabled. They are now enabled by default and work immediately when the parent feature switch is turned on:
+  - **AQI:** PM2.5, PM10
+  - **Pollen:** Pollen Grass, Pollen Tree, Pollen Weed
+  - **Moon:** Moon Illumination
+  - **Solar Forecast:** Solar Forecast Tomorrow, ET₀ Penman-Monteith (Daily)
+  - **Fire Risk:** Fire Weather Index (FWI composite), FWI Daily Severity Rating
+- The 5 FWI intermediate components (FFMC, DMC, DC, ISI, BUI) remain disabled by default as they are calculation inputs rather than outputs.
+- All diagnostic sensors (Sensor Drift, Sensor Consistency, Sensor Quality Flags, Forecast Skill, Forecast Agreement, Solar Lux Factor, Climatology 30-day, Zambretti Number, ET₀ Hourly, Temperature Display, Wind Direction Smoothed) remain disabled by default.
+
+> **Existing installs:** already-disabled entities in your registry will not be automatically re-enabled on upgrade. Go to Settings -> Devices & Services -> your weather station device, find the affected entities, and click Enable. New installs are unaffected.
+
 ## [1.6.0] - 2026-05-22
 
 ### New Features

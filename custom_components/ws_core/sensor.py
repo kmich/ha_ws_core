@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v1.6.0."""
+"""Sensors for Weather Station Core -- v1.6.1."""
 
 from __future__ import annotations
 
@@ -1428,37 +1428,29 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
     }
 
     _DISABLED_BY_DEFAULT = {
+        # Display / derivative sensors — only useful in specific dashboard setups
         KEY_TEMP_DISPLAY,
         KEY_WIND_DIR_SMOOTH_DEG,
-        KEY_SENSOR_QUALITY_FLAGS,
         KEY_ZAMBRETTI_NUMBER,
         KEY_ET0_HOURLY_MM,
-        # v0.7.0 diagnostic sub-pollutants
-        KEY_PM2_5,
-        KEY_PM10,
-        KEY_POLLEN_GRASS,
-        KEY_POLLEN_TREE,
-        KEY_POLLEN_WEED,
-        # v0.8.0
-        KEY_MOON_ILLUMINATION_PCT,
-        # v0.9.0
-        KEY_SOLAR_FORECAST_TOMORROW_KWH,
-        KEY_ET0_PM_DAILY_MM,
-        # v1.2.0 — diagnostic learning sensors hidden by default
+        # Diagnostic / learning sensors — advanced use only
+        KEY_SENSOR_QUALITY_FLAGS,
         KEY_FORECAST_AGREEMENT,
         KEY_FORECAST_SKILL,
         KEY_SOLAR_LUX_FACTOR,
         KEY_CLIMATOLOGY_30D,
         KEY_SENSOR_DRIFT_FLAGS,
         KEY_CONSISTENCY_FLAGS,
-        # v1.3.0 — FWI component sensors (disabled by default; main score via KEY_FIRE_RISK_SCORE)
+        # v1.3.0 — FWI intermediate components only (FFMC/DMC/DC/ISI/BUI);
+        # FWI composite and DSR are primary outputs, enabled when fire risk is on
         KEY_FWI_FFMC,
         KEY_FWI_DMC,
         KEY_FWI_DC,
         KEY_FWI_ISI,
         KEY_FWI_BUI,
-        KEY_FWI,
-        KEY_FWI_DSR,
+        # PM2.5/PM10, pollen breakdown, moon illumination, solar tomorrow,
+        # and ET0-PM are primary outputs of their feature groups — enabled by
+        # default so they work as soon as the parent feature switch is turned on
     }
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
