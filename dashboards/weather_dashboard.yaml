@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION DASHBOARD v1.6.3 (ws_core integration)
+# WEATHER STATION DASHBOARD v1.6.4 (ws_core integration)
 # =============================================================================
 # Two-page dashboard: Weather (main) + Advanced (subview, inline navigation)
 #
@@ -2990,15 +2990,18 @@ views:
                   custom_fields:
                     details: |
                       [[[
-                        var level = (entity && entity.state) || '--';
                         var aqi = parseFloat((states['sensor.ws_air_quality_index'] || {}).state);
+                        var level = (entity && entity.attributes && entity.attributes.level) || '';
+                        if (!level || level === 'None' || level === 'unknown') {
+                          level = isNaN(aqi) ? '--' : aqi > 300 ? 'Hazardous' : aqi > 200 ? 'Very Unhealthy' : aqi > 150 ? 'Unhealthy' : aqi > 100 ? 'Unhealthy for Sensitive Groups' : aqi > 50 ? 'Moderate' : 'Good';
+                        }
                         var pm25 = parseFloat((states['sensor.ws_pm2_5'] || {}).state);
                         var pm10 = parseFloat((states['sensor.ws_pm10'] || {}).state);
                         var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
                         var aqiColor = aqi >= 300 ? '#7c3aed' : aqi >= 200 ? '#dc2626' : aqi >= 150 ? '#f97316' : aqi >= 100 ? '#f59e0b' : aqi >= 50 ? '#facc15' : '#10b981';
                         return '<div style="margin-top:8px;">'
                           + '<div style="font-size:36px;font-weight:200;color:' + aqiColor + ';">' + (!isNaN(aqi) ? aqi.toFixed(0) : '--') + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> AQI</span></div>'
-                          + '<div style="font-size:13px;color:' + aqiColor + ';margin-top:2px;">' + level + '</div>'
+                          + '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + aqiColor + '22;border:1px solid ' + aqiColor + '55;font-size:13px;font-weight:600;color:' + aqiColor + ';">' + level + '</div>'
                           + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
                           + '<div><strong>PM2.5:</strong> ' + fmt(pm25) + ' \u03bcg/m\u00b3</div>'
                           + '<div><strong>PM10:</strong> ' + fmt(pm10) + ' \u03bcg/m\u00b3</div>'

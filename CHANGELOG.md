@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.6.4] - 2026-05-22
+
+### Dashboard
+
+- **Fixed the Air Quality tile showing no category label.** The tile read the AQI sensor's *state* (the numeric value, e.g. 58) and displayed it as the "level", so the category word never appeared. It now reads the category from the sensor's `level` attribute (e.g. "Moderate"), falls back to computing the US EPA category from the AQI number if the attribute is missing, and renders it as a colored badge consistent with the other tiles.
+
 ## [1.6.3] - 2026-05-22
 
 ### Dashboard
