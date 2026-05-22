@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION DASHBOARD v1.6.0 (ws_core integration)
+# WEATHER STATION DASHBOARD v1.6.2 (ws_core integration)
 # =============================================================================
 # Two-page dashboard: Weather (main) + Advanced (subview, inline navigation)
 #
@@ -2132,8 +2132,11 @@ views:
                       var humid = parseFloat((states['sensor.ws_humidity'] || {}).state);
                       var humLevel = (states['sensor.ws_humidity_level'] || {}).state || '';
                       var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                      var tBand = isNaN(current) ? ['--','rgba(255,255,255,0.4)'] : current >= 35 ? ['Very hot','#ef4444'] : current >= 30 ? ['Hot','#f97316'] : current >= 24 ? ['Warm','#f59e0b'] : current >= 18 ? ['Comfortable','#10b981'] : current >= 10 ? ['Cool','#14b8a6'] : current >= 0 ? ['Cold','#06b6d4'] : ['Freezing','#3b82f6'];
+                      var tBadge = '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + tBand[1] + '22;border:1px solid ' + tBand[1] + '55;font-size:13px;font-weight:600;color:' + tBand[1] + ';">' + tBand[0] + '</div>';
                       return '<div style="margin-top:8px;">'
                         + '<div style="font-size:40px;font-weight:200;color:white;">' + fmt(current) + '\u00b0C</div>'
+                        + tBadge
                         + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
                         + '<div><strong>Feels like:</strong> ' + fmt(feelsLike) + '\u00b0C</div>'
                         + '<div><strong>Dew point:</strong> ' + fmt(dew) + '\u00b0C</div>'
@@ -2185,8 +2188,11 @@ views:
                       var frost = parseFloat((states['sensor.ws_frost_point'] || {}).state);
                       var dew = parseFloat((states['sensor.ws_dew_point'] || {}).state);
                       var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
+                      var dBand = isNaN(dew) ? ['--','rgba(255,255,255,0.4)'] : dew >= 24 ? ['Oppressive','#991b1b'] : dew >= 21 ? ['Very humid','#ef4444'] : dew >= 18 ? ['Humid','#f97316'] : dew >= 16 ? ['Sticky','#f59e0b'] : dew >= 13 ? ['Comfortable','#10b981'] : dew >= 10 ? ['Pleasant','#10b981'] : ['Dry','#06b6d4'];
+                      var dBadge = '<div style="display:inline-block;margin-top:6px;margin-bottom:2px;padding:3px 10px;border-radius:8px;background:' + dBand[1] + '22;border:1px solid ' + dBand[1] + '55;font-size:13px;font-weight:600;color:' + dBand[1] + ';">Dew point: ' + dBand[0] + '</div>';
                       return '<div style="margin-top:8px;">'
                         + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(avg) + '<span style="font-size:16px;color:rgba(255,255,255,0.5);"> \u00b0C avg</span></div>'
+                        + dBadge
                         + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
                         + '<div><strong>Dew point:</strong> ' + fmt(dew) + ' \u00b0C</div>'
                         + '<div><strong>Wet-bulb:</strong> ' + fmt(wetBulb) + ' \u00b0C</div>'
@@ -2283,8 +2289,11 @@ views:
                       var dir = parseFloat((states['sensor.ws_wind_direction'] || {}).state);
                       var fmt = function(v) { return isNaN(v) ? '--' : parseFloat(v).toFixed(1); };
                       var toKmh = function(v) { return isNaN(v) ? '--' : (parseFloat(v) * 3.6).toFixed(1); };
+                      var wBand = bft >= 10 ? ['Storm','#991b1b'] : bft >= 8 ? ['Gale','#ef4444'] : bft >= 6 ? ['Strong','#f97316'] : bft >= 4 ? ['Fresh','#f59e0b'] : bft >= 1 ? ['Light','#10b981'] : ['Calm','#10b981'];
+                      var wBadge = '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + wBand[1] + '22;border:1px solid ' + wBand[1] + '55;font-size:13px;font-weight:600;color:' + wBand[1] + ';">' + wBand[0] + '</div>';
                       return '<div style="margin-top:8px;">'
                         + '<div style="font-size:28px;font-weight:300;color:white;">Bft ' + bft + ' <span style="font-size:14px;color:rgba(255,255,255,0.6);">' + bftDesc + '</span></div>'
+                        + wBadge
                         + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
                         + '<div><strong>Speed:</strong> ' + fmt(speedMs) + ' m/s (' + toKmh(speedMs) + ' km/h)</div>'
                         + '<div><strong>Gust:</strong> ' + fmt(gustMs) + ' m/s (' + toKmh(gustMs) + ' km/h)</div>'
@@ -2390,8 +2399,11 @@ views:
                       var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
                       var changeColor = isNaN(change3h) ? 'white' : change3h > 0.8 ? '#10b981' : change3h < -0.8 ? '#ef4444' : 'rgba(255,255,255,0.7)';
                       var changeStr = isNaN(change3h) ? '--' : (change3h >= 0 ? '+' : '') + change3h.toFixed(1);
+                      var pBand = isNaN(mslp) ? ['--','rgba(255,255,255,0.4)'] : mslp >= 1022 ? ['High','#06b6d4'] : mslp >= 1009 ? ['Normal','#10b981'] : mslp >= 1000 ? ['Slightly low','#f59e0b'] : ['Low','#f97316'];
+                      var pBadge = '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + pBand[1] + '22;border:1px solid ' + pBand[1] + '55;font-size:13px;font-weight:600;color:' + pBand[1] + ';">' + pBand[0] + '</div>';
                       return '<div style="margin-top:8px;">'
                         + '<div style="font-size:36px;font-weight:200;color:white;">' + fmt(mslp) + ' <span style="font-size:14px;color:rgba(255,255,255,0.5);">hPa</span></div>'
+                        + pBadge
                         + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:8px;line-height:1.8;">'
                         + '<div><strong>Station:</strong> ' + fmt(station) + ' hPa</div>'
                         + '<div><strong>Trend:</strong> ' + trend + ' <span style="color:' + changeColor + ';">(' + changeStr + ' hPa/3h)</span></div>'
