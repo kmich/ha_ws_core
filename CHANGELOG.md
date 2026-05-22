@@ -2,6 +2,18 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.6.3] - 2026-05-22
+
+### Dashboard
+
+- **Color-coded good/bad badges on the basic metric tiles.** The specialized tiles (AQI, UV, pollen, comfort indices, hazards) already showed a colored category label, but the plain measurement tiles displayed bare numbers. Added at-a-glance qualitative badges:
+  - **Temperature Detail** — comfort band (Freezing -> Cold -> Cool -> Comfortable -> Warm -> Hot -> Very hot)
+  - **Temperature Extended** — dew-point comfort band (Dry -> Pleasant -> Comfortable -> Sticky -> Humid -> Very humid -> Oppressive)
+  - **Wind Detail** — strength band from Beaufort (Calm -> Light -> Fresh -> Strong -> Gale -> Storm)
+  - **Pressure Detail** — pressure band (Low -> Slightly low -> Normal -> High)
+
+> Dashboard is copy-paste (HACS does not deliver it). Re-paste `dashboards/weather_dashboard.yaml` via the Raw configuration editor to pick up the badges.
+
 ## [1.6.2] - 2026-05-22
 
 ### New Features
