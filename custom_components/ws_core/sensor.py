@@ -1,4 +1,4 @@
-"""Sensors for Weather Station Core -- v1.6.4."""
+"""Sensors for Weather Station Core -- v1.6.5."""
 
 from __future__ import annotations
 

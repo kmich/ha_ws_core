@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.6.5] - 2026-05-22
+
+### Dashboard
+
+- **Fixed Station Health and Data Quality badges showing the right text but the wrong (red) color.** The `station_health` and `data_quality` sensors emit lowercase raw states ("online", "ok", "degraded", "stale") which Home Assistant translates to "Online"/"OK" for display. The dashboard's `custom:button-card` JavaScript reads the *raw* state and was comparing against the capitalized display text (`=== 'Online'`, `=== 'OK'`), so the comparisons always failed and the color fell through to red — while CSS `text-transform:uppercase` still rendered "ONLINE"/"OK", making the text look correct. Comparisons are now case-insensitive on both the Advanced top-bar health tile and the main-page header, and the `stale` health state is now handled (orange). Same root cause as the earlier Zambretti underscore fix.
+
 ## [1.6.4] - 2026-05-22
 
 ### Dashboard

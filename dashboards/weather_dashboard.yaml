@@ -1,5 +1,5 @@
 # =============================================================================
-# WEATHER STATION DASHBOARD v1.6.4 (ws_core integration)
+# WEATHER STATION DASHBOARD v1.6.5 (ws_core integration)
 # =============================================================================
 # Two-page dashboard: Weather (main) + Advanced (subview, inline navigation)
 #
@@ -476,7 +476,8 @@ views:
                       const healthState = states['sensor.ws_station_health']?.state || 'Unknown';
                       const healthAttrs = states['sensor.ws_station_health']?.attributes || {};
                       const healthColor = healthAttrs.color || 'rgba(255,255,255,0.5)';
-                      const healthIcon = healthState === 'Online' ? '●' : healthState === 'Degraded' ? '◐' : '○';
+                      const _hs = healthState.toString().toLowerCase();
+                      const healthIcon = _hs === 'online' ? '●' : (_hs === 'degraded' || _hs === 'stale') ? '◐' : '○';
                       const healthHtml = `<span style="font-size:10px; color:${healthColor}; margin-left:6px;">${healthIcon} ${healthState.toUpperCase()}</span>`;
 
                       const battAttrs = states['sensor.ws_battery']?.attributes || {};
@@ -1521,12 +1522,14 @@ views:
                   content: |
                     [[[
                       const health = (entity && entity.state) || 'Unknown';
-                      const healthColor = health === 'Online' ? '#4ade80' : health === 'Degraded' ? '#fbbf24' : '#ef4444';
-                      const healthIcon = health === 'Online' ? '●' : health === 'Degraded' ? '◐' : '○';
+                      const h = health.toString().toLowerCase();
+                      const healthColor = h === 'online' ? '#4ade80' : h === 'degraded' ? '#fbbf24' : h === 'stale' ? '#fb923c' : '#ef4444';
+                      const healthIcon = h === 'online' ? '●' : (h === 'degraded' || h === 'stale') ? '◐' : '○';
 
                       const dqEntity = states['sensor.ws_data_quality_banner'] || {};
                       const dq = (dqEntity.state || 'OK').toString().trim();
-                      const dqColor = dq === 'OK' || dq.startsWith('OK') ? '#4ade80' : dq === 'Warning' || dq.startsWith('WARN') ? '#fbbf24' : '#ef4444';
+                      const dqUpper = dq.toUpperCase();
+                      const dqColor = dqUpper === 'OK' || dqUpper.startsWith('OK') ? '#4ade80' : dqUpper.startsWith('WARN') ? '#fbbf24' : '#ef4444';
                       const dqLabel = dq.replace(/^(OK|WARN|ERROR):\s*/i, '').trim() || dq;
 
                       const battPct = parseFloat((states['sensor.ws_battery'] || {}).state);
