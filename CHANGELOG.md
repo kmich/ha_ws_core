@@ -2,6 +2,15 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.7.1] - 2026-05-24
+
+### Bug Fixes
+
+- **Rolling-window stats and daily accumulators no longer reset on restart (issue #16).** The 24h temperature/gust/rain buffers and the `rain_today`, `wind_run`, and `chill_hours` accumulators were held in memory only, so they reset on every Home Assistant restart (and therefore every upgrade), and the brief value-restore was immediately overwritten by the reset value. This state is now persisted to storage and rehydrated on startup:
+  - 24h windows (`temperature_high/low/avg_24h`, `wind_gust_max_24h`, `rain_last_1h/24h`) are saved and pruned to the trailing 24 hours on reload, so they continue instead of recomputing from scratch.
+  - Daily accumulators (`rain_today`, `wind_run`, `chill_hours_today`) are restored only when their saved date is still the current day, so they continue the day rather than carrying a stale total into a new one. The seasonal chill total persists across days.
+  - Saved on clean shutdown (covers normal restarts and upgrades) and on an hourly backstop (limits loss to one interval on a hard crash). New installs and missing/corrupt state start fresh, so the change is fully backward-compatible.
+
 ## [1.7.0] - 2026-05-22
 
 ### New Features
