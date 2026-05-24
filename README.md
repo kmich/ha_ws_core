@@ -19,9 +19,9 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 
 ---
 
-## What's New in 1.7.0
+## What's New in 1.7
 
-**Precipitation nowcast** (opt-in, no API key) - short-term "is it about to rain" intelligence from Open-Meteo's 15-minute precipitation buckets, independent of your chosen forecast provider:
+**Precipitation nowcast** (1.7.0, opt-in, no API key) - short-term "is it about to rain" intelligence from Open-Meteo's 15-minute precipitation buckets, independent of your chosen forecast provider:
 
 - `sensor.ws_minutes_until_rain` / `sensor.ws_minutes_until_dry` - minutes until rain starts / stops.
 - `sensor.ws_rain_next_60min` - total mm expected in the next hour.
@@ -29,6 +29,8 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 - `binary_sensor.ws_rain_expected_1h` - on when rain is expected within the hour.
 
 Enable via the **Precipitation Nowcast** feature switch.
+
+**Restart-safe history** (1.7.1) - the 24h stats and daily accumulators (`rain_today`, `wind_run`, `chill_hours`, 24h temperature high/low/avg, wind gust max, rain last 1h/24h) now persist across restarts and upgrades instead of resetting.
 
 See the [CHANGELOG](CHANGELOG.md) for full details.
 
