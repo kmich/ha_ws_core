@@ -161,6 +161,17 @@
           "solar_interval_min": "Refresh interval",
           "_go_back": "← Go back to previous step"
         }
+      },
+      "vigicrues_station": {
+        "title": "Vigicrues station",
+        "description": "Choose a hydrometric station or leave on 'Auto' to use the nearest one.",
+        "data": {
+          "vigicrues_station_code": "Hydrometric station",
+          "_go_back": "← Go back to previous step"
+        },
+        "data_description": {
+          "vigicrues_station_code": "Select a station or leave on 'Auto (nearest station)' to auto-detect."
+        }
       }
     },
     "error": {
@@ -335,6 +346,16 @@
           "solar_panel_azimuth": "Panel azimuth",
           "solar_panel_tilt": "Panel tilt",
           "solar_interval_min": "Refresh interval"
+        }
+      },
+      "vigicrues_station_opt": {
+        "title": "Vigicrues station",
+        "description": "Choose a hydrometric station or leave on 'Auto' to use the nearest one.",
+        "data": {
+          "vigicrues_station_code": "Hydrometric station"
+        },
+        "data_description": {
+          "vigicrues_station_code": "Select a station or leave on 'Auto (nearest station)' to auto-detect."
         }
       }
     },
@@ -573,6 +594,20 @@
           "jaune": "Yellow (be attentive)",
           "orange": "Orange (be on alert)",
           "rouge": "Red (absolute vigilance required)"
+        }
+      },
+      "fire_danger_vigilance": {
+        "name": "Fire Danger (Vigilance)",
+        "state": {
+          "vert": "Green (no fire risk)",
+          "jaune": "Yellow (be attentive)",
+          "orange": "Orange (be on alert)",
+          "rouge": "Red (extreme fire danger)"
+        },
+        "state_attributes": {
+          "department": { "name": "Department" },
+          "all_phenomena": { "name": "All active phenomena" },
+          "fetched_at": { "name": "Last updated" }
         }
       },
       "river_level": {

@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -76,6 +77,9 @@ from .const import (
     CONF_THRESH_RAIN_RATE_MMPH,
     CONF_THRESH_WIND_GUST_MS,
     CONF_UNITS_MODE,
+    CONF_VIGICRUES_RIVER_NAME,
+    CONF_VIGICRUES_STATION_CODE,
+    CONF_VIGICRUES_STATION_NAME,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
@@ -190,6 +194,44 @@ def _sanitize_prefix(prefix: str) -> str:
     p = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in p)
     p = p.strip("_")
     return p or DEFAULT_PREFIX
+
+
+_VIGICRUES_AUTO_OPTION = {
+    "value": "",
+    "label": "Auto (nearest station)",
+    "_name": "",
+    "_river": "",
+}
+
+
+async def _fetch_vigicrues_station_options(lat: float, lon: float) -> list[dict]:
+    """Return a list of nearby Vigicrues stations as SelectSelector option dicts."""
+    options = [_VIGICRUES_AUTO_OPTION]
+    try:
+        url = (
+            "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations"
+            f"?format=json&longitude={lon:.4f}&latitude={lat:.4f}&distance=50"
+            "&en_service=true&size=20"
+            "&fields=code_station,libelle_station,libelle_cours_eau"
+        )
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    return options
+                data = await resp.json()
+    except (aiohttp.ClientError, TimeoutError, ValueError):
+        return options
+
+    for st in data.get("data", []):
+        code = st.get("code_station", "").strip()
+        name = (st.get("libelle_station") or code).strip()
+        river = (st.get("libelle_cours_eau") or "").strip()
+        if not code:
+            continue
+        label = f"{name} ({river})" if river else name
+        options.append({"value": code, "label": label, "_name": name, "_river": river})
+
+    return options
 
 
 def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
@@ -745,6 +787,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_pollen()
             if self._data[CONF_ENABLE_SOLAR_FORECAST]:
                 return await self.async_step_solar_forecast()
+            if self._data[CONF_ENABLE_VIGICRUES]:
+                return await self.async_step_vigicrues_station()
             return await self.async_step_alerts()
 
         return self._show_step(
@@ -975,6 +1019,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
+            if self._data.get(CONF_ENABLE_VIGICRUES):
+                return await self.async_step_vigicrues_station()
             return await self.async_step_alerts()
 
         return self._show_step(
@@ -1006,6 +1052,45 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "info": "Free solar PV generation forecast from forecast.solar. Uses forecast lat/lon. Azimuth: 0=N, 90=E, 180=S, 270=W."
             },
+            last_step=False,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 7h: Vigicrues station picker (v1.8.0)
+    # ------------------------------------------------------------------
+    async def async_step_vigicrues_station(self, user_input: dict[str, Any] | None = None):
+        """Let the user pick a specific hydrometric station or keep auto-detect."""
+        if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
+            code = str(user_input.get(CONF_VIGICRUES_STATION_CODE, "")).strip()
+            self._data[CONF_VIGICRUES_STATION_CODE] = code
+            for opt in getattr(self, "_vigicrues_station_options", []):
+                if opt["value"] == code:
+                    self._data[CONF_VIGICRUES_STATION_NAME] = opt.get("_name", "")
+                    self._data[CONF_VIGICRUES_RIVER_NAME] = opt.get("_river", "")
+                    break
+            return await self.async_step_alerts()
+
+        lat = self._data.get(CONF_FORECAST_LAT) or getattr(self.hass.config, "latitude", 0.0) or 0.0
+        lon = self._data.get(CONF_FORECAST_LON) or getattr(self.hass.config, "longitude", 0.0) or 0.0
+        options = await _fetch_vigicrues_station_options(lat, lon)
+        self._vigicrues_station_options = options
+        current_code = self._data.get(CONF_VIGICRUES_STATION_CODE, "")
+
+        return self._show_step(
+            step_id="vigicrues_station",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_VIGICRUES_STATION_CODE, default=current_code): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[{"value": o["value"], "label": o["label"]} for o in options],
+                            mode="dropdown",
+                        )
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -1065,7 +1150,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_THRESH_FREEZE_C,
                         default=round(_convert_temp_to_display(DEFAULT_THRESH_FREEZE_C, imperial), 1),
                     ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u)
+                        selector.NumberSelectorConfig(
+                            min=round(_convert_temp_to_display(-30.0, imperial), 1),
+                            max=round(_convert_temp_to_display(10.0, imperial), 1),
+                            step=0.5,
+                            mode="box",
+                            unit_of_measurement=temp_u,
+                        )
                     ),
                     vol.Optional(CONF_STALENESS_S, default=DEFAULT_STALENESS_S): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=60, max=86400, step=60, mode="box", unit_of_measurement="s")
@@ -1246,7 +1337,13 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, imperial), 1)
                 ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u)
+                    selector.NumberSelectorConfig(
+                        min=round(_convert_temp_to_display(-30.0, imperial), 1),
+                        max=round(_convert_temp_to_display(10.0, imperial), 1),
+                        step=0.5,
+                        mode="box",
+                        unit_of_measurement=temp_u,
+                    )
                 ),
                 vol.Optional(
                     CONF_STALENESS_S, default=g(CONF_STALENESS_S, DEFAULT_STALENESS_S)
@@ -1301,6 +1398,8 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_pollen_opt()
             if user_input.get(CONF_ENABLE_SOLAR_FORECAST):
                 return await self.async_step_solar_forecast_opt()
+            if user_input.get(CONF_ENABLE_VIGICRUES):
+                return await self.async_step_vigicrues_station_opt()
             return self.async_create_entry(title="", data=self._opt)
 
         return self.async_show_form(
@@ -1413,6 +1512,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             (CONF_ENABLE_AIR_QUALITY, "air_quality_opt"),
             (CONF_ENABLE_POLLEN, "pollen_opt"),
             (CONF_ENABLE_SOLAR_FORECAST, "solar_forecast_opt"),
+            (CONF_ENABLE_VIGICRUES, "vigicrues_station_opt"),
         ]
         past = False
         for conf_key, step_name in order:
@@ -1575,5 +1675,49 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             description_placeholders={"info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal."},
+            last_step=False,
+        )
+
+    async def async_step_vigicrues_station_opt(self, user_input: dict[str, Any] | None = None):
+        """Options flow: pick a Vigicrues hydrometric station or keep auto-detect."""
+        g = self._get
+        if user_input is not None:
+            code = str(user_input.get(CONF_VIGICRUES_STATION_CODE, "")).strip()
+            self._opt[CONF_VIGICRUES_STATION_CODE] = code
+            for opt in getattr(self, "_vigicrues_station_options_opt", []):
+                if opt["value"] == code:
+                    self._opt[CONF_VIGICRUES_STATION_NAME] = opt.get("_name", "")
+                    self._opt[CONF_VIGICRUES_RIVER_NAME] = opt.get("_river", "")
+                    break
+            return self.async_create_entry(title="", data=self._opt)
+
+        lat = (
+            self._opt.get(CONF_FORECAST_LAT)
+            or g(CONF_FORECAST_LAT, None)
+            or getattr(self.hass.config, "latitude", 0.0)
+            or 0.0
+        )
+        lon = (
+            self._opt.get(CONF_FORECAST_LON)
+            or g(CONF_FORECAST_LON, None)
+            or getattr(self.hass.config, "longitude", 0.0)
+            or 0.0
+        )
+        options = await _fetch_vigicrues_station_options(lat, lon)
+        self._vigicrues_station_options_opt = options
+        current_code = g(CONF_VIGICRUES_STATION_CODE, "")
+
+        return self.async_show_form(
+            step_id="vigicrues_station_opt",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_VIGICRUES_STATION_CODE, default=current_code): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[{"value": o["value"], "label": o["label"]} for o in options],
+                            mode="dropdown",
+                        )
+                    ),
+                }
+            ),
             last_step=False,
         )
