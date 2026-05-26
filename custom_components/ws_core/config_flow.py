@@ -219,7 +219,7 @@ def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
         SRC_LUX: ["ws_01_illuminance", "illuminance", "lux"],
         SRC_UV: ["ws_01_uv_index", "uv_index", "uv"],
         SRC_DEW_POINT: ["ws_01_dew_point", "dew_point"],
-        SRC_BATTERY: ["ws_01_battery", "battery"],
+        SRC_BATTERY: ["ws_01_battery", "ws90_battery", "wh90_battery"],
     }
 
     for k, subs in mapping.items():
