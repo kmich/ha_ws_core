@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.8.3] - 2026-05-27
+
+### Bug Fixes
+
+- **French translation improvements, part 2 (PR #18).** Applied the remaining terminology improvements contributed by Benjamin45590: river_level, rain_probability, rain_probability_combined, rain_display, rain_anomaly_30d, temperature_anomaly_30d, et0_daily, et0_hourly, solar_lux_factor, wind_quadrant, fire_risk_score attributes, ws_enable_vigicrues switch, and ws_pressure_trend_window number entity labels updated.
+
 ## [1.8.2] - 2026-05-27
 
 ### Bug Fixes

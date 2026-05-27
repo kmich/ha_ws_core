@@ -514,7 +514,7 @@
           "fetched_at": { "name": "Dernière mise à jour" }
         }
       },
-      "river_level": { "name": "Niveau de rivière" },
+      "river_level": { "name": "Hauteur du cours d'eau" },
       "rain_next_60min": { "name": "Pluie dans les 60 min" },
       "minutes_until_rain": { "name": "Minutes avant la pluie" },
       "minutes_until_dry": { "name": "Minutes avant l'arrêt de la pluie" },
@@ -557,7 +557,7 @@
           "z_number": { "name": "Index de prévision technique" },
           "mslp_hpa": { "name": "Pression atmosphérique (hPa)" },
           "trend_3h_hpa": { "name": "Tendance sur 3h (hPa/h)" },
-          "wind_quadrant": { "name": "Direction du vent (secteur)" },
+          "wind_quadrant": { "name": "Direction du vent (Secteur)" },
           "pressure_trend_display": { "name": "Tendance barométrique" }
         }
       },
@@ -625,22 +625,22 @@
         }
       },
       "rain_probability": {
-        "name": "Probabilité de pluie (Météo)",
+        "name": "Probabilité de pluie (Prévisions Météo)",
         "state_attributes": {
           "mslp_hpa": { "name": "Pression atmosphérique (hPa)" },
           "pressure_trend_3h": { "name": "Tendance sur 3h" },
           "humidity_pct": { "name": "Humidité (%)" },
-          "wind_quadrant": { "name": "Direction du vent (secteur)" }
+          "wind_quadrant": { "name": "Direction du vent (Secteur)" }
         }
       },
       "rain_probability_combined": {
-        "name": "Probabilité de pluie (calcul local)",
+        "name": "Probabilité de pluie (Station Météo)",
         "state_attributes": {
           "local_probability_pct": { "name": "Probabilité (Station) (%)" }
         }
       },
       "rain_display": {
-        "name": "Pluie (détails)",
+        "name": "Pluie (Détails)",
         "state": {
           "dry": "Sec",
           "drizzle": "Bruine",
@@ -739,7 +739,7 @@
         "name": "Indice de risque d'incendie",
         "state_attributes": {
           "danger_level": { "name": "Niveau de danger" },
-          "rain_24h_mm": { "name": "Pluie 24 h (mm)" },
+          "rain_24h_mm": { "name": "Pluie sur 24h (mm)" },
           "temperature_c": { "name": "Température (°C)" },
           "humidity_pct": { "name": "Humidité (%)" },
           "wind_ms": { "name": "Vitesse du vent (m/s)" },
@@ -790,12 +790,12 @@
         }
       },
       "et0_daily": {
-        "name": "ET₀ - Besoin eau (jour)",
+        "name": "ET₀ - Besoin en eau (Jour)",
         "state_attributes": {
           "et0_hourly_mm": { "name": "ET₀ (mm/h)" }
         }
       },
-      "et0_hourly": { "name": "ET₀ - Besoin eau (heure)" },
+      "et0_hourly": { "name": "ET₀ - Besoin en eau (heure)" },
       "wu_status": {
         "name": "État Weather Underground",
         "state": {
@@ -926,19 +926,19 @@
       },
       "climatology_30d": { "name": "Climatologie (30 jours)" },
       "temperature_anomaly_30d": {
-        "name": "Anomalie de température (30 jours)",
+        "name": "Écart à la normale (température) (30 jours)",
         "state_attributes": {
-          "normal_30d_c": { "name": "Normale 30 jours (°C)" }
+          "normal_30d_c": { "name": "Normale sur 30 jours (°C)" }
         }
       },
       "rain_anomaly_30d": {
-        "name": "Anomalie de pluie (30 jours)",
+        "name": "Écart à la normale (pluie) (30 jours)",
         "state_attributes": {
-          "normal_30d_avg_mm": { "name": "Moyenne 30 jours (mm)" }
+          "normal_30d_avg_mm": { "name": "Moyenne sur 30 jours (mm)" }
         }
       },
       "solar_lux_factor": {
-        "name": "Facteur lux solaire",
+        "name": "Facteur de conversion Lux/Solaire",
         "state_attributes": {
           "calibration_days": { "name": "Jours de calibration" }
         }
@@ -1022,7 +1022,7 @@
         "name": "Fonction : Vigilance Météo"
       },
       "ws_enable_vigicrues": {
-        "name": "Fonction : Vigicrues (niveau de rivière)"
+        "name": "Fonction : Vigicrues (suivi des cours d'eau français)"
       },
       "ws_enable_diagnostics": {
         "name": "Fonction : Diagnostics de la station"
@@ -1066,7 +1066,7 @@
         "name": "Réglage : Lissage pluie"
       },
       "ws_pressure_trend_window": {
-        "name": "Réglage : Fenêtre tendance pression"
+        "name": "Réglage : Période d'analyse de la tendance"
       }
     },
     "binary_sensor": {
