@@ -15,11 +15,11 @@
         "data": {
           "temperature": "Capteur de température",
           "humidity": "Capteur d'humidité relative (%)",
-          "pressure": "Capteur de pression atmosphérique",
-          "wind_speed": "Capteur de vitesse du vent",
-          "wind_gust": "Capteur de rafales de vent",
-          "wind_direction": "Capteur de direction du vent (°)",
-          "rain_total": "Capteur de cumul des précipitations",
+          "pressure": "Capteur de pression atmosphérique (relative)",
+          "wind_speed": "Anémomètre",
+          "wind_gust": "Anémomètre (rafales venteuses)",
+          "wind_direction": "Girouette (°)",
+          "rain_total": "Pluviomètre",
           "_go_back": "← Retour à l'étape précédente"
         }
       },
@@ -88,8 +88,8 @@
           "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
           "thresh_freeze_c": "Seuil d'alerte gel",
           "staleness_s": "Délai d'inactivité des capteurs",
-          "rain_filter_alpha": "Lissage du débit de pluie (Kalman)",
-          "pressure_trend_window_h": "Fenêtre de tendance de pression",
+          "rain_filter_alpha": "Lissage du taux de précipitation (Kalman)",
+          "pressure_trend_window_h": "Période d'analyse de la tendance",
           "_go_back": "← Retour à l'étape précédente"
         }
       },
@@ -110,10 +110,10 @@
           "enable_thunderstorm_risk": "Risque d'orage (heuristique ; nombreux faux positifs)",
           "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, DPV, delta-T, parcours du vent, heures de froid, nébulosité)",
           "enable_vigilance_meteo": "Vigilance Météo (France, sans clé API)",
-          "enable_vigicrues": "Niveau de rivière Vigicrues (France, sans clé API)",
+          "enable_vigicrues": "Surveillance des cours d'eau (Vigicrues) (France, sans clé API)",
           "enable_diagnostics": "Diagnostics de la station (dérive des capteurs, cohérence, indicateurs de qualité, fiabilité des prévisions, facteur lux solaire, climatologie 30 jours)",
           "enable_fwi_components": "Composantes IFM (FFMC, DMC, DC, ISI, IGI - nécessite le risque d'incendie activé)",
-          "enable_advanced_sensors": "Capteurs avancés/dérivés (numéro Zambretti, ET₀ horaire, direction du vent lissée)",
+          "enable_advanced_sensors": "Capteurs avancés/dérivés (code Zambretti, ET₀ horaire, direction du vent lissée)",
           "enable_nowcast": "Prévision immédiate des précipitations (minutes avant le début/la fin de la pluie, via Open-Meteo, sans clé API)"
         }
       },
@@ -304,11 +304,11 @@
           "enable_thunderstorm_risk": "Active le capteur de risque d'orage (Modèle basé sur les données de surface)",
           "enable_comfort_indices": "Active les indices de confort et capteurs agrométéorologiques",
           "enable_vigilance_meteo": "Active les alertes Vigilance Météo France (niveau départemental)",
-          "enable_vigicrues": "Active la hauteur d'eau de la rivière la plus proche (Hub'Eau v2)",
+          "enable_vigicrues": "Active la hauteur d'eau et le débit du cours d'eau le plus proche (Hub'Eau v2)",
           "enable_diagnostics": "Dérive des capteurs, cohérence inter-capteurs, indicateurs de qualité, fiabilité des prévisions, facteur lux solaire, climatologie 30 jours",
           "enable_fwi_components": "Codes intermédiaires IFM (FFMC/DMC/DC/ISI/IGI). Nécessite le risque d'incendie activé pour produire des données",
           "enable_advanced_sensors": "Numéro Zambretti (forme numérique), ET₀ horaire, direction du vent lissée",
-          "enable_nowcast": "Prévision immédiate Open-Meteo (buckets de 15 min) : minutes avant le début/la fin de la pluie, total sur l'heure, intensité. Sans clé API"
+          "enable_nowcast": "Prévision immédiate Open-Meteo (tranches de 15 min) : minutes avant le début/la fin de la pluie, total sur l'heure, intensité. Sans clé API"
         }
       },
       "sea_temp_opt": {
@@ -392,13 +392,13 @@
       "temperature": { "name": "Température" },
       "dew_point": { "name": "Point de rosée" },
       "humidity": { "name": "Humidité" },
-      "station_pressure": { "name": "Pression atmosphérique (station météo)" },
-      "sea_level_pressure": { "name": "Pression atmosphérique (au niveau de la mer)" },
+      "station_pressure": { "name": "Pression atmosphérique (Station météo)" },
+      "sea_level_pressure": { "name": "Pression atmosphérique (niveau de la mer)" },
       "wind_speed": { "name": "Vitesse du vent" },
       "wind_gust": { "name": "Rafales" },
       "wind_direction": { "name": "Direction du vent" },
-      "rain_total": { "name": "Cumul de pluie total" },
-      "rain_rate": { "name": "Débit de pluie" },
+      "rain_total": { "name": "Cumul de pluie (total)" },
+      "rain_rate": { "name": "Taux de précipitation" },
       "illuminance": { "name": "Éclairement" },
       "uv_index": { "name": "Index UV" },
       "battery": {
@@ -408,7 +408,7 @@
         }
       },
       "pressure_trend_raw": { "name": "Tendance de pression brute" },
-      "pressure_change_window": { "name": "Variation de pression (fenêtre)" },
+      "pressure_change_window": { "name": "Tendance barométrique (période)" },
       "data_quality_banner": {
         "name": "Statut de réception des données",
         "state_attributes": {
@@ -484,11 +484,11 @@
           }
         }
       },
-      "thw_index": { "name": "Indice THW" },
-      "thsw_index": { "name": "Indice THSW" },
+      "thw_index": { "name": "Indice Température-Humidité-Vent" },
+      "thsw_index": { "name": "Indice Température-Humidité-Rayonnement Solaire-Vent" },
       "wind_run": { "name": "Distance totale du vent" },
-      "chill_hours_today": { "name": "Heures de froid (aujourd'hui)" },
-      "chill_hours_season": { "name": "Heures de froid (saison)" },
+      "chill_hours_today": { "name": "Heures de froid (Aujourd'hui)" },
+      "chill_hours_season": { "name": "Heures de froid (Saison)" },
       "clearness_index": { "name": "Indice d'ensoleillement" },
       "cloud_cover": { "name": "Couverture nuageuse" },
       "vigilance_max_level": {
