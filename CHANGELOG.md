@@ -2,6 +2,23 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.8.1] - 2026-05-27
+
+### Improvements
+
+- **Smarter entity picker for sensor mapping (issue #23).** The config flow now filters the entity picker to only show sensors with the correct `device_class` for each slot, making it much faster to find the right sensor on large installations.
+  - Filtered slots: temperature, humidity, atmospheric pressure, rain total, illuminance, dew point, battery, solar radiation.
+  - Wind fields (wind speed, wind gust, wind direction) are intentionally left unfiltered — many weather station integrations (Ecowitt, Froggit, etc.) pre-date `device_class` on wind sensors and would produce an empty picker.
+  - UV index is also unfiltered — there is no standard HA `device_class` for UV index yet.
+  - A new `wrong_sensor_type` validation error surfaces if an entity is manually entered whose `device_class` is explicitly set to something incompatible. Entities with no `device_class` are always accepted.
+
+## [1.8.0] - 2026-05-26
+
+### New Features
+
+- **Vigicrues station picker.** When Vigicrues is enabled, a new config-flow step lists nearby hydrometric stations (via Hub'Eau v2) so you can pin a specific one instead of relying on auto-detect. The station name and river name are stored and shown as state attributes on `sensor.ws_river_level`. The options flow also exposes this picker so you can change the station post-install.
+- **Fire danger from Meteo Vigilance.** A dedicated `sensor.ws_fire_danger_vigilance` entity mirrors the fire-hazard phenomenon from your local Vigilance colour (vert → rouge), independent of the composite `sensor.ws_vigilance_max_level`. State attributes include department, all active phenomena, and last-fetched timestamp.
+
 ## [1.7.1] - 2026-05-24
 
 ### Bug Fixes
