@@ -19,7 +19,13 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 
 ---
 
-## What's New in 1.7
+## What's New in 1.8
+
+**Smarter entity picker** (1.8.1) - the config flow now filters the sensor picker by `device_class` for temperature, humidity, pressure, rain, illuminance, dew point, battery, and solar radiation slots. On a large installation this cuts the list from hundreds of entities down to the relevant handful. Wind and UV slots remain unfiltered - many Ecowitt/Froggit sensors pre-date those `device_class` values and would produce an empty picker. Manually typed entities without a `device_class` are always accepted; a new `wrong_sensor_type` error surfaces only if the class is explicitly set to something incompatible.
+
+**Vigicrues station picker** (1.8.0, France only) - the config flow now includes a dedicated step for choosing a hydrometric station. Up to 20 stations within 50 km are shown (powered by Hub'Eau v2); pin a specific gauge or keep the default auto-detect behaviour.
+
+**Fire danger from Vigilance** (1.8.0, France only) - a new `sensor.ws_fire_danger_vigilance` sensor derives the fire risk colour (`vert` / `jaune` / `orange` / `rouge`) directly from the Meteo-France Vigilance "Feux de foret" phenomenon - zero extra API calls.
 
 **Precipitation nowcast** (1.7.0, opt-in, no API key) - short-term "is it about to rain" intelligence from Open-Meteo's 15-minute precipitation buckets, independent of your chosen forecast provider:
 
