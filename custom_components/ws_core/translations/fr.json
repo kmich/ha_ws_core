@@ -1035,6 +1035,9 @@
       },
       "ws_enable_nowcast": {
         "name": "Fonction : Prévision immédiate des précipitations"
+      },
+      "ws_suppress_notifications": {
+        "name": "Réglage : Désactiver les notifications HA"
       }
     },
     "number": {

@@ -1035,6 +1035,9 @@
       },
       "ws_enable_nowcast": {
         "name": "Feature: Precipitation Nowcast"
+      },
+      "ws_suppress_notifications": {
+        "name": "Setting: Suppress HA Notifications"
       }
     },
     "number": {

@@ -133,6 +133,7 @@ from .const import (
     CONF_SOLAR_PEAK_KW,
     CONF_SOURCES,
     CONF_STALENESS_S,
+    CONF_SUPPRESS_NOTIFICATIONS,
     CONF_THRESH_FREEZE_C,
     CONF_THRESH_HEAT_DAY_C,
     CONF_THRESH_RAIN_RATE_MMPH,
@@ -172,6 +173,7 @@ from .const import (
     DEFAULT_SOLAR_PANEL_TILT,
     DEFAULT_SOLAR_PEAK_KW,
     DEFAULT_STALENESS_S,
+    DEFAULT_SUPPRESS_NOTIFICATIONS,
     DEFAULT_THRESH_FREEZE_C,
     DEFAULT_THRESH_HEAT_DAY_C,
     DEFAULT_THRESH_RAIN_RATE_MMPH,
@@ -521,6 +523,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.nowcast_enabled = bool(_get(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST))
         self.nowcast_interval_min = int(_get(CONF_NOWCAST_INTERVAL_MIN, DEFAULT_NOWCAST_INTERVAL_MIN))
         self._nowcast_cache: dict[str, Any] | None = None
+
+        # v1.8.4 Suppress HA Repairs notifications (issue #20)
+        self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
 
         # Wind run accumulator - resets at local midnight (like rain_today)
         self._wind_run_km: float = 0.0
@@ -1522,44 +1527,50 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if HAS_REPAIRS:
             from .const import DOMAIN
 
-            if missing_entities:
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    "missing_source_entities",
-                    is_fixable=False,
-                    severity=ir.IssueSeverity.ERROR,
-                    translation_key="missing_source_entities",
-                    translation_placeholders={"entities": ", ".join(missing_entities)},
-                )
-            else:
+            if self.suppress_notifications:
+                # User has disabled notifications - clear any existing issues immediately
                 ir.async_delete_issue(self.hass, DOMAIN, "missing_source_entities")
-
-            if stale:
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    "stale_sensors",
-                    is_fixable=False,
-                    severity=ir.IssueSeverity.WARNING,
-                    translation_key="stale_sensors",
-                    translation_placeholders={"sensors": ", ".join(stale)},
-                )
-            else:
                 ir.async_delete_issue(self.hass, DOMAIN, "stale_sensors")
-
-            if self.runtime.forecast_consecutive_failures >= 3:
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    "forecast_api_failures",
-                    is_fixable=False,
-                    severity=ir.IssueSeverity.WARNING,
-                    translation_key="forecast_api_failures",
-                    translation_placeholders={"failures": str(self.runtime.forecast_consecutive_failures)},
-                )
-            else:
                 ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
+            else:
+                if missing_entities:
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        "missing_source_entities",
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.ERROR,
+                        translation_key="missing_source_entities",
+                        translation_placeholders={"entities": ", ".join(missing_entities)},
+                    )
+                else:
+                    ir.async_delete_issue(self.hass, DOMAIN, "missing_source_entities")
+
+                if stale:
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        "stale_sensors",
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="stale_sensors",
+                        translation_placeholders={"sensors": ", ".join(stale)},
+                    )
+                else:
+                    ir.async_delete_issue(self.hass, DOMAIN, "stale_sensors")
+
+                if self.runtime.forecast_consecutive_failures >= 3:
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        "forecast_api_failures",
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="forecast_api_failures",
+                        translation_placeholders={"failures": str(self.runtime.forecast_consecutive_failures)},
+                    )
+                else:
+                    ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
 
     # ------------------------------------------------------------------
     # v1.2.0 - Fog, precipitation type, thunderstorm index

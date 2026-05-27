@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.8.4] - 2026-05-27
+
+### New Features
+
+- **Suppress HA Repairs notifications (issue #20).** A new `switch.ws_suppress_notifications` entity (off by default, under Settings) lets you silence the three HA Repairs issues that ws_core can raise (missing source entities, stale sensors, forecast API failures). Turning the switch on immediately clears any open issues and prevents new ones from being created. Turning it back off restores normal behaviour on the next coordinator update cycle.
+
 ## [1.8.3] - 2026-05-27
 
 ### Bug Fixes

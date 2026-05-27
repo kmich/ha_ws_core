@@ -39,6 +39,7 @@ from .const import (
     CONF_ENABLE_VIGILANCE_METEO,
     CONF_ENABLE_WUNDERGROUND,
     CONF_PREFIX,
+    CONF_SUPPRESS_NOTIFICATIONS,
     DEFAULT_ENABLE_ADVANCED_SENSORS,
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_COMFORT_INDICES,
@@ -57,6 +58,7 @@ from .const import (
     DEFAULT_ENABLE_VIGILANCE_METEO,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_PREFIX,
+    DEFAULT_SUPPRESS_NOTIFICATIONS,
     DOMAIN,
 )
 
@@ -186,6 +188,13 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_NOWCAST,
         name="Feature: Precipitation Nowcast",
         icon="mdi:weather-pouring",
+    ),
+    # v1.8.4 (issue #20)
+    WSFeatureDesc(
+        conf_key=CONF_SUPPRESS_NOTIFICATIONS,
+        default=DEFAULT_SUPPRESS_NOTIFICATIONS,
+        name="Setting: Suppress HA Notifications",
+        icon="mdi:bell-off",
     ),
 )
 

@@ -541,6 +541,10 @@ CONF_NOWCAST_INTERVAL_MIN = "nowcast_interval_min"
 DEFAULT_ENABLE_NOWCAST = False
 DEFAULT_NOWCAST_INTERVAL_MIN = 15
 
+# Suppress HA Repairs notifications (issue #20)
+CONF_SUPPRESS_NOTIFICATIONS = "suppress_notifications"
+DEFAULT_SUPPRESS_NOTIFICATIONS = False
+
 # Data keys - nowcast
 KEY_RAIN_NEXT_60MIN = "rain_next_60min_mm"
 KEY_MINUTES_UNTIL_RAIN = "minutes_until_rain"
