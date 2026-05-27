@@ -116,6 +116,7 @@ def _make_coordinator(**overrides):
     coord.forecast_lat = None
     coord.forecast_lon = None
     coord.forecast_interval_min = 30
+    coord.suppress_notifications = False  # v1.8.4
     coord.runtime = WSStationRuntime()
     return coord, hass, states
 

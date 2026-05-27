@@ -157,6 +157,9 @@ def _make_coordinator(
     coord._vigicrues_station_name = None
     coord._vigicrues_river_name = None
 
+    # v1.8.4
+    coord.suppress_notifications = False
+
     from custom_components.ws_core.coordinator import WSStationRuntime
     coord.runtime = WSStationRuntime()
 
