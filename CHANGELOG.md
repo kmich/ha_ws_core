@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.8.2] - 2026-05-27
+
+### Bug Fixes
+
+- **French translation improvements (PR #18).** Applied terminology improvements contributed by Benjamin45590: required-source labels now use proper meteorological terms (Anemometre, Girouette, Pluviometre); entity names for rain_rate, thw_index, thsw_index, pressure_change_window, chill_hours updated; several feature descriptions improved.
+
 ## [1.8.1] - 2026-05-27
 
 ### Improvements
