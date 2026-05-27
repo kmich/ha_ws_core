@@ -424,9 +424,7 @@ def _build_entity_selector(source_key: str) -> selector.EntitySelector:
     """Return an EntitySelector filtered by device_class where it is safe to do so."""
     dc = _DEVICE_CLASS_FOR_SOURCE.get(source_key)
     if dc:
-        return selector.EntitySelector(
-            selector.EntitySelectorConfig(domain="sensor", device_class=dc)
-        )
+        return selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class=dc))
     return selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
 
 
@@ -556,10 +554,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_SOURCES] = sources
                 return await self.async_step_optional_sources()
 
-        fields = {
-            vol.Required(k, default=defaults.get(k)): _build_entity_selector(k)
-            for k in REQUIRED_SOURCES
-        }
+        fields = {vol.Required(k, default=defaults.get(k)): _build_entity_selector(k) for k in REQUIRED_SOURCES}
         return self._show_step(
             step_id="required_sources",
             data_schema=vol.Schema(fields),
