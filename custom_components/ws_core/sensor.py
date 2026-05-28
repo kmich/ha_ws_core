@@ -259,7 +259,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:compass",
         device_class=SensorDeviceClass.WIND_DIRECTION,
         native_unit="\u00b0",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.MEASUREMENT_ANGLE,
     ),
     WSSensorDescription(
         key=KEY_NORM_RAIN_TOTAL_MM,
