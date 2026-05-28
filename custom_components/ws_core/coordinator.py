@@ -358,9 +358,7 @@ _INTEGRATION_VERSION: str = "unknown"
 def _load_integration_version() -> str:
     """Return the version string from manifest.json (blocking, run via executor)."""
     try:
-        return _json.loads(
-            (_pathlib.Path(__file__).parent / "manifest.json").read_bytes()
-        ).get("version", "unknown")
+        return _json.loads((_pathlib.Path(__file__).parent / "manifest.json").read_bytes()).get("version", "unknown")
     except Exception:  # noqa: BLE001
         return "unknown"
 
