@@ -1080,23 +1080,5 @@
         "name": "Rain Expected (1h)"
       }
     }
-  },
-  "selector": {
-    "units_auto": "Auto (follow Home Assistant)",
-    "units_metric": "Metric (km/h, mm, hPa)",
-    "units_imperial": "Imperial (mph, in, inHg)",
-    "temp_auto": "Auto (follow Home Assistant)",
-    "temp_c": "Celsius (°C)",
-    "temp_f": "Fahrenheit (°F)",
-    "provider_open_meteo": "Open-Meteo (free, no key)",
-    "provider_met_no": "Met.no (free, no key)",
-    "provider_nws": "NWS/NOAA (free, no key, USA only)",
-    "provider_owm": "OpenWeatherMap (API key required)",
-    "provider_pirate": "Pirate Weather (API key required)",
-    "provider_mf": "Météo France (API key required)",
-    "vigicrues_auto": "Auto (nearest station)",
-    "vigicrues_station_label": "{name} ({river})",
-    "hemisphere": "Hemisphere",
-    "climate_region": "Climate region"
   }
 }

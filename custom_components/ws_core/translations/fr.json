@@ -1465,23 +1465,5 @@
         "name": "Pluie prévue (1h)"
       }
     }
-  },
-  "selector": {
-    "units_auto": "Auto (suivre Home Assistant)",
-    "units_metric": "Métrique (km/h, mm, hPa)",
-    "units_imperial": "Impérial (mph, in, inHg)",
-    "temp_auto": "Auto (suivre Home Assistant)",
-    "temp_c": "Celsius (°C)",
-    "temp_f": "Fahrenheit (°F)",
-    "provider_open_meteo": "Open-Meteo (gratuit, sans clé)",
-    "provider_met_no": "Met.no (gratuit, sans clé)",
-    "provider_nws": "NWS/NOAA (gratuit, sans clé, USA uniquement)",
-    "provider_owm": "OpenWeatherMap (clé API requise)",
-    "provider_pirate": "Pirate Weather (clé API requise)",
-    "provider_mf": "Météo France (clé API requise)",
-    "vigicrues_auto": "Auto (station la plus proche)",
-    "vigicrues_station_label": "{name} ({river})",
-    "hemisphere": "Hémisphère",
-    "climate_region": "Région climatique"
   }
 }
