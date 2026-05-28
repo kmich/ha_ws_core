@@ -72,6 +72,8 @@ KNOWN_EXTERNAL: set[str] = {
     "input_text.weather_station_location",
     "input_text.weather_lightning_sensor",
     "sensor.iopool_lagonisi_temperature",
+    # WSRiverSensor (dynamic, auto-detect): suggested_object_id = "{prefix}_river_level"
+    "sensor.ws_river_level",
 }
 
 
