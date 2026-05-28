@@ -142,6 +142,7 @@ from .const import (
     CONF_VIGICRUES_RIVER_NAME,
     CONF_VIGICRUES_STATION_CODE,
     CONF_VIGICRUES_STATION_NAME,
+    CONF_VIGICRUES_STATIONS,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
@@ -276,7 +277,6 @@ from .const import (
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
     KEY_RAIN_TODAY_MM,
-    KEY_RIVER_LEVEL_M,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -524,13 +524,29 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._vigilance_cache: dict[str, Any] | None = None
 
         self.vigicrues_enabled = bool(_get(CONF_ENABLE_VIGICRUES, DEFAULT_ENABLE_VIGICRUES))
-        self._vigicrues_cache: dict[str, Any] | None = None
-        _conf_code = (_get(CONF_VIGICRUES_STATION_CODE, "") or "").strip()
-        self._vigicrues_station_code: str | None = _conf_code if _conf_code else None
-        self._vigicrues_station_name: str | None = (
-            (_get(CONF_VIGICRUES_STATION_NAME, "") or None) if _conf_code else None
-        )
-        self._vigicrues_river_name: str | None = (_get(CONF_VIGICRUES_RIVER_NAME, "") or None) if _conf_code else None
+
+        # v1.9.0: multi-station.  Load from CONF_VIGICRUES_STATIONS (list of
+        # {code, name, river} dicts); fall back to legacy single-station keys.
+        _new_stations: list[dict[str, str]] = list(_get(CONF_VIGICRUES_STATIONS, []) or [])
+        if not _new_stations:
+            _conf_code = (_get(CONF_VIGICRUES_STATION_CODE, "") or "").strip()
+            if _conf_code:
+                _new_stations = [
+                    {
+                        "code": _conf_code,
+                        "name": (_get(CONF_VIGICRUES_STATION_NAME, "") or _conf_code),
+                        "river": (_get(CONF_VIGICRUES_RIVER_NAME, "") or ""),
+                    }
+                ]
+        # Each entry: {"code": str, "name": str, "river": str}
+        # Empty list means auto-detect nearest station.
+        self._vigicrues_stations: list[dict[str, str]] = _new_stations
+        # Per-station caches keyed by station code (or "" for auto-detected)
+        self._vigicrues_caches: dict[str, dict[str, Any]] = {}
+        # For auto-detect mode, remember the discovered code across fetches
+        self._vigicrues_auto_code: str | None = None
+        self._vigicrues_auto_name: str | None = None
+        self._vigicrues_auto_river: str | None = None
 
         # v1.7.0 Precipitation nowcast (Open-Meteo minutely_15, independent of provider)
         self.nowcast_enabled = bool(_get(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST))
@@ -2281,14 +2297,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     break
             data[KEY_FIRE_DANGER_VIGILANCE] = fire_color if fire_color else "vert"
 
-        # v1.6.0 - Vigicrues (France only, no API key)
-        if self.vigicrues_enabled and self._vigicrues_cache:
-            vr = self._vigicrues_cache
-            data[KEY_RIVER_LEVEL_M] = vr.get("level_m")
-            data["_river_station_name"] = vr.get("station_name")
-            data["_river_name"] = vr.get("river_name")
-            data["_river_obs_time"] = vr.get("obs_time")
-            data["_river_station_code"] = vr.get("station_code")
+        # v1.9.0 - Vigicrues multi-station (France only, no API key)
+        if self.vigicrues_enabled and self._vigicrues_caches:
+            # Expose auto-detected code so WSRiverSensor can resolve it
+            if self._vigicrues_auto_code:
+                data["_vigicrues_auto_code"] = self._vigicrues_auto_code
+            for code, vr in self._vigicrues_caches.items():
+                data[f"river_level_m_{code}"] = vr.get("level_m")
+                data[f"_river_station_name_{code}"] = vr.get("station_name")
+                data[f"_river_name_{code}"] = vr.get("river_name")
+                data[f"_river_obs_time_{code}"] = vr.get("obs_time")
+                data[f"_river_station_code_{code}"] = vr.get("station_code")
 
         # v1.7.0 - Precipitation nowcast (Open-Meteo minutely_15)
         if self.nowcast_enabled and self._nowcast_cache:
@@ -3086,68 +3105,101 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_request_refresh()
 
     # ------------------------------------------------------------------
-    # v1.6.0 - Vigicrues (Hub'Eau v2, France, no key)
+    # v1.9.0 - Vigicrues multi-station (Hub'Eau v2, France, no key)
     # ------------------------------------------------------------------
 
     async def _async_fetch_vigicrues(self) -> None:
-        """Fetch real-time water level from the nearest Hub'Eau hydrometric station.
+        """Fetch real-time water level for all configured Vigicrues stations.
 
-        Two-step:
-          1. Find nearest active station within 50 km (cached after first successful lookup)
-          2. Fetch latest H-observation (water level in mm; stored as m for display)
+        If no stations are configured (auto-detect mode), finds the nearest
+        active station within 50 km and monitors it.
         """
-        if not (self.forecast_lat is not None and self.forecast_lon is not None):
+        if self.forecast_lat is None or self.forecast_lon is None:
             return
 
-        lat = self.forecast_lat
-        lon = self.forecast_lon
+        stations = list(self._vigicrues_stations)  # configured stations
+        need_refresh = False
 
         try:
             async with aiohttp.ClientSession() as session:
-                # Step 1: find nearest station (only if not yet cached)
-                if not self._vigicrues_station_code:
-                    stations_url = (
-                        "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations"
-                        f"?format=json&longitude={lon}&latitude={lat}&distance=50"
-                        "&en_service=true&size=1"
-                        "&fields=code_station,libelle_station,longitude_station,latitude_station"
-                        ",code_cours_eau,libelle_cours_eau"
-                    )
-                    async with session.get(stations_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                        if resp.status != 200:
-                            _LOGGER.warning("ws_core Vigicrues: station lookup HTTP %s", resp.status)
+                # Auto-detect mode: no stations configured → find nearest
+                if not stations:
+                    if not self._vigicrues_auto_code:
+                        lat, lon = self.forecast_lat, self.forecast_lon
+                        url = (
+                            "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations"
+                            f"?format=json&longitude={lon}&latitude={lat}&distance=50"
+                            "&en_service=true&size=1"
+                            "&fields=code_station,libelle_station,libelle_cours_eau"
+                        )
+                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                            if resp.status != 200:
+                                _LOGGER.warning("ws_core Vigicrues: auto-detect HTTP %s", resp.status)
+                                return
+                            sdata = await resp.json()
+                        found = sdata.get("data", [])
+                        if not found:
+                            _LOGGER.debug("ws_core Vigicrues: no station within 50 km (outside France?)")
                             return
-                        sdata = await resp.json()
-                    stations = sdata.get("data", [])
-                    if not stations:
-                        _LOGGER.debug("ws_core Vigicrues: no station found within 50 km (not in France?)")
-                        return
-                    st = stations[0]
-                    self._vigicrues_station_code = st.get("code_station")
-                    self._vigicrues_station_name = st.get("libelle_station") or self._vigicrues_station_code
-                    self._vigicrues_river_name = st.get("libelle_cours_eau") or ""
-                    _LOGGER.debug(
-                        "ws_core Vigicrues: nearest station %s (%s) on %s",
-                        self._vigicrues_station_code,
-                        self._vigicrues_station_name,
-                        self._vigicrues_river_name,
+                        st = found[0]
+                        self._vigicrues_auto_code = st.get("code_station", "")
+                        self._vigicrues_auto_name = st.get("libelle_station") or self._vigicrues_auto_code
+                        self._vigicrues_auto_river = st.get("libelle_cours_eau") or ""
+                        _LOGGER.debug(
+                            "ws_core Vigicrues auto-detected: %s (%s) on %s",
+                            self._vigicrues_auto_code,
+                            self._vigicrues_auto_name,
+                            self._vigicrues_auto_river,
+                        )
+                    stations = [
+                        {
+                            "code": self._vigicrues_auto_code or "",
+                            "name": self._vigicrues_auto_name or "",
+                            "river": self._vigicrues_auto_river or "",
+                        }
+                    ]
+
+                for st_info in stations:
+                    code = st_info.get("code", "").strip()
+                    if not code:
+                        continue
+                    obs_url = (
+                        "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr"
+                        f"?format=json&code_entite={code}"
+                        "&grandeur_hydro=H&size=1"
+                        "&fields=code_station,date_obs,resultat_obs"
                     )
+                    async with session.get(obs_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                        if resp.status not in (200, 206):
+                            _LOGGER.warning("ws_core Vigicrues: observations HTTP %s for %s", resp.status, code)
+                            continue
+                        odata = await resp.json()
 
-                if not self._vigicrues_station_code:
-                    return
+                    observations = odata.get("data", [])
+                    if not observations:
+                        _LOGGER.debug("ws_core Vigicrues: no observations for station %s", code)
+                        continue
 
-                # Step 2: fetch latest water level (grandeur_hydro=H)
-                obs_url = (
-                    "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr"
-                    f"?format=json&code_entite={self._vigicrues_station_code}"
-                    "&grandeur_hydro=H&size=1"
-                    "&fields=code_station,date_obs,resultat_obs"
-                )
-                async with session.get(obs_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status != 200:
-                        _LOGGER.warning("ws_core Vigicrues: observations HTTP %s", resp.status)
-                        return
-                    odata = await resp.json()
+                    obs = observations[0]
+                    raw_mm = obs.get("resultat_obs")
+                    level_m = round(float(raw_mm) / 1000.0, 3) if raw_mm is not None else None
+
+                    self._vigicrues_caches[code] = {
+                        "level_m": level_m,
+                        "station_code": code,
+                        "station_name": st_info.get("name", code),
+                        "river_name": st_info.get("river", ""),
+                        "obs_time": obs.get("date_obs"),
+                        "fetched_at": dt_util.utcnow().isoformat(),
+                    }
+                    _LOGGER.debug(
+                        "ws_core Vigicrues: %s (%s) level=%.3f m at %s",
+                        st_info.get("name", code),
+                        code,
+                        level_m or 0,
+                        obs.get("date_obs"),
+                    )
+                    need_refresh = True
 
         except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
             _LOGGER.warning("ws_core Vigicrues fetch error: %s", exc)
@@ -3156,27 +3208,5 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.error("ws_core Vigicrues unexpected error: %s", exc, exc_info=True)
             return
 
-        observations = odata.get("data", [])
-        if not observations:
-            _LOGGER.debug("ws_core Vigicrues: no observations for station %s", self._vigicrues_station_code)
-            return
-
-        obs = observations[0]
-        raw_mm = obs.get("resultat_obs")  # Hub'Eau returns mm for H
-        level_m = round(float(raw_mm) / 1000.0, 3) if raw_mm is not None else None
-
-        self._vigicrues_cache = {
-            "level_m": level_m,
-            "station_code": self._vigicrues_station_code,
-            "station_name": self._vigicrues_station_name,
-            "river_name": self._vigicrues_river_name,
-            "obs_time": obs.get("date_obs"),
-            "fetched_at": dt_util.utcnow().isoformat(),
-        }
-        _LOGGER.debug(
-            "ws_core Vigicrues: %s level=%.3f m at %s",
-            self._vigicrues_station_name,
-            level_m or 0,
-            obs.get("date_obs"),
-        )
-        await self.async_request_refresh()
+        if need_refresh:
+            await self.async_request_refresh()
