@@ -345,9 +345,24 @@ except ImportError:
 
 _LOGGER = logging.getLogger(__name__)
 
-_INTEGRATION_VERSION: str = _json.loads(
-    (_pathlib.Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
-).get("version", "unknown")
+# Read the integration version without blocking the HA event loop.
+# pathlib.read_text() is a synchronous I/O call; performing it at module-level
+# triggers HA's "Detected blocking call" warning because the module is first
+# imported inside async_setup_entry (i.e. within the event loop).  We therefore
+# read the file once in a thread-safe, non-blocking way: read_bytes() on the
+# manifest is tiny and fast, but we still use executor so the call is explicit.
+# The value is cached in a module-level variable after the first read.
+_INTEGRATION_VERSION: str = "unknown"
+
+
+def _load_integration_version() -> str:
+    """Return the version string from manifest.json (blocking, run via executor)."""
+    try:
+        return _json.loads(
+            (_pathlib.Path(__file__).parent / "manifest.json").read_bytes()
+        ).get("version", "unknown")
+    except Exception:  # noqa: BLE001
+        return "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -611,6 +626,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     async def async_start(self) -> None:
+        # Resolve the integration version without blocking the event loop.
+        global _INTEGRATION_VERSION
+        if _INTEGRATION_VERSION == "unknown":
+            _INTEGRATION_VERSION = await self.hass.async_add_executor_job(_load_integration_version)
+
         # Load persistent learning state from HA storage
         from homeassistant.helpers.storage import Store
 
