@@ -163,14 +163,14 @@
         }
       },
       "vigicrues_station": {
-        "title": "Station Vigicrues",
-        "description": "Choisissez une station hydrométrique ou laissez sur « Auto » pour utiliser la plus proche.",
+        "title": "Stations Vigicrues",
+        "description": "Choisissez une ou plusieurs stations hydrométriques, ou laissez vide pour détecter automatiquement la plus proche.",
         "data": {
-          "vigicrues_station_code": "Station hydrométrique",
+          "vigicrues_stations": "Stations hydrométriques",
           "_go_back": "← Retour à l'étape précédente"
         },
         "data_description": {
-          "vigicrues_station_code": "Sélectionnez une station ou laissez sur « Auto (station la plus proche) » pour la détection automatique."
+          "vigicrues_stations": "Sélectionnez une ou plusieurs stations. Laissez vide pour la détection automatique de la station la plus proche."
         }
       }
     },
@@ -350,13 +350,13 @@
         }
       },
       "vigicrues_station_opt": {
-        "title": "Station Vigicrues",
-        "description": "Choisissez une station hydrométrique ou laissez sur « Auto » pour utiliser la plus proche.",
+        "title": "Stations Vigicrues",
+        "description": "Choisissez une ou plusieurs stations hydrométriques, ou laissez vide pour détecter automatiquement la plus proche.",
         "data": {
-          "vigicrues_station_code": "Station hydrométrique"
+          "vigicrues_stations": "Stations hydrométriques"
         },
         "data_description": {
-          "vigicrues_station_code": "Sélectionnez une station ou laissez sur « Auto (station la plus proche) » pour la détection automatique."
+          "vigicrues_stations": "Sélectionnez une ou plusieurs stations. Laissez vide pour la détection automatique de la station la plus proche."
         }
       }
     },
