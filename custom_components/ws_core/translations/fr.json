@@ -1422,7 +1422,7 @@
         "name": "Fonction : Prévision immédiate des précipitations"
       },
       "ws_suppress_notifications": {
-        "name": "Réglage : Désactiver les notifications HA"
+        "name": "Réglage : Activer les notifications HA"
       }
     },
     "number": {

@@ -78,6 +78,7 @@ class WSFeatureDesc:
     default: bool
     name: str
     icon: str
+    inverted: bool = False
 
 
 FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
@@ -189,12 +190,13 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         name="Feature: Precipitation Nowcast",
         icon="mdi:weather-pouring",
     ),
-    # v1.8.4 (issue #20)
+    # v1.8.4 (issue #20) — inverted: ON means notifications enabled (suppress=False)
     WSFeatureDesc(
         conf_key=CONF_SUPPRESS_NOTIFICATIONS,
         default=DEFAULT_SUPPRESS_NOTIFICATIONS,
-        name="Setting: Suppress HA Notifications",
-        icon="mdi:bell-off",
+        name="Setting: Enable HA Notifications",
+        icon="mdi:bell",
+        inverted=True,
     ),
 )
 
@@ -329,12 +331,13 @@ class WSFeatureSwitch(SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Read current state from the config entry."""
-        return bool(
+        stored = bool(
             self._entry.options.get(
                 self._desc.conf_key,
                 self._entry.data.get(self._desc.conf_key, self._desc.default),
             )
         )
+        return (not stored) if self._desc.inverted else stored
 
     async def async_turn_on(self, **kwargs) -> None:
         """Enable the feature."""
@@ -347,5 +350,5 @@ class WSFeatureSwitch(SwitchEntity):
     async def _write(self, value: bool) -> None:
         """Persist value to entry.options (triggers reload via update listener)."""
         new_options = dict(self._entry.options)
-        new_options[self._desc.conf_key] = value
+        new_options[self._desc.conf_key] = (not value) if self._desc.inverted else value
         self.hass.config_entries.async_update_entry(self._entry, options=new_options)
