@@ -1,13 +1,13 @@
 """Config flow for Weather Station Core.
 
 Setup wizard walks the user through:
-  Step 1 (user)            - Station name & entity prefix
-  Step 2 (required_sources)- Map the 7 required sensors
-  Step 3 (optional_sources)- Map optional sensors (lux, UV, dew point, battery)
-  Step 4 (location)        - Hemisphere, climate region, elevation (auto-detected)
-  Step 5 (display)         - Units / temperature display preference
-  Step 6 (forecast)        - Open-Meteo forecast options
-  Step 7 (alerts)          - Alert thresholds & advanced options
+  Step 1 (user)            – Station name & entity prefix
+  Step 2 (required_sources)– Map the 7 required sensors
+  Step 3 (optional_sources)– Map optional sensors (lux, UV, dew point, battery)
+  Step 4 (location)        – Hemisphere, climate region, elevation (auto-detected)
+  Step 5 (display)         – Units / temperature display preference
+  Step 6 (forecast)        – Open-Meteo forecast options
+  Step 7 (alerts)          – Alert thresholds & advanced options
 
 The Options flow (Configure button) exposes all settings for post-install changes.
 """
@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -32,31 +31,25 @@ from .const import (
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
-    CONF_ENABLE_ADVANCED_SENSORS,
     # v0.7.0
     CONF_ENABLE_AIR_QUALITY,
-    CONF_ENABLE_COMFORT_INDICES,
-    CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
+    # v1.2.0
     CONF_ENABLE_FOG,
-    CONF_ENABLE_FWI_COMPONENTS,
+    # v0.8.0
     CONF_ENABLE_MOON,
-    CONF_ENABLE_NOWCAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_SEA_TEMP,
+    # v0.9.0
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
-    CONF_ENABLE_VIGICRUES,
-    CONF_ENABLE_VIGILANCE_METEO,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ENABLE_ZAMBRETTI,
-    CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
-    CONF_FORECAST_PROVIDER,
     CONF_HEMISPHERE,
     CONF_NAME,
     CONF_PREFIX,
@@ -77,8 +70,6 @@ from .const import (
     CONF_THRESH_RAIN_RATE_MMPH,
     CONF_THRESH_WIND_GUST_MS,
     CONF_UNITS_MODE,
-    CONF_VIGICRUES_STATION_CODE,
-    CONF_VIGICRUES_STATIONS,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
@@ -90,26 +81,18 @@ from .const import (
     DEFAULT_CAL_WIND_MS,
     DEFAULT_CLIMATE_REGION,
     DEFAULT_ELEVATION_M,
-    DEFAULT_ENABLE_ADVANCED_SENSORS,
     DEFAULT_ENABLE_AIR_QUALITY,
-    DEFAULT_ENABLE_COMFORT_INDICES,
-    DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
-    DEFAULT_ENABLE_FWI_COMPONENTS,
     DEFAULT_ENABLE_MOON,
-    DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_SEA_TEMP,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
-    DEFAULT_ENABLE_VIGICRUES,
-    DEFAULT_ENABLE_VIGILANCE_METEO,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
-    DEFAULT_FORECAST_PROVIDER,
     DEFAULT_HEMISPHERE,
     DEFAULT_NAME,
     DEFAULT_PREFIX,
@@ -129,15 +112,8 @@ from .const import (
     DEFAULT_UNITS_MODE,
     DEFAULT_WU_INTERVAL_MIN,
     DOMAIN,
-    FORECAST_PROVIDER_MET_NO,
-    FORECAST_PROVIDER_METEO_FRANCE,
-    FORECAST_PROVIDER_NWS,
-    FORECAST_PROVIDER_OPEN_METEO,
-    FORECAST_PROVIDER_OWM,
-    FORECAST_PROVIDER_PIRATE,
     HEMISPHERE_OPTIONS,
     OPTIONAL_SOURCES,
-    PROVIDERS_REQUIRING_API_KEY,
     REQUIRED_SOURCES,
     SRC_BATTERY,
     SRC_DEW_POINT,
@@ -146,7 +122,6 @@ from .const import (
     SRC_LUX,
     SRC_PRESS,
     SRC_RAIN_TOTAL,
-    SRC_SOLAR_RADIATION,
     SRC_TEMP,
     SRC_UV,
     SRC_WIND,
@@ -196,44 +171,6 @@ def _sanitize_prefix(prefix: str) -> str:
     return p or DEFAULT_PREFIX
 
 
-_VIGICRUES_AUTO_OPTION = {
-    "value": "",
-    "label": "Auto (nearest station)",
-    "_name": "",
-    "_river": "",
-}
-
-
-async def _fetch_vigicrues_station_options(lat: float, lon: float) -> list[dict]:
-    """Return a list of nearby Vigicrues stations as SelectSelector option dicts."""
-    options = [_VIGICRUES_AUTO_OPTION]
-    try:
-        url = (
-            "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations"
-            f"?format=json&longitude={lon:.4f}&latitude={lat:.4f}&distance=50"
-            "&en_service=true&size=20"
-            "&fields=code_station,libelle_station,libelle_cours_eau"
-        )
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                if resp.status != 200:
-                    return options
-                data = await resp.json()
-    except (aiohttp.ClientError, TimeoutError, ValueError):
-        return options
-
-    for st in data.get("data", []):
-        code = st.get("code_station", "").strip()
-        name = (st.get("libelle_station") or code).strip()
-        river = (st.get("libelle_cours_eau") or "").strip()
-        if not code:
-            continue
-        label = f"{name} ({river})" if river else name
-        options.append({"value": code, "label": label, "_name": name, "_river": river})
-
-    return options
-
-
 def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
     """Best-effort auto-detection of sensor entity IDs by name pattern."""
     guess: dict[str, str] = {}
@@ -261,7 +198,7 @@ def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
         SRC_LUX: ["ws_01_illuminance", "illuminance", "lux"],
         SRC_UV: ["ws_01_uv_index", "uv_index", "uv"],
         SRC_DEW_POINT: ["ws_01_dew_point", "dew_point"],
-        SRC_BATTERY: ["ws_01_battery", "ws90_battery", "wh90_battery"],
+        SRC_BATTERY: ["ws_01_battery", "battery"],
     }
 
     for k, subs in mapping.items():
@@ -383,58 +320,6 @@ def _convert_temp_to_c(val: float, imperial: bool) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Entity-selector helpers (issue #23 — filter pickers by device_class)
-# ---------------------------------------------------------------------------
-
-# Maps each source key to the HA device_class value that should appear in the
-# entity picker UI.  Wind fields (wind_speed, wind_gust, wind_direction) are
-# deliberately omitted: many Ecowitt / Froggit sensors pre-date those
-# device_class values and would produce an empty picker.  SRC_UV is also
-# omitted — UV index has no standard HA device_class yet.
-_DEVICE_CLASS_FOR_SOURCE: dict[str, str] = {
-    SRC_TEMP: "temperature",
-    SRC_HUM: "humidity",
-    SRC_PRESS: "atmospheric_pressure",
-    SRC_RAIN_TOTAL: "precipitation",
-    SRC_LUX: "illuminance",
-    SRC_DEW_POINT: "temperature",
-    SRC_BATTERY: "battery",
-    SRC_SOLAR_RADIATION: "irradiance",
-}
-
-# Some source slots accept more than one device_class. The picker shows the
-# primary class only; these extras are also accepted by the validator so that
-# stations which report battery as a voltage (e.g. GW3000A) aren't blocked.
-_EXTRA_DEVICE_CLASSES_FOR_SOURCE: dict[str, set[str]] = {
-    SRC_BATTERY: {"voltage"},
-}
-
-# Human-readable expected unit strings used in validation error messages.
-_EXPECTED_UNITS_FOR_SOURCE: dict[str, str] = {
-    SRC_TEMP: "°C / °F",
-    SRC_HUM: "%",
-    SRC_PRESS: "hPa / mbar / inHg",
-    SRC_WIND: "m/s, km/h, mph or kn",
-    SRC_GUST: "m/s, km/h, mph or kn",
-    SRC_WIND_DIR: "° (0–360)",
-    SRC_RAIN_TOTAL: "mm / in",
-    SRC_LUX: "lx",
-    SRC_UV: "UV index",
-    SRC_DEW_POINT: "°C / °F",
-    SRC_BATTERY: "% or V",
-    SRC_SOLAR_RADIATION: "W/m²",
-}
-
-
-def _build_entity_selector(source_key: str) -> selector.EntitySelector:
-    """Return an EntitySelector filtered by device_class where it is safe to do so."""
-    dc = _DEVICE_CLASS_FOR_SOURCE.get(source_key)
-    if dc:
-        return selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class=dc))
-    return selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
-
-
-# ---------------------------------------------------------------------------
 # Config Flow
 # ---------------------------------------------------------------------------
 
@@ -442,9 +327,9 @@ def _build_entity_selector(source_key: str) -> selector.EntitySelector:
 class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = CONFIG_VERSION
 
-    @classmethod
-    def async_get_options_flow(cls, config_entry: config_entries.ConfigEntry):
-        return WSStationOptionsFlowHandler()
+    @staticmethod
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry):
+        return WSStationOptionsFlowHandler(config_entry)
 
     def __init__(self):
         self._data: dict[str, Any] = {}
@@ -489,33 +374,15 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await handler()
         return None
 
-    def _validate_source_sensor(self, eid: str, source_key: str) -> str | None:
-        """Validate a sensor entity for a given source slot.
-
-        Returns an error key string on failure, or ``None`` when the entity is
-        acceptable.  Checks (in order):
-        1. Entity must exist and not be unavailable/unknown.
-        2. Current state must be parseable as a float.
-        3. If the entity declares a ``device_class`` AND that class is known to
-           be wrong for this slot, surface ``wrong_sensor_type``.  Entities
-           without ``device_class`` are always accepted so that older
-           integrations (e.g. Ecowitt) that omit it still work.
-        """
+    def _validate_numeric_sensor(self, eid: str) -> bool:
         st = self.hass.states.get(eid)
         if st is None or st.state in ("unknown", "unavailable"):
-            return "entity_not_found"
+            return False
         try:
             float(st.state)
+            return True
         except (ValueError, TypeError):
-            return "not_numeric"
-        # Soft device_class guard — only block when the class is explicitly wrong.
-        expected_dc = _DEVICE_CLASS_FOR_SOURCE.get(source_key)
-        if expected_dc:
-            actual_dc = st.attributes.get("device_class", "")
-            extras = _EXTRA_DEVICE_CLASSES_FOR_SOURCE.get(source_key, set())
-            if actual_dc and actual_dc != expected_dc and actual_dc not in extras:
-                return "wrong_sensor_type"
-        return None
+            return False
 
     # ------------------------------------------------------------------
     # Step 1: Name & prefix
@@ -552,16 +419,21 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 eid = user_input.get(k)
                 if not eid:
                     errors[k] = "required"
-                else:
-                    err = self._validate_source_sensor(eid, k)
-                    if err:
-                        errors[k] = err
+                elif self.hass.states.get(eid) is None:
+                    errors[k] = "entity_not_found"
+                elif not self._validate_numeric_sensor(eid):
+                    errors[k] = "not_numeric"
             if not errors:
                 sources = {k: user_input[k] for k in REQUIRED_SOURCES}
                 self._data[CONF_SOURCES] = sources
                 return await self.async_step_optional_sources()
 
-        fields = {vol.Required(k, default=defaults.get(k)): _build_entity_selector(k) for k in REQUIRED_SOURCES}
+        fields = {
+            vol.Required(k, default=defaults.get(k)): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            )
+            for k in REQUIRED_SOURCES
+        }
         return self._show_step(
             step_id="required_sources",
             data_schema=vol.Schema(fields),
@@ -585,18 +457,20 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 eid = user_input.get(k)
                 if not eid:
                     continue
-                err = self._validate_source_sensor(eid, k)
-                if err:
-                    errors[k] = err
+                if self.hass.states.get(eid) is None:
+                    errors[k] = "entity_not_found"
+                elif not self._validate_numeric_sensor(eid):
+                    errors[k] = "not_numeric"
                 else:
                     sources[k] = eid
             if not errors:
                 self._data[CONF_SOURCES] = sources
                 return await self.async_step_location()
 
+        entity_sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
         # fmt: off
         fields = {
-            (vol.Optional(k, default=defaults[k]) if k in defaults else vol.Optional(k)): _build_entity_selector(k)
+            (vol.Optional(k, default=defaults[k]) if k in defaults else vol.Optional(k)): entity_sel
             for k in OPTIONAL_SOURCES
         }
         # fmt: on
@@ -608,7 +482,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 4: Location - hemisphere, climate region, elevation
+    # Step 4: Location — hemisphere, climate region, elevation
     # ------------------------------------------------------------------
     async def async_step_location(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
@@ -723,8 +597,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if back:
                 return back
             self._data.update(user_input)
-            if user_input.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
-                return await self.async_step_forecast_api_key()
             return await self.async_step_features()
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
@@ -746,68 +618,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_FORECAST_LON, default=round(default_lon, 4)): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")
                     ),
-                    vol.Optional(CONF_FORECAST_PROVIDER, default=DEFAULT_FORECAST_PROVIDER): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                selector.SelectOptionDict(
-                                    value=FORECAST_PROVIDER_OPEN_METEO, label="Open-Meteo (free, no key)"
-                                ),
-                                selector.SelectOptionDict(
-                                    value=FORECAST_PROVIDER_MET_NO, label="Met.no (free, no key)"
-                                ),
-                                selector.SelectOptionDict(
-                                    value=FORECAST_PROVIDER_NWS, label="NWS/NOAA (free, no key, US only)"
-                                ),
-                                selector.SelectOptionDict(
-                                    value=FORECAST_PROVIDER_OWM, label="OpenWeatherMap (free tier, API key)"
-                                ),
-                                selector.SelectOptionDict(
-                                    value=FORECAST_PROVIDER_PIRATE, label="Pirate Weather (free tier, API key)"
-                                ),
-                                selector.SelectOptionDict(
-                                    value=FORECAST_PROVIDER_METEO_FRANCE, label="Météo France (free tier, API key)"
-                                ),
-                            ],
-                            mode=selector.SelectSelectorMode.LIST,
-                        )
-                    ),
                 }
             ),
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # Step 6b: API key for providers that require one
-    # ------------------------------------------------------------------
-    async def async_step_forecast_api_key(self, user_input: dict[str, Any] | None = None):
-        """Step: API key for forecast providers that require one."""
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            self._data.update(user_input)
-            return await self.async_step_features()
-
-        provider = self._data.get(CONF_FORECAST_PROVIDER, "")
-        provider_labels = {
-            FORECAST_PROVIDER_OWM: "OpenWeatherMap",
-            FORECAST_PROVIDER_PIRATE: "Pirate Weather",
-            FORECAST_PROVIDER_METEO_FRANCE: "Météo France",
-        }
-        provider_name = provider_labels.get(provider, provider)
-
-        return self._show_step(
-            step_id="forecast_api_key",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_FORECAST_API_KEY,
-                        default=self._data.get(CONF_FORECAST_API_KEY, ""),
-                    ): selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)),
-                    vol.Optional("_go_back", default=False): selector.BooleanSelector(),
-                }
-            ),
-            description_placeholders={"provider_name": provider_name},
             last_step=False,
         )
 
@@ -831,15 +643,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_ENABLE_POLLEN] = bool(user_input.get(CONF_ENABLE_POLLEN, False))
             self._data[CONF_ENABLE_MOON] = bool(user_input.get(CONF_ENABLE_MOON, False))
             self._data[CONF_ENABLE_SOLAR_FORECAST] = bool(user_input.get(CONF_ENABLE_SOLAR_FORECAST, False))
-            self._data[CONF_ENABLE_COMFORT_INDICES] = bool(
-                user_input.get(CONF_ENABLE_COMFORT_INDICES, DEFAULT_ENABLE_COMFORT_INDICES)
-            )
-            self._data[CONF_ENABLE_VIGILANCE_METEO] = bool(user_input.get(CONF_ENABLE_VIGILANCE_METEO, False))
-            self._data[CONF_ENABLE_VIGICRUES] = bool(user_input.get(CONF_ENABLE_VIGICRUES, False))
-            self._data[CONF_ENABLE_DIAGNOSTICS] = bool(user_input.get(CONF_ENABLE_DIAGNOSTICS, False))
-            self._data[CONF_ENABLE_FWI_COMPONENTS] = bool(user_input.get(CONF_ENABLE_FWI_COMPONENTS, False))
-            self._data[CONF_ENABLE_ADVANCED_SENSORS] = bool(user_input.get(CONF_ENABLE_ADVANCED_SENSORS, False))
-            self._data[CONF_ENABLE_NOWCAST] = bool(user_input.get(CONF_ENABLE_NOWCAST, False))
             if self._data[CONF_ENABLE_SEA_TEMP]:
                 return await self.async_step_sea_temp()
             if self._data[CONF_ENABLE_WUNDERGROUND]:
@@ -850,8 +653,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_pollen()
             if self._data[CONF_ENABLE_SOLAR_FORECAST]:
                 return await self.async_step_solar_forecast()
-            if self._data[CONF_ENABLE_VIGICRUES]:
-                return await self.async_step_vigicrues_station()
             return await self.async_step_alerts()
 
         return self._show_step(
@@ -878,23 +679,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_ENABLE_SOLAR_FORECAST, default=DEFAULT_ENABLE_SOLAR_FORECAST
                     ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_COMFORT_INDICES, default=DEFAULT_ENABLE_COMFORT_INDICES
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_VIGILANCE_METEO, default=DEFAULT_ENABLE_VIGILANCE_METEO
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_VIGICRUES, default=DEFAULT_ENABLE_VIGICRUES): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_DIAGNOSTICS, default=DEFAULT_ENABLE_DIAGNOSTICS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_FWI_COMPONENTS, default=DEFAULT_ENABLE_FWI_COMPONENTS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_ADVANCED_SENSORS, default=DEFAULT_ENABLE_ADVANCED_SENSORS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_NOWCAST, default=DEFAULT_ENABLE_NOWCAST): selector.BooleanSelector(),
                 }
             ),
             last_step=False,
@@ -959,7 +743,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             station_id = str(user_input.get(CONF_WU_STATION_ID, "")).strip()
             api_key = str(user_input.get(CONF_WU_API_KEY, "")).strip()
             if not station_id or not api_key:
-                # Missing credentials - silently disable WU and skip
+                # Missing credentials — silently disable WU and skip
                 self._data[CONF_ENABLE_WUNDERGROUND] = False
                 self._data[CONF_WU_STATION_ID] = ""
                 self._data[CONF_WU_API_KEY] = ""
@@ -1007,7 +791,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # v0.7.0 - Air Quality (Open-Meteo, free, no API key)
+    # v0.7.0 — Air Quality (Open-Meteo, free, no API key)
     # ------------------------------------------------------------------
     async def async_step_air_quality(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
@@ -1037,13 +821,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # v0.7.0 - Pollen (Open-Meteo, free, no API key)
+    # v0.7.0 — Pollen (Open-Meteo, free, no API key)
     # ------------------------------------------------------------------
     async def async_step_pollen(self, user_input: dict[str, Any] | None = None):
         """Pollen confirmation step.
 
         v0.3.0: pollen now comes from Open-Meteo Air Quality API (free, no key).
-        It piggybacks on the AQI fetch - no separate API call needed.
+        It piggybacks on the AQI fetch — no separate API call needed.
         """
         if user_input is not None:
             back = await self._handle_back(user_input)
@@ -1067,7 +851,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # v0.9.0 - Solar forecast (forecast.solar, free, no key)
+    # v0.9.0 — Solar forecast (forecast.solar, free, no key)
     # ------------------------------------------------------------------
     async def async_step_solar_forecast(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
@@ -1082,8 +866,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
-            if self._data.get(CONF_ENABLE_VIGICRUES):
-                return await self.async_step_vigicrues_station()
             return await self.async_step_alerts()
 
         return self._show_step(
@@ -1119,58 +901,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 7h: Vigicrues station picker (v1.8.0)
-    # ------------------------------------------------------------------
-    async def async_step_vigicrues_station(self, user_input: dict[str, Any] | None = None):
-        """Let the user pick one or more hydrometric stations (or keep auto-detect)."""
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            selected_codes: list[str] = user_input.get(CONF_VIGICRUES_STATIONS) or []
-            stations: list[dict[str, str]] = []
-            for code in selected_codes:
-                code = code.strip()
-                if not code:
-                    continue
-                for opt in getattr(self, "_vigicrues_station_options", []):
-                    if opt["value"] == code:
-                        stations.append({"code": code, "name": opt.get("_name", code), "river": opt.get("_river", "")})
-                        break
-            # Empty list means auto-detect nearest station
-            self._data[CONF_VIGICRUES_STATIONS] = stations
-            return await self.async_step_alerts()
-
-        lat = self._data.get(CONF_FORECAST_LAT) or getattr(self.hass.config, "latitude", 0.0) or 0.0
-        lon = self._data.get(CONF_FORECAST_LON) or getattr(self.hass.config, "longitude", 0.0) or 0.0
-        options = await _fetch_vigicrues_station_options(lat, lon)
-        self._vigicrues_station_options = options
-
-        # Pre-select previously chosen stations (migrate legacy single-code if needed)
-        existing: list[dict] = self._data.get(CONF_VIGICRUES_STATIONS) or []
-        if not existing:
-            legacy_code = (self._data.get(CONF_VIGICRUES_STATION_CODE) or "").strip()
-            if legacy_code:
-                existing = [{"code": legacy_code}]
-        current_codes = [s["code"] for s in existing if s.get("code")]
-
-        return self._show_step(
-            step_id="vigicrues_station",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_VIGICRUES_STATIONS, default=current_codes): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[{"value": o["value"], "label": o["label"]} for o in options],
-                            mode="dropdown",
-                            multiple=True,
-                        )
-                    ),
-                }
-            ),
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
     async def async_step_alerts(self, user_input: dict[str, Any] | None = None):
         units_mode = str(self._data.get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
         imperial = _is_imperial(units_mode, self.hass)
@@ -1194,6 +924,12 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_RAIN_FILTER_ALPHA] = float(user_input[CONF_RAIN_FILTER_ALPHA])
                 self._data[CONF_PRESSURE_TREND_WINDOW_H] = int(user_input[CONF_PRESSURE_TREND_WINDOW_H])
                 self._data[CONF_STALENESS_S] = int(user_input[CONF_STALENESS_S])
+                self._data[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
+                    float(user_input[CONF_RAIN_PENALTY_LIGHT_MMPH]), imperial
+                )
+                self._data[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
+                    float(user_input[CONF_RAIN_PENALTY_HEAVY_MMPH]), imperial
+                )
 
                 title = self._data.get(CONF_NAME, DEFAULT_NAME)
                 return self.async_create_entry(title=title, data=self._data)
@@ -1226,13 +962,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_THRESH_FREEZE_C,
                         default=round(_convert_temp_to_display(DEFAULT_THRESH_FREEZE_C, imperial), 1),
                     ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=round(_convert_temp_to_display(-30.0, imperial), 1),
-                            max=round(_convert_temp_to_display(10.0, imperial), 1),
-                            step=0.5,
-                            mode="box",
-                            unit_of_measurement=temp_u,
-                        )
+                        selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u)
                     ),
                     vol.Optional(CONF_STALENESS_S, default=DEFAULT_STALENESS_S): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=60, max=86400, step=60, mode="box", unit_of_measurement="s")
@@ -1244,6 +974,18 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_PRESSURE_TREND_WINDOW_H, default=DEFAULT_PRESSURE_TREND_WINDOW_H
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
+                    ),
+                    vol.Optional(
+                        CONF_RAIN_PENALTY_LIGHT_MMPH,
+                        default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_LIGHT_MMPH, imperial), 2),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u)
+                    ),
+                    vol.Optional(
+                        CONF_RAIN_PENALTY_HEAVY_MMPH,
+                        default=round(_convert_rain_to_display(DEFAULT_RAIN_PENALTY_HEAVY_MMPH, imperial), 1),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
                     ),
                 }
             ),
@@ -1268,13 +1010,13 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
-    """Multi-step options flow - mirrors the config flow so every setting is accessible post-install."""
+    """Multi-step options flow — mirrors the config flow so every setting is accessible post-install."""
 
     def _get(self, key: str, default: Any) -> Any:
         return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
 
     # ------------------------------------------------------------------
-    # Step 1: Core - identity, location, units, forecast, calibration, alerts
+    # Step 1: Core — identity, location, units, forecast, calibration, alerts
     # ------------------------------------------------------------------
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         units_mode = str(self._get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
@@ -1314,10 +1056,8 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
                 float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), imperial
             )
-            # Merge into options - features step comes next (API key step if needed)
+            # Merge into options — features step comes next
             self._opt: dict[str, Any] = out
-            if out.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
-                return await self.async_step_forecast_api_key_opt()
             return await self.async_step_features_opt()
 
         return self.async_show_form(
@@ -1333,6 +1073,8 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         cur_gust_ms = float(g(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
         cur_rain_mmph = float(g(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
         cur_freeze_c = float(g(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
+        cur_light_mmph = float(g(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH))
+        cur_heavy_mmph = float(g(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH))
         return vol.Schema(
             {
                 vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
@@ -1376,31 +1118,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))
                 ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
                 vol.Optional(
-                    CONF_FORECAST_PROVIDER, default=g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            selector.SelectOptionDict(
-                                value=FORECAST_PROVIDER_OPEN_METEO, label="Open-Meteo (free, no key)"
-                            ),
-                            selector.SelectOptionDict(value=FORECAST_PROVIDER_MET_NO, label="Met.no (free, no key)"),
-                            selector.SelectOptionDict(
-                                value=FORECAST_PROVIDER_NWS, label="NWS/NOAA (free, no key, US only)"
-                            ),
-                            selector.SelectOptionDict(
-                                value=FORECAST_PROVIDER_OWM, label="OpenWeatherMap (free tier, API key)"
-                            ),
-                            selector.SelectOptionDict(
-                                value=FORECAST_PROVIDER_PIRATE, label="Pirate Weather (free tier, API key)"
-                            ),
-                            selector.SelectOptionDict(
-                                value=FORECAST_PROVIDER_METEO_FRANCE, label="Météo France (free tier, API key)"
-                            ),
-                        ],
-                        mode=selector.SelectSelectorMode.LIST,
-                    )
-                ),
-                vol.Optional(
                     CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, imperial), 1)
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0, max=120, step=0.1, mode="box", unit_of_measurement=gust_u)
@@ -1413,13 +1130,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, imperial), 1)
                 ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=round(_convert_temp_to_display(-30.0, imperial), 1),
-                        max=round(_convert_temp_to_display(10.0, imperial), 1),
-                        step=0.5,
-                        mode="box",
-                        unit_of_measurement=temp_u,
-                    )
+                    selector.NumberSelectorConfig(min=-30, max=10, step=0.5, mode="box", unit_of_measurement=temp_u)
                 ),
                 vol.Optional(
                     CONF_STALENESS_S, default=g(CONF_STALENESS_S, DEFAULT_STALENESS_S)
@@ -1434,6 +1145,16 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     default=g(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
+                ),
+                vol.Optional(
+                    CONF_RAIN_PENALTY_LIGHT_MMPH, default=round(_convert_rain_to_display(cur_light_mmph, imperial), 2)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=5, step=0.1, mode="box", unit_of_measurement=rain_u)
+                ),
+                vol.Optional(
+                    CONF_RAIN_PENALTY_HEAVY_MMPH, default=round(_convert_rain_to_display(cur_heavy_mmph, imperial), 1)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.1, max=50, step=0.5, mode="box", unit_of_measurement=rain_u)
                 ),
                 vol.Optional(CONF_CAL_TEMP_C, default=g(CONF_CAL_TEMP_C, DEFAULT_CAL_TEMP_C)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="°C")
@@ -1457,7 +1178,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     # ------------------------------------------------------------------
-    # Step 2: Features - all feature toggles
+    # Step 2: Features — all feature toggles
     # ------------------------------------------------------------------
     async def async_step_features_opt(self, user_input: dict[str, Any] | None = None):
         g = self._get
@@ -1474,8 +1195,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_pollen_opt()
             if user_input.get(CONF_ENABLE_SOLAR_FORECAST):
                 return await self.async_step_solar_forecast_opt()
-            if user_input.get(CONF_ENABLE_VIGICRUES):
-                return await self.async_step_vigicrues_station_opt()
             return self.async_create_entry(title="", data=self._opt)
 
         return self.async_show_form(
@@ -1517,64 +1236,9 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_ENABLE_SOLAR_FORECAST,
                         default=g(CONF_ENABLE_SOLAR_FORECAST, DEFAULT_ENABLE_SOLAR_FORECAST),
                     ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_COMFORT_INDICES,
-                        default=g(CONF_ENABLE_COMFORT_INDICES, DEFAULT_ENABLE_COMFORT_INDICES),
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_VIGILANCE_METEO,
-                        default=g(CONF_ENABLE_VIGILANCE_METEO, DEFAULT_ENABLE_VIGILANCE_METEO),
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_VIGICRUES,
-                        default=g(CONF_ENABLE_VIGICRUES, DEFAULT_ENABLE_VIGICRUES),
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_DIAGNOSTICS,
-                        default=g(CONF_ENABLE_DIAGNOSTICS, DEFAULT_ENABLE_DIAGNOSTICS),
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_FWI_COMPONENTS,
-                        default=g(CONF_ENABLE_FWI_COMPONENTS, DEFAULT_ENABLE_FWI_COMPONENTS),
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_ADVANCED_SENSORS,
-                        default=g(CONF_ENABLE_ADVANCED_SENSORS, DEFAULT_ENABLE_ADVANCED_SENSORS),
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_NOWCAST,
-                        default=g(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST),
-                    ): selector.BooleanSelector(),
                 }
             ),
             last_step=False,
-        )
-
-    async def async_step_forecast_api_key_opt(self, user_input: dict[str, Any] | None = None):
-        """Options step: API key for providers that require one."""
-        if user_input is not None:
-            self._opt.update(user_input)
-            return await self.async_step_features_opt()
-
-        provider = self._opt.get(CONF_FORECAST_PROVIDER, "")
-        provider_labels = {
-            FORECAST_PROVIDER_OWM: "OpenWeatherMap",
-            FORECAST_PROVIDER_PIRATE: "Pirate Weather",
-            FORECAST_PROVIDER_METEO_FRANCE: "Météo France",
-        }
-        provider_name = provider_labels.get(provider, provider)
-        current_key = self._opt.get(CONF_FORECAST_API_KEY, self._get(CONF_FORECAST_API_KEY, ""))
-
-        return self.async_show_form(
-            step_id="forecast_api_key_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_FORECAST_API_KEY, default=current_key): selector.TextSelector(
-                        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
-                    ),
-                }
-            ),
-            description_placeholders={"provider_name": provider_name},
         )
 
     # ------------------------------------------------------------------
@@ -1588,7 +1252,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             (CONF_ENABLE_AIR_QUALITY, "air_quality_opt"),
             (CONF_ENABLE_POLLEN, "pollen_opt"),
             (CONF_ENABLE_SOLAR_FORECAST, "solar_forecast_opt"),
-            (CONF_ENABLE_VIGICRUES, "vigicrues_station_opt"),
         ]
         past = False
         for conf_key, step_name in order:
@@ -1751,64 +1414,5 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             description_placeholders={"info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal."},
-            last_step=False,
-        )
-
-    async def async_step_vigicrues_station_opt(self, user_input: dict[str, Any] | None = None):
-        """Options flow: pick one or more Vigicrues hydrometric stations or keep auto-detect."""
-        g = self._get
-        if user_input is not None:
-            selected_codes: list[str] = user_input.get(CONF_VIGICRUES_STATIONS) or []
-            stations: list[dict[str, str]] = []
-            for code in selected_codes:
-                code = code.strip()
-                if not code:
-                    continue
-                for opt in getattr(self, "_vigicrues_station_options_opt", []):
-                    if opt["value"] == code:
-                        stations.append({"code": code, "name": opt.get("_name", code), "river": opt.get("_river", "")})
-                        break
-            # Empty list means auto-detect nearest station
-            self._opt[CONF_VIGICRUES_STATIONS] = stations
-            return self.async_create_entry(title="", data=self._opt)
-
-        lat = (
-            self._opt.get(CONF_FORECAST_LAT)
-            or g(CONF_FORECAST_LAT, None)
-            or getattr(self.hass.config, "latitude", 0.0)
-            or 0.0
-        )
-        lon = (
-            self._opt.get(CONF_FORECAST_LON)
-            or g(CONF_FORECAST_LON, None)
-            or getattr(self.hass.config, "longitude", 0.0)
-            or 0.0
-        )
-        options = await _fetch_vigicrues_station_options(lat, lon)
-        self._vigicrues_station_options_opt = options
-
-        # Pre-select previously chosen stations (migrate legacy single-code if needed)
-        existing: list[dict] = self._opt.get(CONF_VIGICRUES_STATIONS) or g(CONF_VIGICRUES_STATIONS, []) or []
-        if not existing:
-            legacy_code = (
-                self._opt.get(CONF_VIGICRUES_STATION_CODE) or g(CONF_VIGICRUES_STATION_CODE, "") or ""
-            ).strip()
-            if legacy_code:
-                existing = [{"code": legacy_code}]
-        current_codes = [s["code"] for s in existing if s.get("code")]
-
-        return self.async_show_form(
-            step_id="vigicrues_station_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_VIGICRUES_STATIONS, default=current_codes): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[{"value": o["value"], "label": o["label"]} for o in options],
-                            mode="dropdown",
-                            multiple=True,
-                        )
-                    ),
-                }
-            ),
             last_step=False,
         )
