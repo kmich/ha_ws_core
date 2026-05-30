@@ -2,6 +2,33 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.10.0] - 2026-05-30
+
+### Bug Fixes
+
+- **Fixed wrong sensor filtering in setup wizard (issue #41).** Atmospheric pressure and other sensors were appearing in incorrect source slots. The device-class filter on entity pickers has been removed — any numeric sensor now appears in any slot.
+
+### Improvements
+
+- **Localised state labels (issue #25).** AQI level, fog probability risk level, thunderstorm risk level, and moon phase now use translation keys so HA renders them in the user's language rather than hardcoded English strings.
+- **Per-species pollen levels.** `grass_level`, `tree_level`, and `weed_level` keys added to the pollen sensor attributes alongside the existing overall level.
+- **Streak sensor unit corrected.** Dry/heat/frost streak sensors no longer display a literal "d" unit label.
+- **French translations.** State translations added for AQI, moon phase, fog, and thunderstorm risk. Hemisphere and climate region selector options also translated.
+
+_All changes contributed by @Benjamin45590._
+
+## [1.9.1] - 2026-05-29
+
+### Bug Fixes
+
+- **Battery voltage sensor accepted (issue #33).** Stations that report battery state as a voltage sensor (e.g. GW3000A reporting `device_class: voltage`) were rejected by the config flow validator. Voltage is now accepted alongside the standard `battery` device class for the battery source slot.
+
+## [1.9.0] - 2026-05-28
+
+### New Features
+
+- **Vigicrues multi-station support (issue #27).** The config flow now includes a station picker that lists up to 20 hydrometric stations within 50 km (powered by Hub'Eau v2). Pin a specific gauge or keep the default auto-detect behaviour. Station name and river name are stored and shown as attributes on `sensor.ws_river_level`. The options flow also exposes the picker for post-install changes.
+
 ## [1.8.4] - 2026-05-27
 
 ### New Features

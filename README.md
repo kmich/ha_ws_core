@@ -19,24 +19,17 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 
 ---
 
-## What's New in 1.8
+## What's New in 1.10
 
-**Suppress HA Repairs notifications** (1.8.4) - a new `switch.ws_suppress_notifications` entity (Settings category, off by default) lets you silence the HA Repairs issues raised by ws_core (missing source entities, stale sensors, forecast API failures). Toggling it on immediately clears any open issues; toggling it back off restores normal alerting.
+**Fixed sensor filtering** (1.10.0) - atmospheric pressure and other sensors were appearing in the wrong slot in the setup wizard due to over-restrictive device-class filtering. All numeric sensors now show in all pickers.
 
-**Smarter entity picker** (1.8.1) - the config flow now filters the sensor picker by `device_class` for temperature, humidity, pressure, rain, illuminance, dew point, battery, and solar radiation slots. On a large installation this cuts the list from hundreds of entities down to the relevant handful. Wind and UV slots remain unfiltered - many Ecowitt/Froggit sensors pre-date those `device_class` values and would produce an empty picker. Manually typed entities without a `device_class` are always accepted; a new `wrong_sensor_type` error surfaces only if the class is explicitly set to something incompatible.
+**Localised state labels** (1.10.0) - AQI level, fog probability, thunderstorm risk, and moon phase now use translation keys so HA renders them in the user's language. French translations included.
 
-**Vigicrues station picker** (1.8.0, France only) - the config flow now includes a dedicated step for choosing a hydrometric station. Up to 20 stations within 50 km are shown (powered by Hub'Eau v2); pin a specific gauge or keep the default auto-detect behaviour.
+**Pollen detail** (1.10.0) - per-species grass/tree/weed level keys added alongside the existing overall pollen level.
 
-**Fire danger from Vigilance** (1.8.0, France only) - a new `sensor.ws_fire_danger_vigilance` sensor derives the fire risk colour (`vert` / `jaune` / `orange` / `rouge`) directly from the Meteo-France Vigilance "Feux de foret" phenomenon - zero extra API calls.
+**Battery voltage sensor** (1.9.1) - stations that report battery as a voltage sensor (e.g. GW3000A) are no longer rejected by the config flow.
 
-**Precipitation nowcast** (1.7.0, opt-in, no API key) - short-term "is it about to rain" intelligence from Open-Meteo's 15-minute precipitation buckets, independent of your chosen forecast provider:
-
-- `sensor.ws_minutes_until_rain` / `sensor.ws_minutes_until_dry` - minutes until rain starts / stops.
-- `sensor.ws_rain_next_60min` - total mm expected in the next hour.
-- `sensor.ws_nowcast_intensity` - none / light / moderate / heavy.
-- `binary_sensor.ws_rain_expected_1h` - on when rain is expected within the hour.
-
-Enable via the **Precipitation Nowcast** feature switch.
+**Vigicrues station picker** (1.9.0, France only) - the config flow now includes a dedicated step for choosing a hydrometric station. Up to 20 stations within 50 km are shown; pin a specific gauge or keep auto-detect.
 
 **Restart-safe history** (1.7.1) - the 24h stats and daily accumulators (`rain_today`, `wind_run`, `chill_hours`, 24h temperature high/low/avg, wind gust max, rain last 1h/24h) now persist across restarts and upgrades instead of resetting.
 
