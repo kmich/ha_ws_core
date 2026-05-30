@@ -119,7 +119,7 @@ class TestAQI:
     def test_good(self):
         aqi = calculate_us_aqi(5.0, 20.0)
         assert aqi is not None and aqi < 51
-        assert aqi_level(aqi) == "Good"
+        assert aqi_level(aqi) == "good"
 
     def test_unhealthy(self):
         aqi = calculate_us_aqi(100.0, 200.0)
@@ -129,9 +129,9 @@ class TestAQI:
         assert calculate_us_aqi(None, None) is None
 
     def test_levels(self):
-        assert aqi_level(0) == "Good"
-        assert aqi_level(100) == "Moderate"
-        assert aqi_level(200) == "Unhealthy"
+        assert aqi_level(0) == "good"
+        assert aqi_level(100) == "moderate"
+        assert aqi_level(200) == "unhealthy"
 
 
 class TestPollen:
