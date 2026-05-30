@@ -1518,7 +1518,7 @@
         "name": "Lissage des données du pluviomètre"
       },
       "ws_pressure_trend_window": {
-        "name": ""Fenêtre d'analyse de la tendance""
+        "name": "Fenêtre d'analyse de la tendance"
       }
     },
     "binary_sensor": {
