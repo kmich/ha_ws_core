@@ -1206,7 +1206,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 # ---------------------------------------------------------------------------
 
 
-class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
+class WSStationOptionsFlowHandler(config_entries.OptionsFlowWithReload):
     """Multi-step options flow - mirrors the config flow so every setting is accessible post-install."""
 
     def _get(self, key: str, default: Any) -> Any:

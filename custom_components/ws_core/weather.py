@@ -347,10 +347,6 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             )
         return out
 
-    @property
-    def forecast(self) -> list[dict[str, Any]] | None:
-        return self._build_daily_forecast()
-
     async def async_forecast_daily(self) -> list[dict[str, Any]] | None:
         return self._build_daily_forecast()
 
