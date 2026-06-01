@@ -1490,5 +1490,48 @@
         "name": "Rain Expected (1h)"
       }
     }
+  },
+  "selector": {
+    "hemisphere": {
+      "options": {
+        "Northern": "Northern",
+        "Southern": "Southern"
+      }
+    },
+    "climate_region": {
+      "options": {
+        "Mediterranean": "Mediterranean",
+        "Atlantic Europe": "Atlantic Europe",
+        "Continental Europe": "Continental Europe",
+        "Scandinavia": "Scandinavia",
+        "Australia": "Australia",
+        "North America East": "North America East",
+        "North America West": "North America West"
+      }
+    },
+    "units_mode": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "metric": "Metric (km/h, mm, hPa)",
+        "imperial": "Imperial (mph, in, inHg)"
+      }
+    },
+    "temp_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "C": "Celsius (°C)",
+        "F": "Fahrenheit (°F)"
+      }
+    },
+    "forecast_provider": {
+      "options": {
+        "open_meteo": "Open-Meteo (free, no key)",
+        "met_no": "Met.no (free, no key)",
+        "nws_noaa": "NWS/NOAA (free, no key, US only)",
+        "openweathermap": "OpenWeatherMap (free tier, API key)",
+        "pirate_weather": "Pirate Weather (free tier, API key)",
+        "meteo_france": "Météo France (free tier, API key)"
+      }
+    }
   }
 }
