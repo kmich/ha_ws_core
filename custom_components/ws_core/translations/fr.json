@@ -1531,23 +1531,6 @@
     }
   },
   "selector": {
-    "hemisphere": {
-      "options": {
-        "Northern": "Hémisphère Nord",
-        "Southern": "Hémisphère Sud"
-      }
-    },
-    "climate_region": {
-      "options": {
-        "Mediterranean": "Méditerranée",
-        "Atlantic Europe": "Europe Atlantique",
-        "Continental Europe": "Europe Continentale",
-        "Scandinavia": "Scandinavie",
-        "Australia": "Australie",
-        "North America East": "Amérique du Nord (Est)",
-        "North America West": "Amérique du Nord (Ouest)"
-      }
-    },
     "units_mode": {
       "options": {
         "auto": "Automatique",
