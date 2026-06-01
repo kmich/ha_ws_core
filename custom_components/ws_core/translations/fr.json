@@ -1555,13 +1555,6 @@
         "imperial": "Impérial (mph, in, inHg)"
       }
     },
-    "temp_unit": {
-      "options": {
-        "auto": "Automatique",
-        "C": "Celsius (°C)",
-        "F": "Fahrenheit (°F)"
-      }
-    },
     "forecast_provider": {
       "options": {
         "open_meteo": "Open-Meteo (gratuit, sans clé API)",

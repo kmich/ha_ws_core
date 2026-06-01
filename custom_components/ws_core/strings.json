@@ -1516,13 +1516,6 @@
         "imperial": "Imperial (mph, in, inHg)"
       }
     },
-    "temp_unit": {
-      "options": {
-        "auto": "Auto (follow Home Assistant)",
-        "C": "Celsius (°C)",
-        "F": "Fahrenheit (°F)"
-      }
-    },
     "forecast_provider": {
       "options": {
         "open_meteo": "Open-Meteo (free, no key)",
