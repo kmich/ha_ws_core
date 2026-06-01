@@ -1794,8 +1794,10 @@ class WSRiverSensor(CoordinatorEntity, SensorEntity):
         uid_suffix = self._station_code if self._station_code else "auto"
         self._attr_unique_id = f"{entry.entry_id}_river_level_{uid_suffix}"
         name_slug = _river_slug(self._river_name or self._station_name)
-        slug = f"river_level_{name_slug}" if name_slug else (
-            f"river_level_{uid_suffix}" if uid_suffix != "auto" else "river_level"
+        slug = (
+            f"river_level_{name_slug}"
+            if name_slug
+            else (f"river_level_{uid_suffix}" if uid_suffix != "auto" else "river_level")
         )
         self._attr_suggested_object_id = f"{prefix}_{slug}"
 
@@ -1877,8 +1879,10 @@ class WSRiverFlowSensor(CoordinatorEntity, SensorEntity):
         uid_suffix = self._station_code if self._station_code else "auto"
         self._attr_unique_id = f"{entry.entry_id}_river_flow_{uid_suffix}"
         name_slug = _river_slug(self._river_name or self._station_name)
-        slug = f"river_flow_{name_slug}" if name_slug else (
-            f"river_flow_{uid_suffix}" if uid_suffix != "auto" else "river_flow"
+        slug = (
+            f"river_flow_{name_slug}"
+            if name_slug
+            else (f"river_flow_{uid_suffix}" if uid_suffix != "auto" else "river_flow")
         )
         self._attr_suggested_object_id = f"{prefix}_{slug}"
 
