@@ -2,6 +2,15 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [1.10.1] - 2026-06-01
+
+### Improvements
+
+- **Translated selector labels.** Units mode and forecast provider selectors in the config flow now use translation keys, so labels render in the user's language rather than hardcoded English.
+- **French translation improvements (PR #43/#44).** Better step descriptions for Weather Underground, AQI, pollen, and solar forecast steps. Switch and number entity names cleaned up. River level and Vigilance Météo state attributes translated. Moon phase state labels added. Forecast provider and units mode options translated.
+
+_All changes contributed by @Benjamin45590._
+
 ## [1.10.0] - 2026-05-30
 
 ### Bug Fixes
