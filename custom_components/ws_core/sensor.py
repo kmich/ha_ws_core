@@ -23,6 +23,7 @@ from .const import (
     CONF_ENABLE_COMFORT_INDICES,
     # v2.0
     CONF_ENABLE_DEGREE_DAYS,
+    CONF_ENABLE_LIGHTNING,
     # v1.6.2
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
@@ -167,6 +168,11 @@ from .const import (
     KEY_FFDI,
     KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
+    KEY_LIGHTNING_CLEARANCE_MIN,
+    KEY_LIGHTNING_COUNT_1H,
+    KEY_LIGHTNING_DISTANCE_KM,
+    KEY_LIGHTNING_PROXIMITY,
+    KEY_LIGHTNING_RATE_1H,
     KEY_GDD_SEASON_V2,
     KEY_GDD_TODAY_V2,
     KEY_HDD_SEASON,
@@ -818,6 +824,61 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "peak_rate_mmph": d.get("_nowcast_peak_rate_mmph"),
             "next_60min_mm": d.get(KEY_RAIN_NEXT_60MIN),
+        },
+    ),
+    # =========================================================================
+    # v2.0 - Lightning sensors (opt-in group, enable_lightning)
+    # =========================================================================
+    WSSensorDescription(
+        key=KEY_LIGHTNING_COUNT_1H,
+        translation_key="lightning_count_1h",
+        name="WS Lightning Strikes (1h)",
+        icon="mdi:lightning-bolt",
+        native_unit="strikes",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "rate_per_min": d.get(KEY_LIGHTNING_RATE_1H),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_LIGHTNING_DISTANCE_KM,
+        translation_key="lightning_distance",
+        name="WS Lightning Distance",
+        icon="mdi:lightning-bolt-circle",
+        native_unit="km",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "proximity": d.get(KEY_LIGHTNING_PROXIMITY),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_LIGHTNING_RATE_1H,
+        translation_key="lightning_rate",
+        name="WS Lightning Rate",
+        icon="mdi:lightning-bolt-outline",
+        native_unit="strikes/min",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_LIGHTNING_CLEARANCE_MIN,
+        translation_key="lightning_clearance",
+        name="WS Lightning Clearance",
+        icon="mdi:shield-check-outline",
+        native_unit="min",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "safe": (d.get(KEY_LIGHTNING_CLEARANCE_MIN) or 0) >= 30,
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_LIGHTNING_PROXIMITY,
+        translation_key="lightning_proximity",
+        name="WS Lightning Proximity",
+        icon="mdi:lightning-bolt",
+        attrs_fn=lambda d: {
+            "distance_km": d.get(KEY_LIGHTNING_DISTANCE_KM),
+            "clearance_min": d.get(KEY_LIGHTNING_CLEARANCE_MIN),
         },
     ),
     # Zambretti barometric forecast
@@ -1784,6 +1845,12 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # v2.0 - fire danger additions (gated by fire risk toggle)
     KEY_FFDI: CONF_ENABLE_FIRE_RISK,
     KEY_FFWI: CONF_ENABLE_FIRE_RISK,
+    # v2.0 - lightning sensors
+    KEY_LIGHTNING_COUNT_1H: CONF_ENABLE_LIGHTNING,
+    KEY_LIGHTNING_DISTANCE_KM: CONF_ENABLE_LIGHTNING,
+    KEY_LIGHTNING_RATE_1H: CONF_ENABLE_LIGHTNING,
+    KEY_LIGHTNING_CLEARANCE_MIN: CONF_ENABLE_LIGHTNING,
+    KEY_LIGHTNING_PROXIMITY: CONF_ENABLE_LIGHTNING,
     # v2.0 - degree days + leaf wetness (new opt-in group)
     KEY_HDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
     KEY_HDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
@@ -2084,6 +2151,12 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_FFDI: "ffdi",
             KEY_FFWI: "ffwi",
             KEY_UTCI: "utci",
+            # v2.0 batch 5 (lightning)
+            KEY_LIGHTNING_COUNT_1H: "lightning_count_1h",
+            KEY_LIGHTNING_DISTANCE_KM: "lightning_distance",
+            KEY_LIGHTNING_RATE_1H: "lightning_rate",
+            KEY_LIGHTNING_CLEARANCE_MIN: "lightning_clearance",
+            KEY_LIGHTNING_PROXIMITY: "lightning_proximity",
         }
         if key in overrides:
             return overrides[key]

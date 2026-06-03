@@ -115,7 +115,8 @@
           "enable_fwi_components": "FWI components (FFMC, DMC, DC, ISI, BUI - requires Fire Risk enabled)",
           "enable_advanced_sensors": "Advanced/derived sensors (Zambretti number, ET₀ hourly, smoothed wind direction)",
           "enable_nowcast": "Precipitation nowcast (minutes until rain starts/stops, via Open-Meteo, no API key)",
-          "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness"
+          "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
+          "enable_lightning": "Lightning detection (accepts WH57, AS3935, or any lightning count + distance sensor)"
         }
       },
       "sea_temp": {
@@ -291,7 +292,8 @@
           "enable_fwi_components": "FWI components (needs Fire Risk)",
           "enable_advanced_sensors": "Advanced/derived sensors",
           "enable_nowcast": "Precipitation nowcast (minutes to rain)",
-          "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness"
+          "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
+          "enable_lightning": "Lightning detection sensors"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -1525,6 +1527,38 @@
         "state_attributes": {
           "stress_category": { "name": "Thermal stress category" }
         }
+      },
+      "lightning_count_1h": {
+        "name": "Lightning Strikes (1h)",
+        "state_attributes": {
+          "rate_per_min": { "name": "Strike rate (per min)" }
+        }
+      },
+      "lightning_distance": {
+        "name": "Lightning Distance",
+        "state_attributes": {
+          "proximity": { "name": "Proximity status" }
+        }
+      },
+      "lightning_rate": {
+        "name": "Lightning Rate"
+      },
+      "lightning_clearance": {
+        "name": "Lightning Clearance",
+        "state_attributes": {
+          "safe": { "name": "Safety status (≥30 min)" }
+        }
+      },
+      "lightning_proximity": {
+        "name": "Lightning Proximity",
+        "state": {
+          "near": "Near (within threshold)",
+          "clear": "Clear"
+        },
+        "state_attributes": {
+          "distance_km": { "name": "Distance" },
+          "clearance_min": { "name": "Minutes since last strike" }
+        }
       }
     },
     "select": {
@@ -1626,6 +1660,9 @@
       },
       "ws_pressure_trend_window": {
         "name": "Tuning: Pressure Trend Window"
+      },
+      "ws_lightning_proximity": {
+        "name": "Alert: Lightning Proximity Threshold"
       }
     },
     "binary_sensor": {

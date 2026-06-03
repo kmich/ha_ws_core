@@ -24,6 +24,7 @@ from .const import (
     CONF_CAL_PRESSURE_HPA,
     CONF_CAL_TEMP_C,
     CONF_CAL_WIND_MS,
+    CONF_LIGHTNING_PROXIMITY_KM,
     CONF_PREFIX,
     CONF_PRESSURE_TREND_WINDOW_H,
     CONF_RAIN_FILTER_ALPHA,
@@ -35,6 +36,7 @@ from .const import (
     DEFAULT_CAL_PRESSURE_HPA,
     DEFAULT_CAL_TEMP_C,
     DEFAULT_CAL_WIND_MS,
+    DEFAULT_LIGHTNING_PROXIMITY_KM,
     DEFAULT_PREFIX,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_RAIN_FILTER_ALPHA,
@@ -176,6 +178,18 @@ PARAM_NUMBERS: tuple[WSNumberDesc, ...] = (
         native_unit="h",
     ),
     # v0.3.0: rain_penalty_light/heavy entities removed (laundry score was cut)
+    # v2.0: lightning proximity threshold
+    WSNumberDesc(
+        key="lightning_proximity",
+        conf_key=CONF_LIGHTNING_PROXIMITY_KM,
+        default=DEFAULT_LIGHTNING_PROXIMITY_KM,
+        name="Alert: Lightning Proximity Threshold",
+        icon="mdi:lightning-bolt-circle",
+        native_min=1.0,
+        native_max=100.0,
+        native_step=1.0,
+        native_unit="km",
+    ),
 )
 
 

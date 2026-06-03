@@ -339,10 +339,21 @@ from .const import (
     KEY_CDD_SEASON,
     KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
+    CONF_ENABLE_LIGHTNING,
+    CONF_LIGHTNING_PROXIMITY_KM,
+    DEFAULT_ENABLE_LIGHTNING,
+    DEFAULT_LIGHTNING_PROXIMITY_KM,
     KEY_DOMINANT_WIND_DIR,
     KEY_FFDI,
     KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
+    KEY_LIGHTNING_CLEARANCE_MIN,
+    KEY_LIGHTNING_COUNT_1H,
+    KEY_LIGHTNING_DISTANCE_KM,
+    KEY_LIGHTNING_PROXIMITY,
+    KEY_LIGHTNING_RATE_1H,
+    SRC_LIGHTNING_COUNT,
+    SRC_LIGHTNING_DISTANCE,
     KEY_UTCI,
     KEY_GDD_SEASON_V2,
     KEY_GDD_TODAY_V2,
@@ -507,6 +518,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sea_temp_lat = _get(CONF_SEA_TEMP_LAT, None)
         self.sea_temp_lon = _get(CONF_SEA_TEMP_LON, None)
         self._sea_temp_cache: dict[str, Any] | None = None
+
+        # v2.0: lightning sensor integration
+        self.lightning_enabled = bool(_get(CONF_ENABLE_LIGHTNING, DEFAULT_ENABLE_LIGHTNING))
+        self._lightning_proximity_km = float(_get(CONF_LIGHTNING_PROXIMITY_KM, DEFAULT_LIGHTNING_PROXIMITY_KM))
+        # Rolling 1h lightning strike count history [(ts, cumulative_count)]
+        self._lightning_count_history_1h: deque = deque()
+        self._lightning_last_count: float | None = None
+        self._lightning_last_strike_ts: Any = None  # timestamp of last detected increase
 
         # v2.0: degree days restored with improved implementation
         self.degree_days_enabled = bool(_get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS))
@@ -1746,6 +1765,45 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_ENERGY_TODAY_WHM2] = round(self._solar_energy_today_whm2, 0)
             data[KEY_PEAK_SUN_HOURS] = round(self._solar_energy_today_whm2 / 1000.0, 2)
 
+    def _compute_lightning(self, data: dict, now: Any) -> None:
+        """Derive lightning sensors from optional strike count + distance inputs.  (v2.0)"""
+        if not self.lightning_enabled:
+            return
+
+        count_raw = self._num(self.hass, self.sources.get(SRC_LIGHTNING_COUNT))
+        dist_raw = self._num(self.hass, self.sources.get(SRC_LIGHTNING_DISTANCE))
+
+        # Strike distance passthrough
+        if dist_raw is not None:
+            data[KEY_LIGHTNING_DISTANCE_KM] = round(float(dist_raw), 1)
+            prox_km = self._lightning_proximity_km
+            data[KEY_LIGHTNING_PROXIMITY] = "near" if float(dist_raw) <= prox_km else "clear"
+
+        # 1h rolling strike count (accumulates increases in cumulative counter)
+        if count_raw is not None:
+            if self._lightning_last_count is not None:
+                delta = float(count_raw) - float(self._lightning_last_count)
+                if delta > 0:
+                    self._lightning_last_strike_ts = now
+                    # Record each delta as (now, delta) in the 1h window
+                    self._append_and_prune_24h(self._lightning_count_history_1h, now, delta)
+            self._lightning_last_count = float(count_raw)
+
+            # Prune 1h window
+            cutoff_1h = now - timedelta(hours=1)
+            while self._lightning_count_history_1h and self._lightning_count_history_1h[0][0] < cutoff_1h:
+                self._lightning_count_history_1h.popleft()
+
+            count_1h = sum(v for _, v in self._lightning_count_history_1h)
+            data[KEY_LIGHTNING_COUNT_1H] = int(count_1h)
+            # Rate in strikes/min over the 1h window
+            data[KEY_LIGHTNING_RATE_1H] = round(count_1h / 60.0, 2)
+
+        # Clearance timer (minutes since last detected strike)
+        if self._lightning_last_strike_ts is not None:
+            elapsed_min = (now - self._lightning_last_strike_ts).total_seconds() / 60.0
+            data[KEY_LIGHTNING_CLEARANCE_MIN] = round(elapsed_min, 0)
+
     def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list) -> None:
         """Staleness, package status, data quality, configurable alerts."""
         stale = []
@@ -2526,6 +2584,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._compute_et0(data, now)
         self._compute_degree_days(data, now, tc, dew_c, rh)
+        self._compute_lightning(data, now)
         self._compute_health(data, now, missing, missing_entities)
 
         # v0.3.0: renamed _compute_fog_precip_type -> _compute_fog_and_thunderstorm

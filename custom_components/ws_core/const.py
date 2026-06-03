@@ -260,7 +260,7 @@ SRC_BATTERY = "battery"
 SRC_SOLAR_RADIATION = "solar_radiation"  # W/m², optional
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
-OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY, SRC_SOLAR_RADIATION]
+OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY, SRC_SOLAR_RADIATION, SRC_LIGHTNING_COUNT, SRC_LIGHTNING_DISTANCE]
 
 # Only these sources trigger staleness warnings. Excluded: rain_total (static
 # when dry), lux/uv (zero at night), dew_point, battery (slow-reporting).
@@ -610,6 +610,26 @@ KEY_FFWI = "ffwi"
 
 # Human comfort (comfort indices group)
 KEY_UTCI = "utci_c"
+
+# ---------------------------------------------------------------------------
+# v2.0 - Lightning sensor integration (new opt-in group)
+# ---------------------------------------------------------------------------
+
+CONF_ENABLE_LIGHTNING = "enable_lightning"
+SRC_LIGHTNING_COUNT = "lightning_count"     # cumulative strike count
+SRC_LIGHTNING_DISTANCE = "lightning_dist"   # nearest strike distance (km)
+
+DEFAULT_ENABLE_LIGHTNING = False
+DEFAULT_LIGHTNING_PROXIMITY_KM = 15.0       # threshold for proximity alert
+
+CONF_LIGHTNING_PROXIMITY_KM = "lightning_proximity_km"
+
+# Data keys
+KEY_LIGHTNING_COUNT_1H = "lightning_count_1h"
+KEY_LIGHTNING_DISTANCE_KM = "lightning_distance_km"
+KEY_LIGHTNING_RATE_1H = "lightning_rate_1h"        # strikes per minute (avg)
+KEY_LIGHTNING_CLEARANCE_MIN = "lightning_clearance_min"  # minutes since last strike
+KEY_LIGHTNING_PROXIMITY = "lightning_proximity"    # binary "near" / "clear"
 
 # Comfort indices group (opt-in via CONF_ENABLE_COMFORT_INDICES)
 KEY_AIR_DENSITY = "air_density_kg_m3"

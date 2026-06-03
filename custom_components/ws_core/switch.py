@@ -26,6 +26,7 @@ from .const import (
     CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DIAGNOSTICS,
+    CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
     CONF_ENABLE_FOG,
@@ -46,6 +47,7 @@ from .const import (
     DEFAULT_ENABLE_COMFORT_INDICES,
     DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_DIAGNOSTICS,
+    DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
     DEFAULT_ENABLE_FOG,
@@ -198,6 +200,12 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_DEGREE_DAYS,
         name="Feature: Degree Days & Leaf Wetness",
         icon="mdi:sprout",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_LIGHTNING,
+        default=DEFAULT_ENABLE_LIGHTNING,
+        name="Feature: Lightning Detection",
+        icon="mdi:lightning-bolt",
     ),
     # v1.8.4 (issue #20) — inverted: ON means notifications enabled (suppress=False)
     WSFeatureDesc(
