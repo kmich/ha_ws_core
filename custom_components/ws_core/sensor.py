@@ -27,8 +27,10 @@ from .const import (
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
+    CONF_ENABLE_OWM_STATIONS,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_WEATHERCLOUD,
+    CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
     # v1.6.2
     CONF_ENABLE_DIAGNOSTICS,
@@ -175,6 +177,11 @@ from .const import (
     KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
     KEY_AWEKAS_STATUS,
+    KEY_OWM_STATIONS_STATUS,
+    KEY_WINDY_STATUS,
+    KEY_NET_RADIATION,
+    KEY_SENSOR_SPIKE,
+    KEY_WIND_RUN_MONTH_KM,
     KEY_CWOP_STATUS_V2,
     KEY_DATA_QUALITY_SCORE,
     KEY_NEIGHBOR_QC,
@@ -437,6 +444,19 @@ SENSORS: list[WSSensorDescription] = [
             "all_clear": len(d.get(KEY_NEIGHBOR_QC) or []) == 0,
         },
     ),
+    # v2.0 — Temporal spike (σ-based step-change) detection
+    WSSensorDescription(
+        key=KEY_SENSOR_SPIKE,
+        translation_key="sensor_spike",
+        name="WS Sensor Spike Flags",
+        icon="mdi:pulse",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get(KEY_SENSOR_SPIKE) or []),
+        attrs_fn=lambda d: {
+            "flags": d.get(KEY_SENSOR_SPIKE) or [],
+            "all_clear": len(d.get(KEY_SENSOR_SPIKE) or []) == 0,
+        },
+    ),
     # v2.0 — Overall data quality score (0-100)
     WSSensorDescription(
         key=KEY_DATA_QUALITY_SCORE,
@@ -449,6 +469,7 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "quality_flags": len(d.get(KEY_SENSOR_QUALITY_FLAGS) or []),
             "stuck_flags": len(d.get(KEY_SENSOR_STUCK) or []),
+            "spike_flags": len(d.get(KEY_SENSOR_SPIKE) or []),
         },
     ),
     WSSensorDescription(
@@ -706,6 +727,15 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_WIND_RUN_KM,
         translation_key="wind_run",
         name="WS Wind Run",
+        icon="mdi:weather-windy",
+        native_unit="km",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    # v2.0 Wind Run (monthly km accumulator)
+    WSSensorDescription(
+        key=KEY_WIND_RUN_MONTH_KM,
+        translation_key="wind_run_month",
+        name="WS Wind Run This Month",
         icon="mdi:weather-windy",
         native_unit="km",
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -1511,6 +1541,22 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
         attrs_fn=lambda d: {"last_upload": d.get("_cwop_last_upload")},
     ),
+    WSSensorDescription(
+        key=KEY_OWM_STATIONS_STATUS,
+        translation_key="owm_stations_status",
+        name="WS OpenWeatherMap Status",
+        icon="mdi:cloud-upload",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_owm_stations_last_upload")},
+    ),
+    WSSensorDescription(
+        key=KEY_WINDY_STATUS,
+        translation_key="windy_status",
+        name="WS Windy Status",
+        icon="mdi:cloud-upload-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_windy_last_upload")},
+    ),
     # =========================================================================
     # v2.0 - Indoor sensor group (opt-in)
     # =========================================================================
@@ -1784,6 +1830,16 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # v2.0 — Net radiation (FAO-56), requires solar radiation sensor
+    WSSensorDescription(
+        key=KEY_NET_RADIATION,
+        translation_key="net_radiation",
+        name="WS Net Radiation",
+        icon="mdi:sun-thermometer",
+        native_unit="W/m²",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     # =========================================================================
     # v1.2.0 - NEW METEOROLOGICAL SENSORS
     # =========================================================================
@@ -2028,6 +2084,8 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_WOW_STATUS: CONF_ENABLE_WOW,
     KEY_AWEKAS_STATUS: CONF_ENABLE_AWEKAS,
     KEY_CWOP_STATUS_V2: CONF_ENABLE_CWOP,
+    KEY_OWM_STATIONS_STATUS: CONF_ENABLE_OWM_STATIONS,
+    KEY_WINDY_STATUS: CONF_ENABLE_WINDY,
     # v2.0 - indoor sensor group
     KEY_INDOOR_TEMP_C: CONF_ENABLE_INDOOR,
     KEY_INDOOR_HUMIDITY: CONF_ENABLE_INDOOR,
@@ -2039,6 +2097,7 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_SENSOR_STUCK: CONF_ENABLE_DIAGNOSTICS,
     KEY_DATA_QUALITY_SCORE: CONF_ENABLE_DIAGNOSTICS,
     KEY_NEIGHBOR_QC: CONF_ENABLE_DIAGNOSTICS,
+    KEY_SENSOR_SPIKE: CONF_ENABLE_DIAGNOSTICS,
     # v2.0 - degree days + leaf wetness (new opt-in group)
     KEY_HDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
     KEY_HDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
@@ -2052,6 +2111,8 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_MAX_SOLAR_RADIATION: CONF_ENABLE_COMFORT_INDICES,
     KEY_PEAK_SUN_HOURS: CONF_ENABLE_COMFORT_INDICES,
     KEY_IRRIGATION_DEFICIT: CONF_ENABLE_COMFORT_INDICES,
+    KEY_NET_RADIATION: CONF_ENABLE_COMFORT_INDICES,
+    KEY_WIND_RUN_MONTH_KM: CONF_ENABLE_COMFORT_INDICES,
     # v1.6.0 French regional
     KEY_VIGILANCE_MAX_LEVEL: CONF_ENABLE_VIGILANCE_METEO,
     KEY_FIRE_DANGER_VIGILANCE: CONF_ENABLE_VIGILANCE_METEO,
@@ -2351,6 +2412,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_WOW_STATUS: "wow_upload_status",
             KEY_AWEKAS_STATUS: "awekas_upload_status",
             KEY_CWOP_STATUS_V2: "cwop_upload_status",
+            KEY_OWM_STATIONS_STATUS: "owm_stations_upload_status",
+            KEY_WINDY_STATUS: "windy_upload_status",
             # v2.0 indoor sensors
             KEY_INDOOR_TEMP_C: "indoor_temperature",
             KEY_INDOOR_HUMIDITY: "indoor_humidity",
@@ -2362,6 +2425,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_SENSOR_STUCK: "sensor_stuck",
             KEY_DATA_QUALITY_SCORE: "data_quality_score",
             KEY_NEIGHBOR_QC: "neighbor_qc",
+            KEY_SENSOR_SPIKE: "sensor_spike",
+            # v2.0 finishing items
+            KEY_WIND_RUN_MONTH_KM: "wind_run_month",
+            KEY_NET_RADIATION: "net_radiation",
         }
         if key in overrides:
             return overrides[key]

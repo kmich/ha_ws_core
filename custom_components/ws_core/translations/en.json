@@ -127,6 +127,8 @@
           "enable_pwsweather": "PWSWeather upload",
           "enable_wow": "WOW (UK Met Office) upload",
           "enable_awekas": "AWEKAS upload",
+          "enable_owm_stations": "OpenWeatherMap Stations upload",
+          "enable_windy": "Windy.com upload",
           "enable_mqtt": "MQTT Discovery republishing (publish all derived sensors to MQTT broker for Node-RED / external consumers)"
         }
       },
@@ -167,6 +169,26 @@
           "awekas_username": "Username",
           "awekas_password": "Password",
           "awekas_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
+        }
+      },
+      "owm_stations": {
+        "title": "OpenWeatherMap Stations Upload",
+        "description": "{info}",
+        "data": {
+          "owm_stations_api_key": "API key",
+          "owm_stations_station_id": "Station ID",
+          "owm_stations_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
+        }
+      },
+      "windy": {
+        "title": "Windy.com Upload",
+        "description": "{info}",
+        "data": {
+          "windy_api_key": "API key",
+          "windy_station_id": "Station ID (optional)",
+          "windy_interval_min": "Upload interval",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -360,6 +382,8 @@
           "enable_pwsweather": "PWSWeather upload",
           "enable_wow": "WOW upload",
           "enable_awekas": "AWEKAS upload",
+          "enable_owm_stations": "OpenWeatherMap Stations upload",
+          "enable_windy": "Windy.com upload",
           "enable_mqtt": "MQTT Discovery republishing"
         },
         "data_description": {
@@ -1281,6 +1305,55 @@
           "last_upload": { "name": "Last successful upload" }
         }
       },
+      "cwop_status": {
+        "name": "CWOP Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last successful upload" }
+        }
+      },
+      "owm_stations_status": {
+        "name": "OpenWeatherMap Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_auth": "Authentication Error",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last successful upload" }
+        }
+      },
+      "windy_status": {
+        "name": "Windy Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_auth": "Authentication Error",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last successful upload" }
+        }
+      },
+      "wind_run_month": { "name": "Wind Run This Month" },
+      "net_radiation": { "name": "Net Radiation" },
+      "sensor_spike": {
+        "name": "Sensor Spike Flags",
+        "state_attributes": {
+          "flags": { "name": "Active flags" },
+          "all_clear": { "name": "All clear" }
+        }
+      },
       "indoor_temperature": {
         "name": "Indoor Temperature",
         "state_attributes": {
@@ -1336,89 +1409,6 @@
           "24h": "24 hours",
           "3d": "3 days"
         }
-      }
-    },
-    "switch": {
-      "ws_enable_animations": {
-        "name": "Dashboard: Animations"
-      },
-      "ws_enable_display_sensors": {
-        "name": "Feature: Display Sensors"
-      },
-      "ws_enable_fire_risk_score": {
-        "name": "Feature: Fire Risk Score"
-      },
-      "ws_enable_sea_temp": {
-        "name": "Feature: Sea Surface Temperature"
-      },
-      "ws_enable_wunderground": {
-        "name": "Feature: Weather Underground"
-      },
-      "ws_enable_air_quality": {
-        "name": "Feature: Air Quality Index"
-      },
-      "ws_enable_pollen": {
-        "name": "Feature: Pollen Levels"
-      },
-      "ws_enable_moon": {
-        "name": "Feature: Moon Phase"
-      },
-      "ws_enable_solar_forecast": {
-        "name": "Feature: Solar PV Forecast"
-      },
-      "ws_enable_fog": {
-        "name": "Feature: Fog Probability"
-      },
-      "ws_enable_thunderstorm_risk": {
-        "name": "Feature: Thunderstorm Risk"
-      },
-      "ws_enable_comfort_indices": {
-        "name": "Feature: Comfort Indices"
-      },
-      "ws_enable_vigilance_meteo": {
-        "name": "Feature: Meteo Vigilance"
-      },
-      "ws_enable_vigicrues": {
-        "name": "Feature: Vigicrues River Level"
-      },
-      "ws_enable_diagnostics": {
-        "name": "Feature: Station Diagnostics"
-      },
-      "ws_enable_fwi_components": {
-        "name": "Feature: FWI Components"
-      },
-      "ws_enable_advanced_sensors": {
-        "name": "Feature: Advanced Sensors"
-      },
-      "ws_enable_nowcast": {
-        "name": "Feature: Precipitation Nowcast"
-      },
-      "ws_suppress_notifications": {
-        "name": "Setting: Enable HA Notifications"
-      },
-      "ws_enable_degree_days": {
-        "name": "Feature: Degree Days & Leaf Wetness"
-      },
-      "ws_enable_lightning": {
-        "name": "Feature: Lightning Detection"
-      },
-      "ws_enable_indoor": {
-        "name": "Feature: Indoor Sensors"
-      },
-      "ws_enable_weathercloud": {
-        "name": "Feature: Weathercloud Upload"
-      },
-      "ws_enable_pwsweather": {
-        "name": "Feature: PWSWeather Upload"
-      },
-      "ws_enable_wow": {
-        "name": "Feature: WOW Upload"
-      },
-      "ws_enable_awekas": {
-        "name": "Feature: AWEKAS Upload"
-      },
-      "ws_enable_mqtt": {
-        "name": "Feature: MQTT Discovery"
       }
     },
     "number": {
@@ -1496,7 +1486,9 @@
       "ws_enable_wow": { "name": "Feature: WOW Upload" },
       "ws_enable_awekas": { "name": "Feature: AWEKAS Upload" },
       "ws_enable_mqtt": { "name": "Feature: MQTT Discovery" },
-      "ws_enable_cwop": { "name": "Feature: CWOP Upload" }
+      "ws_enable_cwop": { "name": "Feature: CWOP Upload" },
+      "ws_enable_owm_stations": { "name": "Feature: OpenWeatherMap Upload" },
+      "ws_enable_windy": { "name": "Feature: Windy Upload" }
     },
     "event": {
       "ws_rain_event": {

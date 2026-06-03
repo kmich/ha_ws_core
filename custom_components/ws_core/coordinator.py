@@ -69,6 +69,7 @@ from .algorithms import (
     ffdi_danger_level,
     calculate_leaf_wetness,
     calculate_max_solar_radiation,
+    calculate_net_radiation,
     calculate_utci,
     calculate_moon_illumination,
     calculate_rain_probability,
@@ -404,6 +405,25 @@ from .const import (
     KEY_PWS_STATUS,
     KEY_WC_STATUS,
     KEY_WOW_STATUS,
+    CONF_ENABLE_OWM_STATIONS,
+    CONF_OWM_STATIONS_API_KEY,
+    CONF_OWM_STATIONS_INTERVAL_MIN,
+    CONF_OWM_STATIONS_STATION_ID,
+    DEFAULT_ENABLE_OWM_STATIONS,
+    DEFAULT_OWM_STATIONS_INTERVAL_MIN,
+    KEY_OWM_STATIONS_STATUS,
+    CONF_ENABLE_WINDY,
+    CONF_WINDY_API_KEY,
+    CONF_WINDY_INTERVAL_MIN,
+    CONF_WINDY_STATION_ID,
+    DEFAULT_ENABLE_WINDY,
+    DEFAULT_WINDY_INTERVAL_MIN,
+    KEY_WINDY_STATUS,
+    KEY_NET_RADIATION,
+    KEY_SENSOR_SPIKE,
+    KEY_WIND_RUN_MONTH_KM,
+    SPIKE_MIN_SAMPLES,
+    SPIKE_SIGMA_THRESHOLD,
     KEY_DOMINANT_WIND_DIR,
     KEY_FFDI,
     KEY_FFWI,
@@ -608,6 +628,31 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.awekas_interval_min = int(_get(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN))
         self._awekas_last_upload: Any = None
         self._awekas_status: str = "disabled"
+
+        # v2.0: OpenWeatherMap Stations API upload
+        self.owm_stations_enabled = bool(_get(CONF_ENABLE_OWM_STATIONS, DEFAULT_ENABLE_OWM_STATIONS))
+        self.owm_stations_api_key: str = str(_get(CONF_OWM_STATIONS_API_KEY, "") or "")
+        self.owm_stations_station_id: str = str(_get(CONF_OWM_STATIONS_STATION_ID, "") or "")
+        self.owm_stations_interval_min = int(_get(CONF_OWM_STATIONS_INTERVAL_MIN, DEFAULT_OWM_STATIONS_INTERVAL_MIN))
+        self._owm_stations_last_upload: Any = None
+        self._owm_stations_status: str = "disabled"
+
+        # v2.0: Windy.com upload
+        self.windy_enabled = bool(_get(CONF_ENABLE_WINDY, DEFAULT_ENABLE_WINDY))
+        self.windy_api_key: str = str(_get(CONF_WINDY_API_KEY, "") or "")
+        self.windy_station_id: str = str(_get(CONF_WINDY_STATION_ID, "") or "")
+        self.windy_interval_min = int(_get(CONF_WINDY_INTERVAL_MIN, DEFAULT_WINDY_INTERVAL_MIN))
+        self._windy_last_upload: Any = None
+        self._windy_status: str = "disabled"
+
+        # v2.0: monthly wind run accumulator + spike-detection history
+        self._wind_run_month_km: float = 0.0
+        self._wind_run_month_key: str = ""
+        self._spike_history: dict[str, deque] = {
+            "temp": deque(maxlen=48),
+            "humidity": deque(maxlen=48),
+            "pressure": deque(maxlen=48),
+        }
 
         # v2.0: CWOP upload
         self.cwop_enabled = bool(_get(CONF_ENABLE_CWOP, DEFAULT_ENABLE_CWOP))
@@ -962,6 +1007,26 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self.hass,
                     lambda _now: self.hass.async_create_task(self._async_upload_awekas()),
                     timedelta(minutes=self.awekas_interval_min),
+                )
+            )
+
+        # v2.0: OpenWeatherMap Stations API upload
+        if self.owm_stations_enabled and self.owm_stations_api_key and self.owm_stations_station_id:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_owm_stations()),
+                    timedelta(minutes=self.owm_stations_interval_min),
+                )
+            )
+
+        # v2.0: Windy.com upload
+        if self.windy_enabled and self.windy_api_key:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_windy()),
+                    timedelta(minutes=self.windy_interval_min),
                 )
             )
 
@@ -1974,6 +2039,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_ENERGY_TODAY_WHM2] = round(self._solar_energy_today_whm2, 0)
             data[KEY_PEAK_SUN_HOURS] = round(self._solar_energy_today_whm2 / 1000.0, 2)
 
+            # v2.0 Net radiation (FAO-56) — needs temp + humidity
+            tc_now = data.get(KEY_NORM_TEMP_C)
+            rh_now = data.get(KEY_NORM_HUMIDITY)
+            if tc_now is not None and rh_now is not None:
+                data[KEY_NET_RADIATION] = calculate_net_radiation(
+                    float(solar_rad), float(tc_now), float(rh_now), max_solar_wm2=max_solar
+                )
+
     def _compute_indoor(self, data: dict) -> None:
         """Read and derive indoor sensor group.  (v2.0)"""
         if not self.indoor_enabled:
@@ -2118,6 +2191,29 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         data[KEY_SENSOR_STUCK] = stuck_flags
 
+        # Temporal spike detection: flag readings > Nσ from the rolling mean.
+        spike_flags: list[str] = []
+        for label, data_key in (
+            ("temp", KEY_NORM_TEMP_C),
+            ("humidity", KEY_NORM_HUMIDITY),
+            ("pressure", KEY_NORM_PRESSURE_HPA),
+        ):
+            curr = data.get(data_key)
+            hist = self._spike_history.get(label)
+            if curr is not None and hist is not None:
+                if len(hist) >= SPIKE_MIN_SAMPLES:
+                    mean = sum(hist) / len(hist)
+                    variance = sum((x - mean) ** 2 for x in hist) / len(hist)
+                    sigma = variance**0.5
+                    if sigma > 1e-6 and abs(float(curr) - mean) > SPIKE_SIGMA_THRESHOLD * sigma:
+                        spike_flags.append(
+                            f"{label}: {float(curr):.1f} is "
+                            f"{abs(float(curr) - mean) / sigma:.1f}σ from mean {mean:.1f}"
+                        )
+                # Append after the test so the current spike doesn't poison the window
+                hist.append(float(curr))
+        data[KEY_SENSOR_SPIKE] = spike_flags
+
         # Per-sensor stuck flags for binary sensors
         data["_temp_stuck"] = KEY_NORM_TEMP_C.replace("norm_temperature_c", "temperature") in stuck_flags or SRC_TEMP in stuck_flags
         data["_humidity_stuck"] = SRC_HUM in stuck_flags
@@ -2140,6 +2236,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         score -= min(20, len(existing_drift) * 10)    # drift
         neighbor_flags = data.get(KEY_NEIGHBOR_QC) or []
         score -= min(20, len(neighbor_flags) * 10)    # spatial neighbor QC
+        score -= min(15, len(spike_flags) * 8)         # temporal spikes
         if data.get(KEY_PACKAGE_STATUS) not in (None, "ok"):
             score -= 10
         data[KEY_DATA_QUALITY_SCORE] = max(0, min(100, score))
@@ -2749,6 +2846,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "rain_prev_day_date": self._rain_prev_day_date,
             "wind_run_km": self._wind_run_km,
             "wind_run_date": self._wind_run_date,
+            "wind_run_month_km": self._wind_run_month_km,
+            "wind_run_month_key": self._wind_run_month_key,
             "chill_hours_today": self._chill_hours_today,
             "chill_hours_today_date": self._chill_hours_today_date,
             "chill_hours_season": self._chill_hours_season,
@@ -2822,6 +2921,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if data.get("wind_run_date") == today:
             self._wind_run_km = float(data.get("wind_run_km") or 0.0)
             self._wind_run_date = today
+        # Monthly wind run: restore when still the same month
+        this_month = dt_util.now().strftime("%Y-%m")
+        if data.get("wind_run_month_key") == this_month:
+            self._wind_run_month_km = float(data.get("wind_run_month_km") or 0.0)
+            self._wind_run_month_key = this_month
         if data.get("chill_hours_today_date") == today:
             self._chill_hours_today = float(data.get("chill_hours_today") or 0.0)
             self._chill_hours_today_date = today
@@ -3068,6 +3172,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.cwop_enabled:
             data[KEY_CWOP_STATUS_V2] = self._cwop_status
             data["_cwop_last_upload"] = self._cwop_last_upload.isoformat() if self._cwop_last_upload else None
+        if self.owm_stations_enabled:
+            data[KEY_OWM_STATIONS_STATUS] = self._owm_stations_status
+            data["_owm_stations_last_upload"] = (
+                self._owm_stations_last_upload.isoformat() if self._owm_stations_last_upload else None
+            )
+        if self.windy_enabled:
+            data[KEY_WINDY_STATUS] = self._windy_status
+            data["_windy_last_upload"] = self._windy_last_upload.isoformat() if self._windy_last_upload else None
 
         # Air Quality (Open-Meteo Air Quality API)
         if self.aqi_enabled and self._aqi_cache:
@@ -3998,6 +4110,127 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.error("AWEKAS upload unexpected error: %s", exc)
 
     # ------------------------------------------------------------------
+    # v2.0 - OpenWeatherMap Stations API upload
+    # ------------------------------------------------------------------
+
+    async def _async_upload_owm_stations(self) -> None:
+        """Upload a measurement to the OpenWeatherMap Stations API (v3)."""
+        data = self.data
+        if not data or not self.owm_stations_api_key or not self.owm_stations_station_id:
+            return
+
+        now_utc = dt_util.utcnow()
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H)
+
+        # OWM Stations API expects a JSON array of measurement objects.
+        measurement: dict[str, Any] = {
+            "station_id": self.owm_stations_station_id,
+            "dt": int(now_utc.timestamp()),
+        }
+        if temp_c is not None:
+            measurement["temperature"] = round(float(temp_c), 1)
+        if humidity is not None:
+            measurement["humidity"] = int(float(humidity))
+        if press is not None:
+            measurement["pressure"] = round(float(press), 1)  # hPa
+        if wind_ms is not None:
+            measurement["wind_speed"] = round(float(wind_ms), 1)  # m/s
+        if gust_ms is not None:
+            measurement["wind_gust"] = round(float(gust_ms), 1)
+        if wind_dir is not None:
+            measurement["wind_deg"] = int(float(wind_dir))
+        if rain_1h is not None:
+            measurement["rain_1h"] = round(float(rain_1h), 1)
+
+        url = f"https://api.openweathermap.org/data/3.0/measurements?appid={self.owm_stations_api_key}"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.post(url, json=[measurement], timeout=15) as resp:
+                if resp.status in (200, 201, 204):
+                    self._owm_stations_last_upload = now_utc
+                    self._owm_stations_status = "ok"
+                elif resp.status in (401, 403):
+                    self._owm_stations_status = "error_auth"
+                    _LOGGER.warning("OWM Stations upload auth error HTTP %d", resp.status)
+                else:
+                    self._owm_stations_status = "error_http"
+                    _LOGGER.warning("OWM Stations upload HTTP %d", resp.status)
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            self._owm_stations_status = "error_network"
+            _LOGGER.warning("OWM Stations upload error: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            self._owm_stations_status = "error"
+            _LOGGER.error("OWM Stations upload unexpected error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # v2.0 - Windy.com upload (stations.windy.com)
+    # ------------------------------------------------------------------
+
+    async def _async_upload_windy(self) -> None:
+        """Upload an observation to Windy.com Stations API."""
+        data = self.data
+        if not data or not self.windy_api_key:
+            return
+
+        now_utc = dt_util.utcnow()
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        dew_c = data.get(KEY_DEW_POINT_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H)
+
+        obs: dict[str, Any] = {"dateutc": now_utc.strftime("%Y-%m-%d %H:%M:%S")}
+        try:
+            obs["station"] = int(self.windy_station_id) if self.windy_station_id else 0
+        except (TypeError, ValueError):
+            obs["station"] = 0
+        if temp_c is not None:
+            obs["temp"] = round(float(temp_c), 1)  # Windy accepts °C
+        if dew_c is not None:
+            obs["dewpoint"] = round(float(dew_c), 1)
+        if humidity is not None:
+            obs["rh"] = int(float(humidity))
+        if press is not None:
+            obs["pressure"] = round(float(press) * 100.0)  # Windy wants Pa
+        if wind_ms is not None:
+            obs["wind"] = round(float(wind_ms), 1)  # m/s
+        if gust_ms is not None:
+            obs["gust"] = round(float(gust_ms), 1)
+        if wind_dir is not None:
+            obs["winddir"] = int(float(wind_dir))
+        if rain_1h is not None:
+            obs["precip"] = round(float(rain_1h), 1)  # mm last hour
+
+        url = f"https://stations.windy.com/pws/update/{self.windy_api_key}"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.post(url, json={"observations": [obs]}, timeout=15) as resp:
+                if resp.status in (200, 201, 204):
+                    self._windy_last_upload = now_utc
+                    self._windy_status = "ok"
+                elif resp.status in (401, 403):
+                    self._windy_status = "error_auth"
+                    _LOGGER.warning("Windy upload auth error HTTP %d", resp.status)
+                else:
+                    self._windy_status = "error_http"
+                    _LOGGER.warning("Windy upload HTTP %d", resp.status)
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            self._windy_status = "error_network"
+            _LOGGER.warning("Windy upload error: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            self._windy_status = "error"
+            _LOGGER.error("Windy upload unexpected error: %s", exc)
+
+    # ------------------------------------------------------------------
     # CSV / JSON export  (v0.6.0)
     # ------------------------------------------------------------------
 
@@ -4015,14 +4248,23 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._wind_run_date = date_str
             self._wind_run_last_ts = None
 
+        # Monthly accumulator resets on the 1st of each month
+        month_key = local_now.strftime("%Y-%m")
+        if month_key != self._wind_run_month_key:
+            self._wind_run_month_km = 0.0
+            self._wind_run_month_key = month_key
+
         wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
         if wind_ms is not None and self._wind_run_last_ts is not None:
             dt_s = (now - self._wind_run_last_ts).total_seconds()
-            self._wind_run_km += float(wind_ms) * dt_s / 1000.0  # m/s * s → m → km
+            increment_km = float(wind_ms) * dt_s / 1000.0  # m/s * s → m → km
+            self._wind_run_km += increment_km
+            self._wind_run_month_km += increment_km
         if wind_ms is not None:
             self._wind_run_last_ts = now
 
         data[KEY_WIND_RUN_KM] = round(self._wind_run_km, 2)
+        data[KEY_WIND_RUN_MONTH_KM] = round(self._wind_run_month_km, 2)
 
     def _compute_chill_hours(self, data: dict, now: Any) -> None:
         """Accumulate chill hours today and season.

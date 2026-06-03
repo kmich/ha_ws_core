@@ -603,6 +603,7 @@ KEY_IRRIGATION_DEFICIT = "irrigation_deficit_mm"          # ET₀ - rain today
 # Wind statistics (always-on wind group)
 KEY_DOMINANT_WIND_DIR = "dominant_wind_direction_deg"
 KEY_WIND_DIR_VARIABILITY = "wind_direction_variability_deg"
+KEY_WIND_RUN_MONTH_KM = "wind_run_month_km"  # monthly wind run accumulator
 
 # Fire danger (fire risk group)
 KEY_FFDI = "ffdi"
@@ -610,6 +611,9 @@ KEY_FFWI = "ffwi"
 
 # Human comfort (comfort indices group)
 KEY_UTCI = "utci_c"
+
+# Net radiation (exposed; previously internal to Penman-Monteith ET₀)
+KEY_NET_RADIATION = "net_radiation_wm2"
 
 # ---------------------------------------------------------------------------
 # v2.0 - Lightning sensor integration (new opt-in group)
@@ -660,11 +664,29 @@ CONF_AWEKAS_INTERVAL_MIN = "awekas_interval_min"
 DEFAULT_ENABLE_AWEKAS = False
 DEFAULT_AWEKAS_INTERVAL_MIN = 15
 
+# OpenWeatherMap Stations API (measurement contribution endpoint)
+CONF_ENABLE_OWM_STATIONS = "enable_owm_stations"
+CONF_OWM_STATIONS_API_KEY = "owm_stations_api_key"
+CONF_OWM_STATIONS_STATION_ID = "owm_stations_station_id"  # OWM internal station id
+CONF_OWM_STATIONS_INTERVAL_MIN = "owm_stations_interval_min"
+DEFAULT_ENABLE_OWM_STATIONS = False
+DEFAULT_OWM_STATIONS_INTERVAL_MIN = 10
+
+# Windy.com (Windguru-compatible community upload via stations.windy.com)
+CONF_ENABLE_WINDY = "enable_windy"
+CONF_WINDY_API_KEY = "windy_api_key"
+CONF_WINDY_STATION_ID = "windy_station_id"  # integer station id from windy account
+CONF_WINDY_INTERVAL_MIN = "windy_interval_min"
+DEFAULT_ENABLE_WINDY = False
+DEFAULT_WINDY_INTERVAL_MIN = 10
+
 # Upload status data keys
 KEY_WC_STATUS = "wc_upload_status"
 KEY_PWS_STATUS = "pws_upload_status"
 KEY_WOW_STATUS = "wow_upload_status"
 KEY_AWEKAS_STATUS = "awekas_upload_status"
+KEY_OWM_STATIONS_STATUS = "owm_stations_upload_status"
+KEY_WINDY_STATUS = "windy_upload_status"
 
 # ---------------------------------------------------------------------------
 # v2.0 - Indoor sensor group
@@ -690,6 +712,11 @@ KEY_INDOOR_COMFORT = "indoor_comfort"    # composite score
 KEY_SENSOR_STUCK = "sensor_stuck_flags"      # list of stuck sensor names
 KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
 KEY_NEIGHBOR_QC = "neighbor_qc_flags"          # list of neighbor-comparison flags
+KEY_SENSOR_SPIKE = "sensor_spike_flags"        # list of σ-based step-change flags
+
+# Spike detection thresholds (sigma multiplier + minimum samples)
+SPIKE_SIGMA_THRESHOLD = 3.0     # flag a reading > 3σ from rolling mean
+SPIKE_MIN_SAMPLES = 12          # need at least this many samples to compute σ
 
 # ---------------------------------------------------------------------------
 # v2.0 - CWOP (Citizen Weather Observer Program) upload

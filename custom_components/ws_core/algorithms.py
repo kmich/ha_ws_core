@@ -2284,6 +2284,46 @@ def calculate_max_solar_radiation(lat_deg: float, day_of_year: int, elevation_m:
     return round(max(0.0, Rso * 1e6 / 86400.0), 1)
 
 
+def calculate_net_radiation(
+    solar_wm2: float,
+    temp_c: float,
+    humidity: float,
+    max_solar_wm2: float | None = None,
+    albedo: float = 0.23,
+) -> float:
+    """Instantaneous net radiation at the surface (W/m²), FAO-56 method.
+
+    Rn = Rns − Rnl
+      Rns = (1 − albedo) × Rs               (net shortwave)
+      Rnl = σ·T⁴·(0.34 − 0.14·√ea)·(1.35·Rs/Rso − 0.35)   (net longwave)
+
+    Albedo defaults to 0.23 (FAO reference grass). When clear-sky radiation
+    (Rso = max_solar_wm2) is unavailable or zero (night), the longwave
+    cloudiness term falls back to a clear-sky assumption.
+
+    Reference: Allen et al. (1998), FAO-56, Eqs. 38-40.
+    """
+    rns = (1.0 - albedo) * max(0.0, solar_wm2)
+
+    # Actual vapour pressure (kPa)
+    es = 0.6108 * math.exp(17.27 * temp_c / (temp_c + 237.3))
+    ea = es * max(0.0, min(100.0, humidity)) / 100.0
+
+    # Stefan-Boltzmann constant (W m⁻² K⁻⁴)
+    sigma = 5.670374419e-8
+    t_k = temp_c + 273.15
+
+    # Cloudiness factor from Rs/Rso ratio
+    if max_solar_wm2 and max_solar_wm2 > 1.0 and solar_wm2 > 1.0:
+        ratio = min(1.0, solar_wm2 / max_solar_wm2)
+        cloud_term = 1.35 * ratio - 0.35
+    else:
+        cloud_term = 1.0  # daytime clear-sky fallback / night
+
+    rnl = sigma * (t_k**4) * (0.34 - 0.14 * math.sqrt(max(0.0, ea))) * cloud_term
+    return round(rns - rnl, 1)
+
+
 def calculate_irrigation_deficit(et0_daily_mm: float, rain_today_mm: float) -> float:
     """Irrigation water deficit (mm): crop water need minus rainfall today.
 

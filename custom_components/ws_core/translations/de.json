@@ -112,6 +112,8 @@
           "enable_pwsweather": "PWSWeather Upload",
           "enable_wow": "WOW (UK Met Office) Upload",
           "enable_awekas": "AWEKAS Upload",
+          "enable_owm_stations": "OpenWeatherMap Stations Upload",
+          "enable_windy": "Windy.com Upload",
           "enable_mqtt": "MQTT Discovery (alle abgeleiteten Sensoren an MQTT-Broker für Node-RED / externe Verbraucher veröffentlichen)",
           "_go_back": "← Zurück zum vorherigen Schritt"
         }
@@ -302,6 +304,11 @@
       "wow_upload_status": { "name": "WOW Status" },
       "awekas_upload_status": { "name": "AWEKAS Status" },
       "cwop_status": { "name": "CWOP Status" },
+      "owm_stations_status": { "name": "OpenWeatherMap Status" },
+      "windy_status": { "name": "Windy Status" },
+      "wind_run_month": { "name": "Windlauf diesen Monat" },
+      "net_radiation": { "name": "Nettostrahlung" },
+      "sensor_spike": { "name": "Sensor-Ausreißer (Flags)" },
       "aqi": { "name": "Luftqualitätsindex" },
       "pm2_5": { "name": "PM2,5" },
       "pm10": { "name": "PM10" },
@@ -366,8 +373,6 @@
       "humidity_level": { "name": "Luftfeuchtigkeitsniveau" },
       "uv_level": { "name": "UV-Niveau" },
       "temperature_display": { "name": "Temperaturanzeige" },
-      "pressure_trend_raw": { "name": "Luftdrucktrend (roh)" },
-      "pressure_change_window": { "name": "Luftdruckänderung (Fenster)" },
       "lightning_count_1h": { "name": "Blitzanzahl (1 Std.)" },
       "lightning_distance": { "name": "Blitzabstand" },
       "lightning_rate": { "name": "Blitzrate" },
@@ -411,7 +416,9 @@
       "ws_enable_wow": { "name": "Funktion: WOW Upload" },
       "ws_enable_awekas": { "name": "Funktion: AWEKAS Upload" },
       "ws_enable_mqtt": { "name": "Funktion: MQTT Discovery" },
-      "ws_enable_cwop": { "name": "Funktion: CWOP Upload" }
+      "ws_enable_cwop": { "name": "Funktion: CWOP Upload" },
+      "ws_enable_owm_stations": { "name": "Funktion: OpenWeatherMap Upload" },
+      "ws_enable_windy": { "name": "Funktion: Windy Upload" }
     },
     "number": {
       "ws_thresh_wind_gust": { "name": "Warnung: Böenschwelle" },
