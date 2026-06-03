@@ -27,6 +27,7 @@ from .const import (
     CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DIAGNOSTICS,
+    CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_WEATHERCLOUD,
@@ -52,6 +53,7 @@ from .const import (
     DEFAULT_ENABLE_COMFORT_INDICES,
     DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_DIAGNOSTICS,
+    DEFAULT_ENABLE_INDOOR,
     DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_WEATHERCLOUD,
@@ -214,6 +216,12 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_LIGHTNING,
         name="Feature: Lightning Detection",
         icon="mdi:lightning-bolt",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_INDOOR,
+        default=DEFAULT_ENABLE_INDOOR,
+        name="Feature: Indoor Sensors",
+        icon="mdi:home-thermometer",
     ),
     # v2.0 upload targets
     WSFeatureDesc(

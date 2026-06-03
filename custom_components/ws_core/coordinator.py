@@ -343,6 +343,7 @@ from .const import (
     CONF_AWEKAS_PASSWORD,
     CONF_AWEKAS_USERNAME,
     CONF_ENABLE_AWEKAS,
+    CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_WEATHERCLOUD,
@@ -359,7 +360,19 @@ from .const import (
     CONF_WOW_SITE_ID,
     DEFAULT_AWEKAS_INTERVAL_MIN,
     DEFAULT_ENABLE_AWEKAS,
+    DEFAULT_ENABLE_INDOOR,
     DEFAULT_ENABLE_LIGHTNING,
+    KEY_DATA_QUALITY_SCORE,
+    KEY_INDOOR_CO2_PPM,
+    KEY_INDOOR_COMFORT,
+    KEY_INDOOR_HUMIDITY,
+    KEY_INDOOR_HUMIDITY_DELTA,
+    KEY_INDOOR_TEMP_C,
+    KEY_INDOOR_TEMP_DELTA,
+    KEY_SENSOR_STUCK,
+    SRC_INDOOR_CO2,
+    SRC_INDOOR_HUMIDITY,
+    SRC_INDOOR_TEMP,
     DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_WEATHERCLOUD,
     DEFAULT_ENABLE_WOW,
@@ -575,6 +588,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.awekas_interval_min = int(_get(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN))
         self._awekas_last_upload: Any = None
         self._awekas_status: str = "disabled"
+
+        # v2.0: indoor sensor group
+        self.indoor_enabled = bool(_get(CONF_ENABLE_INDOOR, DEFAULT_ENABLE_INDOOR))
+        # Previous indoor readings for stuck-value detection
+        self._indoor_temp_prev: float | None = None
+        self._indoor_hum_prev: float | None = None
 
         # v2.0: lightning sensor integration
         self.lightning_enabled = bool(_get(CONF_ENABLE_LIGHTNING, DEFAULT_ENABLE_LIGHTNING))
@@ -1862,6 +1881,97 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_ENERGY_TODAY_WHM2] = round(self._solar_energy_today_whm2, 0)
             data[KEY_PEAK_SUN_HOURS] = round(self._solar_energy_today_whm2 / 1000.0, 2)
 
+    def _compute_indoor(self, data: dict) -> None:
+        """Read and derive indoor sensor group.  (v2.0)"""
+        if not self.indoor_enabled:
+            return
+
+        indoor_temp_raw = self._num(self.hass, self.sources.get(SRC_INDOOR_TEMP))
+        indoor_hum_raw = self._num(self.hass, self.sources.get(SRC_INDOOR_HUMIDITY))
+        indoor_co2_raw = self._num(self.hass, self.sources.get(SRC_INDOOR_CO2))
+
+        if indoor_temp_raw is not None:
+            indoor_t_unit = self._uom(self.hass, self.sources.get(SRC_INDOOR_TEMP))
+            indoor_tc = round(self._to_celsius(float(indoor_temp_raw), indoor_t_unit), 2)
+            data[KEY_INDOOR_TEMP_C] = indoor_tc
+            outdoor_tc = data.get(KEY_NORM_TEMP_C)
+            if outdoor_tc is not None:
+                data[KEY_INDOOR_TEMP_DELTA] = round(float(indoor_tc) - float(outdoor_tc), 1)
+
+        if indoor_hum_raw is not None:
+            data[KEY_INDOOR_HUMIDITY] = round(float(indoor_hum_raw), 1)
+            outdoor_rh = data.get(KEY_NORM_HUMIDITY)
+            if outdoor_rh is not None:
+                data[KEY_INDOOR_HUMIDITY_DELTA] = round(float(indoor_hum_raw) - float(outdoor_rh), 1)
+
+        if indoor_co2_raw is not None:
+            data[KEY_INDOOR_CO2_PPM] = round(float(indoor_co2_raw))
+
+        # Composite indoor comfort: penalty for CO₂ > 1000, temp outside 18-24°C, RH outside 40-60%
+        score = 100
+        if indoor_co2_raw is not None:
+            co2 = float(indoor_co2_raw)
+            if co2 > 2000:
+                score -= 40
+            elif co2 > 1500:
+                score -= 25
+            elif co2 > 1000:
+                score -= 10
+        if indoor_temp_raw is not None:
+            indoor_tc_f = data.get(KEY_INDOOR_TEMP_C, 20.0)
+            if indoor_tc_f < 16 or indoor_tc_f > 28:
+                score -= 20
+            elif indoor_tc_f < 18 or indoor_tc_f > 26:
+                score -= 10
+        if indoor_hum_raw is not None:
+            rh_i = float(indoor_hum_raw)
+            if rh_i < 30 or rh_i > 70:
+                score -= 20
+            elif rh_i < 40 or rh_i > 60:
+                score -= 10
+        data[KEY_INDOOR_COMFORT] = max(0, min(100, score))
+
+    def _compute_data_quality_score(self, data: dict) -> None:
+        """Compute overall data quality score (0-100) and stuck-sensor flags.  (v2.0)"""
+        stuck_flags: list[str] = []
+
+        # Stuck-at detection: check if key sensors have the same value as the last cycle.
+        # We compare against saved '_prev' values in data (set each cycle).
+        for src_key, data_key, threshold in [
+            (SRC_TEMP, KEY_NORM_TEMP_C, 0.01),
+            (SRC_HUM, KEY_NORM_HUMIDITY, 0.1),
+            (SRC_PRESS, KEY_NORM_PRESSURE_HPA, 0.01),
+        ]:
+            curr = data.get(data_key)
+            prev_key = f"_prev_{data_key}"
+            prev = data.get(prev_key)
+            if curr is not None and prev is not None:
+                if abs(float(curr) - float(prev)) < threshold:
+                    # Also require that the sensor has been "stuck" for at least one prior cycle
+                    stuck_count_key = f"_stuck_count_{data_key}"
+                    stuck_count = data.get(stuck_count_key, 0) + 1
+                    data[stuck_count_key] = stuck_count
+                    if stuck_count >= 3:  # ≥3 consecutive identical readings
+                        stuck_flags.append(src_key)
+                else:
+                    data[f"_stuck_count_{data_key}"] = 0
+            # Always record current as next cycle's prev
+            if curr is not None:
+                data[f"_prev_{data_key}"] = curr
+
+        data[KEY_SENSOR_STUCK] = stuck_flags
+
+        # Score: start at 100, deduct for issues
+        score = 100
+        existing_flags = data.get(KEY_SENSOR_QUALITY_FLAGS) or []
+        score -= min(40, len(existing_flags) * 10)   # range/consistency flags
+        score -= min(30, len(stuck_flags) * 15)       # stuck sensors
+        existing_drift = data.get(KEY_SENSOR_DRIFT_FLAGS) or []
+        score -= min(20, len(existing_drift) * 10)    # drift
+        if data.get(KEY_PACKAGE_STATUS) not in (None, "ok"):
+            score -= 10
+        data[KEY_DATA_QUALITY_SCORE] = max(0, min(100, score))
+
     def _compute_lightning(self, data: dict, now: Any) -> None:
         """Derive lightning sensors from optional strike count + distance inputs.  (v2.0)"""
         if not self.lightning_enabled:
@@ -2682,6 +2792,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_et0(data, now)
         self._compute_degree_days(data, now, tc, dew_c, rh)
         self._compute_lightning(data, now)
+        self._compute_indoor(data)
+        self._compute_data_quality_score(data)
         self._compute_health(data, now, missing, missing_entities)
 
         # v0.3.0: renamed _compute_fog_precip_type -> _compute_fog_and_thunderstorm

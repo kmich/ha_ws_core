@@ -24,6 +24,7 @@ from .const import (
     # v2.0
     CONF_ENABLE_AWEKAS,
     CONF_ENABLE_DEGREE_DAYS,
+    CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_WEATHERCLOUD,
@@ -173,7 +174,15 @@ from .const import (
     KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
     KEY_AWEKAS_STATUS,
+    KEY_DATA_QUALITY_SCORE,
+    KEY_INDOOR_CO2_PPM,
+    KEY_INDOOR_COMFORT,
+    KEY_INDOOR_HUMIDITY,
+    KEY_INDOOR_HUMIDITY_DELTA,
+    KEY_INDOOR_TEMP_C,
+    KEY_INDOOR_TEMP_DELTA,
     KEY_LIGHTNING_CLEARANCE_MIN,
+    KEY_SENSOR_STUCK,
     KEY_LIGHTNING_COUNT_1H,
     KEY_LIGHTNING_DISTANCE_KM,
     KEY_LIGHTNING_PROXIMITY,
@@ -397,6 +406,33 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "flags": d.get(KEY_SENSOR_QUALITY_FLAGS) or [],
             "all_clear": len(d.get(KEY_SENSOR_QUALITY_FLAGS) or []) == 0,
+        },
+    ),
+    # v2.0 — Stuck-sensor flags (always computed; gated by diagnostics)
+    WSSensorDescription(
+        key=KEY_SENSOR_STUCK,
+        translation_key="sensor_stuck",
+        name="WS Sensor Stuck Flags",
+        icon="mdi:shield-lock-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get(KEY_SENSOR_STUCK) or []),
+        attrs_fn=lambda d: {
+            "stuck_sensors": d.get(KEY_SENSOR_STUCK) or [],
+            "all_clear": len(d.get(KEY_SENSOR_STUCK) or []) == 0,
+        },
+    ),
+    # v2.0 — Overall data quality score (0-100)
+    WSSensorDescription(
+        key=KEY_DATA_QUALITY_SCORE,
+        translation_key="data_quality_score",
+        name="WS Data Quality Score",
+        icon="mdi:star-check-outline",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "quality_flags": len(d.get(KEY_SENSOR_QUALITY_FLAGS) or []),
+            "stuck_flags": len(d.get(KEY_SENSOR_STUCK) or []),
         },
     ),
     WSSensorDescription(
@@ -1451,6 +1487,76 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
         attrs_fn=lambda d: {"last_upload": d.get("_awekas_last_upload")},
     ),
+    # =========================================================================
+    # v2.0 - Indoor sensor group (opt-in)
+    # =========================================================================
+    WSSensorDescription(
+        key=KEY_INDOOR_TEMP_C,
+        translation_key="indoor_temperature",
+        name="WS Indoor Temperature",
+        icon="mdi:home-thermometer",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "outdoor_temp_c": d.get(KEY_NORM_TEMP_C),
+            "delta_c": d.get(KEY_INDOOR_TEMP_DELTA),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_INDOOR_HUMIDITY,
+        translation_key="indoor_humidity",
+        name="WS Indoor Humidity",
+        icon="mdi:home-humidity",
+        device_class=SensorDeviceClass.HUMIDITY,
+        native_unit="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "outdoor_humidity_pct": d.get(KEY_NORM_HUMIDITY),
+            "delta_pct": d.get(KEY_INDOOR_HUMIDITY_DELTA),
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_INDOOR_CO2_PPM,
+        translation_key="indoor_co2",
+        name="WS Indoor CO₂",
+        icon="mdi:molecule-co2",
+        device_class=SensorDeviceClass.CO2,
+        native_unit="ppm",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_INDOOR_TEMP_DELTA,
+        translation_key="indoor_temp_delta",
+        name="WS Indoor/Outdoor Temp Delta",
+        icon="mdi:thermometer-lines",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_INDOOR_HUMIDITY_DELTA,
+        translation_key="indoor_humidity_delta",
+        name="WS Indoor/Outdoor Humidity Delta",
+        icon="mdi:water-percent-alert",
+        native_unit="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    WSSensorDescription(
+        key=KEY_INDOOR_COMFORT,
+        translation_key="indoor_comfort",
+        name="WS Indoor Comfort Score",
+        icon="mdi:home-heart",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "co2_ppm": d.get(KEY_INDOOR_CO2_PPM),
+            "temp_c": d.get(KEY_INDOOR_TEMP_C),
+            "humidity_pct": d.get(KEY_INDOOR_HUMIDITY),
+        },
+    ),
     # ---------------------------------------------------------------
     # Air Quality  (v0.7.0, Open-Meteo AQI API)
     # ---------------------------------------------------------------
@@ -1897,6 +2003,16 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_PWS_STATUS: CONF_ENABLE_PWSWEATHER,
     KEY_WOW_STATUS: CONF_ENABLE_WOW,
     KEY_AWEKAS_STATUS: CONF_ENABLE_AWEKAS,
+    # v2.0 - indoor sensor group
+    KEY_INDOOR_TEMP_C: CONF_ENABLE_INDOOR,
+    KEY_INDOOR_HUMIDITY: CONF_ENABLE_INDOOR,
+    KEY_INDOOR_CO2_PPM: CONF_ENABLE_INDOOR,
+    KEY_INDOOR_TEMP_DELTA: CONF_ENABLE_INDOOR,
+    KEY_INDOOR_HUMIDITY_DELTA: CONF_ENABLE_INDOOR,
+    KEY_INDOOR_COMFORT: CONF_ENABLE_INDOOR,
+    # v2.0 - data quality expansion (diagnostics group)
+    KEY_SENSOR_STUCK: CONF_ENABLE_DIAGNOSTICS,
+    KEY_DATA_QUALITY_SCORE: CONF_ENABLE_DIAGNOSTICS,
     # v2.0 - degree days + leaf wetness (new opt-in group)
     KEY_HDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
     KEY_HDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
@@ -2208,6 +2324,16 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_PWS_STATUS: "pws_upload_status",
             KEY_WOW_STATUS: "wow_upload_status",
             KEY_AWEKAS_STATUS: "awekas_upload_status",
+            # v2.0 indoor sensors
+            KEY_INDOOR_TEMP_C: "indoor_temperature",
+            KEY_INDOOR_HUMIDITY: "indoor_humidity",
+            KEY_INDOOR_CO2_PPM: "indoor_co2",
+            KEY_INDOOR_TEMP_DELTA: "indoor_temp_delta",
+            KEY_INDOOR_HUMIDITY_DELTA: "indoor_humidity_delta",
+            KEY_INDOOR_COMFORT: "indoor_comfort",
+            # v2.0 data quality
+            KEY_SENSOR_STUCK: "sensor_stuck",
+            KEY_DATA_QUALITY_SCORE: "data_quality_score",
         }
         if key in overrides:
             return overrides[key]

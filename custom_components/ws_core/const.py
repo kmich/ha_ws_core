@@ -260,7 +260,7 @@ SRC_BATTERY = "battery"
 SRC_SOLAR_RADIATION = "solar_radiation"  # W/m², optional
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
-OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY, SRC_SOLAR_RADIATION, SRC_LIGHTNING_COUNT, SRC_LIGHTNING_DISTANCE]
+OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY, SRC_SOLAR_RADIATION, SRC_LIGHTNING_COUNT, SRC_LIGHTNING_DISTANCE, SRC_INDOOR_TEMP, SRC_INDOOR_HUMIDITY, SRC_INDOOR_CO2]
 
 # Only these sources trigger staleness warnings. Excluded: rain_total (static
 # when dry), lux/uv (zero at night), dew_point, battery (slow-reporting).
@@ -665,6 +665,30 @@ KEY_WC_STATUS = "wc_upload_status"
 KEY_PWS_STATUS = "pws_upload_status"
 KEY_WOW_STATUS = "wow_upload_status"
 KEY_AWEKAS_STATUS = "awekas_upload_status"
+
+# ---------------------------------------------------------------------------
+# v2.0 - Indoor sensor group
+# ---------------------------------------------------------------------------
+
+CONF_ENABLE_INDOOR = "enable_indoor"
+SRC_INDOOR_TEMP = "indoor_temp"
+SRC_INDOOR_HUMIDITY = "indoor_humidity"
+SRC_INDOOR_CO2 = "indoor_co2"
+DEFAULT_ENABLE_INDOOR = False
+
+KEY_INDOOR_TEMP_C = "indoor_temp_c"
+KEY_INDOOR_HUMIDITY = "indoor_humidity_pct"
+KEY_INDOOR_CO2_PPM = "indoor_co2_ppm"
+KEY_INDOOR_TEMP_DELTA = "indoor_temp_delta_c"
+KEY_INDOOR_HUMIDITY_DELTA = "indoor_humidity_delta_pct"
+KEY_INDOOR_COMFORT = "indoor_comfort"    # composite score
+
+# ---------------------------------------------------------------------------
+# v2.0 - Data quality expansion
+# ---------------------------------------------------------------------------
+
+KEY_SENSOR_STUCK = "sensor_stuck_flags"      # list of stuck sensor names
+KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
 
 # Data keys
 KEY_LIGHTNING_COUNT_1H = "lightning_count_1h"

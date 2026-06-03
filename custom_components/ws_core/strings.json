@@ -116,7 +116,12 @@
           "enable_advanced_sensors": "Advanced/derived sensors (Zambretti number, ET₀ hourly, smoothed wind direction)",
           "enable_nowcast": "Precipitation nowcast (minutes until rain starts/stops, via Open-Meteo, no API key)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
-          "enable_lightning": "Lightning detection (accepts WH57, AS3935, or any lightning count + distance sensor)"
+          "enable_lightning": "Lightning detection (accepts WH57, AS3935, or any lightning count + distance sensor)",
+          "enable_indoor": "Indoor sensors (temperature, humidity, CO₂ differential)",
+          "enable_weathercloud": "Weathercloud upload",
+          "enable_pwsweather": "PWSWeather upload",
+          "enable_wow": "WOW (UK Met Office) upload",
+          "enable_awekas": "AWEKAS upload"
         }
       },
       "sea_temp": {
@@ -293,7 +298,12 @@
           "enable_advanced_sensors": "Advanced/derived sensors",
           "enable_nowcast": "Precipitation nowcast (minutes to rain)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
-          "enable_lightning": "Lightning detection sensors"
+          "enable_lightning": "Lightning detection sensors",
+          "enable_indoor": "Indoor sensors (temperature, humidity, CO₂)",
+          "enable_weathercloud": "Weathercloud upload",
+          "enable_pwsweather": "PWSWeather upload",
+          "enable_wow": "WOW (UK Met Office) upload",
+          "enable_awekas": "AWEKAS upload"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -1610,6 +1620,51 @@
         },
         "state_attributes": {
           "last_upload": { "name": "Last upload" }
+        }
+      },
+      "indoor_temperature": {
+        "name": "Indoor Temperature",
+        "state_attributes": {
+          "outdoor_temp_c": { "name": "Outdoor temperature" },
+          "delta_c": { "name": "Indoor/outdoor delta" }
+        }
+      },
+      "indoor_humidity": {
+        "name": "Indoor Humidity",
+        "state_attributes": {
+          "outdoor_humidity_pct": { "name": "Outdoor humidity" },
+          "delta_pct": { "name": "Indoor/outdoor delta" }
+        }
+      },
+      "indoor_co2": {
+        "name": "Indoor CO₂"
+      },
+      "indoor_temp_delta": {
+        "name": "Indoor/Outdoor Temperature Delta"
+      },
+      "indoor_humidity_delta": {
+        "name": "Indoor/Outdoor Humidity Delta"
+      },
+      "indoor_comfort": {
+        "name": "Indoor Comfort Score",
+        "state_attributes": {
+          "co2_ppm": { "name": "CO₂" },
+          "temp_c": { "name": "Temperature" },
+          "humidity_pct": { "name": "Humidity" }
+        }
+      },
+      "sensor_stuck": {
+        "name": "Sensor Stuck Flags",
+        "state_attributes": {
+          "stuck_sensors": { "name": "Stuck sensor names" },
+          "all_clear": { "name": "All clear" }
+        }
+      },
+      "data_quality_score": {
+        "name": "Data Quality Score",
+        "state_attributes": {
+          "quality_flags": { "name": "Active quality flags" },
+          "stuck_flags": { "name": "Stuck sensor count" }
         }
       }
     },
