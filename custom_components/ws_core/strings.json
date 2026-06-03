@@ -121,7 +121,8 @@
           "enable_weathercloud": "Weathercloud upload",
           "enable_pwsweather": "PWSWeather upload",
           "enable_wow": "WOW (UK Met Office) upload",
-          "enable_awekas": "AWEKAS upload"
+          "enable_awekas": "AWEKAS upload",
+          "enable_mqtt": "MQTT Discovery republishing (publish all derived sensors to MQTT broker for Node-RED / external consumers)"
         }
       },
       "sea_temp": {
@@ -303,7 +304,8 @@
           "enable_weathercloud": "Weathercloud upload",
           "enable_pwsweather": "PWSWeather upload",
           "enable_wow": "WOW (UK Met Office) upload",
-          "enable_awekas": "AWEKAS upload"
+          "enable_awekas": "AWEKAS upload",
+          "enable_mqtt": "MQTT Discovery republishing"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -1735,6 +1737,30 @@
       },
       "ws_suppress_notifications": {
         "name": "Setting: Enable HA Notifications"
+      },
+      "ws_enable_degree_days": {
+        "name": "Feature: Degree Days & Leaf Wetness"
+      },
+      "ws_enable_lightning": {
+        "name": "Feature: Lightning Detection"
+      },
+      "ws_enable_indoor": {
+        "name": "Feature: Indoor Sensors"
+      },
+      "ws_enable_weathercloud": {
+        "name": "Feature: Weathercloud Upload"
+      },
+      "ws_enable_pwsweather": {
+        "name": "Feature: PWSWeather Upload"
+      },
+      "ws_enable_wow": {
+        "name": "Feature: WOW Upload"
+      },
+      "ws_enable_awekas": {
+        "name": "Feature: AWEKAS Upload"
+      },
+      "ws_enable_mqtt": {
+        "name": "Feature: MQTT Discovery"
       }
     },
     "number": {

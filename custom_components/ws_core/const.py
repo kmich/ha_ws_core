@@ -690,6 +690,20 @@ KEY_INDOOR_COMFORT = "indoor_comfort"    # composite score
 KEY_SENSOR_STUCK = "sensor_stuck_flags"      # list of stuck sensor names
 KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
 
+# ---------------------------------------------------------------------------
+# v2.0 - MQTT Discovery republishing
+# ---------------------------------------------------------------------------
+
+CONF_ENABLE_MQTT = "enable_mqtt"
+CONF_MQTT_DISCOVERY_PREFIX = "mqtt_discovery_prefix"
+CONF_MQTT_STATE_PREFIX = "mqtt_state_prefix"
+CONF_MQTT_INTERVAL_MIN = "mqtt_interval_min"
+
+DEFAULT_ENABLE_MQTT = False
+DEFAULT_MQTT_DISCOVERY_PREFIX = "homeassistant"
+DEFAULT_MQTT_STATE_PREFIX = "ws_core"
+DEFAULT_MQTT_INTERVAL_MIN = 1
+
 # Data keys
 KEY_LIGHTNING_COUNT_1H = "lightning_count_1h"
 KEY_LIGHTNING_DISTANCE_KM = "lightning_distance_km"

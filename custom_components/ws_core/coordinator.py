@@ -345,6 +345,10 @@ from .const import (
     CONF_ENABLE_AWEKAS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
+    CONF_ENABLE_MQTT,
+    CONF_MQTT_DISCOVERY_PREFIX,
+    CONF_MQTT_INTERVAL_MIN,
+    CONF_MQTT_STATE_PREFIX,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_WEATHERCLOUD,
     CONF_ENABLE_WOW,
@@ -362,6 +366,10 @@ from .const import (
     DEFAULT_ENABLE_AWEKAS,
     DEFAULT_ENABLE_INDOOR,
     DEFAULT_ENABLE_LIGHTNING,
+    DEFAULT_ENABLE_MQTT,
+    DEFAULT_MQTT_DISCOVERY_PREFIX,
+    DEFAULT_MQTT_INTERVAL_MIN,
+    DEFAULT_MQTT_STATE_PREFIX,
     KEY_DATA_QUALITY_SCORE,
     KEY_INDOOR_CO2_PPM,
     KEY_INDOOR_COMFORT,
@@ -588,6 +596,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.awekas_interval_min = int(_get(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN))
         self._awekas_last_upload: Any = None
         self._awekas_status: str = "disabled"
+
+        # v2.0: MQTT Discovery republishing
+        self.mqtt_enabled = bool(_get(CONF_ENABLE_MQTT, DEFAULT_ENABLE_MQTT))
+        self._mqtt_discovery_prefix: str = str(_get(CONF_MQTT_DISCOVERY_PREFIX, DEFAULT_MQTT_DISCOVERY_PREFIX))
+        self._mqtt_state_prefix: str = str(_get(CONF_MQTT_STATE_PREFIX, DEFAULT_MQTT_STATE_PREFIX))
+        self._mqtt_interval_min = int(_get(CONF_MQTT_INTERVAL_MIN, DEFAULT_MQTT_INTERVAL_MIN))
+        self._mqtt_discovery_published: bool = False
 
         # v2.0: indoor sensor group
         self.indoor_enabled = bool(_get(CONF_ENABLE_INDOOR, DEFAULT_ENABLE_INDOOR))
@@ -1027,6 +1042,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             self.hass.async_create_task(_deferred_nowcast())
 
+        # v2.0: MQTT Discovery periodic state publishing
+        if self.mqtt_enabled:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_mqtt_publish()),
+                    timedelta(minutes=self._mqtt_interval_min),
+                )
+            )
+
+            async def _deferred_mqtt_discovery():
+                await asyncio.sleep(15)
+                try:
+                    await self._async_mqtt_discovery()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("ws_core: MQTT discovery publish failed: %s", err)
+
+            self.hass.async_create_task(_deferred_mqtt_discovery())
+
         # Defer first refresh by 5s so config entry creation completes before any network calls.
         async def _deferred_refresh():
             await asyncio.sleep(5)
@@ -1052,6 +1086,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._history_store is not None:
             with contextlib.suppress(Exception):
                 await self._history_store.async_save(self._dump_history_state())
+        # v2.0: remove MQTT Discovery entries on clean shutdown
+        if self.mqtt_enabled and self._mqtt_discovery_published:
+            from .mqtt_publisher import async_unpublish_discovery
+            with contextlib.suppress(Exception):
+                await async_unpublish_discovery(
+                    self.hass,
+                    self._mqtt_discovery_prefix,
+                    self.entry_options.get("prefix", "ws"),
+                )
 
     @callback
     def _handle_source_change(self, event) -> None:
@@ -3370,6 +3413,45 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as exc:
             self._wu_status = "error"
             _LOGGER.error("WUnderground upload unexpected error: %s", exc, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # v2.0 - MQTT Discovery republishing
+    # ------------------------------------------------------------------
+
+    async def _async_mqtt_discovery(self) -> None:
+        """Publish MQTT Discovery payloads (called once on startup + after reconnect)."""
+        from .mqtt_publisher import async_publish_discovery
+
+        entity_prefix = self.entry_options.get("prefix") or self.entry_data.get("prefix") or "ws"
+        station_name = self.entry_data.get("name") or "Weather Station"
+        await async_publish_discovery(
+            self.hass,
+            discovery_prefix=self._mqtt_discovery_prefix,
+            state_prefix=self._mqtt_state_prefix,
+            entity_prefix=entity_prefix,
+            station_name=station_name,
+            integration_version=_INTEGRATION_VERSION,
+        )
+        self._mqtt_discovery_published = True
+
+    async def _async_mqtt_publish(self) -> None:
+        """Publish current sensor states to MQTT state topics."""
+        if not self.data:
+            return
+        from .mqtt_publisher import async_publish_states
+
+        entity_prefix = self.entry_options.get("prefix") or self.entry_data.get("prefix") or "ws"
+
+        # Ensure discovery was published at least once
+        if not self._mqtt_discovery_published:
+            await self._async_mqtt_discovery()
+
+        await async_publish_states(
+            self.hass,
+            state_prefix=self._mqtt_state_prefix,
+            entity_prefix=entity_prefix,
+            coordinator_data=self.data,
+        )
 
     # ------------------------------------------------------------------
     # v2.0 - Weathercloud upload

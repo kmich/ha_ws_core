@@ -29,6 +29,7 @@ from .const import (
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
+    CONF_ENABLE_MQTT,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_WEATHERCLOUD,
     CONF_ENABLE_WOW,
@@ -55,6 +56,7 @@ from .const import (
     DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_INDOOR,
     DEFAULT_ENABLE_LIGHTNING,
+    DEFAULT_ENABLE_MQTT,
     DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_WEATHERCLOUD,
     DEFAULT_ENABLE_WOW,
@@ -247,6 +249,12 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_AWEKAS,
         name="Feature: AWEKAS Upload",
         icon="mdi:cloud-upload-outline",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_MQTT,
+        default=DEFAULT_ENABLE_MQTT,
+        name="Feature: MQTT Discovery",
+        icon="mdi:transit-connection-variant",
     ),
     # v1.8.4 (issue #20) — inverted: ON means notifications enabled (suppress=False)
     WSFeatureDesc(
