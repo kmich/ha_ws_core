@@ -1,0 +1,133 @@
+##############################################################################
+# Weather Station Core – Mobile Dashboard  (v2.0)
+#
+# A single-column, touch-optimised layout for phones. Large tiles, minimal
+# horizontal scrolling, and the most-glanced values first.
+#
+# Installation:
+#   1. Settings → Dashboards → Add Dashboard → "New dashboard from scratch"
+#   2. Three-dot menu → "Edit Dashboard" → three-dot menu → "Raw configuration
+#      editor" → paste this file.
+#   3. Replace the prefix "ws" with your entity prefix if different.
+#
+# Required HACS cards: mushroom, mini-graph-card
+##############################################################################
+
+title: Weather (Mobile)
+views:
+  - title: Home
+    icon: mdi:cellphone
+    path: home
+    type: sections
+    max_columns: 1
+    sections:
+
+      # ── Headline ────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: custom:mushroom-weather-card
+            entity: weather.ws
+            show_current: true
+            show_forecast: false
+
+          - type: custom:mushroom-template-card
+            primary: "{{ states('sensor.ws_temperature') }}°C — feels {{ states('sensor.ws_feels_like') }}°C"
+            secondary: "{{ states('sensor.ws_current_condition') }}"
+            icon: mdi:thermometer
+            icon_color: >
+              {% set t = states('sensor.ws_temperature') | float(0) %}
+              {% if t <= 0 %}blue{% elif t <= 10 %}cyan{% elif t <= 20 %}green
+              {% elif t <= 30 %}orange{% else %}red{% endif %}
+            multiline_secondary: true
+
+      # ── Core conditions (2-up chips fit phone width) ─────────────
+      - type: grid
+        columns: 2
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_humidity
+            name: Humidity
+            icon: mdi:water-percent
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_sea_level_pressure
+            name: Pressure
+            icon: mdi:gauge
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_wind_speed
+            name: Wind
+            icon: mdi:weather-windy
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_wind_gust
+            name: Gust
+            icon: mdi:weather-windy-variant
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_rain_today
+            name: Rain Today
+            icon: mdi:weather-rainy
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_uv_index
+            name: UV
+            icon: mdi:sun-wireless
+
+      # ── Will it rain? ────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: custom:mushroom-template-card
+            primary: "Rain probability: {{ states('sensor.ws_rain_probability_combined') }}%"
+            secondary: "{{ states('sensor.ws_zambretti_forecast') }}"
+            icon: mdi:weather-rainy
+            icon_color: blue
+            multiline_secondary: true
+
+      # ── 24h temperature trend ────────────────────────────────────
+      - type: grid
+        cards:
+          - type: custom:mini-graph-card
+            name: Temperature (24h)
+            entities:
+              - entity: sensor.ws_temperature
+                name: Temp
+              - entity: sensor.ws_feels_like
+                name: Feels
+                show_line: true
+                show_points: false
+            hours_to_show: 24
+            points_per_hour: 2
+            line_width: 2
+            show:
+              labels: true
+              extrema: true
+
+      # ── 24h pressure trend ───────────────────────────────────────
+      - type: grid
+        cards:
+          - type: custom:mini-graph-card
+            name: Pressure (24h)
+            entities:
+              - entity: sensor.ws_sea_level_pressure
+            hours_to_show: 24
+            points_per_hour: 2
+            line_width: 2
+            show:
+              labels: true
+              extrema: true
+
+      # ── Forecast ─────────────────────────────────────────────────
+      - type: grid
+        cards:
+          - type: weather-forecast
+            entity: weather.ws
+            forecast_type: daily
+
+      # ── Station health ───────────────────────────────────────────
+      - type: grid
+        columns: 2
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.ws_station_health
+            name: Health
+            icon: mdi:heart-pulse
+          - type: custom:mushroom-entity-card
+            entity: sensor.ws_data_quality_score
+            name: Quality
+            icon: mdi:star-check-outline

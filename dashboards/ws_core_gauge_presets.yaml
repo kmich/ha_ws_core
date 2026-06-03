@@ -1,0 +1,185 @@
+##############################################################################
+# Weather Station Core – Gauge Card Presets  (v2.0)
+#
+# Drop-in gauge cards with sensible severity bands for the most common
+# Weather Station Core sensors. Copy the cards you want into any dashboard
+# view. Replace the prefix "ws" with your entity prefix if different.
+#
+# Uses the built-in `gauge` card (no HACS required). Optional `apexcharts-card`
+# radial alternatives are noted in comments where they look nicer.
+##############################################################################
+
+# ─────────────────────────────────────────────────────────────────────────
+# A grid you can paste wholesale, or pick individual cards out of.
+# ─────────────────────────────────────────────────────────────────────────
+type: grid
+columns: 3
+square: false
+cards:
+
+  # Temperature (-20…45 °C)
+  - type: gauge
+    entity: sensor.ws_temperature
+    name: Temperature
+    unit: "°C"
+    min: -20
+    max: 45
+    needle: true
+    severity:
+      green: 10
+      yellow: 28
+      red: 35
+
+  # Humidity (0…100 %) — comfort band 40-60
+  - type: gauge
+    entity: sensor.ws_humidity
+    name: Humidity
+    unit: "%"
+    min: 0
+    max: 100
+    needle: true
+    severity:
+      red: 0
+      green: 40
+      yellow: 70
+
+  # Sea-level pressure (960…1050 hPa)
+  - type: gauge
+    entity: sensor.ws_sea_level_pressure
+    name: Pressure
+    unit: hPa
+    min: 960
+    max: 1050
+    needle: true
+    severity:
+      red: 960
+      yellow: 1000
+      green: 1013
+
+  # Wind speed (0…30 m/s) — Beaufort-ish bands
+  - type: gauge
+    entity: sensor.ws_wind_speed
+    name: Wind
+    unit: m/s
+    min: 0
+    max: 30
+    needle: true
+    severity:
+      green: 0
+      yellow: 11
+      red: 17
+
+  # Wind gust (0…40 m/s)
+  - type: gauge
+    entity: sensor.ws_wind_gust
+    name: Gust
+    unit: m/s
+    min: 0
+    max: 40
+    needle: true
+    severity:
+      green: 0
+      yellow: 14
+      red: 21
+
+  # UV index (0…12)
+  - type: gauge
+    entity: sensor.ws_uv_index
+    name: UV Index
+    min: 0
+    max: 12
+    needle: true
+    severity:
+      green: 0
+      yellow: 6
+      red: 8
+
+  # Rain rate (0…30 mm/h)
+  - type: gauge
+    entity: sensor.ws_rain_rate
+    name: Rain Rate
+    unit: mm/h
+    min: 0
+    max: 30
+    needle: true
+    severity:
+      green: 0
+      yellow: 4
+      red: 8
+
+  # Rain probability (0…100 %)
+  - type: gauge
+    entity: sensor.ws_rain_probability_combined
+    name: Rain Prob.
+    unit: "%"
+    min: 0
+    max: 100
+    needle: true
+    severity:
+      green: 0
+      yellow: 40
+      red: 70
+
+  # Data quality score (0…100) — higher is better, so invert the bands
+  - type: gauge
+    entity: sensor.ws_data_quality_score
+    name: Data Quality
+    min: 0
+    max: 100
+    needle: true
+    severity:
+      red: 0
+      yellow: 60
+      green: 85
+
+  # Air Quality Index (0…300) — only if enable_air_quality
+  - type: gauge
+    entity: sensor.ws_air_quality_index
+    name: AQI
+    min: 0
+    max: 300
+    needle: true
+    severity:
+      green: 0
+      yellow: 51
+      red: 101
+
+  # Fire Risk Score (0…10) — only if enable_fire_risk_score
+  - type: gauge
+    entity: sensor.ws_fire_risk_score
+    name: Fire Risk
+    min: 0
+    max: 10
+    needle: true
+    severity:
+      green: 0
+      yellow: 4
+      red: 7
+
+  # WBGT heat stress (0…40 °C) — only if enable_comfort_indices
+  - type: gauge
+    entity: sensor.ws_wbgt
+    name: WBGT
+    unit: "°C"
+    min: 0
+    max: 40
+    needle: true
+    severity:
+      green: 0
+      yellow: 28
+      red: 32
+
+##############################################################################
+# Optional: apexcharts-card radial gauge (nicer animation) — example for UV.
+# Requires the apexcharts-card HACS frontend card.
+#
+# - type: custom:apexcharts-card
+#   header:
+#     show: true
+#     title: UV Index
+#   chart_type: radialBar
+#   series:
+#     - entity: sensor.ws_uv_index
+#       min: 0
+#       max: 12
+##############################################################################
