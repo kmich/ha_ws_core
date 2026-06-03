@@ -309,6 +309,7 @@
       "wind_run_month": { "name": "Windlauf diesen Monat" },
       "net_radiation": { "name": "Nettostrahlung" },
       "sensor_spike": { "name": "Sensor-Ausreißer (Flags)" },
+      "neighbor_qc": { "name": "Nachbar-QC-Flags" },
       "aqi": { "name": "Luftqualitätsindex" },
       "pm2_5": { "name": "PM2,5" },
       "pm10": { "name": "PM10" },

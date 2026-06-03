@@ -1067,21 +1067,7 @@
         }
       },
       "sea_surface_temperature": {
-        "name": "Température de l'eau",
-        "state_attributes": {
-          "comfort": {
-            "name": "Niveau de confort"
-          },
-          "hourly_forecast": {
-            "name": "Prévision horaire"
-          },
-          "grid_latitude": {
-            "name": "Latitude grille"
-          },
-          "grid_longitude": {
-            "name": "Longitude grille"
-          }
-        }
+        "name": "Température de surface de la mer"
       },
       "et0_daily": {
         "name": "ET₀ - Besoin en eau (jour)",
@@ -1418,6 +1404,164 @@
       },
       "ozone": {
         "name": "Ozone"
+      },
+      "cloud_base": {
+        "name": "Base des nuages"
+      },
+      "freezing_level": {
+        "name": "Niveau de congélation"
+      },
+      "wind_gust_factor": {
+        "name": "Facteur de rafale"
+      },
+      "air_density": {
+        "name": "Densité de l'air"
+      },
+      "specific_humidity": {
+        "name": "Humidité spécifique"
+      },
+      "wbgt": {
+        "name": "WBGT"
+      },
+      "utci": {
+        "name": "UTCI"
+      },
+      "wind_run_month": {
+        "name": "Parcours du vent ce mois"
+      },
+      "net_radiation": {
+        "name": "Rayonnement net"
+      },
+      "hdd_today": {
+        "name": "Degré-jour de chauffage"
+      },
+      "hdd_season": {
+        "name": "Degrés-jour de chauffage saison"
+      },
+      "cdd_today": {
+        "name": "Degré-jour de climatisation"
+      },
+      "cdd_season": {
+        "name": "Degrés-jour de climatisation saison"
+      },
+      "gdd_today": {
+        "name": "Degré-jour de croissance"
+      },
+      "gdd_season": {
+        "name": "Degrés-jour de croissance saison"
+      },
+      "leaf_wetness": {
+        "name": "Humidité foliaire",
+        "state": {
+          "wet": "Humide",
+          "dry": "Sec"
+        }
+      },
+      "dominant_wind_direction": {
+        "name": "Direction dominante du vent"
+      },
+      "wind_direction_variability": {
+        "name": "Variabilité de direction du vent"
+      },
+      "solar_energy_today": {
+        "name": "Énergie solaire aujourd'hui"
+      },
+      "max_solar_radiation": {
+        "name": "Rayonnement solaire max (ciel clair)"
+      },
+      "peak_sun_hours": {
+        "name": "Heures de soleil de pointe"
+      },
+      "irrigation_deficit": {
+        "name": "Déficit d'irrigation"
+      },
+      "ffdi": {
+        "name": "Indice de danger d'incendie de forêt (FFDI)"
+      },
+      "ffwi": {
+        "name": "Indice météo d'incendie (Fosberg)"
+      },
+      "wc_upload_status": {
+        "name": "État Weathercloud"
+      },
+      "pws_upload_status": {
+        "name": "État PWSWeather"
+      },
+      "wow_upload_status": {
+        "name": "État WOW"
+      },
+      "awekas_upload_status": {
+        "name": "État AWEKAS"
+      },
+      "cwop_status": {
+        "name": "État CWOP"
+      },
+      "owm_stations_status": {
+        "name": "État OpenWeatherMap"
+      },
+      "windy_status": {
+        "name": "État Windy"
+      },
+      "sensor_spike": {
+        "name": "Indicateurs de pic de capteur"
+      },
+      "sensor_stuck": {
+        "name": "Capteur bloqué (indicateurs)"
+      },
+      "data_quality_score": {
+        "name": "Score de qualité des données"
+      },
+      "neighbor_qc": {
+        "name": "Indicateurs CQ voisins"
+      },
+      "rain_this_week": {
+        "name": "Pluie cette semaine"
+      },
+      "rain_this_month": {
+        "name": "Pluie ce mois"
+      },
+      "rain_this_year": {
+        "name": "Pluie cette année"
+      },
+      "rain_rate_max_24h": {
+        "name": "Intensité de pluie max (24 h)"
+      },
+      "lightning_count_1h": {
+        "name": "Foudre (1 h)"
+      },
+      "lightning_distance": {
+        "name": "Distance de la foudre"
+      },
+      "lightning_rate": {
+        "name": "Fréquence de foudre"
+      },
+      "lightning_clearance": {
+        "name": "Délai de sécurité foudre"
+      },
+      "lightning_proximity": {
+        "name": "Proximité de la foudre",
+        "state": {
+          "near": "Proche",
+          "clear": "Dégagé"
+        }
+      },
+      "indoor_temperature": {
+        "name": "Température intérieure"
+      },
+      "indoor_humidity": {
+        "name": "Humidité intérieure"
+      },
+      "indoor_co2": {
+        "name": "CO₂ intérieur"
+      },
+      "indoor_temp_delta": {
+        "name": "Écart de température intérieur/extérieur"
+      },
+      "indoor_humidity_delta": {
+        "name": "Écart d'humidité intérieur/extérieur"
+      },
+      "indoor_comfort": {
+        "name": "Score de confort intérieur"
       }
     },
     "select": {
@@ -1487,6 +1631,39 @@
       },
       "ws_suppress_notifications": {
         "name": "Activer les notifications système"
+      },
+      "ws_enable_degree_days": {
+        "name": "Fonction : Degrés-jour et humidité foliaire"
+      },
+      "ws_enable_lightning": {
+        "name": "Fonction : Détection de foudre"
+      },
+      "ws_enable_indoor": {
+        "name": "Fonction : Capteurs intérieurs"
+      },
+      "ws_enable_weathercloud": {
+        "name": "Fonction : Envoi Weathercloud"
+      },
+      "ws_enable_pwsweather": {
+        "name": "Fonction : Envoi PWSWeather"
+      },
+      "ws_enable_wow": {
+        "name": "Fonction : Envoi WOW"
+      },
+      "ws_enable_awekas": {
+        "name": "Fonction : Envoi AWEKAS"
+      },
+      "ws_enable_cwop": {
+        "name": "Fonction : Envoi CWOP"
+      },
+      "ws_enable_owm_stations": {
+        "name": "Fonction : Envoi OpenWeatherMap"
+      },
+      "ws_enable_windy": {
+        "name": "Fonction : Envoi Windy"
+      },
+      "ws_enable_mqtt": {
+        "name": "Fonction : MQTT Discovery"
       }
     },
     "number": {
@@ -1527,6 +1704,41 @@
       },
       "ws_rain_expected_1h": {
         "name": "Pluie prévue (1h)"
+      },
+      "ws_temperature_stuck": {
+        "name": "Capteur de température bloqué"
+      },
+      "ws_humidity_stuck": {
+        "name": "Capteur d'humidité bloqué"
+      },
+      "ws_pressure_stuck": {
+        "name": "Capteur de pression bloqué"
+      },
+      "ws_temperature_out_of_range": {
+        "name": "Température hors plage"
+      },
+      "ws_humidity_out_of_range": {
+        "name": "Humidité hors plage"
+      },
+      "ws_pressure_out_of_range": {
+        "name": "Pression hors plage"
+      },
+      "ws_wind_gust_below_wind": {
+        "name": "Rafale inférieure à la vitesse du vent"
+      },
+      "ws_dew_exceeds_temp": {
+        "name": "Point de rosée dépasse la température"
+      }
+    },
+    "event": {
+      "ws_rain_event": {
+        "name": "Événement de pluie"
+      },
+      "ws_frost_event": {
+        "name": "Événement de gel"
+      },
+      "ws_lightning_event": {
+        "name": "Événement de foudre"
       }
     }
   },
