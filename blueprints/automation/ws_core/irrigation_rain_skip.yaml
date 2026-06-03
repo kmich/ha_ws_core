@@ -1,0 +1,100 @@
+blueprint:
+  name: "WS Core: Irrigation Rain Skip"
+  description: >
+    Skips or cancels an irrigation schedule when today's rain or the irrigation
+    deficit is below a threshold. Uses ws_core rain_today and irrigation_deficit sensors.
+    Compatible with any switch-controlled irrigation zone.
+  domain: automation
+  source_url: https://github.com/kmich/ha_ws_core
+  input:
+    rain_today_sensor:
+      name: WS Rain Today Sensor
+      description: sensor.ws_rain_today or equivalent
+      selector:
+        entity:
+          domain: sensor
+          device_class: precipitation
+    rain_skip_threshold_mm:
+      name: Rain skip threshold (mm)
+      description: Skip irrigation if rain today already exceeds this amount
+      default: 10.0
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 0.5
+          unit_of_measurement: mm
+    rain_probability_sensor:
+      name: WS Rain Probability Combined
+      description: Cancel watering if rain is already likely
+      selector:
+        entity:
+          domain: sensor
+    rain_prob_threshold:
+      name: Rain probability skip threshold (%)
+      default: 70
+      selector:
+        number:
+          min: 30
+          max: 95
+          step: 5
+          unit_of_measurement: "%"
+    irrigation_switch:
+      name: Irrigation switch / zone
+      description: Switch entity that turns irrigation on
+      selector:
+        entity:
+          domain: switch
+    schedule_time:
+      name: Scheduled irrigation time
+      description: Time of day the irrigation should normally run
+      selector:
+        time:
+    duration_minutes:
+      name: Irrigation duration (minutes)
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 120
+          step: 5
+    notify_target:
+      name: Notify target (optional — leave blank to skip notification)
+      default: ""
+      selector:
+        text:
+
+trigger:
+  - platform: time
+    at: !input schedule_time
+
+condition:
+  - condition: template
+    value_template: >
+      {{ states(rain_today_sensor) | float(0) < (rain_skip_threshold_mm | float) }}
+  - condition: template
+    value_template: >
+      {{ states(rain_probability_sensor) | float(0) < (rain_prob_threshold | float) }}
+
+action:
+  - service: switch.turn_on
+    target:
+      entity_id: !input irrigation_switch
+  - delay:
+      minutes: !input duration_minutes
+  - service: switch.turn_off
+    target:
+      entity_id: !input irrigation_switch
+  - if:
+      - condition: template
+        value_template: "{{ (notify_target | trim) != '' }}"
+    then:
+      - service: !input notify_target
+        data:
+          title: "🌱 Irrigation Complete"
+          message: >
+            Ran for {{ duration_minutes }} min.
+            Rain today: {{ states(rain_today_sensor) | round(1) }}mm.
+
+mode: single
+max_exceeded: silent

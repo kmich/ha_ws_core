@@ -1,0 +1,88 @@
+blueprint:
+  name: "WS Core: Lightning Safety Alert"
+  description: >
+    Sends alerts when lightning is detected nearby, and notifies when the area
+    is clear (≥30 minutes since last strike). Requires the Lightning Detection
+    feature enabled in ws_core and a lightning sensor mapped.
+  domain: automation
+  source_url: https://github.com/kmich/ha_ws_core
+  input:
+    lightning_proximity_sensor:
+      name: WS Lightning Proximity Sensor
+      description: sensor.ws_lightning_proximity (near/clear)
+      selector:
+        entity:
+          domain: sensor
+    lightning_clearance_sensor:
+      name: WS Lightning Clearance Sensor
+      description: sensor.ws_lightning_clearance — minutes since last strike
+      selector:
+        entity:
+          domain: sensor
+    notify_target:
+      name: Notify target
+      selector:
+        text:
+    pool_switch:
+      name: Pool / outdoor equipment switch (optional)
+      description: Turn off when lightning nearby; leave empty to skip
+      default: ""
+      selector:
+        text:
+    clearance_minutes:
+      name: Safe clearance time (minutes)
+      description: Minutes since last strike before sending all-clear
+      default: 30
+      selector:
+        number:
+          min: 10
+          max: 60
+          step: 5
+
+trigger:
+  - platform: state
+    entity_id: !input lightning_proximity_sensor
+    to: "near"
+    id: lightning_near
+  - platform: numeric_state
+    entity_id: !input lightning_clearance_sensor
+    above: !input clearance_minutes
+    id: lightning_clear
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: lightning_near
+        sequence:
+          - service: !input notify_target
+            data:
+              title: "⚡ Lightning Nearby!"
+              message: >
+                Lightning detected within proximity threshold.
+                Stay indoors and away from water, tall trees, and metal objects.
+              data:
+                tag: ws_core_lightning
+                priority: high
+          - if:
+              - condition: template
+                value_template: "{{ (pool_switch | trim) != '' }}"
+            then:
+              - service: switch.turn_off
+                target:
+                  entity_id: !input pool_switch
+      - conditions:
+          - condition: trigger
+            id: lightning_clear
+        sequence:
+          - service: !input notify_target
+            data:
+              title: "✅ Lightning All Clear"
+              message: >
+                No lightning detected for {{ states(lightning_clearance_sensor) | int }} minutes.
+                Safe to resume outdoor activities.
+              data:
+                tag: ws_core_lightning
+
+mode: single
+max_exceeded: silent

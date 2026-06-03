@@ -1,0 +1,62 @@
+blueprint:
+  name: "WS Core: Storm Alert (Pressure Drop)"
+  description: >
+    Fires when barometric pressure is falling rapidly (>1.6 hPa/h) — the
+    classic indicator of an approaching storm. Uses the ws_core Pressure Trend sensor.
+  domain: automation
+  source_url: https://github.com/kmich/ha_ws_core
+  input:
+    pressure_trend_sensor:
+      name: WS Pressure Trend Rate Sensor
+      description: The ws_core pressure_trend_raw sensor (hPa/h rate)
+      selector:
+        entity:
+          domain: sensor
+    wind_gust_sensor:
+      name: WS Wind Gust Sensor
+      description: The ws_core wind gust sensor
+      selector:
+        entity:
+          domain: sensor
+          device_class: wind_speed
+    rain_probability_sensor:
+      name: WS Rain Probability Combined Sensor
+      description: The ws_core rain_probability_combined sensor
+      selector:
+        entity:
+          domain: sensor
+    notify_target:
+      name: Notify target
+      selector:
+        text:
+    cooldown_hours:
+      name: Alert cooldown (hours)
+      default: 4
+      selector:
+        number:
+          min: 1
+          max: 12
+          step: 1
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input pressure_trend_sensor
+    below: -1.6
+    for:
+      minutes: 10
+
+action:
+  - service: !input notify_target
+    data:
+      title: "⛈️ Storm Approaching"
+      message: >
+        Pressure falling rapidly at {{ states(trigger.entity_id) | round(2) }} hPa/h.
+        Rain probability: {{ states(rain_probability_sensor) }}%.
+        Wind gusts: {{ states(wind_gust_sensor) | round(1) }} m/s.
+        Storm conditions may develop within 1-3 hours.
+      data:
+        tag: ws_core_storm_alert
+        priority: high
+
+mode: single
+max_exceeded: silent

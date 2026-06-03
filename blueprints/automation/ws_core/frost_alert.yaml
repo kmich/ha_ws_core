@@ -1,0 +1,78 @@
+blueprint:
+  name: "WS Core: Frost & Freeze Alert"
+  description: >
+    Sends a notification when temperature drops below a configurable threshold.
+    Includes frost point and dew point context. Uses the ws_core Temperature sensor.
+  domain: automation
+  source_url: https://github.com/kmich/ha_ws_core
+  input:
+    temperature_sensor:
+      name: WS Temperature Sensor
+      description: The ws_core temperature sensor (sensor.ws_temperature or similar)
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    freeze_threshold:
+      name: Freeze Threshold
+      description: Temperature below which the alert fires (°C)
+      default: 2.0
+      selector:
+        number:
+          min: -20
+          max: 10
+          step: 0.5
+          unit_of_measurement: "°C"
+    notify_target:
+      name: Notify target
+      description: Notification target (e.g. notify.mobile_app_phone)
+      selector:
+        text:
+    cooldown_hours:
+      name: Alert cooldown
+      description: Minimum hours between repeat alerts
+      default: 6
+      selector:
+        number:
+          min: 1
+          max: 24
+          step: 1
+          unit_of_measurement: "h"
+
+variables:
+  threshold: !input freeze_threshold
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input temperature_sensor
+    below: !input freeze_threshold
+    for:
+      minutes: 5
+
+condition:
+  - condition: template
+    value_template: >
+      {% set last = state_attr(this.entity_id, 'last_triggered') %}
+      {% if last == none %}true
+      {% else %}
+        {{ (now() - last).total_seconds() / 3600 > (cooldown_hours | int) }}
+      {% endif %}
+
+action:
+  - service: !input notify_target
+    data:
+      title: "❄️ Frost Alert"
+      message: >
+        Temperature has dropped to {{ states(trigger.entity_id) | round(1) }}°C
+        (below your {{ threshold }}°C threshold).
+        {% set frost = states('sensor.' + trigger.entity_id.split('.')[1].replace('temperature', 'frost_point')) %}
+        {% if frost != 'unavailable' and frost != 'unknown' %}
+        Frost point: {{ frost | round(1) }}°C.
+        {% endif %}
+        Check outdoor plants and pipes.
+      data:
+        tag: ws_core_frost_alert
+        priority: high
+
+mode: single
+max_exceeded: silent

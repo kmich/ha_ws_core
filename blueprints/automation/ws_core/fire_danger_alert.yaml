@@ -1,0 +1,84 @@
+blueprint:
+  name: "WS Core: Fire Danger Alert"
+  description: >
+    Sends a notification when fire danger reaches a configurable level.
+    Uses ws_core Fire Risk Score or FFDI (McArthur, Australian standard).
+    Optionally activates garden irrigation as a precaution.
+  domain: automation
+  source_url: https://github.com/kmich/ha_ws_core
+  input:
+    fire_sensor:
+      name: WS Fire Risk Sensor
+      description: >
+        sensor.ws_fire_risk_score (1-10 scale) or sensor.ws_ffdi (McArthur FFDI).
+        For FFDI, set threshold to 25 (High) or 50 (Very High).
+      selector:
+        entity:
+          domain: sensor
+    fire_threshold:
+      name: Alert threshold
+      description: Fire risk score ≥ this value triggers the alert (default 7 for fire_risk_score, 50 for FFDI)
+      default: 7
+      selector:
+        number:
+          min: 1
+          max: 150
+          step: 1
+    notify_target:
+      name: Notify target
+      selector:
+        text:
+    garden_switch:
+      name: Garden irrigation switch (optional precaution — leave blank to skip)
+      default: ""
+      selector:
+        text:
+    garden_duration_minutes:
+      name: Precaution irrigation duration (minutes)
+      default: 10
+      selector:
+        number:
+          min: 5
+          max: 60
+          step: 5
+    cooldown_hours:
+      name: Alert cooldown (hours)
+      default: 8
+      selector:
+        number:
+          min: 1
+          max: 24
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input fire_sensor
+    above: !input fire_threshold
+    for:
+      minutes: 15
+
+action:
+  - service: !input notify_target
+    data:
+      title: "🔥 High Fire Danger"
+      message: >
+        Fire danger: {{ states(trigger.entity_id) | round(1) }}.
+        Conditions: hot, dry, and/or windy.
+        Avoid outdoor burning. Check local fire authority warnings.
+      data:
+        tag: ws_core_fire_alert
+        priority: high
+  - if:
+      - condition: template
+        value_template: "{{ (garden_switch | trim) != '' }}"
+    then:
+      - service: switch.turn_on
+        target:
+          entity_id: !input garden_switch
+      - delay:
+          minutes: !input garden_duration_minutes
+      - service: switch.turn_off
+        target:
+          entity_id: !input garden_switch
+
+mode: single
+max_exceeded: silent
