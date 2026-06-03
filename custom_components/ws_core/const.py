@@ -624,6 +624,48 @@ DEFAULT_LIGHTNING_PROXIMITY_KM = 15.0       # threshold for proximity alert
 
 CONF_LIGHTNING_PROXIMITY_KM = "lightning_proximity_km"
 
+# ---------------------------------------------------------------------------
+# v2.0 - Additional upload targets
+# ---------------------------------------------------------------------------
+
+# Weathercloud
+CONF_ENABLE_WEATHERCLOUD = "enable_weathercloud"
+CONF_WC_STATION_ID = "wc_station_id"
+CONF_WC_API_KEY = "wc_api_key"
+CONF_WC_INTERVAL_MIN = "wc_interval_min"
+DEFAULT_ENABLE_WEATHERCLOUD = False
+DEFAULT_WC_INTERVAL_MIN = 10
+
+# PWSWeather
+CONF_ENABLE_PWSWEATHER = "enable_pwsweather"
+CONF_PWS_STATION_ID = "pws_station_id"
+CONF_PWS_API_KEY = "pws_api_key"
+CONF_PWS_INTERVAL_MIN = "pws_interval_min"
+DEFAULT_ENABLE_PWSWEATHER = False
+DEFAULT_PWS_INTERVAL_MIN = 10
+
+# WOW (UK Met Office Weather Observations Website)
+CONF_ENABLE_WOW = "enable_wow"
+CONF_WOW_SITE_ID = "wow_site_id"
+CONF_WOW_AUTH_KEY = "wow_auth_key"
+CONF_WOW_INTERVAL_MIN = "wow_interval_min"
+DEFAULT_ENABLE_WOW = False
+DEFAULT_WOW_INTERVAL_MIN = 10
+
+# AWEKAS
+CONF_ENABLE_AWEKAS = "enable_awekas"
+CONF_AWEKAS_USERNAME = "awekas_username"
+CONF_AWEKAS_PASSWORD = "awekas_password"
+CONF_AWEKAS_INTERVAL_MIN = "awekas_interval_min"
+DEFAULT_ENABLE_AWEKAS = False
+DEFAULT_AWEKAS_INTERVAL_MIN = 15
+
+# Upload status data keys
+KEY_WC_STATUS = "wc_upload_status"
+KEY_PWS_STATUS = "pws_upload_status"
+KEY_WOW_STATUS = "wow_upload_status"
+KEY_AWEKAS_STATUS = "awekas_upload_status"
+
 # Data keys
 KEY_LIGHTNING_COUNT_1H = "lightning_count_1h"
 KEY_LIGHTNING_DISTANCE_KM = "lightning_distance_km"

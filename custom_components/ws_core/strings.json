@@ -1559,6 +1559,58 @@
           "distance_km": { "name": "Distance" },
           "clearance_min": { "name": "Minutes since last strike" }
         }
+      },
+      "wc_upload_status": {
+        "name": "Weathercloud Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last upload" }
+        }
+      },
+      "pws_upload_status": {
+        "name": "PWSWeather Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last upload" }
+        }
+      },
+      "wow_upload_status": {
+        "name": "WOW Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last upload" }
+        }
+      },
+      "awekas_upload_status": {
+        "name": "AWEKAS Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last upload" }
+        }
       }
     },
     "select": {

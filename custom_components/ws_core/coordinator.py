@@ -339,10 +339,38 @@ from .const import (
     KEY_CDD_SEASON,
     KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
+    CONF_AWEKAS_INTERVAL_MIN,
+    CONF_AWEKAS_PASSWORD,
+    CONF_AWEKAS_USERNAME,
+    CONF_ENABLE_AWEKAS,
     CONF_ENABLE_LIGHTNING,
+    CONF_ENABLE_PWSWEATHER,
+    CONF_ENABLE_WEATHERCLOUD,
+    CONF_ENABLE_WOW,
     CONF_LIGHTNING_PROXIMITY_KM,
+    CONF_PWS_API_KEY,
+    CONF_PWS_INTERVAL_MIN,
+    CONF_PWS_STATION_ID,
+    CONF_WC_API_KEY,
+    CONF_WC_INTERVAL_MIN,
+    CONF_WC_STATION_ID,
+    CONF_WOW_AUTH_KEY,
+    CONF_WOW_INTERVAL_MIN,
+    CONF_WOW_SITE_ID,
+    DEFAULT_AWEKAS_INTERVAL_MIN,
+    DEFAULT_ENABLE_AWEKAS,
     DEFAULT_ENABLE_LIGHTNING,
+    DEFAULT_ENABLE_PWSWEATHER,
+    DEFAULT_ENABLE_WEATHERCLOUD,
+    DEFAULT_ENABLE_WOW,
     DEFAULT_LIGHTNING_PROXIMITY_KM,
+    DEFAULT_PWS_INTERVAL_MIN,
+    DEFAULT_WC_INTERVAL_MIN,
+    DEFAULT_WOW_INTERVAL_MIN,
+    KEY_AWEKAS_STATUS,
+    KEY_PWS_STATUS,
+    KEY_WC_STATUS,
+    KEY_WOW_STATUS,
     KEY_DOMINANT_WIND_DIR,
     KEY_FFDI,
     KEY_FFWI,
@@ -518,6 +546,35 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sea_temp_lat = _get(CONF_SEA_TEMP_LAT, None)
         self.sea_temp_lon = _get(CONF_SEA_TEMP_LON, None)
         self._sea_temp_cache: dict[str, Any] | None = None
+
+        # v2.0: additional upload targets
+        self.weathercloud_enabled = bool(_get(CONF_ENABLE_WEATHERCLOUD, DEFAULT_ENABLE_WEATHERCLOUD))
+        self.wc_station_id: str = str(_get(CONF_WC_STATION_ID, "") or "")
+        self.wc_api_key: str = str(_get(CONF_WC_API_KEY, "") or "")
+        self.wc_interval_min = int(_get(CONF_WC_INTERVAL_MIN, DEFAULT_WC_INTERVAL_MIN))
+        self._wc_last_upload: Any = None
+        self._wc_status: str = "disabled"
+
+        self.pwsweather_enabled = bool(_get(CONF_ENABLE_PWSWEATHER, DEFAULT_ENABLE_PWSWEATHER))
+        self.pws_station_id: str = str(_get(CONF_PWS_STATION_ID, "") or "")
+        self.pws_api_key: str = str(_get(CONF_PWS_API_KEY, "") or "")
+        self.pws_interval_min = int(_get(CONF_PWS_INTERVAL_MIN, DEFAULT_PWS_INTERVAL_MIN))
+        self._pws_last_upload: Any = None
+        self._pws_status: str = "disabled"
+
+        self.wow_enabled = bool(_get(CONF_ENABLE_WOW, DEFAULT_ENABLE_WOW))
+        self.wow_site_id: str = str(_get(CONF_WOW_SITE_ID, "") or "")
+        self.wow_auth_key: str = str(_get(CONF_WOW_AUTH_KEY, "") or "")
+        self.wow_interval_min = int(_get(CONF_WOW_INTERVAL_MIN, DEFAULT_WOW_INTERVAL_MIN))
+        self._wow_last_upload: Any = None
+        self._wow_status: str = "disabled"
+
+        self.awekas_enabled = bool(_get(CONF_ENABLE_AWEKAS, DEFAULT_ENABLE_AWEKAS))
+        self.awekas_username: str = str(_get(CONF_AWEKAS_USERNAME, "") or "")
+        self.awekas_password: str = str(_get(CONF_AWEKAS_PASSWORD, "") or "")
+        self.awekas_interval_min = int(_get(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN))
+        self._awekas_last_upload: Any = None
+        self._awekas_status: str = "disabled"
 
         # v2.0: lightning sensor integration
         self.lightning_enabled = bool(_get(CONF_ENABLE_LIGHTNING, DEFAULT_ENABLE_LIGHTNING))
@@ -809,6 +866,46 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self.hass,
                     lambda _now: self.hass.async_create_task(self._async_upload_wunderground()),
                     timedelta(minutes=self.wu_interval_min),
+                )
+            )
+
+        # v2.0: Weathercloud upload
+        if self.weathercloud_enabled and self.wc_station_id and self.wc_api_key:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_weathercloud()),
+                    timedelta(minutes=self.wc_interval_min),
+                )
+            )
+
+        # v2.0: PWSWeather upload
+        if self.pwsweather_enabled and self.pws_station_id and self.pws_api_key:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_pwsweather()),
+                    timedelta(minutes=self.pws_interval_min),
+                )
+            )
+
+        # v2.0: WOW (UK Met Office) upload
+        if self.wow_enabled and self.wow_site_id and self.wow_auth_key:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_wow()),
+                    timedelta(minutes=self.wow_interval_min),
+                )
+            )
+
+        # v2.0: AWEKAS upload
+        if self.awekas_enabled and self.awekas_username and self.awekas_password:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_awekas()),
+                    timedelta(minutes=self.awekas_interval_min),
                 )
             )
 
@@ -2670,6 +2767,20 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_WU_STATUS] = self._wu_status
             data["_wu_last_upload"] = self._wu_last_upload.isoformat() if self._wu_last_upload else None
 
+        # v2.0 upload status sensors
+        if self.weathercloud_enabled:
+            data[KEY_WC_STATUS] = self._wc_status
+            data["_wc_last_upload"] = self._wc_last_upload.isoformat() if self._wc_last_upload else None
+        if self.pwsweather_enabled:
+            data[KEY_PWS_STATUS] = self._pws_status
+            data["_pws_last_upload"] = self._pws_last_upload.isoformat() if self._pws_last_upload else None
+        if self.wow_enabled:
+            data[KEY_WOW_STATUS] = self._wow_status
+            data["_wow_last_upload"] = self._wow_last_upload.isoformat() if self._wow_last_upload else None
+        if self.awekas_enabled:
+            data[KEY_AWEKAS_STATUS] = self._awekas_status
+            data["_awekas_last_upload"] = self._awekas_last_upload.isoformat() if self._awekas_last_upload else None
+
         # Air Quality (Open-Meteo Air Quality API)
         if self.aqi_enabled and self._aqi_cache:
             aq = self._aqi_cache
@@ -3147,6 +3258,268 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as exc:
             self._wu_status = "error"
             _LOGGER.error("WUnderground upload unexpected error: %s", exc, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # v2.0 - Weathercloud upload
+    # ------------------------------------------------------------------
+
+    async def _async_upload_weathercloud(self) -> None:
+        """Upload observation to Weathercloud."""
+        data = self.data
+        if not data or not self.wc_station_id or not self.wc_api_key:
+            return
+
+        now_utc = dt_util.utcnow()
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        dew_c = data.get(KEY_DEW_POINT_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+        uv = data.get(KEY_UV)
+
+        def _ms_to_kmh(ms: float) -> float:
+            return round(float(ms) * 3.6, 1)
+
+        def _hpa_to_hpa(v: float) -> float:
+            return round(float(v), 1)
+
+        # Weathercloud API v1 (HTTP GET)
+        params: dict = {
+            "wid": self.wc_station_id,
+            "key": self.wc_api_key,
+            "per": int(self.wc_interval_min),
+        }
+        if temp_c is not None:
+            params["temp"] = round(float(temp_c) * 10)   # Weathercloud uses tenths of °C
+        if dew_c is not None:
+            params["dew"] = round(float(dew_c) * 10)
+        if humidity is not None:
+            params["hum"] = int(float(humidity))
+        if press is not None:
+            params["bar"] = round(float(press) * 10)
+        params["wspdavg"] = round(_ms_to_kmh(wind_ms) * 10)
+        params["wgust"] = round(_ms_to_kmh(gust_ms) * 10)
+        params["wdir"] = int(wind_dir)
+        params["rain"] = round(float(rain_1h) * 10)
+        if uv is not None:
+            params["uvi"] = round(float(uv) * 10)
+
+        url = "https://api.weathercloud.net/v01/set"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.get(url, params=params, timeout=15) as resp:
+                body = await resp.text()
+                if resp.status == 200:
+                    self._wc_last_upload = now_utc
+                    self._wc_status = "ok"
+                else:
+                    self._wc_status = "error_http"
+                    _LOGGER.warning("Weathercloud upload HTTP %d: %s", resp.status, body[:120])
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            self._wc_status = "error_network"
+            _LOGGER.warning("Weathercloud upload error: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            self._wc_status = "error"
+            _LOGGER.error("Weathercloud upload unexpected error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # v2.0 - PWSWeather upload
+    # ------------------------------------------------------------------
+
+    async def _async_upload_pwsweather(self) -> None:
+        """Upload observation to PWSWeather (WU-compatible API)."""
+        data = self.data
+        if not data or not self.pws_station_id or not self.pws_api_key:
+            return
+
+        now_utc = dt_util.utcnow()
+        date_utc = now_utc.strftime("%Y-%m-%d %H:%M:%S")
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        dew_c = data.get(KEY_DEW_POINT_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
+
+        def _c_to_f(c: float) -> float:
+            return round(float(c) * 9 / 5 + 32, 1)
+
+        def _ms_to_mph(ms: float) -> float:
+            return round(float(ms) * 2.23694, 1)
+
+        def _mm_to_in(mm: float) -> float:
+            return round(float(mm) / 25.4, 3)
+
+        def _hpa_to_inhg(hpa: float) -> float:
+            return round(float(hpa) / 33.8639, 2)
+
+        params: dict = {
+            "ID": self.pws_station_id,
+            "PASSWORD": self.pws_api_key,
+            "dateutc": date_utc,
+            "winddir": int(wind_dir),
+            "windspeedmph": _ms_to_mph(wind_ms),
+            "windgustmph": _ms_to_mph(gust_ms),
+            "rainin": _mm_to_in(rain_1h),
+            "dailyrainin": _mm_to_in(rain_24h),
+            "action": "updateraw",
+            "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
+        }
+        if temp_c is not None:
+            params["tempf"] = _c_to_f(float(temp_c))
+        if dew_c is not None:
+            params["dewptf"] = _c_to_f(float(dew_c))
+        if humidity is not None:
+            params["humidity"] = int(float(humidity))
+        if press is not None:
+            params["baromin"] = _hpa_to_inhg(float(press))
+
+        url = "https://www.pwsweather.com/weatherstation/updateweatherstation.php"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.get(url, params=params, timeout=15) as resp:
+                body = await resp.text()
+                if resp.status == 200 and "success" in body.lower():
+                    self._pws_last_upload = now_utc
+                    self._pws_status = "ok"
+                else:
+                    self._pws_status = "error_http"
+                    _LOGGER.warning("PWSWeather upload HTTP %d: %s", resp.status, body[:120])
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            self._pws_status = "error_network"
+            _LOGGER.warning("PWSWeather upload error: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            self._pws_status = "error"
+            _LOGGER.error("PWSWeather upload unexpected error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # v2.0 - WOW (UK Met Office Weather Observations Website) upload
+    # ------------------------------------------------------------------
+
+    async def _async_upload_wow(self) -> None:
+        """Upload observation to UK Met Office WOW."""
+        data = self.data
+        if not data or not self.wow_site_id or not self.wow_auth_key:
+            return
+
+        now_utc = dt_util.utcnow()
+        date_utc = now_utc.strftime("%Y-%m-%d %H:%M:%S")
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        dew_c = data.get(KEY_DEW_POINT_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+
+        params: dict = {
+            "siteid": self.wow_site_id,
+            "siteAuthenticationKey": self.wow_auth_key,
+            "dateutc": date_utc,
+            "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
+        }
+        if temp_c is not None:
+            params["tempf"] = round(float(temp_c) * 9 / 5 + 32, 1)
+        if dew_c is not None:
+            params["dewptf"] = round(float(dew_c) * 9 / 5 + 32, 1)
+        if humidity is not None:
+            params["humidity"] = int(float(humidity))
+        if press is not None:
+            params["baromin"] = round(float(press) / 33.8639, 2)
+        if wind_dir is not None:
+            params["winddir"] = int(float(wind_dir))
+        if wind_ms is not None:
+            params["windspeedmph"] = round(float(wind_ms) * 2.23694, 1)
+        if gust_ms is not None:
+            params["windgustmph"] = round(float(gust_ms) * 2.23694, 1)
+        params["rainin"] = round(float(rain_1h) / 25.4, 3)
+
+        url = "https://wow.metoffice.gov.uk/automaticreading"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.get(url, params=params, timeout=15) as resp:
+                if resp.status in (200, 201):
+                    self._wow_last_upload = now_utc
+                    self._wow_status = "ok"
+                else:
+                    self._wow_status = "error_http"
+                    _LOGGER.warning("WOW upload HTTP %d", resp.status)
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            self._wow_status = "error_network"
+            _LOGGER.warning("WOW upload error: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            self._wow_status = "error"
+            _LOGGER.error("WOW upload unexpected error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # v2.0 - AWEKAS upload
+    # ------------------------------------------------------------------
+
+    async def _async_upload_awekas(self) -> None:
+        """Upload observation to AWEKAS (Automatisches WEtterKArtenSystem)."""
+        data = self.data
+        if not data or not self.awekas_username or not self.awekas_password:
+            return
+
+        now_utc = dt_util.utcnow()
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+        snow_mm = None  # snow depth not yet available in ws_core
+
+        # AWEKAS upload format (semicolon-delimited, UTF-8)
+        # username;password;date;time;temp;humidity;pressure;rain;wind;winddir;windgust;;snow;
+        date_str = now_utc.strftime("%d.%m.%Y")
+        time_str = now_utc.strftime("%H:%M")
+        values = [
+            self.awekas_username,
+            self.awekas_password,
+            date_str,
+            time_str,
+            f"{float(temp_c):.1f}" if temp_c is not None else "",
+            f"{int(float(humidity))}" if humidity is not None else "",
+            f"{float(press):.1f}" if press is not None else "",
+            f"{float(rain_1h):.1f}",
+            f"{round(float(wind_ms) * 3.6, 1)}" if wind_ms is not None else "",
+            f"{int(float(wind_dir))}" if wind_dir is not None else "",
+            f"{round(float(gust_ms) * 3.6, 1)}" if gust_ms is not None else "",
+            "",
+            "" if snow_mm is None else f"{snow_mm:.1f}",
+        ]
+        payload = ";".join(values)
+
+        url = "https://data.awekas.at/eingabe_pruefung.php"
+        try:
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.post(
+                url,
+                data={"val": payload},
+                timeout=20,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            ) as resp:
+                if resp.status == 200:
+                    self._awekas_last_upload = now_utc
+                    self._awekas_status = "ok"
+                else:
+                    self._awekas_status = "error_http"
+                    _LOGGER.warning("AWEKAS upload HTTP %d", resp.status)
+        except (aiohttp.ClientError, TimeoutError) as exc:
+            self._awekas_status = "error_network"
+            _LOGGER.warning("AWEKAS upload error: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            self._awekas_status = "error"
+            _LOGGER.error("AWEKAS upload unexpected error: %s", exc)
 
     # ------------------------------------------------------------------
     # CSV / JSON export  (v0.6.0)

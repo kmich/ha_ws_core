@@ -22,8 +22,12 @@ from .const import (
     # v1.5.0
     CONF_ENABLE_COMFORT_INDICES,
     # v2.0
+    CONF_ENABLE_AWEKAS,
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_LIGHTNING,
+    CONF_ENABLE_PWSWEATHER,
+    CONF_ENABLE_WEATHERCLOUD,
+    CONF_ENABLE_WOW,
     # v1.6.2
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
@@ -168,11 +172,15 @@ from .const import (
     KEY_FFDI,
     KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
+    KEY_AWEKAS_STATUS,
     KEY_LIGHTNING_CLEARANCE_MIN,
     KEY_LIGHTNING_COUNT_1H,
     KEY_LIGHTNING_DISTANCE_KM,
     KEY_LIGHTNING_PROXIMITY,
     KEY_LIGHTNING_RATE_1H,
+    KEY_PWS_STATUS,
+    KEY_WC_STATUS,
+    KEY_WOW_STATUS,
     KEY_GDD_SEASON_V2,
     KEY_GDD_TODAY_V2,
     KEY_HDD_SEASON,
@@ -1410,6 +1418,39 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
         attrs_fn=lambda d: {"last_upload": d.get("_wu_last_upload")},
     ),
+    # v2.0 additional upload status sensors
+    WSSensorDescription(
+        key=KEY_WC_STATUS,
+        translation_key="wc_status",
+        name="WS Weathercloud Status",
+        icon="mdi:cloud-upload",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_wc_last_upload")},
+    ),
+    WSSensorDescription(
+        key=KEY_PWS_STATUS,
+        translation_key="pws_status",
+        name="WS PWSWeather Status",
+        icon="mdi:cloud-upload-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_pws_last_upload")},
+    ),
+    WSSensorDescription(
+        key=KEY_WOW_STATUS,
+        translation_key="wow_status",
+        name="WS WOW Status",
+        icon="mdi:cloud-upload",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_wow_last_upload")},
+    ),
+    WSSensorDescription(
+        key=KEY_AWEKAS_STATUS,
+        translation_key="awekas_status",
+        name="WS AWEKAS Status",
+        icon="mdi:cloud-upload-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_awekas_last_upload")},
+    ),
     # ---------------------------------------------------------------
     # Air Quality  (v0.7.0, Open-Meteo AQI API)
     # ---------------------------------------------------------------
@@ -1851,6 +1892,11 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_LIGHTNING_RATE_1H: CONF_ENABLE_LIGHTNING,
     KEY_LIGHTNING_CLEARANCE_MIN: CONF_ENABLE_LIGHTNING,
     KEY_LIGHTNING_PROXIMITY: CONF_ENABLE_LIGHTNING,
+    # v2.0 - upload status sensors
+    KEY_WC_STATUS: CONF_ENABLE_WEATHERCLOUD,
+    KEY_PWS_STATUS: CONF_ENABLE_PWSWEATHER,
+    KEY_WOW_STATUS: CONF_ENABLE_WOW,
+    KEY_AWEKAS_STATUS: CONF_ENABLE_AWEKAS,
     # v2.0 - degree days + leaf wetness (new opt-in group)
     KEY_HDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
     KEY_HDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
@@ -2157,6 +2203,11 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_LIGHTNING_RATE_1H: "lightning_rate",
             KEY_LIGHTNING_CLEARANCE_MIN: "lightning_clearance",
             KEY_LIGHTNING_PROXIMITY: "lightning_proximity",
+            # v2.0 upload targets
+            KEY_WC_STATUS: "wc_upload_status",
+            KEY_PWS_STATUS: "pws_upload_status",
+            KEY_WOW_STATUS: "wow_upload_status",
+            KEY_AWEKAS_STATUS: "awekas_upload_status",
         }
         if key in overrides:
             return overrides[key]
