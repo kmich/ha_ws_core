@@ -177,6 +177,7 @@ from .const import (
     KEY_AWEKAS_STATUS,
     KEY_CWOP_STATUS_V2,
     KEY_DATA_QUALITY_SCORE,
+    KEY_NEIGHBOR_QC,
     KEY_INDOOR_CO2_PPM,
     KEY_INDOOR_COMFORT,
     KEY_INDOOR_HUMIDITY,
@@ -421,6 +422,19 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "stuck_sensors": d.get(KEY_SENSOR_STUCK) or [],
             "all_clear": len(d.get(KEY_SENSOR_STUCK) or []) == 0,
+        },
+    ),
+    # v2.0 — Spatial neighbor QC (compare vs Open-Meteo NWP grid)
+    WSSensorDescription(
+        key=KEY_NEIGHBOR_QC,
+        translation_key="neighbor_qc",
+        name="WS Neighbor QC Flags",
+        icon="mdi:map-check-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: len(d.get(KEY_NEIGHBOR_QC) or []),
+        attrs_fn=lambda d: {
+            "flags": d.get(KEY_NEIGHBOR_QC) or [],
+            "all_clear": len(d.get(KEY_NEIGHBOR_QC) or []) == 0,
         },
     ),
     # v2.0 — Overall data quality score (0-100)
@@ -2024,6 +2038,7 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # v2.0 - data quality expansion (diagnostics group)
     KEY_SENSOR_STUCK: CONF_ENABLE_DIAGNOSTICS,
     KEY_DATA_QUALITY_SCORE: CONF_ENABLE_DIAGNOSTICS,
+    KEY_NEIGHBOR_QC: CONF_ENABLE_DIAGNOSTICS,
     # v2.0 - degree days + leaf wetness (new opt-in group)
     KEY_HDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
     KEY_HDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
@@ -2346,6 +2361,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             # v2.0 data quality
             KEY_SENSOR_STUCK: "sensor_stuck",
             KEY_DATA_QUALITY_SCORE: "data_quality_score",
+            KEY_NEIGHBOR_QC: "neighbor_qc",
         }
         if key in overrides:
             return overrides[key]

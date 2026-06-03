@@ -1319,6 +1319,13 @@
           "quality_flags": { "name": "Active quality flags" },
           "stuck_flags": { "name": "Stuck sensor count" }
         }
+      },
+      "neighbor_qc": {
+        "name": "Neighbor QC Flags",
+        "state_attributes": {
+          "flags": { "name": "Active flags" },
+          "all_clear": { "name": "All clear" }
+        }
       }
     },
     "select": {
@@ -1490,6 +1497,35 @@
       "ws_enable_awekas": { "name": "Feature: AWEKAS Upload" },
       "ws_enable_mqtt": { "name": "Feature: MQTT Discovery" },
       "ws_enable_cwop": { "name": "Feature: CWOP Upload" }
+    },
+    "event": {
+      "ws_rain_event": {
+        "name": "Rain Event",
+        "state_attributes": {
+          "event_type": {
+            "name": "Event type",
+            "state": { "started": "Rain started", "stopped": "Rain stopped" }
+          }
+        }
+      },
+      "ws_frost_event": {
+        "name": "Frost Event",
+        "state_attributes": {
+          "event_type": {
+            "name": "Event type",
+            "state": { "frost": "Frost / freeze", "thaw": "Thaw" }
+          }
+        }
+      },
+      "ws_lightning_event": {
+        "name": "Lightning Event",
+        "state_attributes": {
+          "event_type": {
+            "name": "Event type",
+            "state": { "strike_detected": "Strike detected", "proximity_alert": "Proximity alert" }
+          }
+        }
+      }
     },
     "binary_sensor": {
       "ws_package_ok": { "name": "Package OK" },

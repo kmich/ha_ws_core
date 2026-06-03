@@ -1,0 +1,444 @@
+##############################################################################
+# Weather Station Core – Full Dashboard  (v2.0)
+#
+# Installation:
+#   1. In HA go to Settings → Dashboards → Add Dashboard → "Paste YAML"
+#   2. Replace all occurrences of "ws" with your entity prefix if different.
+#
+# Required HACS cards:
+#   - mushroom (lovelace-mushroom)
+#   - mini-graph-card
+#   - apexcharts-card (optional, for advanced charts)
+#
+# Tested with HA 2024.x / 2025.x
+##############################################################################
+
+title: Weather Station
+views:
+  # ─────────────────────────────────────────────────────────────────────────
+  # VIEW 1: NOW — current conditions at a glance
+  # ─────────────────────────────────────────────────────────────────────────
+  - title: Now
+    icon: mdi:weather-partly-cloudy
+    path: now
+    cards:
+
+      # Header: current condition + health
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-weather-card
+            entity: weather.ws
+            show_current: true
+            show_forecast: false
+            tap_action:
+              action: more-info
+
+          - type: custom:mushroom-entity-card
+            entity: sensor.ws_station_health
+            name: Station
+            icon: mdi:heart-pulse
+            tap_action:
+              action: more-info
+
+      # Temperature row
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_temperature
+            name: Temperature
+            icon: mdi:thermometer
+            primary_info: state
+            secondary_info: last-changed
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_feels_like
+            name: Feels Like
+            icon: mdi:thermometer-lines
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_dew_point
+            name: Dew Point
+            icon: mdi:water-circle
+
+      # Humidity + Pressure row
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_humidity
+            name: Humidity
+            icon: mdi:water-percent
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_sea_level_pressure
+            name: Pressure
+            icon: mdi:gauge
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_pressure_trend
+            name: Trend
+            icon: mdi:trending-up
+
+      # Wind row
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_wind_speed
+            name: Wind
+            icon: mdi:weather-windy
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_wind_gust
+            name: Gust
+            icon: mdi:weather-windy-variant
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_wind_direction
+            name: Direction
+            icon: mdi:compass
+
+      # Rain row
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_rain_rate
+            name: Rain Rate
+            icon: mdi:water
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_rain_today
+            name: Today
+            icon: mdi:weather-rainy
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_rain_this_week
+            name: This Week
+            icon: mdi:calendar-week
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_rain_this_month
+            name: This Month
+            icon: mdi:calendar-month
+
+      # UV + Illuminance
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_uv_index
+            name: UV Index
+            icon: mdi:sun-wireless
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_uv_level
+            name: UV Level
+            icon: mdi:weather-sunny
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_illuminance
+            name: Illuminance
+            icon: mdi:brightness-7
+
+      # Rain probability
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_rain_probability_combined
+            name: Rain Probability
+            icon: mdi:weather-rainy
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_zambretti_forecast
+            name: Zambretti
+            icon: mdi:crystal-ball
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # VIEW 2: CHARTS — 24h temperature, pressure, rain history
+  # ─────────────────────────────────────────────────────────────────────────
+  - title: Charts
+    icon: mdi:chart-line
+    path: charts
+    cards:
+
+      - type: custom:mini-graph-card
+        name: Temperature (24h)
+        entities:
+          - entity: sensor.ws_temperature
+            name: Temperature
+          - entity: sensor.ws_feels_like
+            name: Feels Like
+            show_line: true
+            show_points: false
+          - entity: sensor.ws_dew_point
+            name: Dew Point
+            show_line: true
+            show_points: false
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        show:
+          labels: true
+          extrema: true
+
+      - type: custom:mini-graph-card
+        name: Pressure (24h)
+        entities:
+          - entity: sensor.ws_sea_level_pressure
+            name: MSLP
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        show:
+          labels: true
+          extrema: true
+
+      - type: custom:mini-graph-card
+        name: Rain Rate (24h)
+        entities:
+          - entity: sensor.ws_rain_rate
+            name: Rain Rate
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        color: "#3b82f6"
+
+      - type: custom:mini-graph-card
+        name: Wind Speed & Gust (24h)
+        entities:
+          - entity: sensor.ws_wind_speed
+            name: Wind Speed
+          - entity: sensor.ws_wind_gust
+            name: Gust
+            show_line: true
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+
+      - type: custom:mini-graph-card
+        name: Humidity (24h)
+        entities:
+          - entity: sensor.ws_humidity
+            name: Humidity
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        color: "#06b6d4"
+        show:
+          labels: true
+          extrema: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # VIEW 3: ADVANCED — comfort, fire, agro, forecast
+  # ─────────────────────────────────────────────────────────────────────────
+  - title: Advanced
+    icon: mdi:thermometer-lines
+    path: advanced
+    cards:
+
+      # Comfort indices (enable_comfort_indices required)
+      - type: entities
+        title: Comfort Indices
+        entities:
+          - sensor.ws_heat_index
+          - sensor.ws_wind_chill
+          - sensor.ws_humidex
+          - sensor.ws_wbgt
+          - sensor.ws_utci
+          - sensor.ws_vpd
+          - sensor.ws_absolute_humidity
+          - sensor.ws_specific_humidity
+          - sensor.ws_air_density
+
+      # Atmospheric
+      - type: entities
+        title: Atmospheric
+        entities:
+          - sensor.ws_wet_bulb_temperature
+          - sensor.ws_frost_point
+          - sensor.ws_cloud_base
+          - sensor.ws_freezing_level
+          - sensor.ws_wind_gust_factor
+          - sensor.ws_dominant_wind_direction
+          - sensor.ws_wind_direction_variability
+
+      # Agrometeorological (enable_comfort_indices + enable_degree_days)
+      - type: entities
+        title: Agrometeorological
+        entities:
+          - sensor.ws_et0_daily
+          - sensor.ws_et0_penman_monteith
+          - sensor.ws_irrigation_deficit
+          - sensor.ws_wind_run
+          - sensor.ws_solar_energy_today
+          - sensor.ws_peak_sun_hours
+          - sensor.ws_max_solar_radiation
+          - sensor.ws_clearness_index
+          - sensor.ws_cloud_cover
+          - sensor.ws_hdd_today
+          - sensor.ws_cdd_today
+          - sensor.ws_gdd_today
+          - sensor.ws_gdd_season
+          - sensor.ws_chill_hours_today
+          - sensor.ws_chill_hours_season
+          - sensor.ws_leaf_wetness
+
+      # Fire danger (enable_fire_risk_score required)
+      - type: entities
+        title: Fire Danger
+        entities:
+          - sensor.ws_fire_risk_score
+          - sensor.ws_ffdi
+          - sensor.ws_ffwi
+          - sensor.ws_fwi
+          - sensor.ws_fwi_isi
+          - sensor.ws_fwi_bui
+
+      # 7-day forecast
+      - type: weather-forecast
+        entity: weather.ws
+        forecast_type: daily
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # VIEW 4: RECORDS — streaks, anomalies, monthly rain
+  # ─────────────────────────────────────────────────────────────────────────
+  - title: Records
+    icon: mdi:trophy
+    path: records
+    cards:
+
+      - type: entities
+        title: Rain Records
+        entities:
+          - sensor.ws_rain_today
+          - sensor.ws_rain_this_week
+          - sensor.ws_rain_this_month
+          - sensor.ws_rain_this_year
+          - sensor.ws_rain_last_24h
+          - sensor.ws_rain_rate_max_24h
+
+      - type: entities
+        title: Temperature Records
+        entities:
+          - sensor.ws_temperature_high_24h
+          - sensor.ws_temperature_low_24h
+          - sensor.ws_temperature_average_24h
+          - sensor.ws_temperature_anomaly_30d
+
+      - type: entities
+        title: Wind Records
+        entities:
+          - sensor.ws_wind_gust_max_24h
+          - sensor.ws_wind_run
+          - sensor.ws_wind_beaufort
+
+      - type: entities
+        title: Streaks
+        entities:
+          - sensor.ws_dry_streak
+          - sensor.ws_heat_streak
+          - sensor.ws_frost_streak
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # VIEW 5: DIAGNOSTICS — station health, data quality, upload status
+  # ─────────────────────────────────────────────────────────────────────────
+  - title: Diagnostics
+    icon: mdi:stethoscope
+    path: diagnostics
+    cards:
+
+      - type: entities
+        title: Station Health
+        entities:
+          - sensor.ws_station_health
+          - sensor.ws_data_quality_banner
+          - sensor.ws_data_quality_score
+          - sensor.ws_package_status
+          - binary_sensor.ws_package_ok
+          - sensor.ws_alert_state
+          - sensor.ws_alert_message
+
+      - type: entities
+        title: Data Quality
+        entities:
+          - sensor.ws_sensor_quality_flags
+          - sensor.ws_sensor_drift
+          - sensor.ws_sensor_consistency
+          - sensor.ws_sensor_stuck
+          - binary_sensor.ws_temperature_stuck
+          - binary_sensor.ws_humidity_stuck
+          - binary_sensor.ws_pressure_stuck
+          - binary_sensor.ws_temperature_out_of_range
+          - binary_sensor.ws_pressure_out_of_range
+          - binary_sensor.ws_dew_exceeds_temp
+
+      - type: entities
+        title: Forecast Quality
+        entities:
+          - sensor.ws_forecast_agreement
+          - sensor.ws_forecast_skill
+          - sensor.ws_zambretti_number
+
+      - type: entities
+        title: Upload Status
+        entities:
+          - sensor.ws_wu_upload_status
+          - sensor.ws_wc_upload_status
+          - sensor.ws_pws_upload_status
+          - sensor.ws_wow_upload_status
+          - sensor.ws_awekas_upload_status
+          - sensor.ws_cwop_upload_status
+
+      # Event log (requires HA 2023.8+)
+      - type: logbook
+        title: Recent Weather Events
+        entities:
+          - event.ws_rain_event
+          - event.ws_frost_event
+          - event.ws_lightning_event
+        hours_to_show: 24
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # VIEW 6: INDOOR — when enable_indoor is active
+  # ─────────────────────────────────────────────────────────────────────────
+  - title: Indoor
+    icon: mdi:home-thermometer
+    path: indoor
+    cards:
+
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_indoor_temperature
+            name: Indoor Temp
+            icon: mdi:home-thermometer
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_indoor_humidity
+            name: Indoor Humidity
+            icon: mdi:home-humidity
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_indoor_co2
+            name: CO₂
+            icon: mdi:molecule-co2
+
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_indoor_temp_delta
+            name: Temp Δ In/Out
+            icon: mdi:thermometer-lines
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_indoor_humidity_delta
+            name: Humidity Δ In/Out
+            icon: mdi:water-percent-alert
+          - type: custom:mushroom-sensor-card
+            entity: sensor.ws_indoor_comfort
+            name: Comfort Score
+            icon: mdi:home-heart
+
+      - type: custom:mini-graph-card
+        name: Indoor vs Outdoor Temperature (24h)
+        entities:
+          - entity: sensor.ws_indoor_temperature
+            name: Indoor
+          - entity: sensor.ws_temperature
+            name: Outdoor
+        hours_to_show: 24
+        points_per_hour: 4
+
+      - type: custom:mini-graph-card
+        name: CO₂ Level (24h)
+        entities:
+          - entity: sensor.ws_indoor_co2
+            name: CO₂
+        hours_to_show: 24
+        points_per_hour: 4
+        color: "#f97316"
+        show:
+          labels: true
+          extrema: true

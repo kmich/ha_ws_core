@@ -2,7 +2,7 @@
 
 DOMAIN = "ws_core"
 
-PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number"]
+PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
 # ---------------------------------------------------------------------------
 # Configuration keys
@@ -689,6 +689,7 @@ KEY_INDOOR_COMFORT = "indoor_comfort"    # composite score
 
 KEY_SENSOR_STUCK = "sensor_stuck_flags"      # list of stuck sensor names
 KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
+KEY_NEIGHBOR_QC = "neighbor_qc_flags"          # list of neighbor-comparison flags
 
 # ---------------------------------------------------------------------------
 # v2.0 - CWOP (Citizen Weather Observer Program) upload

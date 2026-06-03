@@ -383,6 +383,7 @@ from .const import (
     DEFAULT_MQTT_STATE_PREFIX,
     KEY_DATA_QUALITY_SCORE,
     KEY_INDOOR_CO2_PPM,
+    KEY_NEIGHBOR_QC,
     KEY_INDOOR_COMFORT,
     KEY_INDOOR_HUMIDITY,
     KEY_INDOOR_HUMIDITY_DELTA,
@@ -1062,6 +1063,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("ws_core: deferred nowcast fetch failed (will retry): %s", err)
 
             self.hass.async_create_task(_deferred_nowcast())
+
+        # v2.0: spatial neighbor QC (hourly fetch from Open-Meteo)
+        self._neighbor_qc_cache: dict | None = None
+        if self.forecast_lat is not None and self.forecast_lon is not None:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_fetch_neighbor_qc()),
+                    timedelta(hours=1),
+                )
+            )
+            async def _deferred_neighbor_qc():
+                await asyncio.sleep(60)
+                try:
+                    await self._async_fetch_neighbor_qc()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.debug("ws_core: neighbor QC fetch failed: %s", err)
+            self.hass.async_create_task(_deferred_neighbor_qc())
 
         # v2.0: CWOP upload
         if self.cwop_enabled and self.cwop_callsign:
@@ -2005,6 +2024,70 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 score -= 10
         data[KEY_INDOOR_COMFORT] = max(0, min(100, score))
 
+    async def _async_fetch_neighbor_qc(self) -> None:
+        """Fetch Open-Meteo current weather as a spatial QC reference.  (v2.0)
+
+        Compares local station readings against the nearest NWP grid point.
+        Flags large deviations (>5°C temperature, >20 hPa pressure, >20% humidity)
+        as potential sensor errors. Runs hourly; results cached in coordinator.
+        """
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+        if lat is None or lon is None:
+            return
+        try:
+            url = (
+                "https://api.open-meteo.com/v1/forecast"
+                f"?latitude={lat:.4f}&longitude={lon:.4f}"
+                "&current=temperature_2m,relative_humidity_2m,surface_pressure"
+                "&wind_speed_unit=ms&timezone=auto"
+            )
+            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            async with session.get(url, timeout=15) as resp:
+                if resp.status != 200:
+                    return
+                payload = await resp.json()
+            current = payload.get("current", {})
+            self._neighbor_qc_cache = {
+                "temp_c": current.get("temperature_2m"),
+                "humidity": current.get("relative_humidity_2m"),
+                "pressure_hpa": current.get("surface_pressure"),
+                "fetched_at": dt_util.utcnow().isoformat(),
+            }
+        except Exception:  # noqa: BLE001
+            pass  # QC is advisory; never block main flow
+
+    def _compute_neighbor_qc(self, data: dict) -> None:
+        """Compare local readings against cached NWP grid point; populate flags."""
+        cache = getattr(self, "_neighbor_qc_cache", None)
+        flags: list[str] = []
+        if cache:
+            local_tc = data.get(KEY_NORM_TEMP_C)
+            local_rh = data.get(KEY_NORM_HUMIDITY)
+            local_press = data.get(KEY_NORM_PRESSURE_HPA)
+            nwp_tc = cache.get("temp_c")
+            nwp_rh = cache.get("humidity")
+            nwp_press = cache.get("pressure_hpa")
+            if local_tc is not None and nwp_tc is not None:
+                delta_t = abs(float(local_tc) - float(nwp_tc))
+                if delta_t > 8.0:
+                    flags.append(
+                        f"temperature: local {local_tc:.1f}°C vs NWP {nwp_tc:.1f}°C (Δ={delta_t:.1f}°C > 8°C)"
+                    )
+            if local_rh is not None and nwp_rh is not None:
+                delta_rh = abs(float(local_rh) - float(nwp_rh))
+                if delta_rh > 25.0:
+                    flags.append(
+                        f"humidity: local {local_rh:.0f}% vs NWP {nwp_rh:.0f}% (Δ={delta_rh:.0f}% > 25%)"
+                    )
+            if local_press is not None and nwp_press is not None:
+                delta_p = abs(float(local_press) - float(nwp_press))
+                if delta_p > 15.0:
+                    flags.append(
+                        f"pressure: local {local_press:.1f} hPa vs NWP {nwp_press:.1f} hPa (Δ={delta_p:.1f} > 15 hPa)"
+                    )
+        data[KEY_NEIGHBOR_QC] = flags
+
     def _compute_data_quality_score(self, data: dict) -> None:
         """Compute overall data quality score (0-100) and stuck-sensor flags.  (v2.0)"""
         stuck_flags: list[str] = []
@@ -2055,6 +2138,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         score -= min(30, len(stuck_flags) * 15)       # stuck sensors
         existing_drift = data.get(KEY_SENSOR_DRIFT_FLAGS) or []
         score -= min(20, len(existing_drift) * 10)    # drift
+        neighbor_flags = data.get(KEY_NEIGHBOR_QC) or []
+        score -= min(20, len(neighbor_flags) * 10)    # spatial neighbor QC
         if data.get(KEY_PACKAGE_STATUS) not in (None, "ok"):
             score -= 10
         data[KEY_DATA_QUALITY_SCORE] = max(0, min(100, score))
@@ -2880,6 +2965,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_degree_days(data, now, tc, dew_c, rh)
         self._compute_lightning(data, now)
         self._compute_indoor(data)
+        self._compute_neighbor_qc(data)
         self._compute_data_quality_score(data)
         self._compute_health(data, now, missing, missing_entities)
 
@@ -3098,7 +3184,40 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._compute_clearness_and_cloud(data)
 
         self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
+
+        # v2.0: fire HA Event entities for weather transitions
+        self._fire_ws_events(data)
+
         return data
+
+    def _fire_ws_events(self, data: dict) -> None:
+        """Notify event entities of transitions detected in this compute cycle."""
+        try:
+            entry_id = self.config_entry.entry_id
+        except Exception:  # noqa: BLE001
+            return
+        events = self.hass.data.get(DOMAIN, {}).get(f"{entry_id}_events", {})
+        if not events:
+            return
+        freeze_thresh = float(self.entry_options.get("thresh_freeze_c", 0.0))
+        rain_ent = events.get("WSRainEvent")
+        frost_ent = events.get("WSFrostEvent")
+        lightning_ent = events.get("WSLightningEvent")
+        if rain_ent:
+            try:
+                rain_ent.check_and_fire(data)
+            except Exception:  # noqa: BLE001
+                pass
+        if frost_ent:
+            try:
+                frost_ent.check_and_fire(data, threshold_c=freeze_thresh)
+            except Exception:  # noqa: BLE001
+                pass
+        if lightning_ent and self.lightning_enabled:
+            try:
+                lightning_ent.check_and_fire(data)
+            except Exception:  # noqa: BLE001
+                pass
 
     # ------------------------------------------------------------------
     # Moon / forecast helpers
