@@ -62,9 +62,13 @@ from .algorithms import (
     calculate_hdd_contribution,
     calculate_heat_index,
     calculate_humidex,
+    calculate_dominant_wind_direction,
+    calculate_irrigation_deficit,
     calculate_leaf_wetness,
+    calculate_max_solar_radiation,
     calculate_moon_illumination,
     calculate_rain_probability,
+    calculate_wind_direction_variability,
     calculate_specific_humidity,
     calculate_thsw_index,
     calculate_thw_index,
@@ -331,13 +335,19 @@ from .const import (
     KEY_CDD_SEASON,
     KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
+    KEY_DOMINANT_WIND_DIR,
     KEY_FREEZING_LEVEL_M,
     KEY_GDD_SEASON_V2,
     KEY_GDD_TODAY_V2,
     KEY_HDD_SEASON,
     KEY_HDD_TODAY_MM,
+    KEY_IRRIGATION_DEFICIT,
     KEY_LEAF_WETNESS,
+    KEY_MAX_SOLAR_RADIATION,
+    KEY_PEAK_SUN_HOURS,
     KEY_RAIN_RATE_MAX_24H,
+    KEY_SOLAR_ENERGY_TODAY_WHM2,
+    KEY_WIND_DIR_VARIABILITY,
     KEY_RAIN_THIS_MONTH_MM,
     KEY_RAIN_THIS_WEEK_MM,
     KEY_RAIN_THIS_YEAR_MM,
@@ -639,6 +649,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._wind_run_km: float = 0.0
         self._wind_run_date: str = ""
         self._wind_run_last_ts: Any = None
+
+        # v2.0 Solar energy accumulation (Wh/m²) - resets at midnight
+        self._solar_energy_today_whm2: float = 0.0
+        self._solar_energy_date: str = ""
+        self._solar_energy_last_ts: Any = None
+
+        # v2.0 Wind direction history for dominant direction + variability (24h)
+        self._wind_dir_history_24h: deque = deque()
 
         # Chill hour accumulators
         self._chill_hours_today: float = 0.0
@@ -1321,6 +1339,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if gf is not None:
                 data[KEY_WIND_GUST_FACTOR] = gf
 
+        # v2.0 dominant wind direction + variability (24h circular stats)
+        if wind_dir is not None:
+            self._append_and_prune_24h(self._wind_dir_history_24h, now, float(wind_dir))
+        if self._wind_dir_history_24h:
+            dir_vals = [v for _, v in self._wind_dir_history_24h]
+            dom = calculate_dominant_wind_direction(dir_vals)
+            if dom is not None:
+                data[KEY_DOMINANT_WIND_DIR] = dom
+            var = calculate_wind_direction_variability(dir_vals)
+            if var is not None:
+                data[KEY_WIND_DIR_VARIABILITY] = var
+
     def _compute_derived_precipitation(self, data: dict, now: Any, rain_total_mm: float | None) -> float:
         """Rain rate (Kalman-filtered), rain display. Returns rain_rate (filtered)."""
         rt = self.runtime
@@ -1669,6 +1699,32 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         data[KEY_ET0_DAILY_MM] = et0_daily
         data[KEY_ET0_HOURLY_MM] = et0_hourly_estimate(et0_daily, now.hour)
+
+        # v2.0 Max theoretical (clear-sky) solar radiation
+        doy = now.timetuple().tm_yday
+        max_solar = calculate_max_solar_radiation(lat_f, doy, self.elevation_m)
+        data[KEY_MAX_SOLAR_RADIATION] = max_solar
+
+        # v2.0 Irrigation water deficit (ET₀ − today's rain)
+        rain_today = data.get("_rain_today_mm", 0.0) or 0.0
+        data[KEY_IRRIGATION_DEFICIT] = calculate_irrigation_deficit(float(et0_daily), float(rain_today))
+
+        # v2.0 Solar energy accumulation (Wh/m²) — requires solar radiation sensor
+        solar_rad = self._get_solar_radiation()
+        if solar_rad is not None:
+            now_local = dt_util.now()
+            solar_date = now_local.strftime("%Y-%m-%d")
+            if solar_date != self._solar_energy_date:
+                self._solar_energy_today_whm2 = 0.0
+                self._solar_energy_date = solar_date
+                self._solar_energy_last_ts = None
+            if self._solar_energy_last_ts is not None:
+                dt_h = (now_local - self._solar_energy_last_ts).total_seconds() / 3600.0
+                if 0 < dt_h < 2:  # guard against stale readings or restarts
+                    self._solar_energy_today_whm2 += float(solar_rad) * dt_h
+            self._solar_energy_last_ts = now_local
+            data[KEY_SOLAR_ENERGY_TODAY_WHM2] = round(self._solar_energy_today_whm2, 0)
+            data[KEY_PEAK_SUN_HOURS] = round(self._solar_energy_today_whm2 / 1000.0, 2)
 
     def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list) -> None:
         """Staleness, package status, data quality, configurable alerts."""

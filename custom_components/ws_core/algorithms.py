@@ -2250,3 +2250,82 @@ def calculate_leaf_wetness(temp_c: float, dew_c: float, rh: float) -> bool:
     """
     depression = temp_c - dew_c
     return bool(depression < 2.0 and rh >= 90.0)
+
+
+# ===========================================================================
+# v2.0 - Solar energy accumulation, max theoretical solar radiation,
+#         irrigation water deficit, dominant wind direction
+# ===========================================================================
+
+
+def calculate_max_solar_radiation(lat_deg: float, day_of_year: int, elevation_m: float = 0.0) -> float:
+    """Maximum possible (clear-sky) solar radiation at the surface (W/m²).
+
+    Uses the Bras (1990) clear-sky model:
+      Ra = extra-terrestrial radiation * (a + b × n/N)
+    Simplified to use the FAO-56 top-of-atmosphere radiation (Ra) and the
+    empirical Ångström transmittance: Rso ≈ (0.75 + 2×10⁻⁵ × elevation) × Ra.
+
+    Reference: Allen et al. (1998), FAO Irrigation and Drainage Paper 56, §3.
+    """
+    lat_rad = math.radians(lat_deg)
+    dr = 1.0 + 0.033 * math.cos(2.0 * math.pi * day_of_year / 365.0)
+    decl = 0.409 * math.sin(2.0 * math.pi * day_of_year / 365.0 - 1.39)
+    ws = math.acos(-math.tan(lat_rad) * math.tan(decl))
+    # Extra-terrestrial radiation (MJ m⁻² day⁻¹)
+    Gsc = 0.0820  # solar constant (MJ m⁻² min⁻¹)
+    Ra = (24.0 * 60.0 / math.pi) * Gsc * dr * (
+        ws * math.sin(lat_rad) * math.sin(decl)
+        + math.cos(lat_rad) * math.cos(decl) * math.sin(ws)
+    )
+    # Clear-sky surface radiation (FAO-56 Eq. 37)
+    Rso = (0.75 + 2e-5 * max(0.0, elevation_m)) * Ra
+    # Convert MJ m⁻² day⁻¹ → W m⁻² (divide by 86400 s/day × 10⁻⁶ MJ/J)
+    return round(max(0.0, Rso * 1e6 / 86400.0), 1)
+
+
+def calculate_irrigation_deficit(et0_daily_mm: float, rain_today_mm: float) -> float:
+    """Irrigation water deficit (mm): crop water need minus rainfall today.
+
+    Positive values indicate irrigation is needed; zero or negative means
+    rainfall alone covers the reference evapotranspiration demand.
+    The deficit accumulates over the day and resets with each new day's rain.
+    """
+    return round(max(0.0, et0_daily_mm - rain_today_mm), 2)
+
+
+def calculate_dominant_wind_direction(directions: list[float]) -> float | None:
+    """Dominant wind direction (°) from a sample of directions.
+
+    Uses circular mean of the sample rather than a simple histogram mode,
+    which avoids the boundary artefact at 0°/360°.
+    Returns None if the sample is empty.
+    Reference: Mardia & Jupp (2000), Directional Statistics.
+    """
+    if not directions:
+        return None
+    rads = [math.radians(d) for d in directions]
+    sin_mean = sum(math.sin(r) for r in rads) / len(rads)
+    cos_mean = sum(math.cos(r) for r in rads) / len(rads)
+    mean_dir = math.degrees(math.atan2(sin_mean, cos_mean)) % 360.0
+    return round(mean_dir, 1)
+
+
+def calculate_wind_direction_variability(directions: list[float]) -> float | None:
+    """Circular standard deviation of wind directions (°).
+
+    Uses the circular standard deviation formula: σ = √(−2 × ln(R̄))
+    where R̄ is the mean resultant length.  A value of 0° means perfectly
+    steady direction; high values (>60°) indicate highly variable/gusty flow.
+    Returns None if fewer than 2 samples are available.
+    Reference: Mardia & Jupp (2000), Directional Statistics.
+    """
+    if len(directions) < 2:
+        return None
+    rads = [math.radians(d) for d in directions]
+    sin_mean = sum(math.sin(r) for r in rads) / len(rads)
+    cos_mean = sum(math.cos(r) for r in rads) / len(rads)
+    r_bar = math.sqrt(sin_mean**2 + cos_mean**2)
+    r_bar = min(r_bar, 1.0 - 1e-9)
+    csd = math.degrees(math.sqrt(-2.0 * math.log(r_bar)))
+    return round(csd, 1)

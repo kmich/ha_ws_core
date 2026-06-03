@@ -163,19 +163,25 @@ from .const import (
     KEY_CDD_SEASON,
     KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
+    KEY_DOMINANT_WIND_DIR,
     KEY_FREEZING_LEVEL_M,
     KEY_GDD_SEASON_V2,
     KEY_GDD_TODAY_V2,
     KEY_HDD_SEASON,
     KEY_HDD_TODAY_MM,
+    KEY_IRRIGATION_DEFICIT,
     KEY_LEAF_WETNESS,
+    KEY_MAX_SOLAR_RADIATION,
+    KEY_PEAK_SUN_HOURS,
     KEY_RAIN_RATE_MAX_24H,
     KEY_RAIN_THIS_MONTH_MM,
     KEY_RAIN_THIS_WEEK_MM,
     KEY_RAIN_THIS_YEAR_MM,
+    KEY_SOLAR_ENERGY_TODAY_WHM2,
     KEY_SPECIFIC_HUMIDITY,
     KEY_WBGT,
     KEY_WIND_DIR_SMOOTH_DEG,
+    KEY_WIND_DIR_VARIABILITY,
     KEY_WIND_GUST_FACTOR,
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
@@ -1074,6 +1080,29 @@ SENSORS: list[WSSensorDescription] = [
             "wind_ms": d.get(KEY_NORM_WIND_SPEED_MS),
         },
     ),
+    # v2.0 Dominant wind direction (circular mean over 24h)
+    WSSensorDescription(
+        key=KEY_DOMINANT_WIND_DIR,
+        translation_key="dominant_wind_direction",
+        name="WS Dominant Wind Direction",
+        icon="mdi:compass-rose",
+        device_class=SensorDeviceClass.WIND_DIRECTION,
+        native_unit="°",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "variability_deg": d.get(KEY_WIND_DIR_VARIABILITY),
+        },
+    ),
+    # v2.0 Wind direction variability (circular std dev over 24h)
+    WSSensorDescription(
+        key=KEY_WIND_DIR_VARIABILITY,
+        translation_key="wind_direction_variability",
+        name="WS Wind Direction Variability",
+        icon="mdi:compass-outline",
+        native_unit="°",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     # =========================================================================
     # DISPLAY / LEVEL SENSORS
     # =========================================================================
@@ -1419,6 +1448,52 @@ SENSORS: list[WSSensorDescription] = [
             "hargreaves_et0": d.get(KEY_ET0_DAILY_MM),
         },
     ),
+    # v2.0 — Irrigation water deficit (ET₀ − rain today)
+    WSSensorDescription(
+        key=KEY_IRRIGATION_DEFICIT,
+        translation_key="irrigation_deficit",
+        name="WS Irrigation Deficit",
+        icon="mdi:water-sync",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit="mm",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "et0_daily_mm": d.get(KEY_ET0_DAILY_MM),
+            "rain_today_mm": d.get("_rain_today_mm"),
+        },
+    ),
+    # v2.0 — Max theoretical solar radiation (clear-sky model)
+    WSSensorDescription(
+        key=KEY_MAX_SOLAR_RADIATION,
+        translation_key="max_solar_radiation",
+        name="WS Max Solar Radiation",
+        icon="mdi:sun-wireless",
+        native_unit="W/m²",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # v2.0 — Daily solar energy accumulation (Wh/m²) — when solar radiation sensor mapped
+    WSSensorDescription(
+        key=KEY_SOLAR_ENERGY_TODAY_WHM2,
+        translation_key="solar_energy_today",
+        name="WS Solar Energy Today",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit="Wh/m²",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        attrs_fn=lambda d: {
+            "peak_sun_hours": d.get(KEY_PEAK_SUN_HOURS),
+        },
+    ),
+    # v2.0 — Peak sun hours (Wh/m² / 1000)
+    WSSensorDescription(
+        key=KEY_PEAK_SUN_HOURS,
+        translation_key="peak_sun_hours",
+        name="WS Peak Sun Hours",
+        icon="mdi:weather-sunny",
+        native_unit="h",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     # =========================================================================
     # v1.2.0 - NEW METEOROLOGICAL SENSORS
     # =========================================================================
@@ -1655,6 +1730,11 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_GDD_TODAY_V2: CONF_ENABLE_DEGREE_DAYS,
     KEY_GDD_SEASON_V2: CONF_ENABLE_DEGREE_DAYS,
     KEY_LEAF_WETNESS: CONF_ENABLE_DEGREE_DAYS,
+    # v2.0 - solar energy (comfort indices group, needs solar radiation sensor)
+    KEY_SOLAR_ENERGY_TODAY_WHM2: CONF_ENABLE_COMFORT_INDICES,
+    KEY_MAX_SOLAR_RADIATION: CONF_ENABLE_COMFORT_INDICES,
+    KEY_PEAK_SUN_HOURS: CONF_ENABLE_COMFORT_INDICES,
+    KEY_IRRIGATION_DEFICIT: CONF_ENABLE_COMFORT_INDICES,
     # v1.6.0 French regional
     KEY_VIGILANCE_MAX_LEVEL: CONF_ENABLE_VIGILANCE_METEO,
     KEY_FIRE_DANGER_VIGILANCE: CONF_ENABLE_VIGILANCE_METEO,
@@ -1747,6 +1827,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_RAIN_THIS_MONTH_MM,
         KEY_RAIN_THIS_YEAR_MM,
         KEY_RAIN_RATE_MAX_24H,
+        KEY_SOLAR_ENERGY_TODAY_WHM2,
+        KEY_PEAK_SUN_HOURS,
     }
 
     # v1.6.2: _DISABLED_BY_DEFAULT removed. Previously-disabled sensors are now
@@ -1929,6 +2011,13 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_GDD_TODAY_V2: "gdd_today",
             KEY_GDD_SEASON_V2: "gdd_season",
             KEY_LEAF_WETNESS: "leaf_wetness",
+            # v2.0 batch 3
+            KEY_DOMINANT_WIND_DIR: "dominant_wind_direction",
+            KEY_WIND_DIR_VARIABILITY: "wind_direction_variability",
+            KEY_SOLAR_ENERGY_TODAY_WHM2: "solar_energy_today",
+            KEY_MAX_SOLAR_RADIATION: "max_solar_radiation",
+            KEY_PEAK_SUN_HOURS: "peak_sun_hours",
+            KEY_IRRIGATION_DEFICIT: "irrigation_deficit",
         }
         if key in overrides:
             return overrides[key]

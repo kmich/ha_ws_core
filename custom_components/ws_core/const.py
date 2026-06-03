@@ -594,6 +594,16 @@ KEY_CLOUD_BASE_M = "cloud_base_m"
 KEY_FREEZING_LEVEL_M = "freezing_level_m"
 KEY_WIND_GUST_FACTOR = "wind_gust_factor"
 
+# Solar / agro extensions (comfort indices or solar group)
+KEY_SOLAR_ENERGY_TODAY_WHM2 = "solar_energy_today_whm2"  # Wh/m² — daily accumulation
+KEY_MAX_SOLAR_RADIATION = "max_solar_radiation_wm2"       # Clear-sky theoretical max
+KEY_PEAK_SUN_HOURS = "peak_sun_hours"                     # Wh/m² / 1000
+KEY_IRRIGATION_DEFICIT = "irrigation_deficit_mm"          # ET₀ - rain today
+
+# Wind statistics (always-on wind group)
+KEY_DOMINANT_WIND_DIR = "dominant_wind_direction_deg"
+KEY_WIND_DIR_VARIABILITY = "wind_direction_variability_deg"
+
 # Comfort indices group (opt-in via CONF_ENABLE_COMFORT_INDICES)
 KEY_AIR_DENSITY = "air_density_kg_m3"
 KEY_SPECIFIC_HUMIDITY = "specific_humidity_g_kg"

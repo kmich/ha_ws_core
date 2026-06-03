@@ -1471,6 +1471,37 @@
           "humidity_pct": { "name": "Humidity" },
           "rain_rate_mmph": { "name": "Rain rate" }
         }
+      },
+      "dominant_wind_direction": {
+        "name": "Dominant Wind Direction",
+        "state_attributes": {
+          "variability_deg": { "name": "Direction variability" }
+        }
+      },
+      "wind_direction_variability": {
+        "name": "Wind Direction Variability"
+      },
+      "solar_energy_today": {
+        "name": "Solar Energy Today",
+        "state_attributes": {
+          "peak_sun_hours": { "name": "Peak sun hours" }
+        }
+      },
+      "max_solar_radiation": {
+        "name": "Max Solar Radiation (Clear Sky)"
+      },
+      "peak_sun_hours": {
+        "name": "Peak Sun Hours"
+      },
+      "irrigation_deficit": {
+        "name": "Irrigation Deficit",
+        "state_attributes": {
+          "et0_daily_mm": { "name": "ET₀ today" },
+          "rain_today_mm": { "name": "Rain today" }
+        }
+      },
+      "et0_pm_daily": {
+        "name": "ET₀ Penman-Monteith (Daily)"
       }
     },
     "select": {
