@@ -21,6 +21,8 @@ from .const import (
     CONF_ENABLE_AIR_QUALITY,
     # v1.5.0
     CONF_ENABLE_COMFORT_INDICES,
+    # v2.0
+    CONF_ENABLE_DEGREE_DAYS,
     # v1.6.2
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
@@ -158,8 +160,15 @@ from .const import (
     KEY_WIND_BEAUFORT_DESC,
     KEY_WIND_CHILL,
     KEY_AIR_DENSITY,
+    KEY_CDD_SEASON,
+    KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
     KEY_FREEZING_LEVEL_M,
+    KEY_GDD_SEASON_V2,
+    KEY_GDD_TODAY_V2,
+    KEY_HDD_SEASON,
+    KEY_HDD_TODAY_MM,
+    KEY_LEAF_WETNESS,
     KEY_RAIN_RATE_MAX_24H,
     KEY_RAIN_THIS_MONTH_MM,
     KEY_RAIN_THIS_WEEK_MM,
@@ -619,6 +628,70 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:snowflake-variant",
         native_unit="h",
         state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    # =========================================================================
+    # v2.0 DEGREE DAYS + LEAF WETNESS (opt-in group)
+    # =========================================================================
+    WSSensorDescription(
+        key=KEY_HDD_TODAY_MM,
+        translation_key="hdd_today",
+        name="WS Heating Degree Day",
+        icon="mdi:thermometer-chevron-down",
+        native_unit="°C·d",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {"base_c": 18.0},
+    ),
+    WSSensorDescription(
+        key=KEY_HDD_SEASON,
+        translation_key="hdd_season",
+        name="WS Heating Degree Days Season",
+        icon="mdi:thermometer-chevron-down",
+        native_unit="°C·d",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    WSSensorDescription(
+        key=KEY_CDD_TODAY_MM,
+        translation_key="cdd_today",
+        name="WS Cooling Degree Day",
+        icon="mdi:thermometer-chevron-up",
+        native_unit="°C·d",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_CDD_SEASON,
+        translation_key="cdd_season",
+        name="WS Cooling Degree Days Season",
+        icon="mdi:thermometer-chevron-up",
+        native_unit="°C·d",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    WSSensorDescription(
+        key=KEY_GDD_TODAY_V2,
+        translation_key="gdd_today",
+        name="WS Growing Degree Day",
+        icon="mdi:sprout",
+        native_unit="°C·d",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {"base_c": 10.0, "cap_c": 30.0},
+    ),
+    WSSensorDescription(
+        key=KEY_GDD_SEASON_V2,
+        translation_key="gdd_season",
+        name="WS Growing Degree Days Season",
+        icon="mdi:sprout-outline",
+        native_unit="°C·d",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    WSSensorDescription(
+        key=KEY_LEAF_WETNESS,
+        translation_key="leaf_wetness",
+        name="WS Leaf Wetness",
+        icon="mdi:leaf-maple",
+        attrs_fn=lambda d: {
+            "dew_point_c": d.get(KEY_DEW_POINT_C),
+            "humidity_pct": d.get(KEY_NORM_HUMIDITY),
+            "rain_rate_mmph": d.get(KEY_RAIN_RATE_FILT),
+        },
     ),
     # =========================================================================
     # v1.5.0 SOLAR / CLOUD SENSORS
@@ -1574,6 +1647,14 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_AIR_DENSITY: CONF_ENABLE_COMFORT_INDICES,
     KEY_SPECIFIC_HUMIDITY: CONF_ENABLE_COMFORT_INDICES,
     KEY_WBGT: CONF_ENABLE_COMFORT_INDICES,
+    # v2.0 - degree days + leaf wetness (new opt-in group)
+    KEY_HDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
+    KEY_HDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
+    KEY_CDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
+    KEY_CDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
+    KEY_GDD_TODAY_V2: CONF_ENABLE_DEGREE_DAYS,
+    KEY_GDD_SEASON_V2: CONF_ENABLE_DEGREE_DAYS,
+    KEY_LEAF_WETNESS: CONF_ENABLE_DEGREE_DAYS,
     # v1.6.0 French regional
     KEY_VIGILANCE_MAX_LEVEL: CONF_ENABLE_VIGILANCE_METEO,
     KEY_FIRE_DANGER_VIGILANCE: CONF_ENABLE_VIGILANCE_METEO,
@@ -1841,6 +1922,13 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_RAIN_THIS_MONTH_MM: "rain_this_month",
             KEY_RAIN_THIS_YEAR_MM: "rain_this_year",
             KEY_RAIN_RATE_MAX_24H: "rain_rate_max_24h",
+            KEY_HDD_TODAY_MM: "hdd_today",
+            KEY_HDD_SEASON: "hdd_season",
+            KEY_CDD_TODAY_MM: "cdd_today",
+            KEY_CDD_SEASON: "cdd_season",
+            KEY_GDD_TODAY_V2: "gdd_today",
+            KEY_GDD_SEASON_V2: "gdd_season",
+            KEY_LEAF_WETNESS: "leaf_wetness",
         }
         if key in overrides:
             return overrides[key]

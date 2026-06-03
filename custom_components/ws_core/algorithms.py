@@ -2180,3 +2180,73 @@ def derive_nowcast(
                 break
 
     return result
+
+
+# ===========================================================================
+# v2.0 - Degree days (HDD / CDD / GDD) and leaf wetness
+# ===========================================================================
+
+
+def calculate_hdd_contribution(temp_c: float, base_c: float = 18.0) -> float:
+    """Heating Degree Day contribution for one observation interval.
+
+    Returns the positive difference between the base temperature and air
+    temperature; zero when temperature is at or above the base.
+    Callers accumulate the daily total and divide by the number of samples
+    to get degree-days.
+    Reference: WMO TD-No. 1500 (2009).
+    """
+    return max(0.0, base_c - temp_c)
+
+
+def calculate_cdd_contribution(temp_c: float, base_c: float = 18.0) -> float:
+    """Cooling Degree Day contribution for one observation interval.
+
+    Returns the positive difference between air temperature and the base;
+    zero when temperature is at or below the base.
+    Reference: WMO TD-No. 1500 (2009).
+    """
+    return max(0.0, temp_c - base_c)
+
+
+def calculate_gdd_contribution(tmax_c: float, tmin_c: float, base_c: float = 10.0, cap_c: float = 30.0) -> float:
+    """Growing Degree Day (GDD) contribution for one day.
+
+    Uses the modified mean method:
+      mean = (min(tmax, cap) + max(tmin, base)) / 2
+      GDD = max(0, mean - base)
+
+    Parameters
+    ----------
+    tmax_c : float
+        Daily maximum temperature (°C).
+    tmin_c : float
+        Daily minimum temperature (°C).
+    base_c : float
+        Base temperature below which growth is negligible (default 10°C).
+    cap_c : float
+        Upper threshold; temperatures above this do not accelerate growth
+        (default 30°C, common for many crops).
+    Reference: McMaster & Wilhelm (1997), Agric Forest Meteorol 87:291-300.
+    """
+    effective_max = min(tmax_c, cap_c)
+    effective_min = max(tmin_c, base_c)
+    if effective_min > effective_max:
+        return 0.0
+    mean = (effective_max + effective_min) / 2.0
+    return max(0.0, mean - base_c)
+
+
+def calculate_leaf_wetness(temp_c: float, dew_c: float, rh: float) -> bool:
+    """Leaf wetness indicator (boolean).
+
+    Leaf wetness occurs when:
+      • Dew-point depression (T − Td) < 2°C AND relative humidity ≥ 90%, OR
+      • Rain is falling (handled by the caller via rain_rate > 0).
+
+    Returns True when leaf surfaces are likely wet (favourable for fungal
+    disease; relevant for spray timing decisions).
+    Reference: Gleason et al. (1994), Plant Disease 78:1099-1103.
+    """
+    depression = temp_c - dew_c
+    return bool(depression < 2.0 and rh >= 90.0)

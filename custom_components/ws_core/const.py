@@ -561,6 +561,31 @@ KEY_NOWCAST_INTENSITY = "nowcast_intensity"
 KEY_RAIN_EXPECTED_1H = "rain_expected_1h"
 
 # ---------------------------------------------------------------------------
+# v2.0 - Degree days + leaf wetness (new agrometeorological group)
+# ---------------------------------------------------------------------------
+
+CONF_ENABLE_DEGREE_DAYS = "enable_degree_days"
+CONF_HDD_BASE_C = "hdd_base_c"
+CONF_CDD_BASE_C = "cdd_base_c"
+CONF_GDD_BASE_C = "gdd_base_c"
+CONF_GDD_CAP_C_V2 = "gdd_cap_c_v2"  # renamed to avoid clash with legacy CONF_GDD_CAP_C
+
+DEFAULT_ENABLE_DEGREE_DAYS = False
+DEFAULT_HDD_BASE_C = 18.0   # standard WMO base for heating/cooling degree days
+DEFAULT_CDD_BASE_C = 18.0
+DEFAULT_GDD_BASE_C = 10.0   # standard base for most crops; user can tune
+DEFAULT_GDD_CAP_C_V2 = 30.0
+
+# Data keys - degree days (daily accumulators)
+KEY_HDD_TODAY_MM = "hdd_today_degc"       # Heating Degree Day (today)
+KEY_HDD_SEASON = "hdd_season_degc"        # Heating Degree Day (seasonal total)
+KEY_CDD_TODAY_MM = "cdd_today_degc"       # Cooling Degree Day (today)
+KEY_CDD_SEASON = "cdd_season_degc"        # Cooling Degree Day (seasonal total)
+KEY_GDD_TODAY_V2 = "gdd_today_v2_degc"   # Growing Degree Day (today)
+KEY_GDD_SEASON_V2 = "gdd_season_v2_degc" # Growing Degree Day (seasonal total)
+KEY_LEAF_WETNESS = "leaf_wetness"         # Leaf wetness indicator (bool→text)
+
+# ---------------------------------------------------------------------------
 # v2.0 - New derived sensors (always-on or comfort-group opt-in)
 # ---------------------------------------------------------------------------
 

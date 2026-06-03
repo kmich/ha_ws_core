@@ -51,14 +51,18 @@ from .algorithms import (
     calculate_absolute_humidity,
     calculate_air_density,
     calculate_apparent_temperature,
+    calculate_cdd_contribution,
     calculate_clearness_index,
     calculate_cloud_base_m,
     calculate_delta_t,
     calculate_dew_point,
     calculate_freezing_level_m,
     calculate_frost_point,
+    calculate_gdd_contribution,
+    calculate_hdd_contribution,
     calculate_heat_index,
     calculate_humidex,
+    calculate_leaf_wetness,
     calculate_moon_illumination,
     calculate_rain_probability,
     calculate_specific_humidity,
@@ -106,9 +110,14 @@ from .const import (
     CONF_CHILL_SEASON_RESET_MONTH,
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
+    CONF_CDD_BASE_C,
     CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_COMFORT_INDICES,
+    CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_FIRE_RISK,
+    CONF_GDD_BASE_C,
+    CONF_GDD_CAP_C_V2,
+    CONF_HDD_BASE_C,
     # v0.6.0 new
     # v0.5.0 new
     CONF_ENABLE_FOG,
@@ -158,9 +167,14 @@ from .const import (
     DEFAULT_CHILL_SEASON_RESET_DAY,
     DEFAULT_CHILL_SEASON_RESET_MONTH,
     DEFAULT_CLIMATE_REGION,
+    DEFAULT_CDD_BASE_C,
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_COMFORT_INDICES,
+    DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_FIRE_RISK,
+    DEFAULT_GDD_BASE_C,
+    DEFAULT_GDD_CAP_C_V2,
+    DEFAULT_HDD_BASE_C,
     DEFAULT_ENABLE_FOG,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_NOWCAST,
@@ -314,8 +328,15 @@ from .const import (
     KEY_WIND_QUADRANT,
     KEY_WIND_RUN_KM,
     KEY_AIR_DENSITY,
+    KEY_CDD_SEASON,
+    KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
     KEY_FREEZING_LEVEL_M,
+    KEY_GDD_SEASON_V2,
+    KEY_GDD_TODAY_V2,
+    KEY_HDD_SEASON,
+    KEY_HDD_TODAY_MM,
+    KEY_LEAF_WETNESS,
     KEY_RAIN_RATE_MAX_24H,
     KEY_RAIN_THIS_MONTH_MM,
     KEY_RAIN_THIS_WEEK_MM,
@@ -470,7 +491,32 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sea_temp_lon = _get(CONF_SEA_TEMP_LON, None)
         self._sea_temp_cache: dict[str, Any] | None = None
 
-        # v0.3.0: degree days removed entirely (HDD/CDD/GDD)
+        # v2.0: degree days restored with improved implementation
+        self.degree_days_enabled = bool(_get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS))
+        self._hdd_base_c = float(_get(CONF_HDD_BASE_C, DEFAULT_HDD_BASE_C))
+        self._cdd_base_c = float(_get(CONF_CDD_BASE_C, DEFAULT_CDD_BASE_C))
+        self._gdd_base_c = float(_get(CONF_GDD_BASE_C, DEFAULT_GDD_BASE_C))
+        self._gdd_cap_c = float(_get(CONF_GDD_CAP_C_V2, DEFAULT_GDD_CAP_C_V2))
+
+        # HDD/CDD accumulators: today (rolling from sub-daily samples) + season
+        self._hdd_today: float = 0.0
+        self._hdd_today_date: str = ""
+        self._hdd_today_samples: int = 0
+        self._cdd_today: float = 0.0
+        self._cdd_today_date: str = ""
+        self._cdd_today_samples: int = 0
+        # HDD/CDD season (Jul 1 for northern hemisphere heating season)
+        self._hdd_season: float = 0.0
+        self._hdd_season_key: str = ""  # "YYYY-Hs" heating-season year
+        self._cdd_season: float = 0.0
+        self._cdd_season_key: str = ""
+
+        # GDD accumulator: single season with configurable reset
+        self._gdd_today: float = 0.0
+        self._gdd_today_date: str = ""
+        self._gdd_season: float = 0.0
+        self._gdd_season_key: str = ""
+
         # v0.3.0: Fire risk score (kept; opt-in via wizard)
         self.fire_risk_enabled = bool(_get(CONF_ENABLE_FIRE_RISK, DEFAULT_ENABLE_FIRE_RISK))
 
@@ -1514,6 +1560,81 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_forecast_agreement_api_precip_prob"] = round(api_precip_prob)
         data["_forecast_agreement_delta"] = round(delta)
 
+    def _compute_degree_days(self, data: dict, now: Any, tc: float | None, dew_c: float | None, rh: float | None) -> None:
+        """Heating / Cooling / Growing Degree Days and leaf wetness.  (v2.0)
+
+        HDD and CDD accumulate from sub-hourly temperature samples throughout
+        the day (averaged contribution per sample).  GDD uses the daily
+        max/min from the 24h rolling window, consistent with agronomic practice.
+        """
+        if not self.degree_days_enabled or tc is None:
+            return
+
+        date_str = dt_util.now().strftime("%Y-%m-%d")
+        now_local = dt_util.now()
+
+        # --- HDD today (rolling mean of per-sample contributions) ---
+        hdd_contrib = calculate_hdd_contribution(float(tc), self._hdd_base_c)
+        if date_str != self._hdd_today_date:
+            self._hdd_today = 0.0
+            self._hdd_today_date = date_str
+            self._hdd_today_samples = 0
+        self._hdd_today_samples += 1
+        # Welford-style running mean to avoid overflow
+        self._hdd_today += (hdd_contrib - self._hdd_today) / self._hdd_today_samples
+        data[KEY_HDD_TODAY_MM] = round(self._hdd_today, 2)
+
+        # --- CDD today ---
+        cdd_contrib = calculate_cdd_contribution(float(tc), self._cdd_base_c)
+        if date_str != self._cdd_today_date:
+            self._cdd_today = 0.0
+            self._cdd_today_date = date_str
+            self._cdd_today_samples = 0
+        self._cdd_today_samples += 1
+        self._cdd_today += (cdd_contrib - self._cdd_today) / self._cdd_today_samples
+        data[KEY_CDD_TODAY_MM] = round(self._cdd_today, 2)
+
+        # --- GDD today (from 24h rolling max/min; only meaningful after warmup) ---
+        t_max = data.get(KEY_TEMP_HIGH_24H)
+        t_min = data.get(KEY_TEMP_LOW_24H)
+        if t_max is not None and t_min is not None:
+            gdd = calculate_gdd_contribution(float(t_max), float(t_min), self._gdd_base_c, self._gdd_cap_c)
+            if date_str != self._gdd_today_date:
+                self._gdd_today = gdd
+                self._gdd_today_date = date_str
+            else:
+                self._gdd_today = gdd  # refresh with latest 24h window
+            data[KEY_GDD_TODAY_V2] = round(self._gdd_today, 2)
+
+        # --- HDD / CDD season accumulators (reset Jan 1) ---
+        year_key = now_local.strftime("%Y")
+        if year_key != self._hdd_season_key:
+            self._hdd_season = 0.0
+            self._hdd_season_key = year_key
+        # Accumulate once per day (use today's completed HDD/CDD when day ticks over)
+        if hasattr(self, "_hdd_prev_date") and self._hdd_prev_date != date_str:
+            self._hdd_season += self._hdd_today
+            self._cdd_season += self._cdd_today
+        self._hdd_prev_date = date_str  # type: ignore[attr-defined]
+        data[KEY_HDD_SEASON] = round(self._hdd_season, 1)
+        data[KEY_CDD_SEASON] = round(self._cdd_season, 1)
+
+        # --- GDD season ---
+        gdd_season_key = now_local.strftime("%Y")
+        if gdd_season_key != self._gdd_season_key:
+            self._gdd_season = 0.0
+            self._gdd_season_key = gdd_season_key
+        if hasattr(self, "_gdd_prev_date") and self._gdd_prev_date != date_str and data.get(KEY_GDD_TODAY_V2) is not None:
+            self._gdd_season += data[KEY_GDD_TODAY_V2]
+        self._gdd_prev_date = date_str  # type: ignore[attr-defined]
+        data[KEY_GDD_SEASON_V2] = round(self._gdd_season, 1)
+
+        # --- Leaf wetness (boolean → text) ---
+        if dew_c is not None and rh is not None:
+            rain_rate = data.get(KEY_RAIN_RATE_FILT, 0.0) or 0.0
+            wet = calculate_leaf_wetness(float(tc), float(dew_c), float(rh)) or float(rain_rate) > 0.0
+            data[KEY_LEAF_WETNESS] = "wet" if wet else "dry"
+
     def _compute_et0(self, data: dict, now: Any) -> None:
         """Calculate ET₀ (reference evapotranspiration) via Hargreaves-Samani.  (v0.6.0)
 
@@ -2321,6 +2442,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_fire_danger_level"] = danger
 
         self._compute_et0(data, now)
+        self._compute_degree_days(data, now, tc, dew_c, rh)
         self._compute_health(data, now, missing, missing_entities)
 
         # v0.3.0: renamed _compute_fog_precip_type -> _compute_fog_and_thunderstorm

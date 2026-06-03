@@ -24,6 +24,7 @@ from .const import (
     CONF_ENABLE_ADVANCED_SENSORS,
     CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_COMFORT_INDICES,
+    CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_FIRE_RISK,
@@ -43,6 +44,7 @@ from .const import (
     DEFAULT_ENABLE_ADVANCED_SENSORS,
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_COMFORT_INDICES,
+    DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_DISPLAY_SENSORS,
     DEFAULT_ENABLE_FIRE_RISK,
@@ -189,6 +191,13 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_NOWCAST,
         name="Feature: Precipitation Nowcast",
         icon="mdi:weather-pouring",
+    ),
+    # v2.0
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_DEGREE_DAYS,
+        default=DEFAULT_ENABLE_DEGREE_DAYS,
+        name="Feature: Degree Days & Leaf Wetness",
+        icon="mdi:sprout",
     ),
     # v1.8.4 (issue #20) — inverted: ON means notifications enabled (suppress=False)
     WSFeatureDesc(
