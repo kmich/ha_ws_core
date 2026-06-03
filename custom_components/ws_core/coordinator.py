@@ -49,21 +49,28 @@ from .algorithms import (
     aqi_level,
     beaufort_description,
     calculate_absolute_humidity,
+    calculate_air_density,
     calculate_apparent_temperature,
     calculate_clearness_index,
+    calculate_cloud_base_m,
     calculate_delta_t,
     calculate_dew_point,
+    calculate_freezing_level_m,
     calculate_frost_point,
     calculate_heat_index,
     calculate_humidex,
     calculate_moon_illumination,
     calculate_rain_probability,
+    calculate_specific_humidity,
     calculate_thsw_index,
     calculate_thw_index,
     calculate_us_aqi,
     calculate_vpd,
+    calculate_wbgt_outdoor,
+    calculate_wbgt_simplified,
     calculate_wet_bulb,
     calculate_wind_chill,
+    calculate_wind_gust_factor,
     clearness_to_cloud_cover,
     combine_rain_probability,
     compute_fwi,
@@ -306,6 +313,16 @@ from .const import (
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
     KEY_WIND_RUN_KM,
+    KEY_AIR_DENSITY,
+    KEY_CLOUD_BASE_M,
+    KEY_FREEZING_LEVEL_M,
+    KEY_RAIN_RATE_MAX_24H,
+    KEY_RAIN_THIS_MONTH_MM,
+    KEY_RAIN_THIS_WEEK_MM,
+    KEY_RAIN_THIS_YEAR_MM,
+    KEY_SPECIFIC_HUMIDITY,
+    KEY_WBGT,
+    KEY_WIND_GUST_FACTOR,
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
@@ -461,6 +478,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._rain_today_mm: float = 0.0
         self._rain_today_date: str = ""
         self._rain_today_last_total: float | None = None
+
+        # v2.0 rain accumulators: weekly (Mon reset), monthly (1st reset), yearly
+        self._rain_this_week_mm: float = 0.0
+        self._rain_this_week_isoweek: str = ""   # "YYYY-Www"
+        self._rain_this_week_last_total: float | None = None
+
+        self._rain_this_month_mm: float = 0.0
+        self._rain_this_month_key: str = ""      # "YYYY-MM"
+        self._rain_this_month_last_total: float | None = None
+
+        self._rain_this_year_mm: float = 0.0
+        self._rain_this_year_key: str = ""       # "YYYY"
+        self._rain_this_year_last_total: float | None = None
+
+        # v2.0 max rain rate over rolling 24h window
+        self._rain_rate_history_24h: deque = deque()
         # Completed (previous) day snapshot - captured at midnight rollover so
         # streak counters can evaluate the finished day's final rain total
         # rather than the freshly-reset current day (issue #15).
@@ -1058,6 +1091,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if tc is not None and rh is not None and wind_ms is not None:
             data[KEY_FEELS_LIKE_C] = calculate_apparent_temperature(float(tc), float(rh), float(wind_ms))
 
+        # v2.0 — Cloud base, freezing level, air density, specific humidity
+        if tc is not None and dew_c is not None:
+            data[KEY_CLOUD_BASE_M] = calculate_cloud_base_m(float(tc), float(dew_c))
+        if tc is not None:
+            data[KEY_FREEZING_LEVEL_M] = calculate_freezing_level_m(float(tc), self.elevation_m)
+        pressure_hpa_now = data.get(KEY_NORM_PRESSURE_HPA)
+        if tc is not None and pressure_hpa_now is not None:
+            data[KEY_AIR_DENSITY] = calculate_air_density(float(tc), float(pressure_hpa_now))
+        if tc is not None and rh is not None and pressure_hpa_now is not None:
+            data[KEY_SPECIFIC_HUMIDITY] = calculate_specific_humidity(
+                float(tc), float(rh), float(pressure_hpa_now)
+            )
+
         # 24h rolling stats
         if tc is not None:
             self._append_and_prune_24h(rt.temp_history_24h, now, float(tc))
@@ -1110,6 +1156,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             wet_bulb = data.get(KEY_WET_BULB_C)
             if wet_bulb is not None:
                 data[KEY_DELTA_T] = calculate_delta_t(float(tc), float(wet_bulb))
+                # WBGT: prefer outdoor formula when solar radiation is available
+                solar_rad = self._get_solar_radiation()
+                if solar_rad is not None and solar_rad > 0:
+                    data[KEY_WBGT] = calculate_wbgt_outdoor(float(tc), float(wet_bulb), float(solar_rad))
+                else:
+                    data[KEY_WBGT] = calculate_wbgt_simplified(float(tc), float(wet_bulb))
 
         return dew_c
 
@@ -1217,6 +1269,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if gust_vals:
                 data[KEY_WIND_GUST_MAX_24H] = round(max(gust_vals), 1)
 
+        # v2.0 wind gust factor
+        if wind_ms is not None and gust_ms is not None:
+            gf = calculate_wind_gust_factor(float(gust_ms), float(wind_ms))
+            if gf is not None:
+                data[KEY_WIND_GUST_FACTOR] = gf
+
     def _compute_derived_precipitation(self, data: dict, now: Any, rain_total_mm: float | None) -> float:
         """Rain rate (Kalman-filtered), rain display. Returns rain_rate (filtered)."""
         rt = self.runtime
@@ -1272,6 +1330,59 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Track last rain event timestamp (used by streak counters)
         if float(rain_rate) > 0.0:
             rt.last_rain_event_ts = now
+
+        # v2.0 — Weekly / monthly / yearly rain accumulators
+        now_local = dt_util.now()
+        iso_week = now_local.strftime("%G-W%V")   # ISO 8601 week (Mon start)
+        month_key = now_local.strftime("%Y-%m")
+        year_key = now_local.strftime("%Y")
+
+        # Weekly
+        if iso_week != self._rain_this_week_isoweek:
+            self._rain_this_week_mm = 0.0
+            self._rain_this_week_isoweek = iso_week
+            self._rain_this_week_last_total = rain_total_mm
+        elif rain_total_mm is not None and self._rain_this_week_last_total is not None:
+            delta = float(rain_total_mm) - float(self._rain_this_week_last_total)
+            if delta > 0:
+                self._rain_this_week_mm += delta
+            self._rain_this_week_last_total = float(rain_total_mm)
+        elif rain_total_mm is not None and self._rain_this_week_last_total is None:
+            self._rain_this_week_last_total = float(rain_total_mm)
+        data[KEY_RAIN_THIS_WEEK_MM] = round(self._rain_this_week_mm, 1)
+
+        # Monthly
+        if month_key != self._rain_this_month_key:
+            self._rain_this_month_mm = 0.0
+            self._rain_this_month_key = month_key
+            self._rain_this_month_last_total = rain_total_mm
+        elif rain_total_mm is not None and self._rain_this_month_last_total is not None:
+            delta = float(rain_total_mm) - float(self._rain_this_month_last_total)
+            if delta > 0:
+                self._rain_this_month_mm += delta
+            self._rain_this_month_last_total = float(rain_total_mm)
+        elif rain_total_mm is not None and self._rain_this_month_last_total is None:
+            self._rain_this_month_last_total = float(rain_total_mm)
+        data[KEY_RAIN_THIS_MONTH_MM] = round(self._rain_this_month_mm, 1)
+
+        # Yearly
+        if year_key != self._rain_this_year_key:
+            self._rain_this_year_mm = 0.0
+            self._rain_this_year_key = year_key
+            self._rain_this_year_last_total = rain_total_mm
+        elif rain_total_mm is not None and self._rain_this_year_last_total is not None:
+            delta = float(rain_total_mm) - float(self._rain_this_year_last_total)
+            if delta > 0:
+                self._rain_this_year_mm += delta
+            self._rain_this_year_last_total = float(rain_total_mm)
+        elif rain_total_mm is not None and self._rain_this_year_last_total is None:
+            self._rain_this_year_last_total = float(rain_total_mm)
+        data[KEY_RAIN_THIS_YEAR_MM] = round(self._rain_this_year_mm, 1)
+
+        # v2.0 — Max rain rate in rolling 24h window
+        self._append_and_prune_24h(self._rain_rate_history_24h, now, float(rain_rate))
+        if self._rain_rate_history_24h:
+            data[KEY_RAIN_RATE_MAX_24H] = round(max(v for _, v in self._rain_rate_history_24h), 1)
 
         return rain_rate
 
@@ -2008,6 +2119,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "chill_hours_today_date": self._chill_hours_today_date,
             "chill_hours_season": self._chill_hours_season,
             "chill_hours_season_date": self._chill_hours_season_date,
+            # v2.0 rain accumulators
+            "rain_this_week_mm": self._rain_this_week_mm,
+            "rain_this_week_isoweek": self._rain_this_week_isoweek,
+            "rain_this_week_last_total": self._rain_this_week_last_total,
+            "rain_this_month_mm": self._rain_this_month_mm,
+            "rain_this_month_key": self._rain_this_month_key,
+            "rain_this_month_last_total": self._rain_this_month_last_total,
+            "rain_this_year_mm": self._rain_this_year_mm,
+            "rain_this_year_key": self._rain_this_year_key,
+            "rain_this_year_last_total": self._rain_this_year_last_total,
         }
 
     def _restore_history_state(self, data: dict[str, Any]) -> None:
@@ -2073,6 +2194,28 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Season chill total persists across days; its own reset logic handles rollover.
         self._chill_hours_season = float(data.get("chill_hours_season") or 0.0)
         self._chill_hours_season_date = data.get("chill_hours_season_date") or ""
+
+        # v2.0 rain accumulators: restore across restarts
+        now_local = dt_util.now()
+        iso_week = now_local.strftime("%G-W%V")
+        month_key = now_local.strftime("%Y-%m")
+        year_key = now_local.strftime("%Y")
+
+        if data.get("rain_this_week_isoweek") == iso_week:
+            self._rain_this_week_mm = float(data.get("rain_this_week_mm") or 0.0)
+            self._rain_this_week_isoweek = iso_week
+            lt = data.get("rain_this_week_last_total")
+            self._rain_this_week_last_total = float(lt) if lt is not None else None
+        if data.get("rain_this_month_key") == month_key:
+            self._rain_this_month_mm = float(data.get("rain_this_month_mm") or 0.0)
+            self._rain_this_month_key = month_key
+            lt = data.get("rain_this_month_last_total")
+            self._rain_this_month_last_total = float(lt) if lt is not None else None
+        if data.get("rain_this_year_key") == year_key:
+            self._rain_this_year_mm = float(data.get("rain_this_year_mm") or 0.0)
+            self._rain_this_year_key = year_key
+            lt = data.get("rain_this_year_last_total")
+            self._rain_this_year_last_total = float(lt) if lt is not None else None
 
     # ------------------------------------------------------------------
     # Main orchestrator

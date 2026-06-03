@@ -1978,6 +1978,90 @@ def cross_sensor_consistency_flags(
 
 
 # ===========================================================================
+# v2.0 - Cloud base, freezing level, atmospheric density, specific humidity,
+#         wind gust factor, WBGT
+# ===========================================================================
+
+
+def calculate_cloud_base_m(temp_c: float, dew_c: float) -> float:
+    """Lifted Condensation Level (LCL) / estimated cloud base height (m AGL).
+
+    Uses the Espy approximation: h ≈ 125 × (T − Td).
+    Returns 0 when air is saturated (fog / ground-level stratus).
+    Reference: Lawrence (2005), BAMS 86:225-229.
+    """
+    return round(max(0.0, 125.0 * (temp_c - dew_c)))
+
+
+def calculate_freezing_level_m(temp_c: float, elevation_m: float = 0.0) -> float:
+    """Freezing level altitude estimate (m above sea level).
+
+    Uses ISA lapse rate of 6.5°C per 1000 m.
+    Returns station elevation when temp ≤ 0°C (freeze already at surface).
+    """
+    if temp_c <= 0.0:
+        return round(elevation_m)
+    return round(elevation_m + temp_c * 1000.0 / 6.5)
+
+
+def calculate_air_density(temp_c: float, pressure_hpa: float) -> float:
+    """Dry air density (kg/m³).
+
+    ρ = P / (Rd × Tk), where Rd = 287.058 J kg⁻¹ K⁻¹ (ICAO Doc 7488).
+    Moisture correction is negligible (<0.5%) for surface conditions.
+    """
+    return round(pressure_hpa * 100.0 / (287.058 * (temp_c + 273.15)), 4)
+
+
+def calculate_specific_humidity(temp_c: float, humidity: float, pressure_hpa: float) -> float:
+    """Specific humidity (g/kg).
+
+    q = 622 × e / (P − 0.378 × e) where e is actual vapour pressure (hPa).
+    Reference: WMO No. 8 (CIMO Guide), Annex 4.B.
+    """
+    es = 6.108 * math.exp(17.27 * temp_c / (temp_c + 237.3))
+    e = es * max(0.0, min(100.0, humidity)) / 100.0
+    denom = max(pressure_hpa - 0.378 * e, 1.0)
+    return round(0.622 * e / denom * 1000.0, 2)
+
+
+def calculate_wind_gust_factor(gust_ms: float, wind_ms: float) -> float | None:
+    """Wind gust factor (dimensionless ratio: gust / mean wind speed).
+
+    Returns None when wind speed is below 0.5 m/s (ratio becomes meaningless).
+    Typical values: 1.2–1.5 (open terrain), 1.5–2.5+ (gusty or turbulent).
+    """
+    if wind_ms < 0.5:
+        return None
+    return round(gust_ms / wind_ms, 2)
+
+
+def calculate_wbgt_simplified(temp_c: float, wet_bulb_c: float) -> float:
+    """Simplified WBGT (Wet Bulb Globe Temperature) without solar load (°C).
+
+    WBGT_indoor = 0.7 × Twb + 0.3 × Ta
+    Valid for shaded / indoor / overcast conditions. Underestimates heat stress
+    under direct solar radiation — use calculate_wbgt_outdoor when solar data
+    is available.
+    Reference: ISO 7933:2004; Lemke & Kjellstrom (2012), Glob Health Action.
+    """
+    return round(0.7 * wet_bulb_c + 0.3 * temp_c, 1)
+
+
+def calculate_wbgt_outdoor(temp_c: float, wet_bulb_c: float, solar_w_m2: float) -> float:
+    """WBGT with solar correction for outdoor / direct-sun conditions (°C).
+
+    Globe temperature (Tg) is estimated from solar irradiance:
+    Tg ≈ Ta + 0.393 × SR^0.4 − 4.0  (Liljegren simplified)
+    WBGT = 0.7 × Twb + 0.2 × Tg + 0.1 × Ta
+
+    Reference: Liljegren et al. (2008), J Appl Meteor Climatol 47:2983-2995.
+    """
+    tg = temp_c + 0.393 * max(0.0, solar_w_m2) ** 0.4 - 4.0
+    return round(0.7 * wet_bulb_c + 0.2 * tg + 0.1 * temp_c, 1)
+
+
+# ===========================================================================
 # v1.7.0 - Precipitation nowcast (from Open-Meteo 15-minute buckets)
 # ===========================================================================
 

@@ -157,7 +157,17 @@ from .const import (
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
     KEY_WIND_CHILL,
+    KEY_AIR_DENSITY,
+    KEY_CLOUD_BASE_M,
+    KEY_FREEZING_LEVEL_M,
+    KEY_RAIN_RATE_MAX_24H,
+    KEY_RAIN_THIS_MONTH_MM,
+    KEY_RAIN_THIS_WEEK_MM,
+    KEY_RAIN_THIS_YEAR_MM,
+    KEY_SPECIFIC_HUMIDITY,
+    KEY_WBGT,
     KEY_WIND_DIR_SMOOTH_DEG,
+    KEY_WIND_GUST_FACTOR,
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
     KEY_WIND_RUN_KM,
@@ -419,6 +429,34 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
     ),
+    # v2.0 Cloud base altitude (LCL / Espy formula)
+    WSSensorDescription(
+        key=KEY_CLOUD_BASE_M,
+        translation_key="cloud_base",
+        name="WS Cloud Base",
+        icon="mdi:cloud-arrow-up",
+        native_unit="m",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "temp_c": d.get(KEY_NORM_TEMP_C),
+            "dew_point_c": d.get(KEY_DEW_POINT_C),
+            "spread_c": round(float(d[KEY_NORM_TEMP_C]) - float(d[KEY_DEW_POINT_C]), 1)
+            if d.get(KEY_NORM_TEMP_C) is not None and d.get(KEY_DEW_POINT_C) is not None
+            else None,
+        },
+    ),
+    # v2.0 Freezing level altitude estimate
+    WSSensorDescription(
+        key=KEY_FREEZING_LEVEL_M,
+        translation_key="freezing_level",
+        name="WS Freezing Level",
+        icon="mdi:snowflake",
+        native_unit="m",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "temp_c": d.get(KEY_NORM_TEMP_C),
+        },
+    ),
     # =========================================================================
     # v1.5.0 COMFORT / COMFORT STRESS INDICES
     # =========================================================================
@@ -507,6 +545,50 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit=UNIT_TEMP_C,
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # v2.0 — Air density (comfort indices group)
+    WSSensorDescription(
+        key=KEY_AIR_DENSITY,
+        translation_key="air_density",
+        name="WS Air Density",
+        icon="mdi:air-humidifier",
+        native_unit="kg/m³",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "temp_c": d.get(KEY_NORM_TEMP_C),
+            "pressure_hpa": d.get(KEY_NORM_PRESSURE_HPA),
+        },
+    ),
+    # v2.0 — Specific humidity (comfort indices group)
+    WSSensorDescription(
+        key=KEY_SPECIFIC_HUMIDITY,
+        translation_key="specific_humidity",
+        name="WS Specific Humidity",
+        icon="mdi:water-percent",
+        native_unit="g/kg",
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "absolute_humidity_gm3": d.get(KEY_ABSOLUTE_HUMIDITY),
+        },
+    ),
+    # v2.0 — WBGT (comfort indices group; uses outdoor formula when solar available)
+    WSSensorDescription(
+        key=KEY_WBGT,
+        translation_key="wbgt",
+        name="WS WBGT",
+        icon="mdi:sun-thermometer-outline",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "heat_risk": (
+                "extreme" if (d.get(KEY_WBGT) or 0) >= 32
+                else "high" if (d.get(KEY_WBGT) or 0) >= 28
+                else "moderate" if (d.get(KEY_WBGT) or 0) >= 25
+                else "low"
+            ),
+            "wet_bulb_c": d.get(KEY_WET_BULB_C),
+        },
     ),
     # =========================================================================
     # v1.5.0 AGROMETEOROLOGICAL / ACCUMULATION SENSORS
@@ -776,6 +858,44 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=UNIT_RAIN_MM,
         state_class=SensorStateClass.MEASUREMENT,
     ),
+    # v2.0 — Weekly / monthly / yearly rain accumulators
+    WSSensorDescription(
+        key=KEY_RAIN_THIS_WEEK_MM,
+        translation_key="rain_this_week",
+        name="WS Rain This Week",
+        icon="mdi:calendar-week",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit=UNIT_RAIN_MM,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_RAIN_THIS_MONTH_MM,
+        translation_key="rain_this_month",
+        name="WS Rain This Month",
+        icon="mdi:calendar-month",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit=UNIT_RAIN_MM,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WSSensorDescription(
+        key=KEY_RAIN_THIS_YEAR_MM,
+        translation_key="rain_this_year",
+        name="WS Rain This Year",
+        icon="mdi:calendar",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit=UNIT_RAIN_MM,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # v2.0 — Max rain rate in rolling 24h window
+    WSSensorDescription(
+        key=KEY_RAIN_RATE_MAX_24H,
+        translation_key="rain_rate_max_24h",
+        name="WS Rain Rate Max 24h",
+        icon="mdi:weather-pouring",
+        device_class=SensorDeviceClass.PRECIPITATION_INTENSITY,
+        native_unit="mm/h",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
     WSSensorDescription(
         key=KEY_PRESSURE_TREND_DISPLAY,
         translation_key="pressure_trend",
@@ -867,6 +987,19 @@ SENSORS: list[WSSensorDescription] = [
         device_class=SensorDeviceClass.WIND_SPEED,
         native_unit=UNIT_WIND_MS,
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    # v2.0 Wind gust factor (gust / mean speed ratio)
+    WSSensorDescription(
+        key=KEY_WIND_GUST_FACTOR,
+        translation_key="wind_gust_factor",
+        name="WS Wind Gust Factor",
+        icon="mdi:weather-windy",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "gust_ms": d.get(KEY_NORM_WIND_GUST_MS),
+            "wind_ms": d.get(KEY_NORM_WIND_SPEED_MS),
+        },
     ),
     # =========================================================================
     # DISPLAY / LEVEL SENSORS
@@ -1437,6 +1570,10 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_CHILL_HOURS_SEASON: CONF_ENABLE_COMFORT_INDICES,
     KEY_CLEARNESS_INDEX: CONF_ENABLE_COMFORT_INDICES,
     KEY_CLOUD_COVER_PCT: CONF_ENABLE_COMFORT_INDICES,
+    # v2.0 - comfort indices additions
+    KEY_AIR_DENSITY: CONF_ENABLE_COMFORT_INDICES,
+    KEY_SPECIFIC_HUMIDITY: CONF_ENABLE_COMFORT_INDICES,
+    KEY_WBGT: CONF_ENABLE_COMFORT_INDICES,
     # v1.6.0 French regional
     KEY_VIGILANCE_MAX_LEVEL: CONF_ENABLE_VIGILANCE_METEO,
     KEY_FIRE_DANGER_VIGILANCE: CONF_ENABLE_VIGILANCE_METEO,
@@ -1524,6 +1661,11 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_WIND_RUN_KM,
         KEY_CHILL_HOURS_TODAY,
         KEY_CHILL_HOURS_SEASON,
+        # v2.0 accumulators
+        KEY_RAIN_THIS_WEEK_MM,
+        KEY_RAIN_THIS_MONTH_MM,
+        KEY_RAIN_THIS_YEAR_MM,
+        KEY_RAIN_RATE_MAX_24H,
     }
 
     # v1.6.2: _DISABLED_BY_DEFAULT removed. Previously-disabled sensors are now
@@ -1688,6 +1830,17 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_MINUTES_UNTIL_RAIN: "minutes_until_rain",
             KEY_MINUTES_UNTIL_DRY: "minutes_until_dry",
             KEY_NOWCAST_INTENSITY: "nowcast_intensity",
+            # v2.0
+            KEY_CLOUD_BASE_M: "cloud_base",
+            KEY_FREEZING_LEVEL_M: "freezing_level",
+            KEY_WIND_GUST_FACTOR: "wind_gust_factor",
+            KEY_AIR_DENSITY: "air_density",
+            KEY_SPECIFIC_HUMIDITY: "specific_humidity",
+            KEY_WBGT: "wbgt",
+            KEY_RAIN_THIS_WEEK_MM: "rain_this_week",
+            KEY_RAIN_THIS_MONTH_MM: "rain_this_month",
+            KEY_RAIN_THIS_YEAR_MM: "rain_this_year",
+            KEY_RAIN_RATE_MAX_24H: "rain_rate_max_24h",
         }
         if key in overrides:
             return overrides[key]

@@ -561,6 +561,26 @@ KEY_NOWCAST_INTENSITY = "nowcast_intensity"
 KEY_RAIN_EXPECTED_1H = "rain_expected_1h"
 
 # ---------------------------------------------------------------------------
+# v2.0 - New derived sensors (always-on or comfort-group opt-in)
+# ---------------------------------------------------------------------------
+
+# Always-on advanced met
+KEY_CLOUD_BASE_M = "cloud_base_m"
+KEY_FREEZING_LEVEL_M = "freezing_level_m"
+KEY_WIND_GUST_FACTOR = "wind_gust_factor"
+
+# Comfort indices group (opt-in via CONF_ENABLE_COMFORT_INDICES)
+KEY_AIR_DENSITY = "air_density_kg_m3"
+KEY_SPECIFIC_HUMIDITY = "specific_humidity_g_kg"
+KEY_WBGT = "wbgt_c"
+
+# Rain accumulators (always-on)
+KEY_RAIN_THIS_WEEK_MM = "rain_this_week_mm"
+KEY_RAIN_THIS_MONTH_MM = "rain_this_month_mm"
+KEY_RAIN_THIS_YEAR_MM = "rain_this_year_mm"
+KEY_RAIN_RATE_MAX_24H = "rain_rate_max_24h_mmph"
+
+# ---------------------------------------------------------------------------
 # Migration - v0.3.0 deprecated entity keys and config keys
 # ---------------------------------------------------------------------------
 DEPRECATED_KEYS_V030 = (

@@ -1379,6 +1379,59 @@
       },
       "ozone": {
         "name": "Ozone"
+      },
+      "cloud_base": {
+        "name": "Cloud Base",
+        "state_attributes": {
+          "temp_c": { "name": "Temperature" },
+          "dew_point_c": { "name": "Dew point" },
+          "spread_c": { "name": "Temp-dew spread" }
+        }
+      },
+      "freezing_level": {
+        "name": "Freezing Level",
+        "state_attributes": {
+          "temp_c": { "name": "Temperature" }
+        }
+      },
+      "wind_gust_factor": {
+        "name": "Wind Gust Factor",
+        "state_attributes": {
+          "gust_ms": { "name": "Gust speed" },
+          "wind_ms": { "name": "Wind speed" }
+        }
+      },
+      "air_density": {
+        "name": "Air Density",
+        "state_attributes": {
+          "temp_c": { "name": "Temperature" },
+          "pressure_hpa": { "name": "Pressure" }
+        }
+      },
+      "specific_humidity": {
+        "name": "Specific Humidity",
+        "state_attributes": {
+          "absolute_humidity_gm3": { "name": "Absolute humidity" }
+        }
+      },
+      "wbgt": {
+        "name": "WBGT",
+        "state_attributes": {
+          "heat_risk": { "name": "Heat risk" },
+          "wet_bulb_c": { "name": "Wet-bulb temperature" }
+        }
+      },
+      "rain_this_week": {
+        "name": "Rain This Week"
+      },
+      "rain_this_month": {
+        "name": "Rain This Month"
+      },
+      "rain_this_year": {
+        "name": "Rain This Year"
+      },
+      "rain_rate_max_24h": {
+        "name": "Rain Rate Max 24h"
       }
     },
     "select": {
