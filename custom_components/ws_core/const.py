@@ -691,6 +691,24 @@ KEY_SENSOR_STUCK = "sensor_stuck_flags"      # list of stuck sensor names
 KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
 
 # ---------------------------------------------------------------------------
+# v2.0 - CWOP (Citizen Weather Observer Program) upload
+# ---------------------------------------------------------------------------
+
+CONF_ENABLE_CWOP = "enable_cwop"
+CONF_CWOP_CALLSIGN = "cwop_callsign"
+CONF_CWOP_PASSCODE = "cwop_passcode"   # -1 for receive-only; set by CWOP on registration
+CONF_CWOP_SERVER = "cwop_server"       # default: cwop.aprs.net
+CONF_CWOP_PORT = "cwop_port"           # default: 14580
+CONF_CWOP_INTERVAL_MIN = "cwop_interval_min"
+
+DEFAULT_ENABLE_CWOP = False
+DEFAULT_CWOP_SERVER = "cwop.aprs.net"
+DEFAULT_CWOP_PORT = 14580
+DEFAULT_CWOP_INTERVAL_MIN = 15        # CWOP requests no faster than 5 min; 15 is polite
+
+KEY_CWOP_STATUS_V2 = "cwop_upload_status_v2"
+
+# ---------------------------------------------------------------------------
 # v2.0 - MQTT Discovery republishing
 # ---------------------------------------------------------------------------
 

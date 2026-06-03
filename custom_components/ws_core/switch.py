@@ -25,6 +25,7 @@ from .const import (
     CONF_ENABLE_AIR_QUALITY,
     CONF_ENABLE_AWEKAS,
     CONF_ENABLE_COMFORT_INDICES,
+    CONF_ENABLE_CWOP,
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_DIAGNOSTICS,
     CONF_ENABLE_INDOOR,
@@ -52,6 +53,7 @@ from .const import (
     DEFAULT_ENABLE_AIR_QUALITY,
     DEFAULT_ENABLE_AWEKAS,
     DEFAULT_ENABLE_COMFORT_INDICES,
+    DEFAULT_ENABLE_CWOP,
     DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_DIAGNOSTICS,
     DEFAULT_ENABLE_INDOOR,
@@ -255,6 +257,12 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_MQTT,
         name="Feature: MQTT Discovery",
         icon="mdi:transit-connection-variant",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_CWOP,
+        default=DEFAULT_ENABLE_CWOP,
+        name="Feature: CWOP Upload",
+        icon="mdi:radio-tower",
     ),
     # v1.8.4 (issue #20) — inverted: ON means notifications enabled (suppress=False)
     WSFeatureDesc(

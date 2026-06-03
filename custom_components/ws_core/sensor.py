@@ -23,6 +23,7 @@ from .const import (
     CONF_ENABLE_COMFORT_INDICES,
     # v2.0
     CONF_ENABLE_AWEKAS,
+    CONF_ENABLE_CWOP,
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
@@ -174,6 +175,7 @@ from .const import (
     KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
     KEY_AWEKAS_STATUS,
+    KEY_CWOP_STATUS_V2,
     KEY_DATA_QUALITY_SCORE,
     KEY_INDOOR_CO2_PPM,
     KEY_INDOOR_COMFORT,
@@ -1487,6 +1489,14 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
         attrs_fn=lambda d: {"last_upload": d.get("_awekas_last_upload")},
     ),
+    WSSensorDescription(
+        key=KEY_CWOP_STATUS_V2,
+        translation_key="cwop_status",
+        name="WS CWOP Status",
+        icon="mdi:radio-tower",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {"last_upload": d.get("_cwop_last_upload")},
+    ),
     # =========================================================================
     # v2.0 - Indoor sensor group (opt-in)
     # =========================================================================
@@ -2003,6 +2013,7 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_PWS_STATUS: CONF_ENABLE_PWSWEATHER,
     KEY_WOW_STATUS: CONF_ENABLE_WOW,
     KEY_AWEKAS_STATUS: CONF_ENABLE_AWEKAS,
+    KEY_CWOP_STATUS_V2: CONF_ENABLE_CWOP,
     # v2.0 - indoor sensor group
     KEY_INDOOR_TEMP_C: CONF_ENABLE_INDOOR,
     KEY_INDOOR_HUMIDITY: CONF_ENABLE_INDOOR,
@@ -2324,6 +2335,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_PWS_STATUS: "pws_upload_status",
             KEY_WOW_STATUS: "wow_upload_status",
             KEY_AWEKAS_STATUS: "awekas_upload_status",
+            KEY_CWOP_STATUS_V2: "cwop_upload_status",
             # v2.0 indoor sensors
             KEY_INDOOR_TEMP_C: "indoor_temperature",
             KEY_INDOOR_HUMIDITY: "indoor_humidity",

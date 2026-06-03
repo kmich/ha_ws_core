@@ -1666,6 +1666,18 @@
           "last_upload": { "name": "Last upload" }
         }
       },
+      "cwop_status": {
+        "name": "CWOP Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": { "name": "Last successful upload" }
+        }
+      },
       "awekas_upload_status": {
         "name": "AWEKAS Status",
         "state": {
@@ -1851,6 +1863,23 @@
       },
       "ws_lightning_proximity": {
         "name": "Alert: Lightning Proximity Threshold"
+      },
+      "ws_hdd_base": {
+        "name": "Degree Days: HDD Base Temperature"
+      },
+      "ws_cdd_base": {
+        "name": "Degree Days: CDD Base Temperature"
+      },
+      "ws_gdd_base": {
+        "name": "Degree Days: GDD Base Temperature"
+      },
+      "ws_gdd_cap": {
+        "name": "Degree Days: GDD Upper Cap"
+      }
+    },
+    "switch": {
+      "ws_enable_cwop": {
+        "name": "Feature: CWOP Upload"
       }
     },
     "binary_sensor": {
@@ -1859,6 +1888,30 @@
       },
       "ws_rain_expected_1h": {
         "name": "Rain Expected (1h)"
+      },
+      "ws_temperature_stuck": {
+        "name": "Temperature Sensor Stuck"
+      },
+      "ws_humidity_stuck": {
+        "name": "Humidity Sensor Stuck"
+      },
+      "ws_pressure_stuck": {
+        "name": "Pressure Sensor Stuck"
+      },
+      "ws_temperature_out_of_range": {
+        "name": "Temperature Out of Range"
+      },
+      "ws_humidity_out_of_range": {
+        "name": "Humidity Out of Range"
+      },
+      "ws_pressure_out_of_range": {
+        "name": "Pressure Out of Range"
+      },
+      "ws_wind_gust_below_wind": {
+        "name": "Wind Gust Below Wind Speed"
+      },
+      "ws_dew_exceeds_temp": {
+        "name": "Dew Point Exceeds Temperature"
       }
     }
   },

@@ -343,9 +343,20 @@ from .const import (
     CONF_AWEKAS_PASSWORD,
     CONF_AWEKAS_USERNAME,
     CONF_ENABLE_AWEKAS,
+    CONF_CWOP_CALLSIGN,
+    CONF_CWOP_INTERVAL_MIN,
+    CONF_CWOP_PASSCODE,
+    CONF_CWOP_PORT,
+    CONF_CWOP_SERVER,
+    CONF_ENABLE_CWOP,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MQTT,
+    DEFAULT_CWOP_INTERVAL_MIN,
+    DEFAULT_CWOP_PORT,
+    DEFAULT_CWOP_SERVER,
+    DEFAULT_ENABLE_CWOP,
+    KEY_CWOP_STATUS_V2,
     CONF_MQTT_DISCOVERY_PREFIX,
     CONF_MQTT_INTERVAL_MIN,
     CONF_MQTT_STATE_PREFIX,
@@ -596,6 +607,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.awekas_interval_min = int(_get(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN))
         self._awekas_last_upload: Any = None
         self._awekas_status: str = "disabled"
+
+        # v2.0: CWOP upload
+        self.cwop_enabled = bool(_get(CONF_ENABLE_CWOP, DEFAULT_ENABLE_CWOP))
+        self.cwop_callsign: str = str(_get(CONF_CWOP_CALLSIGN, "") or "").upper().strip()
+        self.cwop_passcode: str = str(_get(CONF_CWOP_PASSCODE, "-1") or "-1").strip()
+        self.cwop_server: str = str(_get(CONF_CWOP_SERVER, DEFAULT_CWOP_SERVER)).strip()
+        self.cwop_port: int = int(_get(CONF_CWOP_PORT, DEFAULT_CWOP_PORT))
+        self.cwop_interval_min = int(_get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN))
+        self._cwop_last_upload: Any = None
+        self._cwop_status: str = "disabled"
 
         # v2.0: MQTT Discovery republishing
         self.mqtt_enabled = bool(_get(CONF_ENABLE_MQTT, DEFAULT_ENABLE_MQTT))
@@ -1041,6 +1062,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("ws_core: deferred nowcast fetch failed (will retry): %s", err)
 
             self.hass.async_create_task(_deferred_nowcast())
+
+        # v2.0: CWOP upload
+        if self.cwop_enabled and self.cwop_callsign:
+            self._unsubs.append(
+                async_track_time_interval(
+                    self.hass,
+                    lambda _now: self.hass.async_create_task(self._async_upload_cwop()),
+                    timedelta(minutes=self.cwop_interval_min),
+                )
+            )
 
         # v2.0: MQTT Discovery periodic state publishing
         if self.mqtt_enabled:
@@ -2004,6 +2035,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         data[KEY_SENSOR_STUCK] = stuck_flags
 
+        # Per-sensor stuck flags for binary sensors
+        data["_temp_stuck"] = KEY_NORM_TEMP_C.replace("norm_temperature_c", "temperature") in stuck_flags or SRC_TEMP in stuck_flags
+        data["_humidity_stuck"] = SRC_HUM in stuck_flags
+        data["_pressure_stuck"] = SRC_PRESS in stuck_flags
+
+        # Per-sensor out-of-range from quality flags (parse the existing list)
+        quality_flags = data.get(KEY_SENSOR_QUALITY_FLAGS) or []
+        data["_temp_out_of_range"] = any("temperature" in f.lower() and "outside" in f.lower() for f in quality_flags)
+        data["_humidity_out_of_range"] = any("humidity" in f.lower() and "outside" in f.lower() for f in quality_flags)
+        data["_pressure_out_of_range"] = any("pressure" in f.lower() and "outside" in f.lower() for f in quality_flags)
+        data["_wind_gust_below_wind"] = any("gust" in f.lower() and "below" in f.lower() for f in quality_flags)
+        data["_dew_exceeds_temp"] = any("dew" in f.lower() and "exceeds" in f.lower() for f in quality_flags)
+
         # Score: start at 100, deduct for issues
         score = 100
         existing_flags = data.get(KEY_SENSOR_QUALITY_FLAGS) or []
@@ -2935,6 +2979,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.awekas_enabled:
             data[KEY_AWEKAS_STATUS] = self._awekas_status
             data["_awekas_last_upload"] = self._awekas_last_upload.isoformat() if self._awekas_last_upload else None
+        if self.cwop_enabled:
+            data[KEY_CWOP_STATUS_V2] = self._cwop_status
+            data["_cwop_last_upload"] = self._cwop_last_upload.isoformat() if self._cwop_last_upload else None
 
         # Air Quality (Open-Meteo Air Quality API)
         if self.aqi_enabled and self._aqi_cache:
@@ -3413,6 +3460,122 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as exc:
             self._wu_status = "error"
             _LOGGER.error("WUnderground upload unexpected error: %s", exc, exc_info=True)
+
+    # ------------------------------------------------------------------
+    # v2.0 - CWOP (Citizen Weather Observer Program) upload via APRS TCP
+    # ------------------------------------------------------------------
+
+    async def _async_upload_cwop(self) -> None:
+        """Upload observation to CWOP network using APRS protocol over TCP.
+
+        Protocol:
+          1. Connect to cwop.aprs.net:14580
+          2. Send login: user {CALLSIGN} pass {PASSCODE} vers ws_core {VERSION}
+          3. Send APRS weather packet
+          4. Close connection
+
+        APRS weather packet format:
+          {CALLSIGN}>APRS,TCPXX*,qAX,{CALLSIGN}:@{TIME}z{LAT}/{LON}_{WIND}
+        """
+        import asyncio
+
+        data = self.data
+        if not data or not self.cwop_callsign:
+            return
+
+        now_utc = dt_util.utcnow()
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+        if lat is None or lon is None:
+            return
+
+        temp_c = data.get(KEY_NORM_TEMP_C)
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
+        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
+
+        # APRS uses hundredths of degrees, N/S E/W format
+        lat_f = float(lat)
+        lon_f = float(lon)
+        lat_deg = int(abs(lat_f))
+        lat_min = (abs(lat_f) - lat_deg) * 60
+        lon_deg = int(abs(lon_f))
+        lon_min = (abs(lon_f) - lon_deg) * 60
+        lat_str = f"{lat_deg:02d}{lat_min:05.2f}{'N' if lat_f >= 0 else 'S'}"
+        lon_str = f"{lon_deg:03d}{lon_min:05.2f}{'E' if lon_f >= 0 else 'W'}"
+
+        time_str = now_utc.strftime("%d%H%M")
+
+        def _ms_to_mph(ms: float) -> int:
+            return round(float(ms) * 2.23694)
+
+        def _mm_to_hundredths_in(mm: float) -> int:
+            return round(float(mm) / 25.4 * 100)
+
+        def _c_to_f(c: float) -> int:
+            return round(float(c) * 9 / 5 + 32)
+
+        # APRS weather body
+        wind_dir_s = f"{int(wind_dir):03d}"
+        wind_spd_s = f"{_ms_to_mph(wind_ms):03d}"
+        gust_s = f"g{_ms_to_mph(gust_ms):03d}"
+        temp_s = f"t{_c_to_f(float(temp_c)):03d}" if temp_c is not None else "t..."
+        rain1h_s = f"r{_mm_to_hundredths_in(float(rain_1h)):03d}"
+        rain24h_s = f"p{_mm_to_hundredths_in(float(rain_24h)):03d}"
+        hum_s = (
+            f"h{int(float(humidity)):02d}" if humidity is not None else ""
+        )
+        baro_s = (
+            f"b{round(float(press) * 10):05d}" if press is not None else ""
+        )
+
+        weather_body = (
+            f"_{wind_dir_s}/{wind_spd_s}{gust_s}{temp_s}"
+            f"{rain1h_s}{rain24h_s}{hum_s}{baro_s}"
+            f" ws_core/{_INTEGRATION_VERSION}"
+        )
+
+        packet = (
+            f"{self.cwop_callsign}>APRS,TCPXX*,qAX,{self.cwop_callsign}:"
+            f"@{time_str}z{lat_str}/{lon_str}{weather_body}\r\n"
+        )
+        login = (
+            f"user {self.cwop_callsign} pass {self.cwop_passcode} "
+            f"vers ws_core {_INTEGRATION_VERSION}\r\n"
+        )
+
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(self.cwop_server, self.cwop_port),
+                timeout=15,
+            )
+            try:
+                writer.write(login.encode("ascii"))
+                await writer.drain()
+                # Give server 1 second to respond (it sends a banner)
+                try:
+                    await asyncio.wait_for(reader.read(256), timeout=1.5)
+                except asyncio.TimeoutError:
+                    pass
+                writer.write(packet.encode("ascii"))
+                await writer.drain()
+                self._cwop_last_upload = now_utc
+                self._cwop_status = "ok"
+                _LOGGER.debug("CWOP upload OK: %s", packet.strip())
+            finally:
+                writer.close()
+                with contextlib.suppress(Exception):
+                    await writer.wait_closed()
+        except (OSError, asyncio.TimeoutError) as exc:
+            self._cwop_status = "error_network"
+            _LOGGER.warning("CWOP upload error: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            self._cwop_status = "error"
+            _LOGGER.error("CWOP upload unexpected error: %s", exc)
 
     # ------------------------------------------------------------------
     # v2.0 - MQTT Discovery republishing

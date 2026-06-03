@@ -1447,15 +1447,61 @@
       },
       "ws_lightning_proximity": {
         "name": "Alert: Lightning Proximity Threshold"
+      },
+      "ws_hdd_base": {
+        "name": "Degree Days: HDD Base Temperature"
+      },
+      "ws_cdd_base": {
+        "name": "Degree Days: CDD Base Temperature"
+      },
+      "ws_gdd_base": {
+        "name": "Degree Days: GDD Base Temperature"
+      },
+      "ws_gdd_cap": {
+        "name": "Degree Days: GDD Upper Cap"
       }
     },
+    "switch": {
+      "ws_enable_animations": { "name": "Dashboard: Animations" },
+      "ws_enable_display_sensors": { "name": "Feature: Display Sensors" },
+      "ws_enable_fire_risk_score": { "name": "Feature: Fire Risk Score" },
+      "ws_enable_sea_temp": { "name": "Feature: Sea Surface Temperature" },
+      "ws_enable_wunderground": { "name": "Feature: Weather Underground" },
+      "ws_enable_air_quality": { "name": "Feature: Air Quality Index" },
+      "ws_enable_pollen": { "name": "Feature: Pollen Levels" },
+      "ws_enable_moon": { "name": "Feature: Moon Phase" },
+      "ws_enable_solar_forecast": { "name": "Feature: Solar PV Forecast" },
+      "ws_enable_fog": { "name": "Feature: Fog Probability" },
+      "ws_enable_thunderstorm_risk": { "name": "Feature: Thunderstorm Risk" },
+      "ws_enable_comfort_indices": { "name": "Feature: Comfort Indices" },
+      "ws_enable_vigilance_meteo": { "name": "Feature: Meteo Vigilance" },
+      "ws_enable_vigicrues": { "name": "Feature: Vigicrues River Level" },
+      "ws_enable_diagnostics": { "name": "Feature: Station Diagnostics" },
+      "ws_enable_fwi_components": { "name": "Feature: FWI Components" },
+      "ws_enable_advanced_sensors": { "name": "Feature: Advanced Sensors" },
+      "ws_enable_nowcast": { "name": "Feature: Precipitation Nowcast" },
+      "ws_suppress_notifications": { "name": "Setting: Enable HA Notifications" },
+      "ws_enable_degree_days": { "name": "Feature: Degree Days & Leaf Wetness" },
+      "ws_enable_lightning": { "name": "Feature: Lightning Detection" },
+      "ws_enable_indoor": { "name": "Feature: Indoor Sensors" },
+      "ws_enable_weathercloud": { "name": "Feature: Weathercloud Upload" },
+      "ws_enable_pwsweather": { "name": "Feature: PWSWeather Upload" },
+      "ws_enable_wow": { "name": "Feature: WOW Upload" },
+      "ws_enable_awekas": { "name": "Feature: AWEKAS Upload" },
+      "ws_enable_mqtt": { "name": "Feature: MQTT Discovery" },
+      "ws_enable_cwop": { "name": "Feature: CWOP Upload" }
+    },
     "binary_sensor": {
-      "ws_package_ok": {
-        "name": "Package OK"
-      },
-      "ws_rain_expected_1h": {
-        "name": "Rain Expected (1h)"
-      }
+      "ws_package_ok": { "name": "Package OK" },
+      "ws_rain_expected_1h": { "name": "Rain Expected (1h)" },
+      "ws_temperature_stuck": { "name": "Temperature Sensor Stuck" },
+      "ws_humidity_stuck": { "name": "Humidity Sensor Stuck" },
+      "ws_pressure_stuck": { "name": "Pressure Sensor Stuck" },
+      "ws_temperature_out_of_range": { "name": "Temperature Out of Range" },
+      "ws_humidity_out_of_range": { "name": "Humidity Out of Range" },
+      "ws_pressure_out_of_range": { "name": "Pressure Out of Range" },
+      "ws_wind_gust_below_wind": { "name": "Wind Gust Below Wind Speed" },
+      "ws_dew_exceeds_temp": { "name": "Dew Point Exceeds Temperature" }
     }
   },
   "selector": {
