@@ -32,6 +32,11 @@
           "dew_point": "Dew point (if your station provides it; otherwise it is calculated)",
           "battery": "Station battery level (%)",
           "solar_radiation": "Solar radiation (W/m², for Penman-Monteith ET₀)",
+          "lightning_count": "Lightning strike count (cumulative, e.g. from WH57 or AS3935)",
+          "lightning_dist": "Lightning nearest distance (km, e.g. from WH57)",
+          "indoor_temp": "Indoor temperature sensor",
+          "indoor_humidity": "Indoor humidity sensor",
+          "indoor_co2": "Indoor CO₂ sensor (ppm)",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -123,6 +128,56 @@
           "enable_wow": "WOW (UK Met Office) upload",
           "enable_awekas": "AWEKAS upload",
           "enable_mqtt": "MQTT Discovery republishing (publish all derived sensors to MQTT broker for Node-RED / external consumers)"
+        }
+      },
+      "weathercloud": {
+        "title": "Weathercloud Upload",
+        "description": "{info}",
+        "data": {
+          "wc_station_id": "Station ID",
+          "wc_api_key": "API key",
+          "wc_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
+        }
+      },
+      "pwsweather": {
+        "title": "PWSWeather Upload",
+        "description": "{info}",
+        "data": {
+          "pws_station_id": "Station ID",
+          "pws_api_key": "API key",
+          "pws_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
+        }
+      },
+      "wow": {
+        "title": "WOW (UK Met Office) Upload",
+        "description": "{info}",
+        "data": {
+          "wow_site_id": "Site ID",
+          "wow_auth_key": "Authentication key",
+          "wow_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
+        }
+      },
+      "awekas": {
+        "title": "AWEKAS Upload",
+        "description": "{info}",
+        "data": {
+          "awekas_username": "Username",
+          "awekas_password": "Password",
+          "awekas_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
+        }
+      },
+      "mqtt_config": {
+        "title": "MQTT Discovery Configuration",
+        "description": "{info}",
+        "data": {
+          "mqtt_discovery_prefix": "Discovery prefix (default: homeassistant)",
+          "mqtt_state_prefix": "State topic prefix (default: ws_core)",
+          "mqtt_interval_min": "Publish interval",
+          "_go_back": "← Go back to previous step"
         }
       },
       "sea_temp": {
