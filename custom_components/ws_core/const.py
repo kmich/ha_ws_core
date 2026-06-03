@@ -604,6 +604,13 @@ KEY_IRRIGATION_DEFICIT = "irrigation_deficit_mm"          # ET₀ - rain today
 KEY_DOMINANT_WIND_DIR = "dominant_wind_direction_deg"
 KEY_WIND_DIR_VARIABILITY = "wind_direction_variability_deg"
 
+# Fire danger (fire risk group)
+KEY_FFDI = "ffdi"
+KEY_FFWI = "ffwi"
+
+# Human comfort (comfort indices group)
+KEY_UTCI = "utci_c"
+
 # Comfort indices group (opt-in via CONF_ENABLE_COMFORT_INDICES)
 KEY_AIR_DENSITY = "air_density_kg_m3"
 KEY_SPECIFIC_HUMIDITY = "specific_humidity_g_kg"

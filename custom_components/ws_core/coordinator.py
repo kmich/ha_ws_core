@@ -63,9 +63,13 @@ from .algorithms import (
     calculate_heat_index,
     calculate_humidex,
     calculate_dominant_wind_direction,
+    calculate_ffdi,
+    calculate_ffwi,
     calculate_irrigation_deficit,
+    ffdi_danger_level,
     calculate_leaf_wetness,
     calculate_max_solar_radiation,
+    calculate_utci,
     calculate_moon_illumination,
     calculate_rain_probability,
     calculate_wind_direction_variability,
@@ -336,7 +340,10 @@ from .const import (
     KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
     KEY_DOMINANT_WIND_DIR,
+    KEY_FFDI,
+    KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
+    KEY_UTCI,
     KEY_GDD_SEASON_V2,
     KEY_GDD_TODAY_V2,
     KEY_HDD_SEASON,
@@ -1226,6 +1233,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     data[KEY_WBGT] = calculate_wbgt_outdoor(float(tc), float(wet_bulb), float(solar_rad))
                 else:
                     data[KEY_WBGT] = calculate_wbgt_simplified(float(tc), float(wet_bulb))
+
+        # v2.0 UTCI — uses solar-corrected mean radiant temperature when available
+        if self.comfort_indices_enabled and tc is not None and rh is not None and wind_ms is not None:
+            solar_rad = self._get_solar_radiation()
+            # Estimate mean radiant temperature: tr ≈ ta when shaded; correct for solar
+            if solar_rad is not None and solar_rad > 50:
+                # Simple Tmrt estimation: globe temp formula gives delta above air temp
+                tr = float(tc) + 0.393 * max(0.0, float(solar_rad)) ** 0.4 - 4.0
+            else:
+                tr = float(tc)
+            utci = calculate_utci(float(tc), tr, float(wind_ms), float(rh))
+            if utci is not None:
+                data[KEY_UTCI] = utci
 
         return dew_c
 
@@ -2496,6 +2516,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             data[KEY_FIRE_RISK_SCORE] = f_score
             data["_fire_danger_level"] = danger
+
+            # v2.0 FFDI (McArthur - Australian) + FFWI (Fosberg - US/global)
+            if tc is not None and rh is not None and wind_ms is not None:
+                ffdi_val = calculate_ffdi(float(tc), float(rh), float(wind_ms) * 3.6)
+                data[KEY_FFDI] = ffdi_val
+                data["_ffdi_danger"] = ffdi_danger_level(ffdi_val)
+                data[KEY_FFWI] = calculate_ffwi(float(tc), float(rh), float(wind_ms))
 
         self._compute_et0(data, now)
         self._compute_degree_days(data, now, tc, dew_c, rh)

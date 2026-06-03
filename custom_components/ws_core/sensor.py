@@ -164,6 +164,8 @@ from .const import (
     KEY_CDD_TODAY_MM,
     KEY_CLOUD_BASE_M,
     KEY_DOMINANT_WIND_DIR,
+    KEY_FFDI,
+    KEY_FFWI,
     KEY_FREEZING_LEVEL_M,
     KEY_GDD_SEASON_V2,
     KEY_GDD_TODAY_V2,
@@ -174,6 +176,7 @@ from .const import (
     KEY_MAX_SOLAR_RADIATION,
     KEY_PEAK_SUN_HOURS,
     KEY_RAIN_RATE_MAX_24H,
+    KEY_UTCI,
     KEY_RAIN_THIS_MONTH_MM,
     KEY_RAIN_THIS_WEEK_MM,
     KEY_RAIN_THIS_YEAR_MM,
@@ -603,6 +606,30 @@ SENSORS: list[WSSensorDescription] = [
                 else "low"
             ),
             "wet_bulb_c": d.get(KEY_WET_BULB_C),
+        },
+    ),
+    # v2.0 — UTCI (Universal Thermal Climate Index, Bröde 2012)
+    WSSensorDescription(
+        key=KEY_UTCI,
+        translation_key="utci",
+        name="WS UTCI",
+        icon="mdi:human-handsup",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit=UNIT_TEMP_C,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "stress_category": (
+                "extreme_heat_stress" if (d.get(KEY_UTCI) or -99) >= 46
+                else "very_strong_heat_stress" if (d.get(KEY_UTCI) or -99) >= 38
+                else "strong_heat_stress" if (d.get(KEY_UTCI) or -99) >= 32
+                else "moderate_heat_stress" if (d.get(KEY_UTCI) or -99) >= 26
+                else "no_thermal_stress" if (d.get(KEY_UTCI) or -99) >= 9
+                else "slight_cold_stress" if (d.get(KEY_UTCI) or -99) >= 0
+                else "moderate_cold_stress" if (d.get(KEY_UTCI) or -99) >= -13
+                else "strong_cold_stress" if (d.get(KEY_UTCI) or -99) >= -27
+                else "very_strong_cold_stress" if (d.get(KEY_UTCI) or -99) >= -40
+                else "extreme_cold_stress"
+            ),
         },
     ),
     # =========================================================================
@@ -1150,6 +1177,37 @@ SENSORS: list[WSSensorDescription] = [
             "fwi": d.get(KEY_FWI),
             "bui": d.get(KEY_FWI_BUI),
             "isi": d.get(KEY_FWI_ISI),
+        },
+    ),
+    # v2.0 — McArthur FFDI (Australian fire danger index)
+    WSSensorDescription(
+        key=KEY_FFDI,
+        translation_key="ffdi",
+        name="WS Forest Fire Danger Index",
+        icon="mdi:fire-alert",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "danger_level": d.get("_ffdi_danger"),
+            "temperature_c": d.get(KEY_NORM_TEMP_C),
+            "humidity_pct": d.get(KEY_NORM_HUMIDITY),
+            "wind_kmh": round(float(d[KEY_NORM_WIND_SPEED_MS]) * 3.6, 1)
+            if d.get(KEY_NORM_WIND_SPEED_MS) is not None
+            else None,
+        },
+    ),
+    # v2.0 — Fosberg FFWI (US/global fire weather index)
+    WSSensorDescription(
+        key=KEY_FFWI,
+        translation_key="ffwi",
+        name="WS Fire Weather Index (Fosberg)",
+        icon="mdi:fire-circle",
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        attrs_fn=lambda d: {
+            "temperature_c": d.get(KEY_NORM_TEMP_C),
+            "humidity_pct": d.get(KEY_NORM_HUMIDITY),
+            "wind_ms": d.get(KEY_NORM_WIND_SPEED_MS),
         },
     ),
     # =========================================================================
@@ -1722,6 +1780,10 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_AIR_DENSITY: CONF_ENABLE_COMFORT_INDICES,
     KEY_SPECIFIC_HUMIDITY: CONF_ENABLE_COMFORT_INDICES,
     KEY_WBGT: CONF_ENABLE_COMFORT_INDICES,
+    KEY_UTCI: CONF_ENABLE_COMFORT_INDICES,
+    # v2.0 - fire danger additions (gated by fire risk toggle)
+    KEY_FFDI: CONF_ENABLE_FIRE_RISK,
+    KEY_FFWI: CONF_ENABLE_FIRE_RISK,
     # v2.0 - degree days + leaf wetness (new opt-in group)
     KEY_HDD_TODAY_MM: CONF_ENABLE_DEGREE_DAYS,
     KEY_HDD_SEASON: CONF_ENABLE_DEGREE_DAYS,
@@ -2018,6 +2080,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_MAX_SOLAR_RADIATION: "max_solar_radiation",
             KEY_PEAK_SUN_HOURS: "peak_sun_hours",
             KEY_IRRIGATION_DEFICIT: "irrigation_deficit",
+            # v2.0 batch 4
+            KEY_FFDI: "ffdi",
+            KEY_FFWI: "ffwi",
+            KEY_UTCI: "utci",
         }
         if key in overrides:
             return overrides[key]

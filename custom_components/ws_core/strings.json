@@ -1502,6 +1502,29 @@
       },
       "et0_pm_daily": {
         "name": "ET₀ Penman-Monteith (Daily)"
+      },
+      "ffdi": {
+        "name": "Forest Fire Danger Index",
+        "state_attributes": {
+          "danger_level": { "name": "Danger level" },
+          "temperature_c": { "name": "Temperature" },
+          "humidity_pct": { "name": "Humidity" },
+          "wind_kmh": { "name": "Wind speed" }
+        }
+      },
+      "ffwi": {
+        "name": "Fire Weather Index (Fosberg)",
+        "state_attributes": {
+          "temperature_c": { "name": "Temperature" },
+          "humidity_pct": { "name": "Humidity" },
+          "wind_ms": { "name": "Wind speed" }
+        }
+      },
+      "utci": {
+        "name": "UTCI",
+        "state_attributes": {
+          "stress_category": { "name": "Thermal stress category" }
+        }
       }
     },
     "select": {
