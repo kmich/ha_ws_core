@@ -14,6 +14,7 @@ Enable via: switch.ws_enable_mqtt  (disabled by default).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from typing import Any
@@ -145,7 +146,7 @@ async def async_publish_discovery(
         "sw_version": integration_version,
     }
 
-    for data_key, slug, name, unit, device_class, icon in MQTT_SENSORS:
+    for _data_key, slug, name, unit, device_class, icon in MQTT_SENSORS:
         unique_id = f"ws_core_{entity_prefix}_{slug}"
         state_topic = f"{state_prefix}/{entity_prefix}/{slug}/state"
 
@@ -192,10 +193,7 @@ async def async_publish_states(
 
         state_topic = f"{state_prefix}/{entity_prefix}/{slug}/state"
         # Publish numeric values rounded to 2dp; everything else as string
-        if isinstance(value, float):
-            payload = f"{value:.2f}"
-        else:
-            payload = str(value)
+        payload = f"{value:.2f}" if isinstance(value, float) else str(value)
 
         try:
             await mqtt_component.async_publish(hass, state_topic, payload, retain=False)
@@ -217,7 +215,5 @@ async def async_unpublish_discovery(
     for _data_key, slug, *_ in MQTT_SENSORS:
         unique_id = f"ws_core_{entity_prefix}_{slug}"
         discovery_topic = f"{discovery_prefix}/sensor/{unique_id}/config"
-        try:
+        with contextlib.suppress(Exception):
             await mqtt_component.async_publish(hass, discovery_topic, "", retain=True)
-        except Exception:  # noqa: BLE001
-            pass

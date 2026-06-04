@@ -35,6 +35,7 @@ from typing import Any
 
 import aiohttp
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -56,33 +57,32 @@ from .algorithms import (
     calculate_cloud_base_m,
     calculate_delta_t,
     calculate_dew_point,
+    calculate_dominant_wind_direction,
+    calculate_ffdi,
+    calculate_ffwi,
     calculate_freezing_level_m,
     calculate_frost_point,
     calculate_gdd_contribution,
     calculate_hdd_contribution,
     calculate_heat_index,
     calculate_humidex,
-    calculate_dominant_wind_direction,
-    calculate_ffdi,
-    calculate_ffwi,
     calculate_irrigation_deficit,
-    ffdi_danger_level,
     calculate_leaf_wetness,
     calculate_max_solar_radiation,
-    calculate_net_radiation,
-    calculate_utci,
     calculate_moon_illumination,
+    calculate_net_radiation,
     calculate_rain_probability,
-    calculate_wind_direction_variability,
     calculate_specific_humidity,
     calculate_thsw_index,
     calculate_thw_index,
     calculate_us_aqi,
+    calculate_utci,
     calculate_vpd,
     calculate_wbgt_outdoor,
     calculate_wbgt_simplified,
     calculate_wet_bulb,
     calculate_wind_chill,
+    calculate_wind_direction_variability,
     calculate_wind_gust_factor,
     clearness_to_cloud_cover,
     combine_rain_probability,
@@ -94,6 +94,7 @@ from .algorithms import (
     et0_hargreaves,
     et0_hourly_estimate,
     et0_penman_monteith,
+    ffdi_danger_level,
     fog_probability,
     format_rain_display,
     get_condition_severity,
@@ -114,30 +115,45 @@ from .algorithms import (
 )
 from .const import (
     CONF_AQI_INTERVAL_MIN,
+    CONF_AWEKAS_INTERVAL_MIN,
+    CONF_AWEKAS_PASSWORD,
+    CONF_AWEKAS_USERNAME,
+    CONF_CDD_BASE_C,
     CONF_CHILL_HOUR_BASE_C,
     CONF_CHILL_SEASON_RESET_DAY,
     CONF_CHILL_SEASON_RESET_MONTH,
     CONF_CLIMATE_REGION,
+    CONF_CWOP_CALLSIGN,
+    CONF_CWOP_INTERVAL_MIN,
+    CONF_CWOP_PASSCODE,
+    CONF_CWOP_PORT,
+    CONF_CWOP_SERVER,
     CONF_ELEVATION_M,
-    CONF_CDD_BASE_C,
     CONF_ENABLE_AIR_QUALITY,
+    CONF_ENABLE_AWEKAS,
     CONF_ENABLE_COMFORT_INDICES,
+    CONF_ENABLE_CWOP,
     CONF_ENABLE_DEGREE_DAYS,
     CONF_ENABLE_FIRE_RISK,
-    CONF_GDD_BASE_C,
-    CONF_GDD_CAP_C_V2,
-    CONF_HDD_BASE_C,
     # v0.6.0 new
     # v0.5.0 new
     CONF_ENABLE_FOG,
+    CONF_ENABLE_INDOOR,
+    CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
+    CONF_ENABLE_MQTT,
     CONF_ENABLE_NOWCAST,
+    CONF_ENABLE_OWM_STATIONS,
     CONF_ENABLE_POLLEN,
+    CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_SEA_TEMP,
     CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_WEATHERCLOUD,
+    CONF_ENABLE_WINDY,
+    CONF_ENABLE_WOW,
     CONF_ENABLE_WUNDERGROUND,
     CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
@@ -145,10 +161,23 @@ from .const import (
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
     CONF_FORECAST_PROVIDER,
+    CONF_GDD_BASE_C,
+    CONF_GDD_CAP_C_V2,
+    CONF_HDD_BASE_C,
     CONF_HEMISPHERE,
+    CONF_LIGHTNING_PROXIMITY_KM,
+    CONF_MQTT_DISCOVERY_PREFIX,
+    CONF_MQTT_INTERVAL_MIN,
+    CONF_MQTT_STATE_PREFIX,
     CONF_NOWCAST_INTERVAL_MIN,
+    CONF_OWM_STATIONS_API_KEY,
+    CONF_OWM_STATIONS_INTERVAL_MIN,
+    CONF_OWM_STATIONS_STATION_ID,
     # Tuning numbers (previously no-op, now wired)
     CONF_PRESSURE_TREND_WINDOW_H,
+    CONF_PWS_API_KEY,
+    CONF_PWS_INTERVAL_MIN,
+    CONF_PWS_STATION_ID,
     CONF_RAIN_FILTER_ALPHA,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
@@ -168,36 +197,65 @@ from .const import (
     CONF_VIGICRUES_STATION_CODE,
     CONF_VIGICRUES_STATION_NAME,
     CONF_VIGICRUES_STATIONS,
+    CONF_WC_API_KEY,
+    CONF_WC_INTERVAL_MIN,
+    CONF_WC_STATION_ID,
+    CONF_WINDY_API_KEY,
+    CONF_WINDY_INTERVAL_MIN,
+    CONF_WINDY_STATION_ID,
+    CONF_WOW_AUTH_KEY,
+    CONF_WOW_INTERVAL_MIN,
+    CONF_WOW_SITE_ID,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
     DEFAULT_AQI_INTERVAL_MIN,
+    DEFAULT_AWEKAS_INTERVAL_MIN,
+    DEFAULT_CDD_BASE_C,
     DEFAULT_CHILL_HOUR_BASE_C,
     DEFAULT_CHILL_SEASON_RESET_DAY,
     DEFAULT_CHILL_SEASON_RESET_MONTH,
     DEFAULT_CLIMATE_REGION,
-    DEFAULT_CDD_BASE_C,
+    DEFAULT_CWOP_INTERVAL_MIN,
+    DEFAULT_CWOP_PORT,
+    DEFAULT_CWOP_SERVER,
     DEFAULT_ENABLE_AIR_QUALITY,
+    DEFAULT_ENABLE_AWEKAS,
     DEFAULT_ENABLE_COMFORT_INDICES,
+    DEFAULT_ENABLE_CWOP,
     DEFAULT_ENABLE_DEGREE_DAYS,
     DEFAULT_ENABLE_FIRE_RISK,
-    DEFAULT_GDD_BASE_C,
-    DEFAULT_GDD_CAP_C_V2,
-    DEFAULT_HDD_BASE_C,
     DEFAULT_ENABLE_FOG,
+    DEFAULT_ENABLE_INDOOR,
+    DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_MOON,
+    DEFAULT_ENABLE_MQTT,
     DEFAULT_ENABLE_NOWCAST,
+    DEFAULT_ENABLE_OWM_STATIONS,
     DEFAULT_ENABLE_POLLEN,
+    DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_SOLAR_FORECAST,
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_WEATHERCLOUD,
+    DEFAULT_ENABLE_WINDY,
+    DEFAULT_ENABLE_WOW,
     DEFAULT_ENABLE_WUNDERGROUND,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_FORECAST_PROVIDER,
+    DEFAULT_GDD_BASE_C,
+    DEFAULT_GDD_CAP_C_V2,
+    DEFAULT_HDD_BASE_C,
     DEFAULT_HEMISPHERE,
+    DEFAULT_LIGHTNING_PROXIMITY_KM,
+    DEFAULT_MQTT_DISCOVERY_PREFIX,
+    DEFAULT_MQTT_INTERVAL_MIN,
+    DEFAULT_MQTT_STATE_PREFIX,
     DEFAULT_NOWCAST_INTERVAL_MIN,
+    DEFAULT_OWM_STATIONS_INTERVAL_MIN,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
+    DEFAULT_PWS_INTERVAL_MIN,
     DEFAULT_RAIN_FILTER_ALPHA,
     DEFAULT_SOLAR_INTERVAL_MIN,
     DEFAULT_SOLAR_PANEL_AZIMUTH,
@@ -209,6 +267,9 @@ from .const import (
     DEFAULT_THRESH_HEAT_DAY_C,
     DEFAULT_THRESH_RAIN_RATE_MMPH,
     DEFAULT_THRESH_WIND_GUST_MS,
+    DEFAULT_WC_INTERVAL_MIN,
+    DEFAULT_WINDY_INTERVAL_MIN,
+    DEFAULT_WOW_INTERVAL_MIN,
     DEFAULT_WU_INTERVAL_MIN,
     DRIFT_R_SQ_THRESH,
     DRIFT_SLOPE_HUMIDITY_PCT_H,
@@ -223,28 +284,38 @@ from .const import (
     FORECAST_MIN_RETRY_S,
     # v1.5.0
     KEY_ABSOLUTE_HUMIDITY,
+    KEY_AIR_DENSITY,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     # v0.7.0
     KEY_AQI,
     KEY_AQI_LEVEL,
+    KEY_AWEKAS_STATUS,
     KEY_BATTERY_DISPLAY,
     KEY_BATTERY_PCT,
+    KEY_CDD_SEASON,
+    KEY_CDD_TODAY_MM,
     KEY_CHILL_HOURS_SEASON,
     KEY_CHILL_HOURS_TODAY,
     KEY_CLEARNESS_INDEX,
     KEY_CLIMATOLOGY_30D,
+    KEY_CLOUD_BASE_M,
     KEY_CLOUD_COVER_PCT,
     KEY_CONSISTENCY_FLAGS,
     KEY_CURRENT_CONDITION,
+    KEY_CWOP_STATUS_V2,
     KEY_DATA_QUALITY,
+    KEY_DATA_QUALITY_SCORE,
     KEY_DELTA_T,
     KEY_DEW_POINT_C,
+    KEY_DOMINANT_WIND_DIR,
     KEY_DRY_STREAK,
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
     KEY_ET0_PM_DAILY_MM,
     KEY_FEELS_LIKE_C,
+    KEY_FFDI,
+    KEY_FFWI,
     KEY_FIRE_DANGER_VIGILANCE,
     KEY_FIRE_RISK_SCORE,
     KEY_FOG_PROBABILITY,
@@ -252,6 +323,7 @@ from .const import (
     KEY_FORECAST_AGREEMENT,
     KEY_FORECAST_SKILL,
     KEY_FORECAST_TILES,
+    KEY_FREEZING_LEVEL_M,
     KEY_FROST_POINT_C,
     KEY_FROST_STREAK,
     KEY_FWI,
@@ -261,12 +333,30 @@ from .const import (
     KEY_FWI_DSR,
     KEY_FWI_FFMC,
     KEY_FWI_ISI,
+    KEY_GDD_SEASON_V2,
+    KEY_GDD_TODAY_V2,
+    KEY_HDD_SEASON,
+    KEY_HDD_TODAY_MM,
     KEY_HEALTH_DISPLAY,
     KEY_HEAT_INDEX,
     KEY_HEAT_STREAK,
     KEY_HUMIDEX,
     KEY_HUMIDITY_LEVEL_DISPLAY,
+    KEY_INDOOR_CO2_PPM,
+    KEY_INDOOR_COMFORT,
+    KEY_INDOOR_HUMIDITY,
+    KEY_INDOOR_HUMIDITY_DELTA,
+    KEY_INDOOR_TEMP_C,
+    KEY_INDOOR_TEMP_DELTA,
+    KEY_IRRIGATION_DEFICIT,
+    KEY_LEAF_WETNESS,
+    KEY_LIGHTNING_CLEARANCE_MIN,
+    KEY_LIGHTNING_COUNT_1H,
+    KEY_LIGHTNING_DISTANCE_KM,
+    KEY_LIGHTNING_PROXIMITY,
+    KEY_LIGHTNING_RATE_1H,
     KEY_LUX,
+    KEY_MAX_SOLAR_RADIATION,
     KEY_MINUTES_UNTIL_DRY,
     KEY_MINUTES_UNTIL_RAIN,
     KEY_MOON_AGE_DAYS,
@@ -275,6 +365,8 @@ from .const import (
     KEY_MOON_NEXT_FULL,
     KEY_MOON_NEXT_NEW,
     KEY_MOON_PHASE,
+    KEY_NEIGHBOR_QC,
+    KEY_NET_RADIATION,
     # v0.8.0
     KEY_NO2,
     KEY_NORM_HUMIDITY,
@@ -285,9 +377,11 @@ from .const import (
     KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
     KEY_NOWCAST_INTENSITY,
+    KEY_OWM_STATIONS_STATUS,
     KEY_OZONE,
     KEY_PACKAGE_OK,
     KEY_PACKAGE_STATUS,
+    KEY_PEAK_SUN_HOURS,
     KEY_PM2_5,
     KEY_PM10,
     KEY_POLLEN_GRASS,
@@ -297,6 +391,7 @@ from .const import (
     KEY_PRESSURE_CHANGE_WINDOW_HPA,
     KEY_PRESSURE_TREND_DISPLAY,
     KEY_PRESSURE_TREND_HPAH,
+    KEY_PWS_STATUS,
     KEY_RAIN_ACCUM_1H,
     KEY_RAIN_ACCUM_24H,
     KEY_RAIN_ANOMALY_30D,
@@ -306,16 +401,24 @@ from .const import (
     KEY_RAIN_PROBABILITY,
     KEY_RAIN_PROBABILITY_COMBINED,
     KEY_RAIN_RATE_FILT,
+    KEY_RAIN_RATE_MAX_24H,
+    KEY_RAIN_THIS_MONTH_MM,
+    KEY_RAIN_THIS_WEEK_MM,
+    KEY_RAIN_THIS_YEAR_MM,
     KEY_RAIN_TODAY_MM,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
     KEY_SENSOR_QUALITY_FLAGS,
+    KEY_SENSOR_SPIKE,
+    KEY_SENSOR_STUCK,
+    KEY_SOLAR_ENERGY_TODAY_WHM2,
     KEY_SOLAR_FORECAST_STATUS,
     # v0.9.0
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
+    KEY_SPECIFIC_HUMIDITY,
     KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_AVG_24H,
     KEY_TEMP_DISPLAY,
@@ -324,135 +427,26 @@ from .const import (
     KEY_THSW_INDEX,
     KEY_THUNDERSTORM_RISK,
     KEY_THW_INDEX,
+    KEY_UTCI,
     KEY_UV,
     KEY_UV_LEVEL_DISPLAY,
     KEY_VIGILANCE_MAX_LEVEL,
     KEY_VPD,
+    KEY_WBGT,
+    KEY_WC_STATUS,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
     KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
+    KEY_WIND_DIR_VARIABILITY,
+    KEY_WIND_GUST_FACTOR,
     KEY_WIND_GUST_MAX_24H,
     KEY_WIND_QUADRANT,
     KEY_WIND_RUN_KM,
-    KEY_AIR_DENSITY,
-    KEY_CDD_SEASON,
-    KEY_CDD_TODAY_MM,
-    KEY_CLOUD_BASE_M,
-    CONF_AWEKAS_INTERVAL_MIN,
-    CONF_AWEKAS_PASSWORD,
-    CONF_AWEKAS_USERNAME,
-    CONF_ENABLE_AWEKAS,
-    CONF_CWOP_CALLSIGN,
-    CONF_CWOP_INTERVAL_MIN,
-    CONF_CWOP_PASSCODE,
-    CONF_CWOP_PORT,
-    CONF_CWOP_SERVER,
-    CONF_ENABLE_CWOP,
-    CONF_ENABLE_INDOOR,
-    CONF_ENABLE_LIGHTNING,
-    CONF_ENABLE_MQTT,
-    DEFAULT_CWOP_INTERVAL_MIN,
-    DEFAULT_CWOP_PORT,
-    DEFAULT_CWOP_SERVER,
-    DEFAULT_ENABLE_CWOP,
-    KEY_CWOP_STATUS_V2,
-    CONF_MQTT_DISCOVERY_PREFIX,
-    CONF_MQTT_INTERVAL_MIN,
-    CONF_MQTT_STATE_PREFIX,
-    CONF_ENABLE_PWSWEATHER,
-    CONF_ENABLE_WEATHERCLOUD,
-    CONF_ENABLE_WOW,
-    CONF_LIGHTNING_PROXIMITY_KM,
-    CONF_PWS_API_KEY,
-    CONF_PWS_INTERVAL_MIN,
-    CONF_PWS_STATION_ID,
-    CONF_WC_API_KEY,
-    CONF_WC_INTERVAL_MIN,
-    CONF_WC_STATION_ID,
-    CONF_WOW_AUTH_KEY,
-    CONF_WOW_INTERVAL_MIN,
-    CONF_WOW_SITE_ID,
-    DEFAULT_AWEKAS_INTERVAL_MIN,
-    DEFAULT_ENABLE_AWEKAS,
-    DEFAULT_ENABLE_INDOOR,
-    DEFAULT_ENABLE_LIGHTNING,
-    DEFAULT_ENABLE_MQTT,
-    DEFAULT_MQTT_DISCOVERY_PREFIX,
-    DEFAULT_MQTT_INTERVAL_MIN,
-    DEFAULT_MQTT_STATE_PREFIX,
-    KEY_DATA_QUALITY_SCORE,
-    KEY_INDOOR_CO2_PPM,
-    KEY_NEIGHBOR_QC,
-    KEY_INDOOR_COMFORT,
-    KEY_INDOOR_HUMIDITY,
-    KEY_INDOOR_HUMIDITY_DELTA,
-    KEY_INDOOR_TEMP_C,
-    KEY_INDOOR_TEMP_DELTA,
-    KEY_SENSOR_STUCK,
-    SRC_INDOOR_CO2,
-    SRC_INDOOR_HUMIDITY,
-    SRC_INDOOR_TEMP,
-    DEFAULT_ENABLE_PWSWEATHER,
-    DEFAULT_ENABLE_WEATHERCLOUD,
-    DEFAULT_ENABLE_WOW,
-    DEFAULT_LIGHTNING_PROXIMITY_KM,
-    DEFAULT_PWS_INTERVAL_MIN,
-    DEFAULT_WC_INTERVAL_MIN,
-    DEFAULT_WOW_INTERVAL_MIN,
-    KEY_AWEKAS_STATUS,
-    KEY_PWS_STATUS,
-    KEY_WC_STATUS,
-    KEY_WOW_STATUS,
-    CONF_ENABLE_OWM_STATIONS,
-    CONF_OWM_STATIONS_API_KEY,
-    CONF_OWM_STATIONS_INTERVAL_MIN,
-    CONF_OWM_STATIONS_STATION_ID,
-    DEFAULT_ENABLE_OWM_STATIONS,
-    DEFAULT_OWM_STATIONS_INTERVAL_MIN,
-    KEY_OWM_STATIONS_STATUS,
-    CONF_ENABLE_WINDY,
-    CONF_WINDY_API_KEY,
-    CONF_WINDY_INTERVAL_MIN,
-    CONF_WINDY_STATION_ID,
-    DEFAULT_ENABLE_WINDY,
-    DEFAULT_WINDY_INTERVAL_MIN,
-    KEY_WINDY_STATUS,
-    KEY_NET_RADIATION,
-    KEY_SENSOR_SPIKE,
     KEY_WIND_RUN_MONTH_KM,
-    SPIKE_MIN_SAMPLES,
-    SPIKE_SIGMA_THRESHOLD,
-    KEY_DOMINANT_WIND_DIR,
-    KEY_FFDI,
-    KEY_FFWI,
-    KEY_FREEZING_LEVEL_M,
-    KEY_LIGHTNING_CLEARANCE_MIN,
-    KEY_LIGHTNING_COUNT_1H,
-    KEY_LIGHTNING_DISTANCE_KM,
-    KEY_LIGHTNING_PROXIMITY,
-    KEY_LIGHTNING_RATE_1H,
-    SRC_LIGHTNING_COUNT,
-    SRC_LIGHTNING_DISTANCE,
-    KEY_UTCI,
-    KEY_GDD_SEASON_V2,
-    KEY_GDD_TODAY_V2,
-    KEY_HDD_SEASON,
-    KEY_HDD_TODAY_MM,
-    KEY_IRRIGATION_DEFICIT,
-    KEY_LEAF_WETNESS,
-    KEY_MAX_SOLAR_RADIATION,
-    KEY_PEAK_SUN_HOURS,
-    KEY_RAIN_RATE_MAX_24H,
-    KEY_SOLAR_ENERGY_TODAY_WHM2,
-    KEY_WIND_DIR_VARIABILITY,
-    KEY_RAIN_THIS_MONTH_MM,
-    KEY_RAIN_THIS_WEEK_MM,
-    KEY_RAIN_THIS_YEAR_MM,
-    KEY_SPECIFIC_HUMIDITY,
-    KEY_WBGT,
-    KEY_WIND_GUST_FACTOR,
+    KEY_WINDY_STATUS,
+    KEY_WOW_STATUS,
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
@@ -461,10 +455,17 @@ from .const import (
     PRESSURE_HISTORY_SAMPLES,
     RAIN_RATE_PHYSICAL_CAP_MMPH,
     REQUIRED_SOURCES,
+    SPIKE_MIN_SAMPLES,
+    SPIKE_SIGMA_THRESHOLD,
     SRC_BATTERY,
     SRC_DEW_POINT,
     SRC_GUST,
     SRC_HUM,
+    SRC_INDOOR_CO2,
+    SRC_INDOOR_HUMIDITY,
+    SRC_INDOOR_TEMP,
+    SRC_LIGHTNING_COUNT,
+    SRC_LIGHTNING_DISTANCE,
     SRC_LUX,
     SRC_PRESS,
     SRC_RAIN_TOTAL,
@@ -2115,7 +2116,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "&current=temperature_2m,relative_humidity_2m,surface_pressure"
                 "&wind_speed_unit=ms&timezone=auto"
             )
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.get(url, timeout=15) as resp:
                 if resp.status != 200:
                     return
@@ -3304,6 +3305,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _fire_ws_events(self, data: dict) -> None:
         """Notify event entities of transitions detected in this compute cycle."""
+        from .const import DOMAIN
+
         try:
             entry_id = self.config_entry.entry_id
         except Exception:  # noqa: BLE001
@@ -3316,20 +3319,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         frost_ent = events.get("WSFrostEvent")
         lightning_ent = events.get("WSLightningEvent")
         if rain_ent:
-            try:
+            with contextlib.suppress(Exception):
                 rain_ent.check_and_fire(data)
-            except Exception:  # noqa: BLE001
-                pass
         if frost_ent:
-            try:
+            with contextlib.suppress(Exception):
                 frost_ent.check_and_fire(data, threshold_c=freeze_thresh)
-            except Exception:  # noqa: BLE001
-                pass
         if lightning_ent and self.lightning_enabled:
-            try:
+            with contextlib.suppress(Exception):
                 lightning_ent.check_and_fire(data)
-            except Exception:  # noqa: BLE001
-                pass
 
     # ------------------------------------------------------------------
     # Moon / forecast helpers
@@ -3408,7 +3405,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         lat = self.forecast_lat or float(self.hass.config.latitude)
         lon = self.forecast_lon or float(self.hass.config.longitude)
 
-        from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
         session = async_get_clientsession(self.hass)
         provider = get_provider(self.forecast_provider)
@@ -3490,7 +3486,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "&cell_selection=sea"
                 "&timezone=auto"
             )
-            from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
             session = async_get_clientsession(self.hass)
             async with session.get(url, timeout=20) as resp:
@@ -3582,7 +3577,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "&forecast_minutely_15=24"
                 "&timezone=auto"
             )
-            from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
             session = async_get_clientsession(self.hass)
             async with session.get(url, timeout=20) as resp:
@@ -3675,7 +3669,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         url = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
         try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.get(url, params=params, timeout=15) as resp:
                 body = await resp.text()
                 if resp.status == 200 and "success" in body.lower():
@@ -3788,10 +3782,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 writer.write(login.encode("ascii"))
                 await writer.drain()
                 # Give server 1 second to respond (it sends a banner)
-                try:
+                with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(reader.read(256), timeout=1.5)
-                except asyncio.TimeoutError:
-                    pass
                 writer.write(packet.encode("ascii"))
                 await writer.drain()
                 self._cwop_last_upload = now_utc
@@ -3801,7 +3793,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 writer.close()
                 with contextlib.suppress(Exception):
                     await writer.wait_closed()
-        except (OSError, asyncio.TimeoutError) as exc:
+        except (TimeoutError, OSError) as exc:
             self._cwop_status = "error_network"
             _LOGGER.warning("CWOP upload error: %s", exc)
         except Exception as exc:  # noqa: BLE001
@@ -3897,7 +3889,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         url = "https://api.weathercloud.net/v01/set"
         try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.get(url, params=params, timeout=15) as resp:
                 body = await resp.text()
                 if resp.status == 200:
@@ -3970,7 +3962,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         url = "https://www.pwsweather.com/weatherstation/updateweatherstation.php"
         try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.get(url, params=params, timeout=15) as resp:
                 body = await resp.text()
                 if resp.status == 200 and "success" in body.lower():
@@ -4031,7 +4023,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         url = "https://wow.metoffice.gov.uk/automaticreading"
         try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.get(url, params=params, timeout=15) as resp:
                 if resp.status in (200, 201):
                     self._wow_last_upload = now_utc
@@ -4089,7 +4081,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         url = "https://data.awekas.at/eingabe_pruefung.php"
         try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.post(
                 url,
                 data={"val": payload},
@@ -4150,7 +4142,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         url = f"https://api.openweathermap.org/data/3.0/measurements?appid={self.owm_stations_api_key}"
         try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.post(url, json=[measurement], timeout=15) as resp:
                 if resp.status in (200, 201, 204):
                     self._owm_stations_last_upload = now_utc
@@ -4212,7 +4204,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         url = f"https://stations.windy.com/pws/update/{self.windy_api_key}"
         try:
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             async with session.post(url, json={"observations": [obs]}, timeout=15) as resp:
                 if resp.status in (200, 201, 204):
                     self._windy_last_upload = now_utc

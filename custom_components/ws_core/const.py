@@ -258,6 +258,13 @@ SRC_UV = "uv_index"
 SRC_DEW_POINT = "dew_point"
 SRC_BATTERY = "battery"
 SRC_SOLAR_RADIATION = "solar_radiation"  # W/m², optional
+# v2.0 optional source inputs (defined here so OPTIONAL_SOURCES can reference
+# them; the v2.0 feature sections below reuse these same names).
+SRC_LIGHTNING_COUNT = "lightning_count"     # cumulative strike count
+SRC_LIGHTNING_DISTANCE = "lightning_dist"   # nearest strike distance (km)
+SRC_INDOOR_TEMP = "indoor_temp"
+SRC_INDOOR_HUMIDITY = "indoor_humidity"
+SRC_INDOOR_CO2 = "indoor_co2"
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
 OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY, SRC_SOLAR_RADIATION, SRC_LIGHTNING_COUNT, SRC_LIGHTNING_DISTANCE, SRC_INDOOR_TEMP, SRC_INDOOR_HUMIDITY, SRC_INDOOR_CO2]
@@ -620,8 +627,7 @@ KEY_NET_RADIATION = "net_radiation_wm2"
 # ---------------------------------------------------------------------------
 
 CONF_ENABLE_LIGHTNING = "enable_lightning"
-SRC_LIGHTNING_COUNT = "lightning_count"     # cumulative strike count
-SRC_LIGHTNING_DISTANCE = "lightning_dist"   # nearest strike distance (km)
+# SRC_LIGHTNING_COUNT / SRC_LIGHTNING_DISTANCE defined near OPTIONAL_SOURCES above.
 
 DEFAULT_ENABLE_LIGHTNING = False
 DEFAULT_LIGHTNING_PROXIMITY_KM = 15.0       # threshold for proximity alert
@@ -693,9 +699,7 @@ KEY_WINDY_STATUS = "windy_upload_status"
 # ---------------------------------------------------------------------------
 
 CONF_ENABLE_INDOOR = "enable_indoor"
-SRC_INDOOR_TEMP = "indoor_temp"
-SRC_INDOOR_HUMIDITY = "indoor_humidity"
-SRC_INDOOR_CO2 = "indoor_co2"
+# SRC_INDOOR_TEMP / SRC_INDOOR_HUMIDITY / SRC_INDOOR_CO2 defined near OPTIONAL_SOURCES above.
 DEFAULT_ENABLE_INDOOR = False
 
 KEY_INDOOR_TEMP_C = "indoor_temp_c"

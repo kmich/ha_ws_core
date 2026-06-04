@@ -19,6 +19,34 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 
 ---
 
+## What's New in 2.0
+
+Version 2.0 is the largest release to date. Highlights (all opt-in via the
+Features step):
+
+- **New comfort & safety indices** — WBGT and **UTCI** (Universal Thermal
+  Climate Index), the gold-standard heat-stress metric, plus cloud base,
+  freezing level, air density, and specific humidity.
+- **Fire danger for every region** — McArthur **FFDI** (Australia) and Fosberg
+  **FFWI** (US/global) join the existing Canadian FWI.
+- **Lightning detection** — count, distance, strike rate, clearance timer, and
+  proximity alerts from WH57 / AS3935 / Blitzortung sensors.
+- **Indoor sensors** — temperature, humidity, CO₂ with indoor/outdoor deltas
+  and a comfort score.
+- **Degree days & agro** — HDD/CDD/GDD, leaf wetness, irrigation water deficit,
+  daily solar energy (Energy-dashboard ready), net radiation.
+- **Seven new upload networks** — Weathercloud, PWSWeather, WOW, AWEKAS, CWOP,
+  OpenWeatherMap Stations, Windy.
+- **MQTT Discovery republishing**, **HA Event entities** (rain/frost/lightning),
+  expanded **data-quality** sensors (stuck/spike/neighbour QC + 0–100 score).
+- **Eight languages** (added German, Dutch, Spanish, Italian, Portuguese,
+  Polish), new dashboards (full + mobile + gauge presets) and five automation
+  blueprints.
+
+See the [CHANGELOG](CHANGELOG.md) for the complete list.
+
+---
+
 ## What's New in 1.10
 
 **Fixed sensor filtering** (1.10.0) - atmospheric pressure and other sensors were appearing in the wrong slot in the setup wizard due to over-restrictive device-class filtering. All numeric sensors now show in all pickers.
@@ -342,6 +370,76 @@ Opt-in. Short-term rain timing from Open-Meteo's 15-minute precipitation buckets
 | `sensor.ws_nowcast_intensity` | - | none / light / moderate / heavy (peak rate in the next hour) |
 | `binary_sensor.ws_rain_expected_1h` | - | On when measurable rain is expected within 60 minutes |
 
+### Always-on additions (v2.0)
+
+Created automatically — no toggle required.
+
+| Entity | Unit | Description |
+|---|---|---|
+| `sensor.ws_cloud_base` | m | Estimated cloud base height (lifted condensation level) |
+| `sensor.ws_freezing_level` | m | Estimated freezing-level altitude (ISA lapse rate) |
+| `sensor.ws_wind_gust_factor` | - | Gust ÷ mean wind speed ratio |
+| `sensor.ws_dominant_wind_direction` | ° | Circular-mean wind direction over 24 h |
+| `sensor.ws_wind_direction_variability` | ° | Circular standard deviation of wind direction |
+| `sensor.ws_rain_this_week` / `_this_month` / `_this_year` | mm | Rolling rain accumulators |
+| `sensor.ws_rain_rate_max_24h` | mm/h | Rolling 24 h maximum rain rate |
+
+### Optional: Lightning Detection (`enable_lightning`)
+
+Map a cumulative strike-count sensor (and optional nearest-distance) from a WH57, AS3935, or Blitzortung device.
+
+| Entity | Unit | Description |
+|---|---|---|
+| `sensor.ws_lightning_count_1h` | strikes | Strikes in the last hour |
+| `sensor.ws_lightning_distance` | km | Nearest detected strike |
+| `sensor.ws_lightning_rate` | /min | Average strike rate |
+| `sensor.ws_lightning_clearance` | min | Minutes since the last strike (safe at ≥30) |
+| `sensor.ws_lightning_proximity` | - | `near` / `clear` vs a configurable threshold (number entity) |
+
+### Optional: Indoor Sensors (`enable_indoor`)
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_indoor_temperature` / `_humidity` / `_co2` | Indoor readings |
+| `sensor.ws_indoor_temp_delta` / `_humidity_delta` | Indoor/outdoor differentials |
+| `sensor.ws_indoor_comfort` | 0–100 composite comfort score |
+
+### Optional: Degree Days & Leaf Wetness (`enable_degree_days`)
+
+| Entity | Description |
+|---|---|
+| `sensor.ws_hdd_today` / `_season` | Heating degree days (configurable base) |
+| `sensor.ws_cdd_today` / `_season` | Cooling degree days |
+| `sensor.ws_gdd_today` / `_season` | Growing degree days (base/cap configurable) |
+| `sensor.ws_leaf_wetness` | wet / dry |
+
+### Comfort, solar & fire additions (with their existing groups)
+
+- **`enable_comfort_indices`** also adds: WBGT, **UTCI**, air density, specific
+  humidity, daily solar energy (Wh/m²), max clear-sky radiation, peak sun hours,
+  net radiation, irrigation deficit, monthly wind run.
+- **`enable_fire_risk_score`** also adds: McArthur **FFDI** and Fosberg **FFWI**.
+- **`enable_diagnostics`** also adds: stuck-sensor flags, σ-spike flags, spatial
+  neighbour-QC flags, a 0–100 data-quality score, and eight per-sensor problem
+  binary sensors.
+
+### Optional: Network Uploads
+
+Each upload target is an independent toggle with its own credentials and a status sensor:
+`enable_wunderground`, `enable_weathercloud`, `enable_pwsweather`, `enable_wow`,
+`enable_awekas`, `enable_cwop`, `enable_owm_stations`, `enable_windy`.
+
+### Optional: MQTT Discovery (`enable_mqtt`)
+
+Republishes 70+ derived sensors as MQTT Discovery entities for Node-RED, external
+dashboards, or other HA instances. Requires the Home Assistant MQTT integration.
+
+### HA Event entities (v2.0)
+
+`event.ws_rain_event`, `event.ws_frost_event`, and `event.ws_lightning_event`
+fire on weather transitions (rain start/stop, frost/thaw, lightning strike/proximity)
+for use as automation triggers. Requires Home Assistant 2023.8+.
+
 ### Other Entities
 
 | Entity | Type | Description |
@@ -408,6 +506,15 @@ Rich visual dashboard requiring these HACS frontend cards:
 - `custom:windrose-card`
 - `card-mod`
 - `kiosk-mode`
+
+### v2.0 Dashboards (`dashboards/`)
+
+- **`ws_core_dashboard.yaml`** — full 6-view dashboard (Now / Charts / Advanced /
+  Records / Diagnostics / Indoor). Needs `mushroom` + `mini-graph-card`.
+- **`ws_core_dashboard_mobile.yaml`** — single-column, touch-optimised layout
+  for phones (HA Sections). Needs `mushroom` + `mini-graph-card`.
+- **`ws_core_gauge_presets.yaml`** — drop-in gauge cards with sensible severity
+  bands for 12 common sensors. Uses the built-in `gauge` card (no HACS needed).
 
 ---
 

@@ -2,6 +2,88 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.0.0] - 2026-06-04
+
+The largest release to date — a comprehensive expansion aimed at making
+Weather Station Core the most complete personal-weather-station integration
+for Home Assistant. All new features are opt-in via feature toggles, so
+existing setups are unaffected until you enable them.
+
+### New derived sensors
+
+- **Atmospheric:** cloud base (LCL), freezing level, air density, specific
+  humidity, wind gust factor.
+- **Human comfort:** WBGT (indoor + solar-corrected outdoor) and **UTCI**
+  (Universal Thermal Climate Index, full Bröde 2012 polynomial) — neither
+  previously available in any HA weather integration.
+- **Fire danger:** McArthur **FFDI** (Australian standard) and Fosberg
+  **FFWI** (US/global), alongside the existing Canadian FWI.
+- **Agrometeorological:** Heating / Cooling / Growing Degree Days (HDD/CDD/GDD)
+  with configurable base temperatures, leaf wetness, irrigation water deficit.
+- **Solar/energy:** daily solar energy accumulation (Wh/m², Energy-dashboard
+  compatible), max theoretical clear-sky radiation, peak sun hours, net
+  radiation (FAO-56).
+- **Wind statistics:** dominant wind direction and direction variability
+  (circular statistics), monthly wind run.
+- **Rain accumulators:** this week / this month / this year, plus rolling
+  24-hour max rain rate.
+
+### Lightning detection (new opt-in group)
+
+- Accepts cumulative strike count + nearest distance from WH57, AS3935,
+  Blitzortung, or any compatible sensor.
+- Sensors: strikes (1 h), distance, strike rate, clearance timer, and a
+  proximity state with a configurable threshold (number entity).
+
+### Indoor sensors (new opt-in group)
+
+- Indoor temperature, humidity, and CO₂ inputs with indoor/outdoor deltas
+  and a composite indoor comfort score.
+
+### Data-quality expansion (diagnostics group)
+
+- Stuck-sensor detection, σ-based temporal spike detection, spatial neighbour
+  QC (vs Open-Meteo grid point), an overall 0–100 data-quality score, and
+  eight per-sensor problem binary sensors.
+
+### Network uploads — seven new targets
+
+- Weathercloud, PWSWeather, WOW (UK Met Office), AWEKAS, CWOP (APRS),
+  OpenWeatherMap Stations, and Windy.com — each independently configurable
+  with its own status sensor.
+
+### MQTT Discovery republishing
+
+- Publishes 70+ derived sensors as MQTT Discovery payloads for Node-RED,
+  external dashboards, or other HA instances. Uses the built-in MQTT
+  integration; no extra dependency.
+
+### Home Assistant platform features
+
+- **Event entities** for rain onset/cessation, frost/thaw, and lightning
+  strikes/proximity (HA 2023.8+).
+- Daily solar energy exposed with `device_class: energy` for the Energy
+  dashboard.
+
+### Translations
+
+- Full translations added for **German, Dutch, Spanish, Italian, Portuguese,
+  and Polish**, joining English and French — eight languages, all at full
+  entity-name parity.
+
+### Dashboards & automations
+
+- Pre-built full Lovelace dashboard (6 views), a mobile-optimised single-column
+  dashboard, gauge-card presets, and five automation blueprints (frost alert,
+  storm alert, irrigation rain-skip, lightning safety, fire danger).
+
+### Fixes
+
+- Fixed module import order in `const.py` that could raise `NameError` on load.
+- Replaced the deprecated `hass.helpers.aiohttp_client` accessor (removed in
+  recent HA) with the modern `async_get_clientsession` throughout — fixes all
+  network uploads/fetches on HA 2025+.
+
 ## [1.10.1] - 2026-06-01
 
 ### Improvements

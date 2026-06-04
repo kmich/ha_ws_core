@@ -13,11 +13,14 @@ These are Home Assistant Blueprint automations that work with Weather Station Co
 
 | Blueprint | Trigger | Description |
 |---|---|---|
-| `frost_alert.yaml` | Temperature below threshold | Notify when frost risk is detected |
-| `rain_notification.yaml` | Rain rate or probability | Notify when rain starts or is imminent |
-| `storm_warning.yaml` | Rapid pressure drop + high wind | Alert when a storm front approaches |
+| `frost_alert.yaml` | Temperature below threshold | Notify when frost/freeze risk is detected, with frost-point context and a cooldown |
+| `storm_alert.yaml` | Rapid pressure drop (>1.6 hPa/h) | Alert when a storm front approaches, with rain probability + gust context |
+| `irrigation_rain_skip.yaml` | Scheduled time | Run an irrigation zone on schedule, skipping if rain today or high rain probability |
+| `lightning_safety.yaml` | Lightning proximity / clearance | "Near" and "all-clear" alerts; can switch off pool/outdoor equipment (needs `enable_lightning`) |
+| `fire_danger_alert.yaml` | Fire Risk Score or FFDI above threshold | Alert on high fire danger; optional precautionary garden irrigation (needs `enable_fire_risk_score`) |
 
 ## Notes
 
-- All blueprints default to `notify.persistent_notification`. Change to your mobile app notification service for push alerts.
+- Most blueprints take a `notify_target` (e.g. `notify.mobile_app_phone`); some default to a persistent notification. Set it to your mobile app notification service for push alerts.
 - Entity IDs assume the default `ws` prefix. Adjust if you used a different prefix.
+- Blueprints that depend on optional feature groups (lightning, fire risk) require that group to be enabled in the integration's Configure → Features step.
