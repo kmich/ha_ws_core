@@ -20,9 +20,8 @@ existing setups are unaffected until you enable them.
   **FFWI** (US/global), alongside the existing Canadian FWI.
 - **Agrometeorological:** Heating / Cooling / Growing Degree Days (HDD/CDD/GDD)
   with configurable base temperatures, leaf wetness, irrigation water deficit.
-- **Solar/energy:** daily solar energy accumulation (Wh/m², Energy-dashboard
-  compatible), max theoretical clear-sky radiation, peak sun hours, net
-  radiation (FAO-56).
+- **Solar/energy:** daily solar irradiation accumulation (Wh/m²), max
+  theoretical clear-sky radiation, peak sun hours, net radiation (FAO-56).
 - **Wind statistics:** dominant wind direction and direction variability
   (circular statistics), monthly wind run.
 - **Rain accumulators:** this week / this month / this year, plus rolling
@@ -62,8 +61,6 @@ existing setups are unaffected until you enable them.
 
 - **Event entities** for rain onset/cessation, frost/thaw, and lightning
   strikes/proximity (HA 2023.8+).
-- Daily solar energy exposed with `device_class: energy` for the Energy
-  dashboard.
 
 ### Translations
 

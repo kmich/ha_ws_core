@@ -34,7 +34,7 @@ Features step):
 - **Indoor sensors** — temperature, humidity, CO₂ with indoor/outdoor deltas
   and a comfort score.
 - **Degree days & agro** — HDD/CDD/GDD, leaf wetness, irrigation water deficit,
-  daily solar energy (Energy-dashboard ready), net radiation.
+  daily solar irradiation (Wh/m²), net radiation.
 - **Seven new upload networks** — Weathercloud, PWSWeather, WOW, AWEKAS, CWOP,
   OpenWeatherMap Stations, Windy.
 - **MQTT Discovery republishing**, **HA Event entities** (rain/frost/lightning),

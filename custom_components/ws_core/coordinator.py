@@ -109,7 +109,9 @@ from .algorithms import (
     pressure_trend_display,
     smooth_wind_direction,
     thunderstorm_risk_index,
+    uv_burn_time_minutes,
     uv_level,
+    uv_recommendation,
     wind_speed_to_beaufort,
     zambretti_forecast,
 )
@@ -1504,6 +1506,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         uv_val = data.get(KEY_UV)
         if uv_val is not None:
             data[KEY_UV_LEVEL_DISPLAY] = uv_level(float(uv_val))
+            # Populate the UV-level sensor's advertised attributes (previously
+            # referenced by attrs_fn but never set → always showed empty).
+            data["_uv_recommendation"] = uv_recommendation(float(uv_val))
+            data["_uv_burn_fair_skin"] = uv_burn_time_minutes(float(uv_val), skin_type=2)
 
         # --- v1.5.0 comfort / humidity / vapour indices ---
         if self.comfort_indices_enabled and tc is not None and rh is not None:

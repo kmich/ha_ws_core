@@ -1115,7 +1115,11 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=UNIT_RAIN_MM,
         state_class=SensorStateClass.MEASUREMENT,
     ),
-    # v2.0 — Weekly / monthly / yearly rain accumulators
+    # v2.0 — Weekly / monthly / yearly rain accumulators.
+    # TOTAL_INCREASING: they accumulate within the period and reset to 0 at the
+    # boundary — HA's statistics engine handles the reset as a new cycle (matches
+    # wind_run / chill_hours_season), whereas MEASUREMENT would compute a
+    # meaningless mean/min/max over a running total.
     WSSensorDescription(
         key=KEY_RAIN_THIS_WEEK_MM,
         translation_key="rain_this_week",
@@ -1123,7 +1127,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:calendar-week",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit=UNIT_RAIN_MM,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     WSSensorDescription(
         key=KEY_RAIN_THIS_MONTH_MM,
@@ -1132,7 +1136,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:calendar-month",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit=UNIT_RAIN_MM,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     WSSensorDescription(
         key=KEY_RAIN_THIS_YEAR_MM,
@@ -1141,7 +1145,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:calendar",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit=UNIT_RAIN_MM,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     # v2.0 — Max rain rate in rolling 24h window
     WSSensorDescription(
@@ -1258,7 +1262,10 @@ SENSORS: list[WSSensorDescription] = [
             "wind_ms": d.get(KEY_NORM_WIND_SPEED_MS),
         },
     ),
-    # v2.0 Dominant wind direction (circular mean over 24h)
+    # v2.0 Dominant wind direction (circular mean over 24h).
+    # MEASUREMENT_ANGLE (matches the live wind_direction sensor) so HA computes a
+    # circular mean for statistics — plain MEASUREMENT would average 350°+10° as
+    # 180° instead of 0°.
     WSSensorDescription(
         key=KEY_DOMINANT_WIND_DIR,
         translation_key="dominant_wind_direction",
@@ -1266,7 +1273,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:compass-rose",
         device_class=SensorDeviceClass.WIND_DIRECTION,
         native_unit="°",
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.MEASUREMENT_ANGLE,
         attrs_fn=lambda d: {
             "variability_deg": d.get(KEY_WIND_DIR_VARIABILITY),
         },
@@ -1503,7 +1510,7 @@ SENSORS: list[WSSensorDescription] = [
     # v2.0 additional upload status sensors
     WSSensorDescription(
         key=KEY_WC_STATUS,
-        translation_key="wc_status",
+        translation_key="wc_upload_status",
         name="WS Weathercloud Status",
         icon="mdi:cloud-upload",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1511,7 +1518,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_PWS_STATUS,
-        translation_key="pws_status",
+        translation_key="pws_upload_status",
         name="WS PWSWeather Status",
         icon="mdi:cloud-upload-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1519,7 +1526,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_WOW_STATUS,
-        translation_key="wow_status",
+        translation_key="wow_upload_status",
         name="WS WOW Status",
         icon="mdi:cloud-upload",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1527,7 +1534,7 @@ SENSORS: list[WSSensorDescription] = [
     ),
     WSSensorDescription(
         key=KEY_AWEKAS_STATUS,
-        translation_key="awekas_status",
+        translation_key="awekas_upload_status",
         name="WS AWEKAS Status",
         icon="mdi:cloud-upload-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -1807,13 +1814,14 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="W/m²",
         state_class=SensorStateClass.MEASUREMENT,
     ),
-    # v2.0 — Daily solar energy accumulation (Wh/m²) — when solar radiation sensor mapped
+    # v2.0 — Daily solar energy accumulation (Wh/m²) — when solar radiation sensor mapped.
+    # NOTE: Wh/m² is solar irradiation density, NOT an HA ENERGY-class unit
+    # (Wh/kWh), so no device_class is set — otherwise HA rejects the unit.
     WSSensorDescription(
         key=KEY_SOLAR_ENERGY_TODAY_WHM2,
         translation_key="solar_energy_today",
         name="WS Solar Energy Today",
         icon="mdi:solar-power",
-        device_class=SensorDeviceClass.ENERGY,
         native_unit="Wh/m²",
         state_class=SensorStateClass.TOTAL_INCREASING,
         attrs_fn=lambda d: {

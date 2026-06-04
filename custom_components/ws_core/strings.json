@@ -257,6 +257,18 @@
         "data_description": {
           "vigicrues_stations": "Select one or more stations. Leave empty to auto-detect the nearest station."
         }
+      },
+      "cwop": {
+        "title": "CWOP (APRS) Upload",
+        "description": "{info}",
+        "data": {
+          "cwop_callsign": "CWOP / APRS callsign",
+          "cwop_passcode": "Passcode (-1 for CWOP IDs)",
+          "cwop_server": "APRS-IS server",
+          "cwop_port": "Port",
+          "cwop_interval_min": "Upload interval",
+          "_go_back": "← Go back to previous step"
+        }
       }
     },
     "error": {
@@ -452,6 +464,72 @@
         },
         "data_description": {
           "vigicrues_stations": "Select one or more stations. Leave empty to auto-detect the nearest station."
+        }
+      },
+      "weathercloud_opt": {
+        "title": "Weathercloud Upload",
+        "data": {
+          "wc_station_id": "Station ID",
+          "wc_api_key": "API key",
+          "wc_interval_min": "Upload interval"
+        }
+      },
+      "pwsweather_opt": {
+        "title": "PWSWeather Upload",
+        "data": {
+          "pws_station_id": "Station ID",
+          "pws_api_key": "API key",
+          "pws_interval_min": "Upload interval"
+        }
+      },
+      "wow_opt": {
+        "title": "WOW (UK Met Office) Upload",
+        "data": {
+          "wow_site_id": "Site ID",
+          "wow_auth_key": "Authentication key",
+          "wow_interval_min": "Upload interval"
+        }
+      },
+      "awekas_opt": {
+        "title": "AWEKAS Upload",
+        "data": {
+          "awekas_username": "Username",
+          "awekas_password": "Password",
+          "awekas_interval_min": "Upload interval"
+        }
+      },
+      "owm_stations_opt": {
+        "title": "OpenWeatherMap Stations Upload",
+        "data": {
+          "owm_stations_api_key": "API key",
+          "owm_stations_station_id": "Station ID",
+          "owm_stations_interval_min": "Upload interval"
+        }
+      },
+      "windy_opt": {
+        "title": "Windy.com Upload",
+        "data": {
+          "windy_api_key": "API key",
+          "windy_station_id": "Station ID (optional)",
+          "windy_interval_min": "Upload interval"
+        }
+      },
+      "cwop_opt": {
+        "title": "CWOP (APRS) Upload",
+        "data": {
+          "cwop_callsign": "CWOP / APRS callsign",
+          "cwop_passcode": "Passcode (-1 for CWOP IDs)",
+          "cwop_server": "APRS-IS server",
+          "cwop_port": "Port",
+          "cwop_interval_min": "Upload interval"
+        }
+      },
+      "mqtt_config_opt": {
+        "title": "MQTT Discovery Configuration",
+        "data": {
+          "mqtt_discovery_prefix": "Discovery prefix",
+          "mqtt_state_prefix": "State topic prefix",
+          "mqtt_interval_min": "Publish interval"
         }
       }
     },
@@ -702,9 +780,15 @@
           "rouge": "Red (extreme fire danger)"
         },
         "state_attributes": {
-          "department": { "name": "Department" },
-          "all_phenomena": { "name": "All active phenomena" },
-          "fetched_at": { "name": "Last updated" }
+          "department": {
+            "name": "Department"
+          },
+          "all_phenomena": {
+            "name": "All active phenomena"
+          },
+          "fetched_at": {
+            "name": "Last updated"
+          }
         }
       },
       "river_level": {
@@ -1478,42 +1562,64 @@
       "cloud_base": {
         "name": "Cloud Base",
         "state_attributes": {
-          "temp_c": { "name": "Temperature" },
-          "dew_point_c": { "name": "Dew point" },
-          "spread_c": { "name": "Temp-dew spread" }
+          "temp_c": {
+            "name": "Temperature"
+          },
+          "dew_point_c": {
+            "name": "Dew point"
+          },
+          "spread_c": {
+            "name": "Temp-dew spread"
+          }
         }
       },
       "freezing_level": {
         "name": "Freezing Level",
         "state_attributes": {
-          "temp_c": { "name": "Temperature" }
+          "temp_c": {
+            "name": "Temperature"
+          }
         }
       },
       "wind_gust_factor": {
         "name": "Wind Gust Factor",
         "state_attributes": {
-          "gust_ms": { "name": "Gust speed" },
-          "wind_ms": { "name": "Wind speed" }
+          "gust_ms": {
+            "name": "Gust speed"
+          },
+          "wind_ms": {
+            "name": "Wind speed"
+          }
         }
       },
       "air_density": {
         "name": "Air Density",
         "state_attributes": {
-          "temp_c": { "name": "Temperature" },
-          "pressure_hpa": { "name": "Pressure" }
+          "temp_c": {
+            "name": "Temperature"
+          },
+          "pressure_hpa": {
+            "name": "Pressure"
+          }
         }
       },
       "specific_humidity": {
         "name": "Specific Humidity",
         "state_attributes": {
-          "absolute_humidity_gm3": { "name": "Absolute humidity" }
+          "absolute_humidity_gm3": {
+            "name": "Absolute humidity"
+          }
         }
       },
       "wbgt": {
         "name": "WBGT",
         "state_attributes": {
-          "heat_risk": { "name": "Heat risk" },
-          "wet_bulb_c": { "name": "Wet-bulb temperature" }
+          "heat_risk": {
+            "name": "Heat risk"
+          },
+          "wet_bulb_c": {
+            "name": "Wet-bulb temperature"
+          }
         }
       },
       "rain_this_week": {
@@ -1531,7 +1637,9 @@
       "hdd_today": {
         "name": "Heating Degree Day",
         "state_attributes": {
-          "base_c": { "name": "Base temperature" }
+          "base_c": {
+            "name": "Base temperature"
+          }
         }
       },
       "hdd_season": {
@@ -1546,8 +1654,12 @@
       "gdd_today": {
         "name": "Growing Degree Day",
         "state_attributes": {
-          "base_c": { "name": "Base temperature" },
-          "cap_c": { "name": "Upper threshold" }
+          "base_c": {
+            "name": "Base temperature"
+          },
+          "cap_c": {
+            "name": "Upper threshold"
+          }
         }
       },
       "gdd_season": {
@@ -1560,15 +1672,23 @@
           "dry": "Dry"
         },
         "state_attributes": {
-          "dew_point_c": { "name": "Dew point" },
-          "humidity_pct": { "name": "Humidity" },
-          "rain_rate_mmph": { "name": "Rain rate" }
+          "dew_point_c": {
+            "name": "Dew point"
+          },
+          "humidity_pct": {
+            "name": "Humidity"
+          },
+          "rain_rate_mmph": {
+            "name": "Rain rate"
+          }
         }
       },
       "dominant_wind_direction": {
         "name": "Dominant Wind Direction",
         "state_attributes": {
-          "variability_deg": { "name": "Direction variability" }
+          "variability_deg": {
+            "name": "Direction variability"
+          }
         }
       },
       "wind_direction_variability": {
@@ -1577,7 +1697,9 @@
       "solar_energy_today": {
         "name": "Solar Energy Today",
         "state_attributes": {
-          "peak_sun_hours": { "name": "Peak sun hours" }
+          "peak_sun_hours": {
+            "name": "Peak sun hours"
+          }
         }
       },
       "max_solar_radiation": {
@@ -1589,43 +1711,67 @@
       "irrigation_deficit": {
         "name": "Irrigation Deficit",
         "state_attributes": {
-          "et0_daily_mm": { "name": "ET₀ today" },
-          "rain_today_mm": { "name": "Rain today" }
+          "et0_daily_mm": {
+            "name": "ET₀ today"
+          },
+          "rain_today_mm": {
+            "name": "Rain today"
+          }
         }
       },
       "ffdi": {
         "name": "Forest Fire Danger Index",
         "state_attributes": {
-          "danger_level": { "name": "Danger level" },
-          "temperature_c": { "name": "Temperature" },
-          "humidity_pct": { "name": "Humidity" },
-          "wind_kmh": { "name": "Wind speed" }
+          "danger_level": {
+            "name": "Danger level"
+          },
+          "temperature_c": {
+            "name": "Temperature"
+          },
+          "humidity_pct": {
+            "name": "Humidity"
+          },
+          "wind_kmh": {
+            "name": "Wind speed"
+          }
         }
       },
       "ffwi": {
         "name": "Fire Weather Index (Fosberg)",
         "state_attributes": {
-          "temperature_c": { "name": "Temperature" },
-          "humidity_pct": { "name": "Humidity" },
-          "wind_ms": { "name": "Wind speed" }
+          "temperature_c": {
+            "name": "Temperature"
+          },
+          "humidity_pct": {
+            "name": "Humidity"
+          },
+          "wind_ms": {
+            "name": "Wind speed"
+          }
         }
       },
       "utci": {
         "name": "UTCI",
         "state_attributes": {
-          "stress_category": { "name": "Thermal stress category" }
+          "stress_category": {
+            "name": "Thermal stress category"
+          }
         }
       },
       "lightning_count_1h": {
         "name": "Lightning Strikes (1h)",
         "state_attributes": {
-          "rate_per_min": { "name": "Strike rate (per min)" }
+          "rate_per_min": {
+            "name": "Strike rate (per min)"
+          }
         }
       },
       "lightning_distance": {
         "name": "Lightning Distance",
         "state_attributes": {
-          "proximity": { "name": "Proximity status" }
+          "proximity": {
+            "name": "Proximity status"
+          }
         }
       },
       "lightning_rate": {
@@ -1634,7 +1780,9 @@
       "lightning_clearance": {
         "name": "Lightning Clearance",
         "state_attributes": {
-          "safe": { "name": "Safety status (≥30 min)" }
+          "safe": {
+            "name": "Safety status (≥30 min)"
+          }
         }
       },
       "lightning_proximity": {
@@ -1644,8 +1792,12 @@
           "clear": "Clear"
         },
         "state_attributes": {
-          "distance_km": { "name": "Distance" },
-          "clearance_min": { "name": "Minutes since last strike" }
+          "distance_km": {
+            "name": "Distance"
+          },
+          "clearance_min": {
+            "name": "Minutes since last strike"
+          }
         }
       },
       "wc_upload_status": {
@@ -1658,7 +1810,9 @@
           "error": "Error"
         },
         "state_attributes": {
-          "last_upload": { "name": "Last upload" }
+          "last_upload": {
+            "name": "Last upload"
+          }
         }
       },
       "pws_upload_status": {
@@ -1671,7 +1825,9 @@
           "error": "Error"
         },
         "state_attributes": {
-          "last_upload": { "name": "Last upload" }
+          "last_upload": {
+            "name": "Last upload"
+          }
         }
       },
       "wow_upload_status": {
@@ -1684,7 +1840,9 @@
           "error": "Error"
         },
         "state_attributes": {
-          "last_upload": { "name": "Last upload" }
+          "last_upload": {
+            "name": "Last upload"
+          }
         }
       },
       "cwop_status": {
@@ -1696,7 +1854,9 @@
           "error": "Error"
         },
         "state_attributes": {
-          "last_upload": { "name": "Last successful upload" }
+          "last_upload": {
+            "name": "Last successful upload"
+          }
         }
       },
       "owm_stations_status": {
@@ -1710,7 +1870,9 @@
           "error": "Error"
         },
         "state_attributes": {
-          "last_upload": { "name": "Last successful upload" }
+          "last_upload": {
+            "name": "Last successful upload"
+          }
         }
       },
       "windy_status": {
@@ -1724,16 +1886,26 @@
           "error": "Error"
         },
         "state_attributes": {
-          "last_upload": { "name": "Last successful upload" }
+          "last_upload": {
+            "name": "Last successful upload"
+          }
         }
       },
-      "wind_run_month": { "name": "Wind Run This Month" },
-      "net_radiation": { "name": "Net Radiation" },
+      "wind_run_month": {
+        "name": "Wind Run This Month"
+      },
+      "net_radiation": {
+        "name": "Net Radiation"
+      },
       "sensor_spike": {
         "name": "Sensor Spike Flags",
         "state_attributes": {
-          "flags": { "name": "Active flags" },
-          "all_clear": { "name": "All clear" }
+          "flags": {
+            "name": "Active flags"
+          },
+          "all_clear": {
+            "name": "All clear"
+          }
         }
       },
       "awekas_upload_status": {
@@ -1746,21 +1918,31 @@
           "error": "Error"
         },
         "state_attributes": {
-          "last_upload": { "name": "Last upload" }
+          "last_upload": {
+            "name": "Last upload"
+          }
         }
       },
       "indoor_temperature": {
         "name": "Indoor Temperature",
         "state_attributes": {
-          "outdoor_temp_c": { "name": "Outdoor temperature" },
-          "delta_c": { "name": "Indoor/outdoor delta" }
+          "outdoor_temp_c": {
+            "name": "Outdoor temperature"
+          },
+          "delta_c": {
+            "name": "Indoor/outdoor delta"
+          }
         }
       },
       "indoor_humidity": {
         "name": "Indoor Humidity",
         "state_attributes": {
-          "outdoor_humidity_pct": { "name": "Outdoor humidity" },
-          "delta_pct": { "name": "Indoor/outdoor delta" }
+          "outdoor_humidity_pct": {
+            "name": "Outdoor humidity"
+          },
+          "delta_pct": {
+            "name": "Indoor/outdoor delta"
+          }
         }
       },
       "indoor_co2": {
@@ -1775,30 +1957,48 @@
       "indoor_comfort": {
         "name": "Indoor Comfort Score",
         "state_attributes": {
-          "co2_ppm": { "name": "CO₂" },
-          "temp_c": { "name": "Temperature" },
-          "humidity_pct": { "name": "Humidity" }
+          "co2_ppm": {
+            "name": "CO₂"
+          },
+          "temp_c": {
+            "name": "Temperature"
+          },
+          "humidity_pct": {
+            "name": "Humidity"
+          }
         }
       },
       "sensor_stuck": {
         "name": "Sensor Stuck Flags",
         "state_attributes": {
-          "stuck_sensors": { "name": "Stuck sensor names" },
-          "all_clear": { "name": "All clear" }
+          "stuck_sensors": {
+            "name": "Stuck sensor names"
+          },
+          "all_clear": {
+            "name": "All clear"
+          }
         }
       },
       "data_quality_score": {
         "name": "Data Quality Score",
         "state_attributes": {
-          "quality_flags": { "name": "Active quality flags" },
-          "stuck_flags": { "name": "Stuck sensor count" }
+          "quality_flags": {
+            "name": "Active quality flags"
+          },
+          "stuck_flags": {
+            "name": "Stuck sensor count"
+          }
         }
       },
       "neighbor_qc": {
         "name": "Neighbor QC Flags",
         "state_attributes": {
-          "flags": { "name": "Active flags" },
-          "all_clear": { "name": "All clear" }
+          "flags": {
+            "name": "Active flags"
+          },
+          "all_clear": {
+            "name": "All clear"
+          }
         }
       }
     },
