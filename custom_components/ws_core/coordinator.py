@@ -2869,6 +2869,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "rain_this_year_mm": self._rain_this_year_mm,
             "rain_this_year_key": self._rain_this_year_key,
             "rain_this_year_last_total": self._rain_this_year_last_total,
+            # v2.0 degree-day accumulators (season totals must survive restarts)
+            "hdd_today": self._hdd_today,
+            "hdd_today_date": self._hdd_today_date,
+            "hdd_today_samples": self._hdd_today_samples,
+            "cdd_today": self._cdd_today,
+            "cdd_today_date": self._cdd_today_date,
+            "cdd_today_samples": self._cdd_today_samples,
+            "gdd_today": self._gdd_today,
+            "gdd_today_date": self._gdd_today_date,
+            "hdd_season": self._hdd_season,
+            "hdd_season_key": self._hdd_season_key,
+            "cdd_season": self._cdd_season,
+            "cdd_season_key": self._cdd_season_key,
+            "gdd_season": self._gdd_season,
+            "gdd_season_key": self._gdd_season_key,
+            # v2.0 solar energy accumulation (Wh/m², resets at midnight)
+            "solar_energy_today_whm2": self._solar_energy_today_whm2,
+            "solar_energy_date": self._solar_energy_date,
         }
 
     def _restore_history_state(self, data: dict[str, Any]) -> None:
@@ -2961,6 +2979,33 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._rain_this_year_key = year_key
             lt = data.get("rain_this_year_last_total")
             self._rain_this_year_last_total = float(lt) if lt is not None else None
+
+        # v2.0 degree days: 'today' values continue only within the same day;
+        # 'season' totals are restored unconditionally (their own reset logic,
+        # keyed by year, handles the seasonal rollover) so a restart never wipes
+        # an accumulated growing/heating/cooling season.
+        if data.get("hdd_today_date") == today:
+            self._hdd_today = float(data.get("hdd_today") or 0.0)
+            self._hdd_today_date = today
+            self._hdd_today_samples = int(data.get("hdd_today_samples") or 0)
+        if data.get("cdd_today_date") == today:
+            self._cdd_today = float(data.get("cdd_today") or 0.0)
+            self._cdd_today_date = today
+            self._cdd_today_samples = int(data.get("cdd_today_samples") or 0)
+        if data.get("gdd_today_date") == today:
+            self._gdd_today = float(data.get("gdd_today") or 0.0)
+            self._gdd_today_date = today
+        self._hdd_season = float(data.get("hdd_season") or 0.0)
+        self._hdd_season_key = data.get("hdd_season_key") or ""
+        self._cdd_season = float(data.get("cdd_season") or 0.0)
+        self._cdd_season_key = data.get("cdd_season_key") or ""
+        self._gdd_season = float(data.get("gdd_season") or 0.0)
+        self._gdd_season_key = data.get("gdd_season_key") or ""
+
+        # v2.0 solar energy: continue only if still the same calendar day.
+        if data.get("solar_energy_date") == today:
+            self._solar_energy_today_whm2 = float(data.get("solar_energy_today_whm2") or 0.0)
+            self._solar_energy_date = today
 
     # ------------------------------------------------------------------
     # Main orchestrator
