@@ -104,11 +104,13 @@ if _HAS_EVENT:
                     "rain_rate_mmph": round(float(rate), 1),
                     "rain_today_mm": data.get("_rain_today_mm"),
                 })
+                self.async_write_ha_state()
             elif not is_raining and self._prev_raining:
                 self._trigger_event("stopped", {
                     "rain_today_mm": data.get("_rain_today_mm"),
                     "rain_1h_mm": data.get("rain_accum_1h_mm"),
                 })
+                self.async_write_ha_state()
             self._prev_raining = is_raining
 
     class WSFrostEvent(CoordinatorEntity, EventEntity):
@@ -153,10 +155,12 @@ if _HAS_EVENT:
                     "frost_point_c": data.get("frost_point_c"),
                     "dew_point_c": data.get("dew_point_c"),
                 })
+                self.async_write_ha_state()
             elif not is_frozen and self._prev_frozen:
                 self._trigger_event("thaw", {
                     "temperature_c": round(float(tc), 1),
                 })
+                self.async_write_ha_state()
             self._prev_frozen = is_frozen
 
     class WSLightningEvent(CoordinatorEntity, EventEntity):
@@ -197,10 +201,12 @@ if _HAS_EVENT:
                     "distance_km": data.get("lightning_distance_km"),
                     "proximity": proximity,
                 })
+                self.async_write_ha_state()
             if proximity == "near" and self._prev_proximity == "clear":
                 self._trigger_event("proximity_alert", {
                     "distance_km": data.get("lightning_distance_km"),
                 })
+                self.async_write_ha_state()
             self._prev_count_1h = float(count_1h)
             self._prev_proximity = proximity
 
