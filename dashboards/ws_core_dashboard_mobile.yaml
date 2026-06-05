@@ -61,7 +61,7 @@ views:
             name: Gust
             icon: mdi:weather-windy-variant
           - type: custom:mushroom-sensor-card
-            entity: sensor.ws_rain_today
+            entity: sensor.ws_rain_today_mm
             name: Rain Today
             icon: mdi:weather-rainy
           - type: custom:mushroom-sensor-card

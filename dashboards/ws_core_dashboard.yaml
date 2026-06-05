@@ -98,7 +98,7 @@ views:
             name: Rain Rate
             icon: mdi:water
           - type: custom:mushroom-sensor-card
-            entity: sensor.ws_rain_today
+            entity: sensor.ws_rain_today_mm
             name: Today
             icon: mdi:weather-rainy
           - type: custom:mushroom-sensor-card
@@ -239,7 +239,7 @@ views:
       - type: entities
         title: Atmospheric
         entities:
-          - sensor.ws_wet_bulb_temperature
+          - sensor.ws_wet_bulb
           - sensor.ws_frost_point
           - sensor.ws_cloud_base
           - sensor.ws_freezing_level
@@ -255,9 +255,11 @@ views:
           - sensor.ws_et0_penman_monteith
           - sensor.ws_irrigation_deficit
           - sensor.ws_wind_run
+          - sensor.ws_wind_run_month
           - sensor.ws_solar_energy_today
           - sensor.ws_peak_sun_hours
           - sensor.ws_max_solar_radiation
+          - sensor.ws_net_radiation
           - sensor.ws_clearness_index
           - sensor.ws_cloud_cover
           - sensor.ws_hdd_today
@@ -295,7 +297,7 @@ views:
       - type: entities
         title: Rain Records
         entities:
-          - sensor.ws_rain_today
+          - sensor.ws_rain_today_mm
           - sensor.ws_rain_this_week
           - sensor.ws_rain_this_month
           - sensor.ws_rain_this_year
@@ -307,7 +309,7 @@ views:
         entities:
           - sensor.ws_temperature_high_24h
           - sensor.ws_temperature_low_24h
-          - sensor.ws_temperature_average_24h
+          - sensor.ws_temperature_avg_24h
           - sensor.ws_temperature_anomaly_30d
 
       - type: entities
@@ -320,9 +322,9 @@ views:
       - type: entities
         title: Streaks
         entities:
-          - sensor.ws_dry_streak
-          - sensor.ws_heat_streak
-          - sensor.ws_frost_streak
+          - sensor.ws_dry_streak_days
+          - sensor.ws_heat_streak_days
+          - sensor.ws_frost_streak_days
 
   # ─────────────────────────────────────────────────────────────────────────
   # VIEW 5: DIAGNOSTICS — station health, data quality, upload status
@@ -350,6 +352,8 @@ views:
           - sensor.ws_sensor_drift
           - sensor.ws_sensor_consistency
           - sensor.ws_sensor_stuck
+          - sensor.ws_sensor_spike
+          - sensor.ws_neighbor_qc
           - binary_sensor.ws_temperature_stuck
           - binary_sensor.ws_humidity_stuck
           - binary_sensor.ws_pressure_stuck
@@ -373,6 +377,8 @@ views:
           - sensor.ws_wow_upload_status
           - sensor.ws_awekas_upload_status
           - sensor.ws_cwop_upload_status
+          - sensor.ws_owm_stations_upload_status
+          - sensor.ws_windy_upload_status
 
       # Event log (requires HA 2023.8+)
       - type: logbook

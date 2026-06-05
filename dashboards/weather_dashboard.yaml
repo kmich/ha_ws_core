@@ -286,7 +286,6 @@ views:
                   - sensor.ws_wind_beaufort
                   - sensor.ws_wind_quadrant
                   - sun.sun
-                  - sensor.ws_stargazing_quality
                   - sensor.ws_station_health
                   - sensor.ws_forecast_tiles
                   - sensor.ws_temperature
@@ -2645,7 +2644,7 @@ views:
                 show_icon: true
                 icon: mdi:weather-rainy
                 triggers_update:
-                  - sensor.ws_dry_streak
+                  - sensor.ws_dry_streak_days
                   - sensor.ws_rain_probability
                   - sensor.ws_sea_level_pressure
                   - sensor.ws_pressure_trend

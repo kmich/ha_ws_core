@@ -9,7 +9,7 @@ blueprint:
   input:
     rain_today_sensor:
       name: WS Rain Today Sensor
-      description: sensor.ws_rain_today or equivalent
+      description: sensor.ws_rain_today_mm or equivalent
       selector:
         entity:
           domain: sensor
