@@ -687,9 +687,12 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "heat_risk": (
-                "extreme" if (d.get(KEY_WBGT) or 0) >= 32
-                else "high" if (d.get(KEY_WBGT) or 0) >= 28
-                else "moderate" if (d.get(KEY_WBGT) or 0) >= 25
+                "extreme"
+                if (d.get(KEY_WBGT) or 0) >= 32
+                else "high"
+                if (d.get(KEY_WBGT) or 0) >= 28
+                else "moderate"
+                if (d.get(KEY_WBGT) or 0) >= 25
                 else "low"
             ),
             "wet_bulb_c": d.get(KEY_WET_BULB_C),
@@ -706,15 +709,24 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "stress_category": (
-                "extreme_heat_stress" if (d.get(KEY_UTCI) or -99) >= 46
-                else "very_strong_heat_stress" if (d.get(KEY_UTCI) or -99) >= 38
-                else "strong_heat_stress" if (d.get(KEY_UTCI) or -99) >= 32
-                else "moderate_heat_stress" if (d.get(KEY_UTCI) or -99) >= 26
-                else "no_thermal_stress" if (d.get(KEY_UTCI) or -99) >= 9
-                else "slight_cold_stress" if (d.get(KEY_UTCI) or -99) >= 0
-                else "moderate_cold_stress" if (d.get(KEY_UTCI) or -99) >= -13
-                else "strong_cold_stress" if (d.get(KEY_UTCI) or -99) >= -27
-                else "very_strong_cold_stress" if (d.get(KEY_UTCI) or -99) >= -40
+                "extreme_heat_stress"
+                if (d.get(KEY_UTCI) or -99) >= 46
+                else "very_strong_heat_stress"
+                if (d.get(KEY_UTCI) or -99) >= 38
+                else "strong_heat_stress"
+                if (d.get(KEY_UTCI) or -99) >= 32
+                else "moderate_heat_stress"
+                if (d.get(KEY_UTCI) or -99) >= 26
+                else "no_thermal_stress"
+                if (d.get(KEY_UTCI) or -99) >= 9
+                else "slight_cold_stress"
+                if (d.get(KEY_UTCI) or -99) >= 0
+                else "moderate_cold_stress"
+                if (d.get(KEY_UTCI) or -99) >= -13
+                else "strong_cold_stress"
+                if (d.get(KEY_UTCI) or -99) >= -27
+                else "very_strong_cold_stress"
+                if (d.get(KEY_UTCI) or -99) >= -40
                 else "extreme_cold_stress"
             ),
         },

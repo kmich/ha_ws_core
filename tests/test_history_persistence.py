@@ -37,6 +37,34 @@ def _coord():
     c._chill_hours_today_date = ""
     c._chill_hours_season = 0.0
     c._chill_hours_season_date = ""
+    # v2.0 accumulators persisted by _dump_history_state
+    c._wind_run_month_km = 0.0
+    c._wind_run_month_key = ""
+    c._rain_this_week_mm = 0.0
+    c._rain_this_week_isoweek = ""
+    c._rain_this_week_last_total = None
+    c._rain_this_month_mm = 0.0
+    c._rain_this_month_key = ""
+    c._rain_this_month_last_total = None
+    c._rain_this_year_mm = 0.0
+    c._rain_this_year_key = ""
+    c._rain_this_year_last_total = None
+    c._hdd_today = 0.0
+    c._hdd_today_date = ""
+    c._hdd_today_samples = 0
+    c._cdd_today = 0.0
+    c._cdd_today_date = ""
+    c._cdd_today_samples = 0
+    c._gdd_today = 0.0
+    c._gdd_today_date = ""
+    c._hdd_season = 0.0
+    c._hdd_season_key = ""
+    c._cdd_season = 0.0
+    c._cdd_season_key = ""
+    c._gdd_season = 0.0
+    c._gdd_season_key = ""
+    c._solar_energy_today_whm2 = 0.0
+    c._solar_energy_date = ""
     return c
 
 

@@ -392,7 +392,7 @@
           "enable_indoor": "Indoor sensors (temperature, humidity, CO₂)",
           "enable_weathercloud": "Weathercloud upload",
           "enable_pwsweather": "PWSWeather upload",
-          "enable_wow": "WOW upload",
+          "enable_wow": "WOW (UK Met Office) upload",
           "enable_awekas": "AWEKAS upload",
           "enable_owm_stations": "OpenWeatherMap Stations upload",
           "enable_windy": "Windy.com upload",

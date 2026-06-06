@@ -1563,13 +1563,13 @@
         "name": "Cloud Base",
         "state_attributes": {
           "temp_c": {
-            "name": "Temperature"
+            "name": "Temperature (°C)"
           },
           "dew_point_c": {
-            "name": "Dew point"
+            "name": "Dew point (°C)"
           },
           "spread_c": {
-            "name": "Temp-dew spread"
+            "name": "Temp-dew spread (°C)"
           }
         }
       },
@@ -1577,7 +1577,7 @@
         "name": "Freezing Level",
         "state_attributes": {
           "temp_c": {
-            "name": "Temperature"
+            "name": "Temperature (°C)"
           }
         }
       },
@@ -1585,10 +1585,10 @@
         "name": "Wind Gust Factor",
         "state_attributes": {
           "gust_ms": {
-            "name": "Gust speed"
+            "name": "Gust speed (m/s)"
           },
           "wind_ms": {
-            "name": "Wind speed"
+            "name": "Wind speed (m/s)"
           }
         }
       },
@@ -1596,10 +1596,10 @@
         "name": "Air Density",
         "state_attributes": {
           "temp_c": {
-            "name": "Temperature"
+            "name": "Temperature (°C)"
           },
           "pressure_hpa": {
-            "name": "Pressure"
+            "name": "Pressure (hPa)"
           }
         }
       },
@@ -1607,7 +1607,7 @@
         "name": "Specific Humidity",
         "state_attributes": {
           "absolute_humidity_gm3": {
-            "name": "Absolute humidity"
+            "name": "Absolute humidity (g/m³)"
           }
         }
       },
@@ -1615,10 +1615,18 @@
         "name": "WBGT",
         "state_attributes": {
           "heat_risk": {
-            "name": "Heat risk"
+            "name": "Heat risk level"
           },
           "wet_bulb_c": {
-            "name": "Wet-bulb temperature"
+            "name": "Wet-bulb temperature (°C)"
+          }
+        }
+      },
+      "utci": {
+        "name": "UTCI",
+        "state_attributes": {
+          "stress_category": {
+            "name": "Thermal stress category"
           }
         }
       },
@@ -1632,13 +1640,13 @@
         "name": "Rain This Year"
       },
       "rain_rate_max_24h": {
-        "name": "Rain Rate Max 24h"
+        "name": "Rain Rate Max (24h)"
       },
       "hdd_today": {
         "name": "Heating Degree Day",
         "state_attributes": {
           "base_c": {
-            "name": "Base temperature"
+            "name": "Base temperature (°C)"
           }
         }
       },
@@ -1655,10 +1663,10 @@
         "name": "Growing Degree Day",
         "state_attributes": {
           "base_c": {
-            "name": "Base temperature"
+            "name": "Base temperature (°C)"
           },
           "cap_c": {
-            "name": "Upper threshold"
+            "name": "Upper threshold (°C)"
           }
         }
       },
@@ -1673,13 +1681,13 @@
         },
         "state_attributes": {
           "dew_point_c": {
-            "name": "Dew point"
+            "name": "Dew point (°C)"
           },
           "humidity_pct": {
-            "name": "Humidity"
+            "name": "Humidity (%)"
           },
           "rain_rate_mmph": {
-            "name": "Rain rate"
+            "name": "Rain rate (mm/h)"
           }
         }
       },
@@ -1687,7 +1695,7 @@
         "name": "Dominant Wind Direction",
         "state_attributes": {
           "variability_deg": {
-            "name": "Direction variability"
+            "name": "Direction variability (°)"
           }
         }
       },
@@ -1712,10 +1720,10 @@
         "name": "Irrigation Deficit",
         "state_attributes": {
           "et0_daily_mm": {
-            "name": "ET₀ today"
+            "name": "ET₀ today (mm)"
           },
           "rain_today_mm": {
-            "name": "Rain today"
+            "name": "Rain today (mm)"
           }
         }
       },
@@ -1726,13 +1734,13 @@
             "name": "Danger level"
           },
           "temperature_c": {
-            "name": "Temperature"
+            "name": "Temperature (°C)"
           },
           "humidity_pct": {
-            "name": "Humidity"
+            "name": "Humidity (%)"
           },
           "wind_kmh": {
-            "name": "Wind speed"
+            "name": "Wind speed (km/h)"
           }
         }
       },
@@ -1740,21 +1748,13 @@
         "name": "Fire Weather Index (Fosberg)",
         "state_attributes": {
           "temperature_c": {
-            "name": "Temperature"
+            "name": "Temperature (°C)"
           },
           "humidity_pct": {
-            "name": "Humidity"
+            "name": "Humidity (%)"
           },
           "wind_ms": {
-            "name": "Wind speed"
-          }
-        }
-      },
-      "utci": {
-        "name": "UTCI",
-        "state_attributes": {
-          "stress_category": {
-            "name": "Thermal stress category"
+            "name": "Wind speed (m/s)"
           }
         }
       },
@@ -1781,7 +1781,7 @@
         "name": "Lightning Clearance",
         "state_attributes": {
           "safe": {
-            "name": "Safety status (≥30 min)"
+            "name": "Safe (≥30 min)"
           }
         }
       },
@@ -1793,7 +1793,7 @@
         },
         "state_attributes": {
           "distance_km": {
-            "name": "Distance"
+            "name": "Distance (km)"
           },
           "clearance_min": {
             "name": "Minutes since last strike"
@@ -1811,7 +1811,7 @@
         },
         "state_attributes": {
           "last_upload": {
-            "name": "Last upload"
+            "name": "Last successful upload"
           }
         }
       },
@@ -1826,7 +1826,7 @@
         },
         "state_attributes": {
           "last_upload": {
-            "name": "Last upload"
+            "name": "Last successful upload"
           }
         }
       },
@@ -1841,7 +1841,22 @@
         },
         "state_attributes": {
           "last_upload": {
-            "name": "Last upload"
+            "name": "Last successful upload"
+          }
+        }
+      },
+      "awekas_upload_status": {
+        "name": "AWEKAS Status",
+        "state": {
+          "disabled": "Disabled",
+          "ok": "OK",
+          "error_http": "HTTP Error",
+          "error_network": "Network Error",
+          "error": "Error"
+        },
+        "state_attributes": {
+          "last_upload": {
+            "name": "Last successful upload"
           }
         }
       },
@@ -1908,29 +1923,14 @@
           }
         }
       },
-      "awekas_upload_status": {
-        "name": "AWEKAS Status",
-        "state": {
-          "disabled": "Disabled",
-          "ok": "OK",
-          "error_http": "HTTP Error",
-          "error_network": "Network Error",
-          "error": "Error"
-        },
-        "state_attributes": {
-          "last_upload": {
-            "name": "Last upload"
-          }
-        }
-      },
       "indoor_temperature": {
         "name": "Indoor Temperature",
         "state_attributes": {
           "outdoor_temp_c": {
-            "name": "Outdoor temperature"
+            "name": "Outdoor temperature (°C)"
           },
           "delta_c": {
-            "name": "Indoor/outdoor delta"
+            "name": "Indoor/outdoor delta (°C)"
           }
         }
       },
@@ -1938,10 +1938,10 @@
         "name": "Indoor Humidity",
         "state_attributes": {
           "outdoor_humidity_pct": {
-            "name": "Outdoor humidity"
+            "name": "Outdoor humidity (%)"
           },
           "delta_pct": {
-            "name": "Indoor/outdoor delta"
+            "name": "Indoor/outdoor delta (%)"
           }
         }
       },
@@ -1958,13 +1958,13 @@
         "name": "Indoor Comfort Score",
         "state_attributes": {
           "co2_ppm": {
-            "name": "CO₂"
+            "name": "CO₂ (ppm)"
           },
           "temp_c": {
-            "name": "Temperature"
+            "name": "Temperature (°C)"
           },
           "humidity_pct": {
-            "name": "Humidity"
+            "name": "Humidity (%)"
           }
         }
       },
@@ -2010,6 +2010,53 @@
           "24h": "24 hours",
           "3d": "3 days"
         }
+      }
+    },
+    "number": {
+      "ws_thresh_wind_gust": {
+        "name": "Alert: Wind Gust Threshold"
+      },
+      "ws_thresh_rain_rate": {
+        "name": "Alert: Rain Rate Threshold"
+      },
+      "ws_thresh_freeze": {
+        "name": "Alert: Freeze Threshold"
+      },
+      "ws_cal_temp": {
+        "name": "Calibration: Temperature"
+      },
+      "ws_cal_humidity": {
+        "name": "Calibration: Humidity"
+      },
+      "ws_cal_pressure": {
+        "name": "Calibration: Pressure"
+      },
+      "ws_cal_wind": {
+        "name": "Calibration: Wind Speed"
+      },
+      "ws_staleness_timeout": {
+        "name": "Tuning: Staleness Timeout"
+      },
+      "ws_rain_filter_alpha": {
+        "name": "Tuning: Rain Filter Smoothing"
+      },
+      "ws_pressure_trend_window": {
+        "name": "Tuning: Pressure Trend Window"
+      },
+      "ws_lightning_proximity": {
+        "name": "Alert: Lightning Proximity Threshold"
+      },
+      "ws_hdd_base": {
+        "name": "Degree Days: HDD Base Temperature"
+      },
+      "ws_cdd_base": {
+        "name": "Degree Days: CDD Base Temperature"
+      },
+      "ws_gdd_base": {
+        "name": "Degree Days: GDD Base Temperature"
+      },
+      "ws_gdd_cap": {
+        "name": "Degree Days: GDD Upper Cap"
       }
     },
     "switch": {
@@ -2102,53 +2149,6 @@
       },
       "ws_enable_windy": {
         "name": "Feature: Windy Upload"
-      }
-    },
-    "number": {
-      "ws_thresh_wind_gust": {
-        "name": "Alert: Wind Gust Threshold"
-      },
-      "ws_thresh_rain_rate": {
-        "name": "Alert: Rain Rate Threshold"
-      },
-      "ws_thresh_freeze": {
-        "name": "Alert: Freeze Threshold"
-      },
-      "ws_cal_temp": {
-        "name": "Calibration: Temperature"
-      },
-      "ws_cal_humidity": {
-        "name": "Calibration: Humidity"
-      },
-      "ws_cal_pressure": {
-        "name": "Calibration: Pressure"
-      },
-      "ws_cal_wind": {
-        "name": "Calibration: Wind Speed"
-      },
-      "ws_staleness_timeout": {
-        "name": "Tuning: Staleness Timeout"
-      },
-      "ws_rain_filter_alpha": {
-        "name": "Tuning: Rain Filter Smoothing"
-      },
-      "ws_pressure_trend_window": {
-        "name": "Tuning: Pressure Trend Window"
-      },
-      "ws_lightning_proximity": {
-        "name": "Alert: Lightning Proximity Threshold"
-      },
-      "ws_hdd_base": {
-        "name": "Degree Days: HDD Base Temperature"
-      },
-      "ws_cdd_base": {
-        "name": "Degree Days: CDD Base Temperature"
-      },
-      "ws_gdd_base": {
-        "name": "Degree Days: GDD Base Temperature"
-      },
-      "ws_gdd_cap": {
-        "name": "Degree Days: GDD Upper Cap"
       }
     },
     "event": {

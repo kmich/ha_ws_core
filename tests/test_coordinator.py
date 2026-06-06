@@ -160,6 +160,69 @@ def _make_coordinator(
     # v1.8.4
     coord.suppress_notifications = False
 
+    # v2.0 accumulators / rolling histories (normally set in __init__, which the
+    # fixture bypasses).
+    from collections import deque
+    coord._wind_dir_history_24h = deque()
+    coord._rain_rate_history_24h = deque()
+    coord._wind_run_month_km = 0.0
+    coord._wind_run_month_key = ""
+    coord._rain_this_week_mm = 0.0
+    coord._rain_this_week_isoweek = ""
+    coord._rain_this_week_last_total = None
+    coord._rain_this_month_mm = 0.0
+    coord._rain_this_month_key = ""
+    coord._rain_this_month_last_total = None
+    coord._rain_this_year_mm = 0.0
+    coord._rain_this_year_key = ""
+    coord._rain_this_year_last_total = None
+    coord._solar_energy_today_whm2 = 0.0
+    coord._solar_energy_date = ""
+    coord._solar_energy_last_ts = None
+    # degree days (off by default)
+    coord.degree_days_enabled = False
+    coord._hdd_base_c = 18.0
+    coord._cdd_base_c = 18.0
+    coord._gdd_base_c = 10.0
+    coord._gdd_cap_c = 30.0
+    coord._hdd_today = 0.0
+    coord._hdd_today_date = ""
+    coord._hdd_today_samples = 0
+    coord._cdd_today = 0.0
+    coord._cdd_today_date = ""
+    coord._cdd_today_samples = 0
+    coord._gdd_today = 0.0
+    coord._gdd_today_date = ""
+    coord._hdd_season = 0.0
+    coord._hdd_season_key = ""
+    coord._cdd_season = 0.0
+    coord._cdd_season_key = ""
+    coord._gdd_season = 0.0
+    coord._gdd_season_key = ""
+    # v2.0 feature flags (off) + their state
+    coord.lightning_enabled = False
+    coord._lightning_proximity_km = 15.0
+    coord._lightning_count_history_1h = deque()
+    coord._lightning_last_count = None
+    coord._lightning_last_strike_ts = None
+    coord.indoor_enabled = False
+    coord._indoor_temp_prev = None
+    coord._indoor_hum_prev = None
+    coord.weathercloud_enabled = False
+    coord.pwsweather_enabled = False
+    coord.wow_enabled = False
+    coord.awekas_enabled = False
+    coord.cwop_enabled = False
+    coord.owm_stations_enabled = False
+    coord.windy_enabled = False
+    coord.mqtt_enabled = False
+    coord._neighbor_qc_cache = None
+    coord._spike_history = {
+        "temp": deque(maxlen=48),
+        "humidity": deque(maxlen=48),
+        "pressure": deque(maxlen=48),
+    }
+
     from custom_components.ws_core.coordinator import WSStationRuntime
     coord.runtime = WSStationRuntime()
 

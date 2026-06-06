@@ -24,6 +24,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 try:
     from homeassistant.components.event import EventEntity
+
     _HAS_EVENT = True
 except ImportError:
     _HAS_EVENT = False  # HA < 2023.8
@@ -100,16 +101,22 @@ if _HAS_EVENT:
                 self._prev_raining = is_raining
                 return
             if is_raining and not self._prev_raining:
-                self._trigger_event("started", {
-                    "rain_rate_mmph": round(float(rate), 1),
-                    "rain_today_mm": data.get("_rain_today_mm"),
-                })
+                self._trigger_event(
+                    "started",
+                    {
+                        "rain_rate_mmph": round(float(rate), 1),
+                        "rain_today_mm": data.get("_rain_today_mm"),
+                    },
+                )
                 self.async_write_ha_state()
             elif not is_raining and self._prev_raining:
-                self._trigger_event("stopped", {
-                    "rain_today_mm": data.get("_rain_today_mm"),
-                    "rain_1h_mm": data.get("rain_accum_1h_mm"),
-                })
+                self._trigger_event(
+                    "stopped",
+                    {
+                        "rain_today_mm": data.get("_rain_today_mm"),
+                        "rain_1h_mm": data.get("rain_accum_1h_mm"),
+                    },
+                )
                 self.async_write_ha_state()
             self._prev_raining = is_raining
 
@@ -150,16 +157,22 @@ if _HAS_EVENT:
                 self._prev_frozen = is_frozen
                 return
             if is_frozen and not self._prev_frozen:
-                self._trigger_event("frost", {
-                    "temperature_c": round(float(tc), 1),
-                    "frost_point_c": data.get("frost_point_c"),
-                    "dew_point_c": data.get("dew_point_c"),
-                })
+                self._trigger_event(
+                    "frost",
+                    {
+                        "temperature_c": round(float(tc), 1),
+                        "frost_point_c": data.get("frost_point_c"),
+                        "dew_point_c": data.get("dew_point_c"),
+                    },
+                )
                 self.async_write_ha_state()
             elif not is_frozen and self._prev_frozen:
-                self._trigger_event("thaw", {
-                    "temperature_c": round(float(tc), 1),
-                })
+                self._trigger_event(
+                    "thaw",
+                    {
+                        "temperature_c": round(float(tc), 1),
+                    },
+                )
                 self.async_write_ha_state()
             self._prev_frozen = is_frozen
 
@@ -196,16 +209,22 @@ if _HAS_EVENT:
             count_1h = data.get("lightning_count_1h", 0) or 0
             proximity = data.get("lightning_proximity", "clear") or "clear"
             if float(count_1h) > self._prev_count_1h:
-                self._trigger_event("strike_detected", {
-                    "count_1h": int(count_1h),
-                    "distance_km": data.get("lightning_distance_km"),
-                    "proximity": proximity,
-                })
+                self._trigger_event(
+                    "strike_detected",
+                    {
+                        "count_1h": int(count_1h),
+                        "distance_km": data.get("lightning_distance_km"),
+                        "proximity": proximity,
+                    },
+                )
                 self.async_write_ha_state()
             if proximity == "near" and self._prev_proximity == "clear":
-                self._trigger_event("proximity_alert", {
-                    "distance_km": data.get("lightning_distance_km"),
-                })
+                self._trigger_event(
+                    "proximity_alert",
+                    {
+                        "distance_km": data.get("lightning_distance_km"),
+                    },
+                )
                 self.async_write_ha_state()
             self._prev_count_1h = float(count_1h)
             self._prev_proximity = proximity
@@ -214,7 +233,9 @@ else:
     # Stub classes for HA < 2023.8 (never instantiated)
     class WSRainEvent:  # type: ignore[no-redef]
         pass
+
     class WSFrostEvent:  # type: ignore[no-redef]
         pass
+
     class WSLightningEvent:  # type: ignore[no-redef]
         pass

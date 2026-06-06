@@ -47,8 +47,22 @@ MQTT_SENSORS: list[tuple[str, str, str, str | None, str | None, str]] = [
     ("cloud_base_m", "cloud_base", "Cloud Base", "m", None, "mdi:cloud-arrow-up"),
     ("freezing_level_m", "freezing_level", "Freezing Level", "m", None, "mdi:snowflake"),
     ("wind_gust_factor", "wind_gust_factor", "Wind Gust Factor", None, None, "mdi:weather-windy"),
-    ("dominant_wind_direction_deg", "dominant_wind_direction", "Dominant Wind Direction", "°", "wind_direction", "mdi:compass-rose"),
-    ("wind_direction_variability_deg", "wind_direction_variability", "Wind Direction Variability", "°", None, "mdi:compass-outline"),
+    (
+        "dominant_wind_direction_deg",
+        "dominant_wind_direction",
+        "Dominant Wind Direction",
+        "°",
+        "wind_direction",
+        "mdi:compass-rose",
+    ),
+    (
+        "wind_direction_variability_deg",
+        "wind_direction_variability",
+        "Wind Direction Variability",
+        "°",
+        None,
+        "mdi:compass-outline",
+    ),
     # Rain accumulators
     ("rain_accum_1h_mm", "rain_1h", "Rain Last 1h", "mm", "precipitation", "mdi:weather-pouring"),
     ("rain_accum_24h_mm", "rain_24h", "Rain Last 24h", "mm", "precipitation", "mdi:weather-pouring"),
@@ -56,7 +70,14 @@ MQTT_SENSORS: list[tuple[str, str, str, str | None, str | None, str]] = [
     ("rain_this_week_mm", "rain_this_week", "Rain This Week", "mm", "precipitation", "mdi:calendar-week"),
     ("rain_this_month_mm", "rain_this_month", "Rain This Month", "mm", "precipitation", "mdi:calendar-month"),
     ("rain_this_year_mm", "rain_this_year", "Rain This Year", "mm", "precipitation", "mdi:calendar"),
-    ("rain_rate_max_24h_mmph", "rain_rate_max_24h", "Rain Rate Max 24h", "mm/h", "precipitation_intensity", "mdi:weather-pouring"),
+    (
+        "rain_rate_max_24h_mmph",
+        "rain_rate_max_24h",
+        "Rain Rate Max 24h",
+        "mm/h",
+        "precipitation_intensity",
+        "mdi:weather-pouring",
+    ),
     # Pressure trend
     ("pressure_trend_display", "pressure_trend", "Pressure Trend", None, None, "mdi:trending-up"),
     ("pressure_trend_hpah", "pressure_trend_raw", "Pressure Trend Rate", "hPa/h", None, "mdi:chart-line"),
@@ -100,7 +121,14 @@ MQTT_SENSORS: list[tuple[str, str, str, str | None, str | None, str]] = [
     ("ffwi", "ffwi", "FFWI", None, None, "mdi:fire-circle"),
     # Rain probability
     ("rain_probability", "rain_probability", "Rain Probability", "%", None, "mdi:weather-rainy"),
-    ("rain_probability_combined", "rain_probability_combined", "Rain Probability Combined", "%", None, "mdi:weather-rainy"),
+    (
+        "rain_probability_combined",
+        "rain_probability_combined",
+        "Rain Probability Combined",
+        "%",
+        None,
+        "mdi:weather-rainy",
+    ),
     # Current condition
     ("current_condition", "current_condition", "Current Condition", None, None, "mdi:weather-partly-cloudy"),
     # Air quality & pollen

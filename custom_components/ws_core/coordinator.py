@@ -724,15 +724,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # v2.0 rain accumulators: weekly (Mon reset), monthly (1st reset), yearly
         self._rain_this_week_mm: float = 0.0
-        self._rain_this_week_isoweek: str = ""   # "YYYY-Www"
+        self._rain_this_week_isoweek: str = ""  # "YYYY-Www"
         self._rain_this_week_last_total: float | None = None
 
         self._rain_this_month_mm: float = 0.0
-        self._rain_this_month_key: str = ""      # "YYYY-MM"
+        self._rain_this_month_key: str = ""  # "YYYY-MM"
         self._rain_this_month_last_total: float | None = None
 
         self._rain_this_year_mm: float = 0.0
-        self._rain_this_year_key: str = ""       # "YYYY"
+        self._rain_this_year_key: str = ""  # "YYYY"
         self._rain_this_year_last_total: float | None = None
 
         # v2.0 max rain rate over rolling 24h window
@@ -1142,12 +1142,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     timedelta(hours=1),
                 )
             )
+
             async def _deferred_neighbor_qc():
                 await asyncio.sleep(60)
                 try:
                     await self._async_fetch_neighbor_qc()
                 except Exception as err:  # noqa: BLE001
                     _LOGGER.debug("ws_core: neighbor QC fetch failed: %s", err)
+
             self.hass.async_create_task(_deferred_neighbor_qc())
 
         # v2.0: CWOP upload
@@ -1207,6 +1209,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # v2.0: remove MQTT Discovery entries on clean shutdown
         if self.mqtt_enabled and self._mqtt_discovery_published:
             from .mqtt_publisher import async_unpublish_discovery
+
             with contextlib.suppress(Exception):
                 await async_unpublish_discovery(
                     self.hass,
@@ -1467,9 +1470,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if tc is not None and pressure_hpa_now is not None:
             data[KEY_AIR_DENSITY] = calculate_air_density(float(tc), float(pressure_hpa_now))
         if tc is not None and rh is not None and pressure_hpa_now is not None:
-            data[KEY_SPECIFIC_HUMIDITY] = calculate_specific_humidity(
-                float(tc), float(rh), float(pressure_hpa_now)
-            )
+            data[KEY_SPECIFIC_HUMIDITY] = calculate_specific_humidity(float(tc), float(rh), float(pressure_hpa_now))
 
         # 24h rolling stats
         if tc is not None:
@@ -1729,7 +1730,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # v2.0 — Weekly / monthly / yearly rain accumulators
         now_local = dt_util.now()
-        iso_week = now_local.strftime("%G-W%V")   # ISO 8601 week (Mon start)
+        iso_week = now_local.strftime("%G-W%V")  # ISO 8601 week (Mon start)
         month_key = now_local.strftime("%Y-%m")
         year_key = now_local.strftime("%Y")
 
@@ -1910,7 +1911,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_forecast_agreement_api_precip_prob"] = round(api_precip_prob)
         data["_forecast_agreement_delta"] = round(delta)
 
-    def _compute_degree_days(self, data: dict, now: Any, tc: float | None, dew_c: float | None, rh: float | None) -> None:
+    def _compute_degree_days(
+        self, data: dict, now: Any, tc: float | None, dew_c: float | None, rh: float | None
+    ) -> None:
         """Heating / Cooling / Growing Degree Days and leaf wetness.  (v2.0)
 
         HDD and CDD accumulate from sub-hourly temperature samples throughout
@@ -1974,7 +1977,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if gdd_season_key != self._gdd_season_key:
             self._gdd_season = 0.0
             self._gdd_season_key = gdd_season_key
-        if hasattr(self, "_gdd_prev_date") and self._gdd_prev_date != date_str and data.get(KEY_GDD_TODAY_V2) is not None:
+        if (
+            hasattr(self, "_gdd_prev_date")
+            and self._gdd_prev_date != date_str
+            and data.get(KEY_GDD_TODAY_V2) is not None
+        ):
             self._gdd_season += data[KEY_GDD_TODAY_V2]
         self._gdd_prev_date = date_str  # type: ignore[attr-defined]
         data[KEY_GDD_SEASON_V2] = round(self._gdd_season, 1)
@@ -2151,15 +2158,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if local_tc is not None and nwp_tc is not None:
                 delta_t = abs(float(local_tc) - float(nwp_tc))
                 if delta_t > 8.0:
-                    flags.append(
-                        f"temperature: local {local_tc:.1f}°C vs NWP {nwp_tc:.1f}°C (Δ={delta_t:.1f}°C > 8°C)"
-                    )
+                    flags.append(f"temperature: local {local_tc:.1f}°C vs NWP {nwp_tc:.1f}°C (Δ={delta_t:.1f}°C > 8°C)")
             if local_rh is not None and nwp_rh is not None:
                 delta_rh = abs(float(local_rh) - float(nwp_rh))
                 if delta_rh > 25.0:
-                    flags.append(
-                        f"humidity: local {local_rh:.0f}% vs NWP {nwp_rh:.0f}% (Δ={delta_rh:.0f}% > 25%)"
-                    )
+                    flags.append(f"humidity: local {local_rh:.0f}% vs NWP {nwp_rh:.0f}% (Δ={delta_rh:.0f}% > 25%)")
             if local_press is not None and nwp_press is not None:
                 delta_p = abs(float(local_press) - float(nwp_press))
                 if delta_p > 15.0:
@@ -2214,15 +2217,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     sigma = variance**0.5
                     if sigma > 1e-6 and abs(float(curr) - mean) > SPIKE_SIGMA_THRESHOLD * sigma:
                         spike_flags.append(
-                            f"{label}: {float(curr):.1f} is "
-                            f"{abs(float(curr) - mean) / sigma:.1f}σ from mean {mean:.1f}"
+                            f"{label}: {float(curr):.1f} is {abs(float(curr) - mean) / sigma:.1f}σ from mean {mean:.1f}"
                         )
                 # Append after the test so the current spike doesn't poison the window
                 hist.append(float(curr))
         data[KEY_SENSOR_SPIKE] = spike_flags
 
         # Per-sensor stuck flags for binary sensors
-        data["_temp_stuck"] = KEY_NORM_TEMP_C.replace("norm_temperature_c", "temperature") in stuck_flags or SRC_TEMP in stuck_flags
+        data["_temp_stuck"] = (
+            KEY_NORM_TEMP_C.replace("norm_temperature_c", "temperature") in stuck_flags or SRC_TEMP in stuck_flags
+        )
         data["_humidity_stuck"] = SRC_HUM in stuck_flags
         data["_pressure_stuck"] = SRC_PRESS in stuck_flags
 
@@ -2237,13 +2241,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Score: start at 100, deduct for issues
         score = 100
         existing_flags = data.get(KEY_SENSOR_QUALITY_FLAGS) or []
-        score -= min(40, len(existing_flags) * 10)   # range/consistency flags
-        score -= min(30, len(stuck_flags) * 15)       # stuck sensors
+        score -= min(40, len(existing_flags) * 10)  # range/consistency flags
+        score -= min(30, len(stuck_flags) * 15)  # stuck sensors
         existing_drift = data.get(KEY_SENSOR_DRIFT_FLAGS) or []
-        score -= min(20, len(existing_drift) * 10)    # drift
+        score -= min(20, len(existing_drift) * 10)  # drift
         neighbor_flags = data.get(KEY_NEIGHBOR_QC) or []
-        score -= min(20, len(neighbor_flags) * 10)    # spatial neighbor QC
-        score -= min(15, len(spike_flags) * 8)         # temporal spikes
+        score -= min(20, len(neighbor_flags) * 10)  # spatial neighbor QC
+        score -= min(15, len(spike_flags) * 8)  # temporal spikes
         if data.get(KEY_PACKAGE_STATUS) not in (None, "ok"):
             score -= 10
         data[KEY_DATA_QUALITY_SCORE] = max(0, min(100, score))
@@ -3456,7 +3460,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         lat = self.forecast_lat or float(self.hass.config.latitude)
         lon = self.forecast_lon or float(self.hass.config.longitude)
 
-
         session = async_get_clientsession(self.hass)
         provider = get_provider(self.forecast_provider)
         try:
@@ -3802,12 +3805,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         temp_s = f"t{_c_to_f(float(temp_c)):03d}" if temp_c is not None else "t..."
         rain1h_s = f"r{_mm_to_hundredths_in(float(rain_1h)):03d}"
         rain24h_s = f"p{_mm_to_hundredths_in(float(rain_24h)):03d}"
-        hum_s = (
-            f"h{int(float(humidity)):02d}" if humidity is not None else ""
-        )
-        baro_s = (
-            f"b{round(float(press) * 10):05d}" if press is not None else ""
-        )
+        hum_s = f"h{int(float(humidity)):02d}" if humidity is not None else ""
+        baro_s = f"b{round(float(press) * 10):05d}" if press is not None else ""
 
         weather_body = (
             f"_{wind_dir_s}/{wind_spd_s}{gust_s}{temp_s}"
@@ -3819,10 +3818,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             f"{self.cwop_callsign}>APRS,TCPXX*,qAX,{self.cwop_callsign}:"
             f"@{time_str}z{lat_str}/{lon_str}{weather_body}\r\n"
         )
-        login = (
-            f"user {self.cwop_callsign} pass {self.cwop_passcode} "
-            f"vers ws_core {_INTEGRATION_VERSION}\r\n"
-        )
+        login = f"user {self.cwop_callsign} pass {self.cwop_passcode} vers ws_core {_INTEGRATION_VERSION}\r\n"
 
         try:
             reader, writer = await asyncio.wait_for(
@@ -3924,7 +3920,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "per": int(self.wc_interval_min),
         }
         if temp_c is not None:
-            params["temp"] = round(float(temp_c) * 10)   # Weathercloud uses tenths of °C
+            params["temp"] = round(float(temp_c) * 10)  # Weathercloud uses tenths of °C
         if dew_c is not None:
             params["dew"] = round(float(dew_c) * 10)
         if humidity is not None:

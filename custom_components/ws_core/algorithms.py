@@ -2274,9 +2274,11 @@ def calculate_max_solar_radiation(lat_deg: float, day_of_year: int, elevation_m:
     ws = math.acos(-math.tan(lat_rad) * math.tan(decl))
     # Extra-terrestrial radiation (MJ m⁻² day⁻¹)
     Gsc = 0.0820  # solar constant (MJ m⁻² min⁻¹)
-    Ra = (24.0 * 60.0 / math.pi) * Gsc * dr * (
-        ws * math.sin(lat_rad) * math.sin(decl)
-        + math.cos(lat_rad) * math.cos(decl) * math.sin(ws)
+    Ra = (
+        (24.0 * 60.0 / math.pi)
+        * Gsc
+        * dr
+        * (ws * math.sin(lat_rad) * math.sin(decl) + math.cos(lat_rad) * math.cos(decl) * math.sin(ws))
     )
     # Clear-sky surface radiation (FAO-56 Eq. 37)
     Rso = (0.75 + 2e-5 * max(0.0, elevation_m)) * Ra
@@ -2492,7 +2494,7 @@ def calculate_utci(ta: float, tr: float, va: float, rh: float) -> float | None:
         + (-3.24651995e-06) * ta**4
         + (7.32602852e-08) * ta**5
         + (1.35959073e-09) * ta**6
-        + (-2.25836520e+00) * va
+        + (-2.25836520e00) * va
         + (8.80326035e-02) * ta * va
         + (2.16844454e-03) * ta**2 * va
         + (-1.53347087e-05) * ta**3 * va

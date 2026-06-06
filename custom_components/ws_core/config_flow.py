@@ -831,10 +831,14 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_ENABLE_ADVANCED_SENSORS] = bool(user_input.get(CONF_ENABLE_ADVANCED_SENSORS, False))
             self._data[CONF_ENABLE_NOWCAST] = bool(user_input.get(CONF_ENABLE_NOWCAST, False))
             # v2.0 feature toggles
-            self._data[CONF_ENABLE_DEGREE_DAYS] = bool(user_input.get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS))
+            self._data[CONF_ENABLE_DEGREE_DAYS] = bool(
+                user_input.get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)
+            )
             self._data[CONF_ENABLE_LIGHTNING] = bool(user_input.get(CONF_ENABLE_LIGHTNING, DEFAULT_ENABLE_LIGHTNING))
             self._data[CONF_ENABLE_INDOOR] = bool(user_input.get(CONF_ENABLE_INDOOR, DEFAULT_ENABLE_INDOOR))
-            self._data[CONF_ENABLE_WEATHERCLOUD] = bool(user_input.get(CONF_ENABLE_WEATHERCLOUD, DEFAULT_ENABLE_WEATHERCLOUD))
+            self._data[CONF_ENABLE_WEATHERCLOUD] = bool(
+                user_input.get(CONF_ENABLE_WEATHERCLOUD, DEFAULT_ENABLE_WEATHERCLOUD)
+            )
             self._data[CONF_ENABLE_PWSWEATHER] = bool(user_input.get(CONF_ENABLE_PWSWEATHER, DEFAULT_ENABLE_PWSWEATHER))
             self._data[CONF_ENABLE_WOW] = bool(user_input.get(CONF_ENABLE_WOW, DEFAULT_ENABLE_WOW))
             self._data[CONF_ENABLE_AWEKAS] = bool(user_input.get(CONF_ENABLE_AWEKAS, DEFAULT_ENABLE_AWEKAS))
@@ -917,10 +921,14 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_NOWCAST, default=DEFAULT_ENABLE_NOWCAST): selector.BooleanSelector(),
                     # v2.0 feature toggles
-                    vol.Optional(CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS
+                    ): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_LIGHTNING, default=DEFAULT_ENABLE_LIGHTNING): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_INDOOR, default=DEFAULT_ENABLE_INDOOR): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_WEATHERCLOUD, default=DEFAULT_ENABLE_WEATHERCLOUD): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_WEATHERCLOUD, default=DEFAULT_ENABLE_WEATHERCLOUD
+                    ): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_PWSWEATHER, default=DEFAULT_ENABLE_PWSWEATHER): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_WOW, default=DEFAULT_ENABLE_WOW): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_AWEKAS, default=DEFAULT_ENABLE_AWEKAS): selector.BooleanSelector(),
@@ -1256,17 +1264,19 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self._show_step(
             step_id="weathercloud",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_WC_STATION_ID, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(CONF_WC_API_KEY, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_WC_INTERVAL_MIN, default=DEFAULT_WC_INTERVAL_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_WC_STATION_ID, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_WC_API_KEY, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(CONF_WC_INTERVAL_MIN, default=DEFAULT_WC_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             description_placeholders={
                 "info": "Weathercloud station ID and key from weathercloud.net/dashboard. Leave blank to skip."
             },
@@ -1299,17 +1309,19 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self._show_step(
             step_id="pwsweather",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_PWS_STATION_ID, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(CONF_PWS_API_KEY, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_PWS_INTERVAL_MIN, default=DEFAULT_PWS_INTERVAL_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_PWS_STATION_ID, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_PWS_API_KEY, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(CONF_PWS_INTERVAL_MIN, default=DEFAULT_PWS_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             description_placeholders={
                 "info": "PWSWeather station ID and API key from pwsweather.com. Leave blank to skip."
             },
@@ -1340,17 +1352,19 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self._show_step(
             step_id="wow",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_WOW_SITE_ID, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(CONF_WOW_AUTH_KEY, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_WOW_INTERVAL_MIN, default=DEFAULT_WOW_INTERVAL_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_WOW_SITE_ID, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_WOW_AUTH_KEY, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(CONF_WOW_INTERVAL_MIN, default=DEFAULT_WOW_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             description_placeholders={
                 "info": "WOW site ID and authentication key from wow.metoffice.gov.uk. Leave blank to skip."
             },
@@ -1385,20 +1399,22 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self._show_step(
             step_id="awekas",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_AWEKAS_USERNAME, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(CONF_AWEKAS_PASSWORD, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_AWEKAS_INTERVAL_MIN, default=DEFAULT_AWEKAS_INTERVAL_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
-            description_placeholders={
-                "info": "AWEKAS username and password from awekas.at. Leave blank to skip."
-            },
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_AWEKAS_USERNAME, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_AWEKAS_PASSWORD, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(
+                        CONF_AWEKAS_INTERVAL_MIN, default=DEFAULT_AWEKAS_INTERVAL_MIN
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
+            description_placeholders={"info": "AWEKAS username and password from awekas.at. Leave blank to skip."},
             last_step=False,
         )
 
@@ -1428,19 +1444,21 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self._show_step(
             step_id="owm_stations",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_OWM_STATIONS_API_KEY, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_OWM_STATIONS_STATION_ID, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(
-                    CONF_OWM_STATIONS_INTERVAL_MIN, default=DEFAULT_OWM_STATIONS_INTERVAL_MIN
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_OWM_STATIONS_API_KEY, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(CONF_OWM_STATIONS_STATION_ID, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(
+                        CONF_OWM_STATIONS_INTERVAL_MIN, default=DEFAULT_OWM_STATIONS_INTERVAL_MIN
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             description_placeholders={
                 "info": (
                     "OpenWeatherMap Stations API. Create a station via the OWM API to get a "
@@ -1475,17 +1493,19 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self._show_step(
             step_id="windy",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_WINDY_API_KEY, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_WINDY_STATION_ID, default=""): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(CONF_WINDY_INTERVAL_MIN, default=DEFAULT_WINDY_INTERVAL_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_WINDY_API_KEY, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(CONF_WINDY_STATION_ID, default=""): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_WINDY_INTERVAL_MIN, default=DEFAULT_WINDY_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             description_placeholders={
                 "info": (
                     "Windy.com Stations API key from stations.windy.com. Station ID is optional "
@@ -1511,24 +1531,28 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_CWOP_PASSCODE] = str(user_input.get(CONF_CWOP_PASSCODE, "-1")).strip() or "-1"
                 self._data[CONF_CWOP_SERVER] = str(user_input.get(CONF_CWOP_SERVER, DEFAULT_CWOP_SERVER)).strip()
                 self._data[CONF_CWOP_PORT] = int(user_input.get(CONF_CWOP_PORT, DEFAULT_CWOP_PORT))
-                self._data[CONF_CWOP_INTERVAL_MIN] = int(user_input.get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN))
+                self._data[CONF_CWOP_INTERVAL_MIN] = int(
+                    user_input.get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN)
+                )
             if self._data.get(CONF_ENABLE_MQTT):
                 return await self.async_step_mqtt_config()
             return await self.async_step_alerts()
 
         return self._show_step(
             step_id="cwop",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_CWOP_CALLSIGN, default=""): selector.TextSelector(),
-                vol.Optional(CONF_CWOP_PASSCODE, default="-1"): selector.TextSelector(),
-                vol.Optional(CONF_CWOP_SERVER, default=DEFAULT_CWOP_SERVER): selector.TextSelector(),
-                vol.Optional(CONF_CWOP_PORT, default=DEFAULT_CWOP_PORT): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=65535, step=1, mode="box")
-                ),
-                vol.Optional(CONF_CWOP_INTERVAL_MIN, default=DEFAULT_CWOP_INTERVAL_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=5, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_CWOP_CALLSIGN, default=""): selector.TextSelector(),
+                    vol.Optional(CONF_CWOP_PASSCODE, default="-1"): selector.TextSelector(),
+                    vol.Optional(CONF_CWOP_SERVER, default=DEFAULT_CWOP_SERVER): selector.TextSelector(),
+                    vol.Optional(CONF_CWOP_PORT, default=DEFAULT_CWOP_PORT): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=65535, step=1, mode="box")
+                    ),
+                    vol.Optional(CONF_CWOP_INTERVAL_MIN, default=DEFAULT_CWOP_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=5, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             description_placeholders={
                 "info": (
                     "CWOP (Citizen Weather Observer Program) via APRS. Enter your CWOP/APRS "
@@ -1548,30 +1572,32 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             back = await self._handle_back(user_input)
             if back:
                 return back
-            self._data[CONF_MQTT_DISCOVERY_PREFIX] = str(
-                user_input.get(CONF_MQTT_DISCOVERY_PREFIX, DEFAULT_MQTT_DISCOVERY_PREFIX)
-            ).strip() or DEFAULT_MQTT_DISCOVERY_PREFIX
-            self._data[CONF_MQTT_STATE_PREFIX] = str(
-                user_input.get(CONF_MQTT_STATE_PREFIX, DEFAULT_MQTT_STATE_PREFIX)
-            ).strip() or DEFAULT_MQTT_STATE_PREFIX
-            self._data[CONF_MQTT_INTERVAL_MIN] = int(
-                user_input.get(CONF_MQTT_INTERVAL_MIN, DEFAULT_MQTT_INTERVAL_MIN)
+            self._data[CONF_MQTT_DISCOVERY_PREFIX] = (
+                str(user_input.get(CONF_MQTT_DISCOVERY_PREFIX, DEFAULT_MQTT_DISCOVERY_PREFIX)).strip()
+                or DEFAULT_MQTT_DISCOVERY_PREFIX
             )
+            self._data[CONF_MQTT_STATE_PREFIX] = (
+                str(user_input.get(CONF_MQTT_STATE_PREFIX, DEFAULT_MQTT_STATE_PREFIX)).strip()
+                or DEFAULT_MQTT_STATE_PREFIX
+            )
+            self._data[CONF_MQTT_INTERVAL_MIN] = int(user_input.get(CONF_MQTT_INTERVAL_MIN, DEFAULT_MQTT_INTERVAL_MIN))
             return await self.async_step_alerts()
 
         return self._show_step(
             step_id="mqtt_config",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_MQTT_DISCOVERY_PREFIX, default=DEFAULT_MQTT_DISCOVERY_PREFIX): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(CONF_MQTT_STATE_PREFIX, default=DEFAULT_MQTT_STATE_PREFIX): selector.TextSelector(
-                    selector.TextSelectorConfig(type="text")
-                ),
-                vol.Optional(CONF_MQTT_INTERVAL_MIN, default=DEFAULT_MQTT_INTERVAL_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                ),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_MQTT_DISCOVERY_PREFIX, default=DEFAULT_MQTT_DISCOVERY_PREFIX
+                    ): selector.TextSelector(selector.TextSelectorConfig(type="text")),
+                    vol.Optional(CONF_MQTT_STATE_PREFIX, default=DEFAULT_MQTT_STATE_PREFIX): selector.TextSelector(
+                        selector.TextSelectorConfig(type="text")
+                    ),
+                    vol.Optional(CONF_MQTT_INTERVAL_MIN, default=DEFAULT_MQTT_INTERVAL_MIN): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             description_placeholders={
                 "info": (
                     "Sensors will be published as MQTT Discovery payloads under "
@@ -2038,14 +2064,19 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="weathercloud_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_WC_STATION_ID, default=g(CONF_WC_STATION_ID, "")): selector.TextSelector(),
-                vol.Optional(CONF_WC_API_KEY, default=g(CONF_WC_API_KEY, "")): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_WC_INTERVAL_MIN, default=g(CONF_WC_INTERVAL_MIN, DEFAULT_WC_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_WC_STATION_ID, default=g(CONF_WC_STATION_ID, "")): selector.TextSelector(),
+                    vol.Optional(CONF_WC_API_KEY, default=g(CONF_WC_API_KEY, "")): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(
+                        CONF_WC_INTERVAL_MIN, default=g(CONF_WC_INTERVAL_MIN, DEFAULT_WC_INTERVAL_MIN)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -2066,14 +2097,19 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="pwsweather_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_PWS_STATION_ID, default=g(CONF_PWS_STATION_ID, "")): selector.TextSelector(),
-                vol.Optional(CONF_PWS_API_KEY, default=g(CONF_PWS_API_KEY, "")): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_PWS_INTERVAL_MIN, default=g(CONF_PWS_INTERVAL_MIN, DEFAULT_PWS_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_PWS_STATION_ID, default=g(CONF_PWS_STATION_ID, "")): selector.TextSelector(),
+                    vol.Optional(CONF_PWS_API_KEY, default=g(CONF_PWS_API_KEY, "")): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(
+                        CONF_PWS_INTERVAL_MIN, default=g(CONF_PWS_INTERVAL_MIN, DEFAULT_PWS_INTERVAL_MIN)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -2092,14 +2128,19 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="wow_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_WOW_SITE_ID, default=g(CONF_WOW_SITE_ID, "")): selector.TextSelector(),
-                vol.Optional(CONF_WOW_AUTH_KEY, default=g(CONF_WOW_AUTH_KEY, "")): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_WOW_INTERVAL_MIN, default=g(CONF_WOW_INTERVAL_MIN, DEFAULT_WOW_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_WOW_SITE_ID, default=g(CONF_WOW_SITE_ID, "")): selector.TextSelector(),
+                    vol.Optional(CONF_WOW_AUTH_KEY, default=g(CONF_WOW_AUTH_KEY, "")): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(
+                        CONF_WOW_INTERVAL_MIN, default=g(CONF_WOW_INTERVAL_MIN, DEFAULT_WOW_INTERVAL_MIN)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -2116,14 +2157,19 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="awekas_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_AWEKAS_USERNAME, default=g(CONF_AWEKAS_USERNAME, "")): selector.TextSelector(),
-                vol.Optional(CONF_AWEKAS_PASSWORD, default=g(CONF_AWEKAS_PASSWORD, "")): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_AWEKAS_INTERVAL_MIN, default=g(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_AWEKAS_USERNAME, default=g(CONF_AWEKAS_USERNAME, "")): selector.TextSelector(),
+                    vol.Optional(CONF_AWEKAS_PASSWORD, default=g(CONF_AWEKAS_PASSWORD, "")): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(
+                        CONF_AWEKAS_INTERVAL_MIN, default=g(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -2138,14 +2184,22 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="owm_stations_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_OWM_STATIONS_API_KEY, default=g(CONF_OWM_STATIONS_API_KEY, "")): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_OWM_STATIONS_STATION_ID, default=g(CONF_OWM_STATIONS_STATION_ID, "")): selector.TextSelector(),
-                vol.Optional(CONF_OWM_STATIONS_INTERVAL_MIN, default=g(CONF_OWM_STATIONS_INTERVAL_MIN, DEFAULT_OWM_STATIONS_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_OWM_STATIONS_API_KEY, default=g(CONF_OWM_STATIONS_API_KEY, "")
+                    ): selector.TextSelector(selector.TextSelectorConfig(type="password")),
+                    vol.Optional(
+                        CONF_OWM_STATIONS_STATION_ID, default=g(CONF_OWM_STATIONS_STATION_ID, "")
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_OWM_STATIONS_INTERVAL_MIN,
+                        default=g(CONF_OWM_STATIONS_INTERVAL_MIN, DEFAULT_OWM_STATIONS_INTERVAL_MIN),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -2160,14 +2214,19 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="windy_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_WINDY_API_KEY, default=g(CONF_WINDY_API_KEY, "")): selector.TextSelector(
-                    selector.TextSelectorConfig(type="password")
-                ),
-                vol.Optional(CONF_WINDY_STATION_ID, default=g(CONF_WINDY_STATION_ID, "")): selector.TextSelector(),
-                vol.Optional(CONF_WINDY_INTERVAL_MIN, default=g(CONF_WINDY_INTERVAL_MIN, DEFAULT_WINDY_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_WINDY_API_KEY, default=g(CONF_WINDY_API_KEY, "")): selector.TextSelector(
+                        selector.TextSelectorConfig(type="password")
+                    ),
+                    vol.Optional(CONF_WINDY_STATION_ID, default=g(CONF_WINDY_STATION_ID, "")): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_WINDY_INTERVAL_MIN, default=g(CONF_WINDY_INTERVAL_MIN, DEFAULT_WINDY_INTERVAL_MIN)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -2180,15 +2239,23 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="cwop_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_CWOP_CALLSIGN, default=g(CONF_CWOP_CALLSIGN, "")): selector.TextSelector(),
-                vol.Optional(CONF_CWOP_PASSCODE, default=g(CONF_CWOP_PASSCODE, "-1")): selector.TextSelector(),
-                vol.Optional(CONF_CWOP_SERVER, default=g(CONF_CWOP_SERVER, DEFAULT_CWOP_SERVER)): selector.TextSelector(),
-                vol.Optional(CONF_CWOP_PORT, default=g(CONF_CWOP_PORT, DEFAULT_CWOP_PORT)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=65535, step=1, mode="box")),
-                vol.Optional(CONF_CWOP_INTERVAL_MIN, default=g(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_CWOP_CALLSIGN, default=g(CONF_CWOP_CALLSIGN, "")): selector.TextSelector(),
+                    vol.Optional(CONF_CWOP_PASSCODE, default=g(CONF_CWOP_PASSCODE, "-1")): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_CWOP_SERVER, default=g(CONF_CWOP_SERVER, DEFAULT_CWOP_SERVER)
+                    ): selector.TextSelector(),
+                    vol.Optional(CONF_CWOP_PORT, default=g(CONF_CWOP_PORT, DEFAULT_CWOP_PORT)): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=65535, step=1, mode="box")
+                    ),
+                    vol.Optional(
+                        CONF_CWOP_INTERVAL_MIN, default=g(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=5, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 
@@ -2199,12 +2266,21 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_create_entry(title="", data=self._opt)
         return self.async_show_form(
             step_id="mqtt_config_opt",
-            data_schema=vol.Schema({
-                vol.Optional(CONF_MQTT_DISCOVERY_PREFIX, default=g(CONF_MQTT_DISCOVERY_PREFIX, DEFAULT_MQTT_DISCOVERY_PREFIX)): selector.TextSelector(),
-                vol.Optional(CONF_MQTT_STATE_PREFIX, default=g(CONF_MQTT_STATE_PREFIX, DEFAULT_MQTT_STATE_PREFIX)): selector.TextSelector(),
-                vol.Optional(CONF_MQTT_INTERVAL_MIN, default=g(CONF_MQTT_INTERVAL_MIN, DEFAULT_MQTT_INTERVAL_MIN)):
-                    selector.NumberSelector(selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_MQTT_DISCOVERY_PREFIX, default=g(CONF_MQTT_DISCOVERY_PREFIX, DEFAULT_MQTT_DISCOVERY_PREFIX)
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_MQTT_STATE_PREFIX, default=g(CONF_MQTT_STATE_PREFIX, DEFAULT_MQTT_STATE_PREFIX)
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_MQTT_INTERVAL_MIN, default=g(CONF_MQTT_INTERVAL_MIN, DEFAULT_MQTT_INTERVAL_MIN)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
+                    ),
+                }
+            ),
             last_step=False,
         )
 

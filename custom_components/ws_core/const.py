@@ -260,14 +260,25 @@ SRC_BATTERY = "battery"
 SRC_SOLAR_RADIATION = "solar_radiation"  # W/m², optional
 # v2.0 optional source inputs (defined here so OPTIONAL_SOURCES can reference
 # them; the v2.0 feature sections below reuse these same names).
-SRC_LIGHTNING_COUNT = "lightning_count"     # cumulative strike count
-SRC_LIGHTNING_DISTANCE = "lightning_dist"   # nearest strike distance (km)
+SRC_LIGHTNING_COUNT = "lightning_count"  # cumulative strike count
+SRC_LIGHTNING_DISTANCE = "lightning_dist"  # nearest strike distance (km)
 SRC_INDOOR_TEMP = "indoor_temp"
 SRC_INDOOR_HUMIDITY = "indoor_humidity"
 SRC_INDOOR_CO2 = "indoor_co2"
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
-OPTIONAL_SOURCES = [SRC_LUX, SRC_UV, SRC_DEW_POINT, SRC_BATTERY, SRC_SOLAR_RADIATION, SRC_LIGHTNING_COUNT, SRC_LIGHTNING_DISTANCE, SRC_INDOOR_TEMP, SRC_INDOOR_HUMIDITY, SRC_INDOOR_CO2]
+OPTIONAL_SOURCES = [
+    SRC_LUX,
+    SRC_UV,
+    SRC_DEW_POINT,
+    SRC_BATTERY,
+    SRC_SOLAR_RADIATION,
+    SRC_LIGHTNING_COUNT,
+    SRC_LIGHTNING_DISTANCE,
+    SRC_INDOOR_TEMP,
+    SRC_INDOOR_HUMIDITY,
+    SRC_INDOOR_CO2,
+]
 
 # Only these sources trigger staleness warnings. Excluded: rain_total (static
 # when dry), lux/uv (zero at night), dew_point, battery (slow-reporting).
@@ -578,19 +589,19 @@ CONF_GDD_BASE_C = "gdd_base_c"
 CONF_GDD_CAP_C_V2 = "gdd_cap_c_v2"  # renamed to avoid clash with legacy CONF_GDD_CAP_C
 
 DEFAULT_ENABLE_DEGREE_DAYS = False
-DEFAULT_HDD_BASE_C = 18.0   # standard WMO base for heating/cooling degree days
+DEFAULT_HDD_BASE_C = 18.0  # standard WMO base for heating/cooling degree days
 DEFAULT_CDD_BASE_C = 18.0
-DEFAULT_GDD_BASE_C = 10.0   # standard base for most crops; user can tune
+DEFAULT_GDD_BASE_C = 10.0  # standard base for most crops; user can tune
 DEFAULT_GDD_CAP_C_V2 = 30.0
 
 # Data keys - degree days (daily accumulators)
-KEY_HDD_TODAY_MM = "hdd_today_degc"       # Heating Degree Day (today)
-KEY_HDD_SEASON = "hdd_season_degc"        # Heating Degree Day (seasonal total)
-KEY_CDD_TODAY_MM = "cdd_today_degc"       # Cooling Degree Day (today)
-KEY_CDD_SEASON = "cdd_season_degc"        # Cooling Degree Day (seasonal total)
-KEY_GDD_TODAY_V2 = "gdd_today_v2_degc"   # Growing Degree Day (today)
-KEY_GDD_SEASON_V2 = "gdd_season_v2_degc" # Growing Degree Day (seasonal total)
-KEY_LEAF_WETNESS = "leaf_wetness"         # Leaf wetness indicator (bool→text)
+KEY_HDD_TODAY_MM = "hdd_today_degc"  # Heating Degree Day (today)
+KEY_HDD_SEASON = "hdd_season_degc"  # Heating Degree Day (seasonal total)
+KEY_CDD_TODAY_MM = "cdd_today_degc"  # Cooling Degree Day (today)
+KEY_CDD_SEASON = "cdd_season_degc"  # Cooling Degree Day (seasonal total)
+KEY_GDD_TODAY_V2 = "gdd_today_v2_degc"  # Growing Degree Day (today)
+KEY_GDD_SEASON_V2 = "gdd_season_v2_degc"  # Growing Degree Day (seasonal total)
+KEY_LEAF_WETNESS = "leaf_wetness"  # Leaf wetness indicator (bool→text)
 
 # ---------------------------------------------------------------------------
 # v2.0 - New derived sensors (always-on or comfort-group opt-in)
@@ -603,9 +614,9 @@ KEY_WIND_GUST_FACTOR = "wind_gust_factor"
 
 # Solar / agro extensions (comfort indices or solar group)
 KEY_SOLAR_ENERGY_TODAY_WHM2 = "solar_energy_today_whm2"  # Wh/m² — daily accumulation
-KEY_MAX_SOLAR_RADIATION = "max_solar_radiation_wm2"       # Clear-sky theoretical max
-KEY_PEAK_SUN_HOURS = "peak_sun_hours"                     # Wh/m² / 1000
-KEY_IRRIGATION_DEFICIT = "irrigation_deficit_mm"          # ET₀ - rain today
+KEY_MAX_SOLAR_RADIATION = "max_solar_radiation_wm2"  # Clear-sky theoretical max
+KEY_PEAK_SUN_HOURS = "peak_sun_hours"  # Wh/m² / 1000
+KEY_IRRIGATION_DEFICIT = "irrigation_deficit_mm"  # ET₀ - rain today
 
 # Wind statistics (always-on wind group)
 KEY_DOMINANT_WIND_DIR = "dominant_wind_direction_deg"
@@ -630,7 +641,7 @@ CONF_ENABLE_LIGHTNING = "enable_lightning"
 # SRC_LIGHTNING_COUNT / SRC_LIGHTNING_DISTANCE defined near OPTIONAL_SOURCES above.
 
 DEFAULT_ENABLE_LIGHTNING = False
-DEFAULT_LIGHTNING_PROXIMITY_KM = 15.0       # threshold for proximity alert
+DEFAULT_LIGHTNING_PROXIMITY_KM = 15.0  # threshold for proximity alert
 
 CONF_LIGHTNING_PROXIMITY_KM = "lightning_proximity_km"
 
@@ -707,20 +718,20 @@ KEY_INDOOR_HUMIDITY = "indoor_humidity_pct"
 KEY_INDOOR_CO2_PPM = "indoor_co2_ppm"
 KEY_INDOOR_TEMP_DELTA = "indoor_temp_delta_c"
 KEY_INDOOR_HUMIDITY_DELTA = "indoor_humidity_delta_pct"
-KEY_INDOOR_COMFORT = "indoor_comfort"    # composite score
+KEY_INDOOR_COMFORT = "indoor_comfort"  # composite score
 
 # ---------------------------------------------------------------------------
 # v2.0 - Data quality expansion
 # ---------------------------------------------------------------------------
 
-KEY_SENSOR_STUCK = "sensor_stuck_flags"      # list of stuck sensor names
+KEY_SENSOR_STUCK = "sensor_stuck_flags"  # list of stuck sensor names
 KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
-KEY_NEIGHBOR_QC = "neighbor_qc_flags"          # list of neighbor-comparison flags
-KEY_SENSOR_SPIKE = "sensor_spike_flags"        # list of σ-based step-change flags
+KEY_NEIGHBOR_QC = "neighbor_qc_flags"  # list of neighbor-comparison flags
+KEY_SENSOR_SPIKE = "sensor_spike_flags"  # list of σ-based step-change flags
 
 # Spike detection thresholds (sigma multiplier + minimum samples)
-SPIKE_SIGMA_THRESHOLD = 3.0     # flag a reading > 3σ from rolling mean
-SPIKE_MIN_SAMPLES = 12          # need at least this many samples to compute σ
+SPIKE_SIGMA_THRESHOLD = 3.0  # flag a reading > 3σ from rolling mean
+SPIKE_MIN_SAMPLES = 12  # need at least this many samples to compute σ
 
 # ---------------------------------------------------------------------------
 # v2.0 - CWOP (Citizen Weather Observer Program) upload
@@ -728,15 +739,15 @@ SPIKE_MIN_SAMPLES = 12          # need at least this many samples to compute σ
 
 CONF_ENABLE_CWOP = "enable_cwop"
 CONF_CWOP_CALLSIGN = "cwop_callsign"
-CONF_CWOP_PASSCODE = "cwop_passcode"   # -1 for receive-only; set by CWOP on registration
-CONF_CWOP_SERVER = "cwop_server"       # default: cwop.aprs.net
-CONF_CWOP_PORT = "cwop_port"           # default: 14580
+CONF_CWOP_PASSCODE = "cwop_passcode"  # -1 for receive-only; set by CWOP on registration
+CONF_CWOP_SERVER = "cwop_server"  # default: cwop.aprs.net
+CONF_CWOP_PORT = "cwop_port"  # default: 14580
 CONF_CWOP_INTERVAL_MIN = "cwop_interval_min"
 
 DEFAULT_ENABLE_CWOP = False
 DEFAULT_CWOP_SERVER = "cwop.aprs.net"
 DEFAULT_CWOP_PORT = 14580
-DEFAULT_CWOP_INTERVAL_MIN = 15        # CWOP requests no faster than 5 min; 15 is polite
+DEFAULT_CWOP_INTERVAL_MIN = 15  # CWOP requests no faster than 5 min; 15 is polite
 
 KEY_CWOP_STATUS_V2 = "cwop_upload_status_v2"
 
@@ -757,9 +768,9 @@ DEFAULT_MQTT_INTERVAL_MIN = 1
 # Data keys
 KEY_LIGHTNING_COUNT_1H = "lightning_count_1h"
 KEY_LIGHTNING_DISTANCE_KM = "lightning_distance_km"
-KEY_LIGHTNING_RATE_1H = "lightning_rate_1h"        # strikes per minute (avg)
+KEY_LIGHTNING_RATE_1H = "lightning_rate_1h"  # strikes per minute (avg)
 KEY_LIGHTNING_CLEARANCE_MIN = "lightning_clearance_min"  # minutes since last strike
-KEY_LIGHTNING_PROXIMITY = "lightning_proximity"    # binary "near" / "clear"
+KEY_LIGHTNING_PROXIMITY = "lightning_proximity"  # binary "near" / "clear"
 
 # Comfort indices group (opt-in via CONF_ENABLE_COMFORT_INDICES)
 KEY_AIR_DENSITY = "air_density_kg_m3"
