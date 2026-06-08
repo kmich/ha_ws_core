@@ -1099,7 +1099,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._unsubs.append(
                 async_track_time_interval(
                     self.hass,
-                    lambda _now: self.hass.async_create_task(self._async_fetch_vigicrues()),
+                    lambda _now: self.hass.add_job(self._async_fetch_vigicrues),
                     timedelta(minutes=15),
                 )
             )
