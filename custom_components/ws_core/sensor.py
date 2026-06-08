@@ -2449,6 +2449,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             # v2.0 finishing items
             KEY_WIND_RUN_MONTH_KM: "wind_run_month",
             KEY_NET_RADIATION: "net_radiation",
+            KEY_RAIN_TODAY_MM: "rain_today_mm",
         }
         if key in overrides:
             return overrides[key]
