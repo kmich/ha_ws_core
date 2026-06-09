@@ -2,6 +2,27 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.0.2] - 2026-06-09
+
+### Fixed
+
+- **French translation (fr.json):** overhauled and expanded by @Benjamin45590 (PR #51),
+  with the following corrections applied before merge:
+  - NWS/NOAA description was accidentally left in English — restored to French
+  - Typo in `leaf_wetness` sensor name (`feuillag` → `feuillage`)
+  - Key mismatch: `enable_thunderstorm_risk` → `enable_thunderstorm` in config
+    flow `data_description` (aligns with the renamed field)
+  - `ws_suppress_notifications` switch label was inverted — now reads
+    "Bloquer les notifications HA" (suppress = block)
+  - `windy_status` sensor name corrected to "Statut Windy.com" (consistent with
+    other upload-status sensors)
+
+## [2.0.1] - 2026-06-08
+
+### Fixed
+
+- Minor version and metadata housekeeping following the 2.0.0 release.
+
 ## [2.0.0] - 2026-06-04
 
 The largest release to date — a comprehensive expansion aimed at making
