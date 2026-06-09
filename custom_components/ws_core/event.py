@@ -70,6 +70,7 @@ if _HAS_EVENT:
 
         _attr_event_types = ["started", "stopped"]
         _attr_has_entity_name = True
+        _attr_translation_key = "ws_rain_event"
         _attr_icon = "mdi:weather-pouring"
 
         def __init__(self, coordinator, entry: ConfigEntry, prefix: str) -> None:
@@ -77,7 +78,6 @@ if _HAS_EVENT:
             self._entry = entry
             self._attr_unique_id = f"{entry.entry_id}_rain_event"
             self._attr_suggested_object_id = f"{prefix}_rain_event"
-            self._attr_name = "Rain Event"
             self._prev_raining: bool | None = None
 
         @property
@@ -125,6 +125,7 @@ if _HAS_EVENT:
 
         _attr_event_types = ["frost", "thaw"]
         _attr_has_entity_name = True
+        _attr_translation_key = "ws_frost_event"
         _attr_icon = "mdi:snowflake-alert"
 
         def __init__(self, coordinator, entry: ConfigEntry, prefix: str) -> None:
@@ -132,7 +133,6 @@ if _HAS_EVENT:
             self._entry = entry
             self._attr_unique_id = f"{entry.entry_id}_frost_event"
             self._attr_suggested_object_id = f"{prefix}_frost_event"
-            self._attr_name = "Frost Event"
             self._prev_frozen: bool | None = None
 
         @property
@@ -181,6 +181,7 @@ if _HAS_EVENT:
 
         _attr_event_types = ["strike_detected", "proximity_alert"]
         _attr_has_entity_name = True
+        _attr_translation_key = "ws_lightning_event"
         _attr_icon = "mdi:lightning-bolt"
 
         def __init__(self, coordinator, entry: ConfigEntry, prefix: str) -> None:
@@ -188,7 +189,6 @@ if _HAS_EVENT:
             self._entry = entry
             self._attr_unique_id = f"{entry.entry_id}_lightning_event"
             self._attr_suggested_object_id = f"{prefix}_lightning_event"
-            self._attr_name = "Lightning Event"
             self._prev_count_1h: float = 0.0
             self._prev_proximity: str = "clear"
 
