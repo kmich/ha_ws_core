@@ -366,6 +366,35 @@
           "forecast_api_key": "Paste your API key here."
         }
       },
+      "required_sources_opt": {
+        "title": "Required source sensors",
+        "description": "Update the source entities used by Weather Station Core. These mappings can be changed when hardware is replaced.",
+        "data": {
+          "temperature": "Temperature sensor",
+          "humidity": "Humidity sensor",
+          "pressure": "Pressure sensor",
+          "wind_speed": "Wind speed sensor",
+          "wind_gust": "Wind gust sensor",
+          "wind_direction": "Wind direction sensor (degrees)",
+          "rain_total": "Cumulative precipitation sensor"
+        }
+      },
+      "optional_sources_opt": {
+        "title": "Optional source sensors",
+        "description": "Update optional source entities. Clear a field to stop using that optional source.",
+        "data": {
+          "illuminance": "Illuminance / solar radiation (lux)",
+          "uv_index": "UV index",
+          "dew_point": "Dew point (if your station provides it; otherwise it is calculated)",
+          "battery": "Station battery level (%)",
+          "solar_radiation": "Solar radiation (W/m², for Penman-Monteith ET₀)",
+          "lightning_count": "Lightning strike count (cumulative, e.g. from WH57 or AS3935)",
+          "lightning_dist": "Lightning nearest distance (km, e.g. from WH57)",
+          "indoor_temp": "Indoor temperature sensor",
+          "indoor_humidity": "Indoor humidity sensor",
+          "indoor_co2": "Indoor CO₂ sensor (ppm)"
+        }
+      },
       "features_opt": {
         "title": "Features",
         "description": "Toggle sensors and enable external data sources. Sub-steps will appear for each enabled feature.",
@@ -556,8 +585,8 @@
       "description": "The following sensors have not updated within the staleness timeout: {sensors}. Check that your weather station hardware is online and connected."
     },
     "forecast_api_failures": {
-      "title": "Open-Meteo forecast API failures",
-      "description": "The Open-Meteo forecast API has failed {failures} consecutive times. Forecast data may be stale. Check your internet connection. The integration will retry automatically with exponential backoff."
+      "title": "Forecast provider API failures",
+      "description": "The active forecast provider ({provider}) has failed {failures} consecutive times. Forecast data may be stale. Check your internet connection and provider settings. The integration will retry automatically with exponential backoff."
     }
   },
   "entity": {
@@ -692,6 +721,17 @@
       },
       "forecast_daily": {
         "name": "Forecast Daily"
+      },
+      "forecast_provider": {
+        "name": "Forecast Provider",
+        "state_attributes": {
+          "provider_name": {
+            "name": "Provider name"
+          },
+          "forecast_enabled": {
+            "name": "Forecast enabled"
+          }
+        }
       },
       "feels_like": {
         "name": "Feels Like",

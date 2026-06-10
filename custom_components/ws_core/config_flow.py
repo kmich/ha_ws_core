@@ -1753,15 +1753,80 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
                 float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), imperial
             )
-            # Merge into options - features step comes next (API key step if needed)
+            # Merge into options - source mapping step comes next.
             self._opt: dict[str, Any] = out
-            if out.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
-                return await self.async_step_forecast_api_key_opt()
-            return await self.async_step_features_opt()
+            return await self.async_step_required_sources_opt()
 
         return self.async_show_form(
             step_id="init",
             data_schema=self._build_core_schema(imperial, gust_u, rain_u, temp_u),
+            last_step=False,
+        )
+
+    def _current_sources_for_options(self) -> dict[str, str]:
+        defaults = _guess_defaults(self.hass)
+        current = dict(self.config_entry.data.get(CONF_SOURCES, {}))
+        current.update(self.config_entry.options.get(CONF_SOURCES, {}) or {})
+        return {**defaults, **{k: v for k, v in current.items() if v}}
+
+    async def async_step_required_sources_opt(self, user_input: dict[str, Any] | None = None):
+        defaults = self._current_sources_for_options()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            sources = dict(self._get(CONF_SOURCES, {}))
+            for k in REQUIRED_SOURCES:
+                eid = user_input.get(k)
+                if not eid:
+                    errors[k] = "required"
+                else:
+                    err = self._validate_numeric_sensor(eid)
+                    if err:
+                        errors[k] = err
+                    else:
+                        sources[k] = eid
+            if not errors:
+                self._opt[CONF_SOURCES] = sources
+                return await self.async_step_optional_sources_opt()
+
+        fields = {vol.Required(k, default=defaults.get(k)): _ENTITY_SELECTOR for k in REQUIRED_SOURCES}
+        return self.async_show_form(
+            step_id="required_sources_opt",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            last_step=False,
+        )
+
+    async def async_step_optional_sources_opt(self, user_input: dict[str, Any] | None = None):
+        defaults = self._current_sources_for_options()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            sources = dict(self._opt.get(CONF_SOURCES) or self._get(CONF_SOURCES, {}))
+            for k in OPTIONAL_SOURCES:
+                sources.pop(k, None)
+                eid = user_input.get(k)
+                if not eid:
+                    continue
+                err = self._validate_numeric_sensor(eid)
+                if err:
+                    errors[k] = err
+                else:
+                    sources[k] = eid
+            if not errors:
+                self._opt[CONF_SOURCES] = sources
+                if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
+                    return await self.async_step_forecast_api_key_opt()
+                return await self.async_step_features_opt()
+
+        fields = {
+            (vol.Optional(k, default=defaults[k]) if k in defaults else vol.Optional(k)): _ENTITY_SELECTOR
+            for k in OPTIONAL_SOURCES
+        }
+        return self.async_show_form(
+            step_id="optional_sources_opt",
+            data_schema=vol.Schema(fields),
+            errors=errors,
             last_step=False,
         )
 

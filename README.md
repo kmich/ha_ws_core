@@ -447,11 +447,14 @@ for use as automation triggers. Requires Home Assistant 2023.8+.
 | `weather.ws` | weather | Standard HA weather entity with daily forecast |
 | `binary_sensor.ws_package_ok` | binary_sensor | True when all required sources are mapped and available |
 | `select.ws_graph_range` | select | Dashboard graph time range (6h/24h/3d) |
-| `switch.ws_enable_animations` | switch | Dashboard animation toggle |
+| `sensor.ws_forecast_provider` | sensor | Active forecast provider diagnostic |
+| `switch.ws_enable_animations` | switch | Dashboard-only animation toggle; does not enable or disable weather calculations |
 
 ### Configuration Entities (device page)
 
 All configurable parameters are exposed as entities on the device page so you can adjust them directly without entering the config flow. Changes trigger a coordinator reload automatically.
+
+Use **Configure** from the integration entry to remap required and optional source sensors after setup. This lets you replace weather-station hardware or clear optional sources without deleting and recreating the integration.
 
 **Number entities** (thresholds, calibration offsets, algorithm parameters):
 
@@ -472,7 +475,7 @@ All configurable parameters are exposed as entities on the device page so you ca
 
 | Entity | Description |
 |---|---|
-| `switch.ws_enable_display_sensors` | Display sensors (levels, trends, health) |
+| `switch.ws_enable_display_sensors` | Display-oriented helper sensors: humidity/UV levels, temperature/rain displays, pressure trend, station health, and forecast tiles |
 | `switch.ws_enable_fire_risk_score` | Fire risk score |
 | `switch.ws_enable_fog` | Fog probability |
 | `switch.ws_enable_thunderstorm_risk` | Thunderstorm risk index |
@@ -1067,7 +1070,7 @@ Offsets are applied after unit conversion, before all derived calculations (dew 
 
 ## Forecast Provider
 
-`sensor.ws_forecast_daily` and all NWP-derived sensors use a swappable forecast backend. Change it at any time via **Configure** (Settings → Devices & Services → Weather Station Core → Configure) - no reinstall needed.
+`sensor.ws_forecast_daily` and all NWP-derived sensors use a swappable forecast backend. Change it at any time via **Configure** (Settings → Devices & Services → Weather Station Core → Configure) - no reinstall needed. `sensor.ws_forecast_provider` shows the active provider and stays available even before a successful forecast fetch.
 
 | Provider | Free | API key | Notes |
 |---|---|---|---|

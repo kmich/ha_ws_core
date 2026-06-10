@@ -323,6 +323,7 @@ from .const import (
     KEY_FOG_PROBABILITY,
     KEY_FORECAST,
     KEY_FORECAST_AGREEMENT,
+    KEY_FORECAST_PROVIDER,
     KEY_FORECAST_SKILL,
     KEY_FORECAST_TILES,
     KEY_FREEZING_LEVEL_M,
@@ -582,7 +583,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry_options = entry_options or {}
         self.runtime = WSStationRuntime()
 
-        self.sources: dict[str, str] = dict(entry_data.get(CONF_SOURCES, {}))
+        self.sources: dict[str, str] = dict((entry_options or {}).get(CONF_SOURCES) or entry_data.get(CONF_SOURCES, {}))
 
         def _get(key: str, default: Any) -> Any:
             return self.entry_options.get(key, entry_data.get(key, default))
@@ -2447,6 +2448,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     ir.async_delete_issue(self.hass, DOMAIN, "stale_sensors")
 
                 if self.runtime.forecast_consecutive_failures >= 3:
+                    provider = get_provider(self.forecast_provider)
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,
@@ -2454,7 +2456,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         is_fixable=False,
                         severity=ir.IssueSeverity.WARNING,
                         translation_key="forecast_api_failures",
-                        translation_placeholders={"failures": str(self.runtime.forecast_consecutive_failures)},
+                        translation_placeholders={
+                            "failures": str(self.runtime.forecast_consecutive_failures),
+                            "provider": provider.PROVIDER_NAME,
+                        },
                     )
                 else:
                     ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
@@ -3174,6 +3179,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Periodic save of learning state (async, fire-and-forget)
         with contextlib.suppress(RuntimeError):
             self.hass.async_create_task(self._async_maybe_save_learning())
+
+        provider = get_provider(self.forecast_provider)
+        data[KEY_FORECAST_PROVIDER] = self.forecast_provider
+        data["_forecast_provider_name"] = provider.PROVIDER_NAME
+        data["_forecast_provider_enabled"] = self.forecast_enabled
 
         if self.forecast_enabled:
             data[KEY_FORECAST] = self._get_cached_or_schedule_forecast(now)
