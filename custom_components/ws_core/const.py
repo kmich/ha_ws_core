@@ -167,6 +167,7 @@ KEY_DATA_QUALITY = "data_quality"
 KEY_PACKAGE_STATUS = "package_status"
 KEY_PACKAGE_OK = "package_ok"
 KEY_FORECAST = "forecast"
+KEY_FORECAST_PROVIDER = "forecast_provider"
 
 # Keys for ADVANCED METEOROLOGICAL SENSORS
 KEY_FEELS_LIKE_C = "feels_like_c"

@@ -52,6 +52,7 @@ from .const import (
     CONF_ENABLE_WEATHERCLOUD,
     CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
+    CONF_ENABLE_WUNDERGROUND,
     CONF_PREFIX,
     CONF_VIGICRUES_RIVER_NAME,
     CONF_VIGICRUES_STATION_CODE,
@@ -98,6 +99,7 @@ from .const import (
     KEY_FOG_PROBABILITY,
     KEY_FORECAST,
     KEY_FORECAST_AGREEMENT,
+    KEY_FORECAST_PROVIDER,
     KEY_FORECAST_SKILL,
     KEY_FORECAST_TILES,
     KEY_FREEZING_LEVEL_M,
@@ -494,6 +496,17 @@ SENSORS: list[WSSensorDescription] = [
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get(KEY_FORECAST) or {}).get("provider") if d.get(KEY_FORECAST) else None,
         attrs_fn=lambda d: d.get(KEY_FORECAST) or {},
+    ),
+    WSSensorDescription(
+        key=KEY_FORECAST_PROVIDER,
+        translation_key="forecast_provider",
+        name="WS Forecast Provider",
+        icon="mdi:cloud-search",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        attrs_fn=lambda d: {
+            "provider_name": d.get("_forecast_provider_name"),
+            "forecast_enabled": d.get("_forecast_provider_enabled"),
+        },
     ),
     # =========================================================================
     # ADVANCED METEOROLOGICAL SENSORS
@@ -2099,6 +2112,7 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_LIGHTNING_CLEARANCE_MIN: CONF_ENABLE_LIGHTNING,
     KEY_LIGHTNING_PROXIMITY: CONF_ENABLE_LIGHTNING,
     # v2.0 - upload status sensors
+    KEY_WU_STATUS: CONF_ENABLE_WUNDERGROUND,
     KEY_WC_STATUS: CONF_ENABLE_WEATHERCLOUD,
     KEY_PWS_STATUS: CONF_ENABLE_PWSWEATHER,
     KEY_WOW_STATUS: CONF_ENABLE_WOW,

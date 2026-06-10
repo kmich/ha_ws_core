@@ -101,6 +101,7 @@ class WSFeatureDesc:
     name: str
     icon: str
     inverted: bool = False
+    description: str | None = None
 
 
 FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
@@ -109,6 +110,7 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_DISPLAY_SENSORS,
         name="Feature: Display Sensors",
         icon="mdi:monitor-dashboard",
+        description="Shows display-oriented helper sensors such as humidity level, UV level, pressure trend, station health, and forecast tiles.",
     ),
     # v0.3.0: removed laundry/stargazing/running score switches (cut sensors)
     WSFeatureDesc(
@@ -367,6 +369,13 @@ class WSToggleSwitch(RestoreEntity, SwitchEntity):
         if last_state:
             self._attr_is_on = last_state.state == "on"
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "description": "Controls dashboard-only animation behavior; it does not enable or disable weather calculations.",
+            "scope": "dashboard",
+        }
+
     async def async_turn_on(self, **kwargs) -> None:
         self._attr_is_on = True
         self.async_write_ha_state()
@@ -428,6 +437,13 @@ class WSFeatureSwitch(SwitchEntity):
             )
         )
         return (not stored) if self._desc.inverted else stored
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs: dict[str, Any] = {"config_key": self._desc.conf_key}
+        if self._desc.description:
+            attrs["description"] = self._desc.description
+        return attrs
 
     async def async_turn_on(self, **kwargs) -> None:
         """Enable the feature."""
