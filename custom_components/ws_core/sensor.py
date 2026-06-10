@@ -1228,7 +1228,7 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="forecast_tiles",
         name="WS Forecast Tiles",
         icon="mdi:calendar-weather",
-        value_fn=lambda d: "available" if d.get(KEY_FORECAST_TILES) else "unavailable",
+        value_fn=lambda d: len(d.get(KEY_FORECAST_TILES) or []),
         attrs_fn=lambda d: {
             "tiles": d.get(KEY_FORECAST_TILES) or [],
             "count": len(d.get(KEY_FORECAST_TILES) or []),

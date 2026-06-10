@@ -1967,11 +1967,9 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         g = self._get
         if user_input is not None:
             self._opt.update(user_input)
-            # Route through sub-steps for enabled features (v0.3.0: METAR/CWOP/Export/DegreeDays removed)
+            # Route through sub-steps for enabled data-source features
             if user_input.get(CONF_ENABLE_SEA_TEMP):
                 return await self.async_step_sea_temp_opt()
-            if user_input.get(CONF_ENABLE_WUNDERGROUND):
-                return await self.async_step_wunderground_opt()
             if user_input.get(CONF_ENABLE_AIR_QUALITY):
                 return await self.async_step_air_quality_opt()
             if user_input.get(CONF_ENABLE_POLLEN):
@@ -1980,7 +1978,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_solar_forecast_opt()
             if user_input.get(CONF_ENABLE_VIGICRUES):
                 return await self.async_step_vigicrues_station_opt()
-            return await self._next_v2_opt_step()
+            return await self.async_step_upload_services_opt()
 
         return self.async_show_form(
             step_id="features_opt",
@@ -1990,7 +1988,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_ENABLE_DISPLAY_SENSORS,
                         default=g(CONF_ENABLE_DISPLAY_SENSORS, DEFAULT_ENABLE_DISPLAY_SENSORS),
                     ): selector.BooleanSelector(),
-                    # v0.3.0: removed laundry/stargazing/running/degree_days/metar/cwop/export
                     vol.Optional(
                         CONF_ENABLE_FIRE_RISK,
                         default=g(CONF_ENABLE_FIRE_RISK, DEFAULT_ENABLE_FIRE_RISK),
@@ -2004,9 +2001,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_SEA_TEMP, default=g(CONF_ENABLE_SEA_TEMP, DEFAULT_ENABLE_SEA_TEMP)
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_WUNDERGROUND, default=g(CONF_ENABLE_WUNDERGROUND, DEFAULT_ENABLE_WUNDERGROUND)
                     ): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_AIR_QUALITY, default=g(CONF_ENABLE_AIR_QUALITY, DEFAULT_ENABLE_AIR_QUALITY)
@@ -2049,7 +2043,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_ENABLE_NOWCAST,
                         default=g(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST),
                     ): selector.BooleanSelector(),
-                    # v2.0 feature toggles
                     vol.Optional(
                         CONF_ENABLE_DEGREE_DAYS, default=g(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)
                     ): selector.BooleanSelector(),
@@ -2058,6 +2051,26 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_INDOOR, default=g(CONF_ENABLE_INDOOR, DEFAULT_ENABLE_INDOOR)
+                    ): selector.BooleanSelector(),
+                }
+            ),
+            last_step=False,
+        )
+
+    async def async_step_upload_services_opt(self, user_input: dict[str, Any] | None = None):
+        g = self._get
+        if user_input is not None:
+            self._opt.update(user_input)
+            if user_input.get(CONF_ENABLE_WUNDERGROUND):
+                return await self.async_step_wunderground_opt()
+            return await self._next_v2_opt_step()
+
+        return self.async_show_form(
+            step_id="upload_services_opt",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_ENABLE_WUNDERGROUND, default=g(CONF_ENABLE_WUNDERGROUND, DEFAULT_ENABLE_WUNDERGROUND)
                     ): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_WEATHERCLOUD, default=g(CONF_ENABLE_WEATHERCLOUD, DEFAULT_ENABLE_WEATHERCLOUD)
@@ -2386,10 +2399,9 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
     # Sub-steps for each configurable feature
     # ------------------------------------------------------------------
     def _opt_next_after(self, after: str):
-        """Route to the next enabled feature sub-step or finish."""
+        """Route to the next enabled feature sub-step."""
         order = [
             (CONF_ENABLE_SEA_TEMP, "sea_temp_opt"),
-            (CONF_ENABLE_WUNDERGROUND, "wunderground_opt"),
             (CONF_ENABLE_AIR_QUALITY, "air_quality_opt"),
             (CONF_ENABLE_POLLEN, "pollen_opt"),
             (CONF_ENABLE_SOLAR_FORECAST, "solar_forecast_opt"),
@@ -2402,13 +2414,13 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 continue
             if past and self._opt.get(conf_key):
                 return getattr(self, f"async_step_{step_name}")()
-        return None  # signals: go to finish
+        return None  # signals: proceed to upload_services_opt
 
     async def _finish_or_next(self, after: str):
         nxt = self._opt_next_after(after)
         if nxt is not None:
             return await nxt
-        return self.async_create_entry(title="", data=self._opt)
+        return await self.async_step_upload_services_opt()
 
     async def async_step_sea_temp_opt(self, user_input: dict[str, Any] | None = None):
         g = self._get
@@ -2455,7 +2467,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 self._opt[CONF_WU_API_KEY] = api_key
                 self._opt[CONF_WU_INTERVAL_MIN] = int(user_input.get(CONF_WU_INTERVAL_MIN, DEFAULT_WU_INTERVAL_MIN))
             if not errors:
-                return await self._finish_or_next("wunderground_opt")
+                return await self._next_v2_opt_step()
         return self.async_show_form(
             step_id="wunderground_opt",
             data_schema=vol.Schema(
@@ -2575,7 +2587,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         break
             # Empty list means auto-detect nearest station
             self._opt[CONF_VIGICRUES_STATIONS] = stations
-            return self.async_create_entry(title="", data=self._opt)
+            return await self.async_step_upload_services_opt()
 
         lat = (
             self._opt.get(CONF_FORECAST_LAT)

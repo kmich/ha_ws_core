@@ -1383,15 +1383,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_NORM_TEMP_C] = tc
 
         h_raw = num(SRC_HUM)
-        rh = round(h_raw, 1) if h_raw is not None else None
+        rh = round(h_raw, 2) if h_raw is not None else None
         if rh is not None:
-            rh = round(max(0.0, min(100.0, rh + float(self.entry_options.get("cal_humidity", 0.0)))), 1)
+            rh = round(max(0.0, min(100.0, rh + float(self.entry_options.get("cal_humidity", 0.0)))), 2)
             data[KEY_NORM_HUMIDITY] = rh
 
         p_raw = num(SRC_PRESS)
-        pressure_hpa = round(self._to_hpa(p_raw, uom(SRC_PRESS)), 1) if p_raw is not None else None
+        pressure_hpa = round(self._to_hpa(p_raw, uom(SRC_PRESS)), 2) if p_raw is not None else None
         if pressure_hpa is not None:
-            pressure_hpa = round(pressure_hpa + float(self.entry_options.get("cal_pressure_hpa", 0.0)), 1)
+            pressure_hpa = round(pressure_hpa + float(self.entry_options.get("cal_pressure_hpa", 0.0)), 2)
             data[KEY_NORM_PRESSURE_HPA] = pressure_hpa
 
         ws_raw = num(SRC_WIND)
@@ -1406,7 +1406,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_NORM_WIND_GUST_MS] = gust_ms
 
         wd_raw = num(SRC_WIND_DIR)
-        wind_dir = round(float(wd_raw), 1) if wd_raw is not None else None
+        wind_dir = round(float(wd_raw), 2) if wd_raw is not None else None
         if wind_dir is not None:
             data[KEY_NORM_WIND_DIR_DEG] = wind_dir
 
@@ -1416,7 +1416,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_NORM_RAIN_TOTAL_MM] = rain_total_mm
 
         lux_raw = num(SRC_LUX)
-        lux = round(lux_raw, 1) if lux_raw is not None else None
+        lux = round(lux_raw, 2) if lux_raw is not None else None
         if lux is not None:
             data[KEY_LUX] = lux
 
@@ -2077,13 +2077,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_INDOOR_TEMP_C] = indoor_tc
             outdoor_tc = data.get(KEY_NORM_TEMP_C)
             if outdoor_tc is not None:
-                data[KEY_INDOOR_TEMP_DELTA] = round(float(indoor_tc) - float(outdoor_tc), 1)
+                data[KEY_INDOOR_TEMP_DELTA] = round(float(indoor_tc) - float(outdoor_tc), 2)
 
         if indoor_hum_raw is not None:
-            data[KEY_INDOOR_HUMIDITY] = round(float(indoor_hum_raw), 1)
+            data[KEY_INDOOR_HUMIDITY] = round(float(indoor_hum_raw), 2)
             outdoor_rh = data.get(KEY_NORM_HUMIDITY)
             if outdoor_rh is not None:
-                data[KEY_INDOOR_HUMIDITY_DELTA] = round(float(indoor_hum_raw) - float(outdoor_rh), 1)
+                data[KEY_INDOOR_HUMIDITY_DELTA] = round(float(indoor_hum_raw) - float(outdoor_rh), 2)
 
         if indoor_co2_raw is not None:
             data[KEY_INDOOR_CO2_PPM] = round(float(indoor_co2_raw))
