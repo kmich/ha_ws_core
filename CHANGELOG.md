@@ -2,6 +2,19 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.0.4] - 2026-06-10
+
+### Added
+
+- Dedicated `sensor.ws_forecast_provider` diagnostic entity showing the active forecast provider.
+- Configure-flow source remapping for required and optional weather station source sensors.
+
+### Fixed
+
+- Forecast failure Repairs text now names the active forecast provider instead of always saying Open-Meteo.
+- `sensor.ws_wu_upload_status` is only created when Weather Underground upload is enabled.
+- Clarified the purpose of `switch.ws_enable_animations` and `switch.ws_enable_display_sensors` in entity attributes and documentation.
+
 ## [2.0.2] - 2026-06-09
 
 ### Fixed
