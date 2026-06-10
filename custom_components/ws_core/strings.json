@@ -397,12 +397,11 @@
       },
       "features_opt": {
         "title": "Features",
-        "description": "Toggle sensors and enable external data sources. Sub-steps will appear for each enabled feature.",
+        "description": "Toggle computed sensors and enable data-source features. Upload service settings are on the next page.",
         "data": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
           "enable_fire_risk_score": "Fire risk score",
           "enable_sea_temp": "Sea surface temperature",
-          "enable_wunderground": "Weather Underground upload",
           "enable_air_quality": "Air quality index (Open-Meteo)",
           "enable_pollen": "Pollen levels (Open-Meteo, free, no API key)",
           "enable_moon": "Moon phase & illumination",
@@ -418,20 +417,12 @@
           "enable_nowcast": "Precipitation nowcast (minutes to rain)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
           "enable_lightning": "Lightning detection sensors",
-          "enable_indoor": "Indoor sensors (temperature, humidity, CO₂)",
-          "enable_weathercloud": "Weathercloud upload",
-          "enable_pwsweather": "PWSWeather upload",
-          "enable_wow": "WOW (UK Met Office) upload",
-          "enable_awekas": "AWEKAS upload",
-          "enable_owm_stations": "OpenWeatherMap Stations upload",
-          "enable_windy": "Windy.com upload",
-          "enable_mqtt": "MQTT Discovery republishing"
+          "enable_indoor": "Indoor sensors (temperature, humidity, CO₂)"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
           "enable_fire_risk_score": "Fire risk score",
           "enable_sea_temp": "Sea surface temperature",
-          "enable_wunderground": "Weather Underground upload",
           "enable_air_quality": "Air quality index (Open-Meteo)",
           "enable_pollen": "Pollen levels (Open-Meteo)",
           "enable_moon": "Moon phase & illumination",
@@ -445,6 +436,21 @@
           "enable_fwi_components": "FWI intermediate codes (FFMC/DMC/DC/ISI/BUI). Requires Fire Risk enabled to produce data",
           "enable_advanced_sensors": "Zambretti number (numeric form), hourly ET₀, smoothed wind direction",
           "enable_nowcast": "Open-Meteo 15-minute precipitation nowcast: minutes until rain starts/stops, next-hour total, intensity. No API key"
+        }
+      },
+      "upload_services_opt": {
+        "title": "Upload Services",
+        "description": "Enable sharing your weather data with external services. Sub-steps will appear for each enabled service.",
+        "data": {
+          "enable_wunderground": "Weather Underground upload",
+          "enable_weathercloud": "Weathercloud upload",
+          "enable_pwsweather": "PWSWeather upload",
+          "enable_wow": "WOW (UK Met Office) upload",
+          "enable_awekas": "AWEKAS upload",
+          "enable_owm_stations": "OpenWeatherMap Stations upload",
+          "enable_windy": "Windy.com upload",
+          "enable_cwop": "CWOP / APRS upload",
+          "enable_mqtt": "MQTT Discovery republishing"
         }
       },
       "sea_temp_opt": {

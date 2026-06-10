@@ -43,19 +43,15 @@ MOON_ILLUMINATION = {
 
 
 def calculate_dew_point(temp_c: float, humidity: float) -> float:
-    """Magnus-formula dew point (Alduchov & Eskridge 1996).
+    """Magnus-formula dew point over liquid water (Alduchov & Eskridge 1996).
 
-    Uses temperature-dependent constants:
-      Over water (T >= 0): a=17.625, b=243.04
-      Over ice   (T <  0): a=22.587, b=273.86 (Buck 1981)
+    Uses saturation-over-water constants at all temperatures:
+      a=17.625, b=243.04
 
     Valid range: -45 C to +60 C, 1%-100% RH.
-    Max error < 0.1 C across valid range (over water).
+    Max error < 0.1 C across valid range.
     """
-    if temp_c >= 0:
-        a, b = 17.625, 243.04
-    else:
-        a, b = 22.587, 273.86
+    a, b = 17.625, 243.04
     rh_clamped = max(1.0, min(100.0, humidity))
     gamma = (a * temp_c) / (b + temp_c) + math.log(rh_clamped / 100.0)
     return round((b * gamma) / (a - gamma), 2)
@@ -65,13 +61,13 @@ def calculate_frost_point(temp_c: float, humidity: float) -> float:
     """Frost point using Magnus formula with ice constants (Buck 1981).
 
     The frost point is the temperature at which air becomes saturated
-    with respect to ice. Only physically meaningful below 0 C.
-    Above 0 C, returns the standard dew point.
+    with respect to ice. Uses ice constants at all temperatures:
+      a=22.587, b=273.86
 
-    Constants: a=22.587, b=273.86 (saturation over ice).
+    The frost point is always numerically higher (warmer) than the dew
+    point at the same conditions, because ice requires less vapour
+    pressure to saturate than liquid water does.
     """
-    if temp_c >= 0:
-        return calculate_dew_point(temp_c, humidity)
     a, b = 22.587, 273.86
     rh_clamped = max(1.0, min(100.0, humidity))
     gamma = (a * temp_c) / (b + temp_c) + math.log(rh_clamped / 100.0)
