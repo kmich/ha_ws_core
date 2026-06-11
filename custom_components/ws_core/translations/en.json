@@ -108,10 +108,10 @@
       },
       "wunderground": {
         "title": "Weather Underground upload",
-        "description": "Upload observations to your Weather Underground Personal Weather Station. You need a station ID and API key from your Weather Underground account (wunderground.com/member/devices). Leave both fields blank to skip and configure later.",
+        "description": "Upload observations to your Weather Underground Personal Weather Station. You need a station ID and station key (password) from your Weather Underground account (wunderground.com/member/devices). Leave both fields blank to skip and configure later.",
         "data": {
           "wu_station_id": "Station ID (e.g. IATHEN123) — leave blank to skip",
-          "wu_api_key": "API key — leave blank to skip",
+          "wu_api_key": "Station key (password) — leave blank to skip",
           "wu_interval_min": "Upload interval",
           "_go_back": "← Go back to previous step"
         }
@@ -190,7 +190,7 @@
           "sea_temp_lon": "Sea temperature longitude",
           "enable_wunderground": "Weather Underground upload",
           "wu_station_id": "WU Station ID",
-          "wu_api_key": "WU API key",
+          "wu_api_key": "WU Station key (password)",
           "wu_interval_min": "WU upload interval"
         },
         "data_description": {
@@ -223,7 +223,7 @@
           "sea_temp_lon": "Sea temperature longitude",
           "enable_wunderground": "Weather Underground upload",
           "wu_station_id": "WU Station ID",
-          "wu_api_key": "WU API key",
+          "wu_api_key": "WU Station key (password)",
           "wu_interval_min": "WU upload interval"
         }
       },
@@ -267,7 +267,7 @@
         "description": "{info}",
         "data": {
           "wu_station_id": "Station ID",
-          "wu_api_key": "API key",
+          "wu_api_key": "Station key (password)",
           "wu_interval_min": "Upload interval"
         }
       },

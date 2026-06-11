@@ -143,20 +143,33 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def _validate_wu_credentials(station_id: str, api_key: str) -> tuple[bool, str]:
-    """Validate Weather Underground station ID + API key. Returns (valid, error_key)."""
+    """Validate Weather Underground station ID + station key using the upload endpoint.
+
+    The field stored as wu_api_key is the station key (PASSWORD) used by the PWS upload
+    endpoint, NOT the 32-character read API key used by api.weather.com.  Validating
+    against the upload endpoint avoids the read-API key requirement and also handles
+    stations that have never uploaded (which would return HTTP 204 from the read API,
+    previously misidentified as "cannot_connect").
+    """
     try:
         import aiohttp
 
-        url = (
-            f"https://api.weather.com/v2/pws/observations/current"
-            f"?stationId={station_id}&format=json&units=m&apiKey={api_key}&numericPrecision=decimal"
-        )
+        url = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
+        params = {
+            "ID": station_id,
+            "PASSWORD": api_key,
+            "action": "updateraw",
+            "dateutc": "now",
+        }
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                if resp.status == 200:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                body = (await resp.text()).lower().strip()
+                if resp.status == 200 and "success" in body:
                     return True, ""
-                if resp.status == 401 or resp.status == 403:
+                # 401 = bad PASSWORD (station key); 403 = station exists but rejected
+                if resp.status in (401, 403):
                     return False, "invalid_api_key"
+                # station ID not recognised
                 if resp.status == 404:
                     return False, "station_not_found"
                 return False, "cannot_connect"
