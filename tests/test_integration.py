@@ -485,3 +485,105 @@ class TestVersionConsistency:
         with open("pyproject.toml") as f:
             content = f.read()
         assert f'version = "{v}"' in content, f"pyproject.toml does not contain version {v!r}"
+
+
+class TestOptionsFlowSourceValidation:
+    """Regression tests for the options flow (issues #70 and #71)."""
+
+    @staticmethod
+    def _make_flow(sources, states):
+        from custom_components.ws_core import config_flow as cf
+
+        class _State:
+            def __init__(self, s):
+                self.state = s
+                self.attributes = {}
+
+        hass = MagicMock()
+        hass.config.latitude = 47.8358
+        hass.config.longitude = 1.9507
+        hass.config.elevation = 100
+        hass.states.get = lambda eid: _State(states[eid]) if eid in states else None
+        hass.states.async_all = lambda: [
+            type("S", (), {"entity_id": e, "attributes": {}})() for e in states
+        ]
+
+        entry = MagicMock()
+        entry.data = {CONF_SOURCES: dict(sources)}
+        entry.options = {}
+
+        class _Flow(cf.WSStationOptionsFlowHandler):
+            pass
+
+        # config_entry is a read-only property on the real OptionsFlow base.
+        _Flow.config_entry = property(lambda self: entry)
+        flow = _Flow()
+        flow.hass = hass
+        flow._opt = {}
+        return flow
+
+    def test_required_sources_opt_validates_without_attribute_error(self):
+        """Issue #70: submitting source sensors in the options flow must not raise.
+
+        ``_validate_numeric_sensor`` used to live only on the config-flow class, so
+        the options flow raised AttributeError -> HA's 'Unknown error occurred'.
+        """
+        from custom_components.ws_core.const import REQUIRED_SOURCES
+
+        sources = {k: f"sensor.{k}" for k in REQUIRED_SOURCES}
+        states = {f"sensor.{k}": "1.0" for k in REQUIRED_SOURCES}
+        flow = self._make_flow(sources, states)
+
+        import asyncio
+
+        res = asyncio.run(flow.async_step_required_sources_opt(dict(sources)))
+        # No exception, advances to the next step with no errors.
+        assert res.get("errors") in (None, {})
+        assert res.get("type") in ("form", None) or res.get("step_id")
+
+        # A missing/non-numeric sensor returns a field error rather than crashing.
+        bad = dict(sources)
+        bad[REQUIRED_SOURCES[0]] = "sensor.does_not_exist"
+        res2 = asyncio.run(flow.async_step_required_sources_opt(bad))
+        assert res2["errors"][REQUIRED_SOURCES[0]] == "entity_not_found"
+
+    def test_options_init_schema_accepts_empty_forecast_entity(self):
+        """Issue #71: the options 'init' schema must validate when no weather entity is set.
+
+        An empty weather EntitySelector default raised 'Entity is neither a valid
+        entity ID nor a valid UUID', blocking the whole dialog.
+        """
+        import asyncio
+
+        from voluptuous import UNDEFINED
+
+        from custom_components.ws_core.const import (
+            CONF_FORECAST_ENTITY,
+            REQUIRED_SOURCES,
+        )
+
+        sources = {k: f"sensor.{k}" for k in REQUIRED_SOURCES}
+        states = {f"sensor.{k}": "1.0" for k in REQUIRED_SOURCES}
+        flow = self._make_flow(sources, states)
+
+        res = asyncio.run(flow.async_step_init(None))
+        schema = res["data_schema"]
+
+        # Build the payload the frontend submits, omitting the (empty) weather entity.
+        user_input = {}
+        for marker in schema.schema:
+            key = marker.schema
+            if key == CONF_FORECAST_ENTITY:
+                continue
+            default = marker.default
+            if callable(default):
+                try:
+                    default = default()
+                except Exception:
+                    default = None
+            if default is UNDEFINED or default is None:
+                continue
+            user_input[key] = default
+
+        # Must not raise vol.Invalid for the empty weather entity.
+        schema(user_input)

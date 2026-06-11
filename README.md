@@ -19,6 +19,11 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 
 ---
 
+## What's New in 2.0.7
+
+- **Configure dialog fixes** — editing source sensors no longer fails with "Unknown error occurred" (#70), and the general settings step no longer blocks with "Entity is neither a valid entity ID nor a valid UUID" when no HA weather entity is selected (#71).
+- **Weather Underground uploads fixed** (thanks @miczu71, #72) — credential validation now checks the **station key (password)** against the actual PWS upload endpoint, so valid credentials save correctly and uploads are sent. The field is relabelled "Station key (password)" to match `wunderground.com/member/devices`.
+
 ## What's New in 2.0.6
 
 - **HA weather entity forecast provider** — use any existing `weather.*` entity in Home Assistant as your forecast source. No extra API, no external calls. Select it in Configure → Forecast and pick an entity. Great for users already running Met.no, OpenWeatherMap, or any other HA weather integration.
