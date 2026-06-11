@@ -2,6 +2,27 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.0.6] - 2026-06-11
+
+### Added
+
+- **#68**: `Home Assistant weather entity` forecast provider — use any existing `weather.*` entity already set up in Home Assistant as the forecast source. No external API calls or keys needed; select it in Configure → Forecast and pick a weather entity from the picker. Uses the `weather.get_forecasts` service (HA 2024.2+) with fallback to the `forecast` attribute on older installations.
+- **#63**: Multi-room indoor temperature delta sensors — configure any number of indoor temperature sensors (one per room) in Configure → Indoor. A dedicated `sensor.ws_indoor_room_delta_<room>` diagnostic entity is created for each room, reporting the temperature difference from outdoor and the room's temperature as an attribute.
+
+### Fixed
+
+- **#62**: Blitzortung lightning auto-fallback — when no physical lightning sensor is manually mapped, the coordinator now auto-discovers Blitzortung integration entities at startup and uses them as a fallback. If Blitzortung is installed, no manual mapping is needed.
+- Synced `strings.json` with `translations/en.json` (forecast provider description had diverged after the v2.0.5 update).
+
+## [2.0.5] - 2026-06-10
+
+### Fixed
+
+- **#58**: Missing MDI icons on several sensors — all `WSSensorDescription` entries now include an explicit `icon` field.
+- **#59**: Dew point and frost point were returning identical values at sub-zero temperatures — frost point now correctly applies Buck (1981) ice-phase saturation constants below 0 °C.
+- **#60**: Decimal precision standardised to 2 places across all derived sensors.
+- **#56**: Options flow UI simplified — condensed multi-step settings and improved back-navigation flow.
+
 ## [2.0.4] - 2026-06-10
 
 ### Added

@@ -19,6 +19,12 @@ Weather Station Core reads raw sensor data from your existing weather station - 
 
 ---
 
+## What's New in 2.0.6
+
+- **HA weather entity forecast provider** — use any existing `weather.*` entity in Home Assistant as your forecast source. No extra API, no external calls. Select it in Configure → Forecast and pick an entity. Great for users already running Met.no, OpenWeatherMap, or any other HA weather integration.
+- **Multi-room indoor delta sensors** — map any number of indoor temperature sensors (one per room) in Configure → Indoor. Each room gets its own `sensor.ws_indoor_room_delta_<room>` diagnostic showing the delta vs outdoor temperature.
+- **Blitzortung lightning auto-fallback** — if Blitzortung is installed but no physical lightning sensor is manually mapped, the integration now discovers Blitzortung entities automatically. Zero config needed.
+
 ## What's New in 2.0
 
 Version 2.0 is the largest release to date. Highlights (all opt-in via the
@@ -31,8 +37,8 @@ Features step):
   **FFWI** (US/global) join the existing Canadian FWI.
 - **Lightning detection** — count, distance, strike rate, clearance timer, and
   proximity alerts from WH57 / AS3935 / Blitzortung sensors.
-- **Indoor sensors** — temperature, humidity, CO₂ with indoor/outdoor deltas
-  and a comfort score.
+- **Indoor sensors** — temperature, humidity, CO₂ with indoor/outdoor deltas,
+  a comfort score, and per-room temperature delta sensors (v2.0.6).
 - **Degree days & agro** — HDD/CDD/GDD, leaf wetness, irrigation water deficit,
   daily solar irradiation (Wh/m²), net radiation.
 - **Seven new upload networks** — Weathercloud, PWSWeather, WOW, AWEKAS, CWOP,
@@ -79,7 +85,7 @@ See the [CHANGELOG](CHANGELOG.md) for full details.
 - **Thunderstorm risk index** - surface-based heuristic proxy (T-Td gap, pressure fall rate, wind acceleration)
 - **Streak counters** - consecutive dry days, heat days, and frost days
 - **Full Canadian FWI system** - FFMC, DMC, DC, ISI, BUI, FWI, DSR with persistent daily moisture memory (Van Wagner 1987)
-- **Pluggable forecast provider** - choose Open-Meteo (default, free), Met.no (free), NWS/NOAA (free, US only), OpenWeatherMap (API key), or Pirate Weather (API key) from the Configure menu; swappable without reinstalling
+- **Pluggable forecast provider** - choose Open-Meteo (default, free), Met.no (free), NWS/NOAA (free, US only), OpenWeatherMap (API key), Pirate Weather (API key), Météo France (API key), or **any existing HA `weather.*` entity** from the Configure menu; swappable without reinstalling
 - **Air Quality Index** via Open-Meteo (free, no API key) - PM2.5, PM10, NO₂, ozone exposed as standalone sensors
 - **Pollen levels** (grass, tree, weed) via Open-Meteo (free, no API key)
 - **Moon phase & illumination** - calculated astronomically, no API key required
@@ -386,7 +392,7 @@ Created automatically — no toggle required.
 
 ### Optional: Lightning Detection (`enable_lightning`)
 
-Map a cumulative strike-count sensor (and optional nearest-distance) from a WH57, AS3935, or Blitzortung device.
+Map a cumulative strike-count sensor (and optional nearest-distance) from a WH57, AS3935, or Blitzortung device. If Blitzortung is installed but no sensors are manually mapped, the integration auto-discovers Blitzortung entities and uses them as a fallback — no configuration needed.
 
 | Entity | Unit | Description |
 |---|---|---|
@@ -403,6 +409,7 @@ Map a cumulative strike-count sensor (and optional nearest-distance) from a WH57
 | `sensor.ws_indoor_temperature` / `_humidity` / `_co2` | Indoor readings |
 | `sensor.ws_indoor_temp_delta` / `_humidity_delta` | Indoor/outdoor differentials |
 | `sensor.ws_indoor_comfort` | 0–100 composite comfort score |
+| `sensor.ws_indoor_room_delta_<room>` | Per-room temperature delta vs outdoor (one sensor per room configured in Configure → Indoor). `indoor_temp_c` and `source_entity` in attributes. |
 
 ### Optional: Degree Days & Leaf Wetness (`enable_degree_days`)
 
@@ -1080,6 +1087,7 @@ Offsets are applied after unit conversion, before all derived calculations (dew 
 | **OpenWeatherMap** | ✅* | ✅ | One Call 3.0 API; free tier requires registration |
 | **Pirate Weather** | ✅* | ✅ | Dark Sky-compatible API; free tier available |
 | **Météo France** | ✅* | ✅ | Météo Concept API; free tier available at api.meteo-concept.com |
+| **Home Assistant weather entity** | ✅ | ❌ | Uses any existing `weather.*` entity already in HA. No external calls. Configure → Forecast → select provider → pick entity. |
 
 Existing installs default to Open-Meteo automatically when upgrading - no action needed.
 
