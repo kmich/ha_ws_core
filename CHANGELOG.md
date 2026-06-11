@@ -2,6 +2,14 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.0.7] - 2026-06-11
+
+### Fixed
+
+- **#70**: "Unknown error occurred" when editing source sensors via Configure — the options flow called `_validate_numeric_sensor`, which only existed on the config-flow class, raising `AttributeError`. The sensor validator is now a shared module-level helper used by both flows.
+- **#71**: "Entity is neither a valid entity ID nor a valid UUID" blocking the whole options dialog — the inline HA weather-entity field carried an empty-string default that fails the weather `EntitySelector`. It now uses a suggested value and is simply omitted when left blank.
+- **#72** (thanks @miczu71): Weather Underground credentials could never be saved (and so no uploads were ever sent) because the validator checked the read API (`api.weather.com`), which needs a separate 32-character read key. It now validates the **station key (password)** against the same PWS upload endpoint the uploader actually uses. The Weather Underground field is relabelled "Station key (password)" to match `wunderground.com/member/devices`.
+
 ## [2.0.6] - 2026-06-11
 
 ### Added
