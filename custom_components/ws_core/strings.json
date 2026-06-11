@@ -71,7 +71,7 @@
           "_go_back": "← Go back to previous step"
         },
         "data_description": {
-          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key."
+          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key. 'Home Assistant weather entity' uses an existing weather.* entity - no extra API calls."
         }
       },
       "forecast_entity": {
