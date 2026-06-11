@@ -141,6 +141,7 @@ from .const import (
     # v0.5.0 new
     CONF_ENABLE_FOG,
     CONF_ENABLE_INDOOR,
+    CONF_INDOOR_ROOMS,
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
@@ -159,6 +160,8 @@ from .const import (
     CONF_ENABLE_WUNDERGROUND,
     CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
+    CONF_FORECAST_ENTITY,
+    FORECAST_PROVIDER_HA_ENTITY,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
@@ -349,6 +352,7 @@ from .const import (
     KEY_INDOOR_COMFORT,
     KEY_INDOOR_HUMIDITY,
     KEY_INDOOR_HUMIDITY_DELTA,
+    KEY_INDOOR_ROOMS_DATA,
     KEY_INDOOR_TEMP_C,
     KEY_INDOOR_TEMP_DELTA,
     KEY_IRRIGATION_DEFICIT,
@@ -680,6 +684,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Previous indoor readings for stuck-value detection
         self._indoor_temp_prev: float | None = None
         self._indoor_hum_prev: float | None = None
+        # Per-room temperature sensors for multi-room delta support
+        self._indoor_room_temps: list[str] = list(_get(CONF_INDOOR_ROOMS, []) or [])
 
         # v2.0: lightning sensor integration
         self.lightning_enabled = bool(_get(CONF_ENABLE_LIGHTNING, DEFAULT_ENABLE_LIGHTNING))
@@ -688,6 +694,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._lightning_count_history_1h: deque = deque()
         self._lightning_last_count: float | None = None
         self._lightning_last_strike_ts: Any = None  # timestamp of last detected increase
+        # Entities from the Blitzortung HA integration, used as fallback when no physical sensor is mapped
+        self._blitzortung_sources: dict[str, str] = {}
+        if self.lightning_enabled:
+            self._discover_blitzortung()
 
         # v2.0: degree days restored with improved implementation
         self.degree_days_enabled = bool(_get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS))
@@ -919,6 +929,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """API key for forecast providers that require one."""
         opts = {**self.config_entry.data, **self.config_entry.options}
         return opts.get(CONF_FORECAST_API_KEY) or None
+
+    @property
+    def forecast_entity(self) -> str | None:
+        """Entity ID of the HA weather.* entity used as forecast provider."""
+        opts = {**self.config_entry.data, **self.config_entry.options}
+        return opts.get(CONF_FORECAST_ENTITY) or None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -2112,6 +2128,23 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 score -= 10
         data[KEY_INDOOR_COMFORT] = max(0, min(100, score))
 
+        # Per-room temperature deltas (multi-room support, v2.0.5)
+        if self._indoor_room_temps:
+            outdoor_tc = data.get(KEY_NORM_TEMP_C)
+            rooms: dict[str, dict] = {}
+            for eid in self._indoor_room_temps:
+                val = self._num(self.hass, eid)
+                if val is None:
+                    continue
+                unit = self._uom(self.hass, eid)
+                tc = round(self._to_celsius(float(val), unit), 2)
+                room_data: dict[str, Any] = {"temp_c": tc}
+                if outdoor_tc is not None:
+                    room_data["delta_c"] = round(tc - float(outdoor_tc), 2)
+                rooms[eid] = room_data
+            if rooms:
+                data[KEY_INDOOR_ROOMS_DATA] = rooms
+
     async def _async_fetch_neighbor_qc(self) -> None:
         """Fetch Open-Meteo current weather as a spatial QC reference.  (v2.0)
 
@@ -2253,13 +2286,45 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             score -= 10
         data[KEY_DATA_QUALITY_SCORE] = max(0, min(100, score))
 
+    def _discover_blitzortung(self) -> None:
+        """Scan the entity registry for Blitzortung integration entities.
+
+        Used as an automatic fallback source for lightning count and distance
+        when no physical sensor is mapped by the user.
+        """
+        from homeassistant.helpers import entity_registry as er  # local import to avoid circular
+
+        registry = er.async_get(self.hass)
+        for entry in registry.entities.values():
+            if entry.platform != "blitzortung":
+                continue
+            eid = entry.entity_id
+            uid = (entry.unique_id or "").lower()
+            if SRC_LIGHTNING_COUNT not in self._blitzortung_sources and (
+                "counter" in uid or "count" in uid or "counter" in eid
+            ):
+                self._blitzortung_sources[SRC_LIGHTNING_COUNT] = eid
+                _LOGGER.debug("Blitzortung lightning counter auto-detected: %s", eid)
+            if SRC_LIGHTNING_DISTANCE not in self._blitzortung_sources and (
+                "distance" in uid or "distance" in eid
+            ):
+                self._blitzortung_sources[SRC_LIGHTNING_DISTANCE] = eid
+                _LOGGER.debug("Blitzortung lightning distance auto-detected: %s", eid)
+
     def _compute_lightning(self, data: dict, now: Any) -> None:
         """Derive lightning sensors from optional strike count + distance inputs.  (v2.0)"""
         if not self.lightning_enabled:
             return
 
-        count_raw = self._num(self.hass, self.sources.get(SRC_LIGHTNING_COUNT))
-        dist_raw = self._num(self.hass, self.sources.get(SRC_LIGHTNING_DISTANCE))
+        # Use physical sensor if mapped; fall back to auto-detected Blitzortung entity
+        count_raw = self._num(
+            self.hass,
+            self.sources.get(SRC_LIGHTNING_COUNT) or self._blitzortung_sources.get(SRC_LIGHTNING_COUNT),
+        )
+        dist_raw = self._num(
+            self.hass,
+            self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE),
+        )
 
         # Strike distance passthrough
         if dist_raw is not None:
@@ -3471,9 +3536,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         lon = self.forecast_lon or float(self.hass.config.longitude)
 
         session = async_get_clientsession(self.hass)
-        provider = get_provider(self.forecast_provider)
+        is_ha_entity = self.forecast_provider == FORECAST_PROVIDER_HA_ENTITY
+        provider = get_provider(self.forecast_provider, hass=self.hass if is_ha_entity else None)
+        api_key = self.forecast_entity if is_ha_entity else self.forecast_api_key
         try:
-            result = await provider.async_fetch(session, lat, lon, api_key=self.forecast_api_key)
+            result = await provider.async_fetch(session, lat, lon, api_key=api_key)
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("Forecast fetch failed (%s): %s", provider.PROVIDER_NAME, exc)
             rt.forecast_consecutive_failures += 1

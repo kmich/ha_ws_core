@@ -28,8 +28,11 @@ FORECAST_PROVIDER_NWS = "nws_noaa"
 FORECAST_PROVIDER_OWM = "openweathermap"
 FORECAST_PROVIDER_PIRATE = "pirate_weather"
 FORECAST_PROVIDER_METEO_FRANCE = "meteo_france"
+FORECAST_PROVIDER_HA_ENTITY = "ha_weather_entity"
 PROVIDERS_REQUIRING_API_KEY: set[str] = {"openweathermap", "pirate_weather", "meteo_france"}
+PROVIDERS_REQUIRING_ENTITY: set[str] = {"ha_weather_entity"}
 DEFAULT_FORECAST_PROVIDER = FORECAST_PROVIDER_OPEN_METEO
+CONF_FORECAST_ENTITY = "forecast_entity"  # entity_id of the HA weather.* entity used as provider
 
 # Alert & heuristic options (stored in canonical metric units internally)
 CONF_THRESH_WIND_GUST_MS = "thresh_wind_gust_ms"
@@ -720,6 +723,10 @@ KEY_INDOOR_CO2_PPM = "indoor_co2_ppm"
 KEY_INDOOR_TEMP_DELTA = "indoor_temp_delta_c"
 KEY_INDOOR_HUMIDITY_DELTA = "indoor_humidity_delta_pct"
 KEY_INDOOR_COMFORT = "indoor_comfort"  # composite score
+
+# Multiple indoor rooms: each entry is a temp sensor entity_id; one delta sensor is created per room
+CONF_INDOOR_ROOMS = "indoor_rooms"
+KEY_INDOOR_ROOMS_DATA = "indoor_rooms_data"  # dict[entity_id, {"temp_c": float, "delta_c": float}]
 
 # ---------------------------------------------------------------------------
 # v2.0 - Data quality expansion

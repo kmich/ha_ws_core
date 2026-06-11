@@ -54,6 +54,7 @@ from .const import (
     CONF_ENABLE_FWI_COMPONENTS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
+    CONF_INDOOR_ROOMS,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
     CONF_ENABLE_NOWCAST,
@@ -72,10 +73,13 @@ from .const import (
     CONF_ENABLE_ZAMBRETTI,
     CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
+    CONF_FORECAST_ENTITY,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
     CONF_FORECAST_PROVIDER,
+    FORECAST_PROVIDER_HA_ENTITY,
+    PROVIDERS_REQUIRING_ENTITY,
     CONF_HEMISPHERE,
     CONF_MQTT_DISCOVERY_PREFIX,
     CONF_MQTT_INTERVAL_MIN,
@@ -720,6 +724,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data.update(user_input)
             if user_input.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
                 return await self.async_step_forecast_api_key()
+            if user_input.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_ENTITY:
+                return await self.async_step_forecast_entity()
             return await self.async_step_features()
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
@@ -750,6 +756,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 FORECAST_PROVIDER_OWM,
                                 FORECAST_PROVIDER_PIRATE,
                                 FORECAST_PROVIDER_METEO_FRANCE,
+                                FORECAST_PROVIDER_HA_ENTITY,
                             ],
                             mode=selector.SelectSelectorMode.LIST,
                             translation_key="forecast_provider",
@@ -761,7 +768,35 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 6b: API key for providers that require one
+    # Step 6b: HA weather entity selector (ha_weather_entity provider)
+    # ------------------------------------------------------------------
+    async def async_step_forecast_entity(self, user_input: dict[str, Any] | None = None):
+        """Step: select the HA weather.* entity to use as forecast provider."""
+        if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
+            self._data[CONF_FORECAST_ENTITY] = user_input.get(CONF_FORECAST_ENTITY, "")
+            return await self.async_step_features()
+
+        return self._show_step(
+            step_id="forecast_entity",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_FORECAST_ENTITY,
+                        default=self._data.get(CONF_FORECAST_ENTITY, ""),
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="weather")
+                    ),
+                    vol.Optional("_go_back", default=False): selector.BooleanSelector(),
+                }
+            ),
+            last_step=False,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 6c: API key for providers that require one
     # ------------------------------------------------------------------
     async def async_step_forecast_api_key(self, user_input: dict[str, Any] | None = None):
         """Step: API key for forecast providers that require one."""
@@ -1899,10 +1934,16 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                             FORECAST_PROVIDER_OWM,
                             FORECAST_PROVIDER_PIRATE,
                             FORECAST_PROVIDER_METEO_FRANCE,
+                            FORECAST_PROVIDER_HA_ENTITY,
                         ],
                         mode=selector.SelectSelectorMode.LIST,
                         translation_key="forecast_provider",
                     )
+                ),
+                vol.Optional(
+                    CONF_FORECAST_ENTITY, default=g(CONF_FORECAST_ENTITY, "")
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="weather")
                 ),
                 vol.Optional(
                     CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, imperial), 1)
@@ -1978,6 +2019,8 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_solar_forecast_opt()
             if user_input.get(CONF_ENABLE_VIGICRUES):
                 return await self.async_step_vigicrues_station_opt()
+            if user_input.get(CONF_ENABLE_INDOOR):
+                return await self.async_step_indoor_rooms_opt()
             return await self.async_step_upload_services_opt()
 
         return self.async_show_form(
@@ -2052,6 +2095,27 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_INDOOR, default=g(CONF_ENABLE_INDOOR, DEFAULT_ENABLE_INDOOR)
                     ): selector.BooleanSelector(),
+                }
+            ),
+            last_step=False,
+        )
+
+    async def async_step_indoor_rooms_opt(self, user_input: dict[str, Any] | None = None):
+        """Select additional indoor temperature sensors for per-room delta sensors."""
+        g = self._get
+        if user_input is not None:
+            rooms = user_input.get(CONF_INDOOR_ROOMS) or []
+            self._opt[CONF_INDOOR_ROOMS] = list(rooms)
+            return await self.async_step_upload_services_opt()
+
+        current = list(g(CONF_INDOOR_ROOMS, []) or [])
+        return self.async_show_form(
+            step_id="indoor_rooms_opt",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_INDOOR_ROOMS, default=current): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor", multiple=True)
+                    ),
                 }
             ),
             last_step=False,

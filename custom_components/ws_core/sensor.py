@@ -35,6 +35,7 @@ from .const import (
     CONF_ENABLE_FWI_COMPONENTS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
+    CONF_INDOOR_ROOMS,
     # v0.8.0
     CONF_ENABLE_MOON,
     # v1.7.0
@@ -125,6 +126,7 @@ from .const import (
     KEY_INDOOR_COMFORT,
     KEY_INDOOR_HUMIDITY,
     KEY_INDOOR_HUMIDITY_DELTA,
+    KEY_INDOOR_ROOMS_DATA,
     KEY_INDOOR_TEMP_C,
     KEY_INDOOR_TEMP_DELTA,
     KEY_IRRIGATION_DEFICIT,
@@ -2185,6 +2187,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         filtered.append(desc)
 
     entities: list[SensorEntity] = [WSSensor(coordinator, entry, desc, prefix) for desc in filtered]
+
+    # v2.0.5: dynamic per-room indoor temperature delta sensors
+    if opts.get(CONF_ENABLE_INDOOR, False):
+        room_temps: list[str] = list(opts.get(CONF_INDOOR_ROOMS) or [])
+        for eid in room_temps:
+            slug = eid.split(".", 1)[-1] if "." in eid else eid
+            state = hass.states.get(eid)
+            friendly = (state.attributes.get("friendly_name") if state else None) or slug.replace("_", " ").title()
+            desc = WSSensorDescription(
+                key=f"indoor_room_delta_{slug}",
+                name=f"Temp Delta - {friendly}",
+                icon="mdi:thermometer-lines",
+                device_class=SensorDeviceClass.TEMPERATURE,
+                native_unit=UNIT_TEMP_C,
+                state_class=SensorStateClass.MEASUREMENT,
+                entity_category=EntityCategory.DIAGNOSTIC,
+                value_fn=lambda d, _eid=eid: (d.get(KEY_INDOOR_ROOMS_DATA) or {}).get(_eid, {}).get("delta_c"),
+                attrs_fn=lambda d, _eid=eid: {
+                    "indoor_temp_c": (d.get(KEY_INDOOR_ROOMS_DATA) or {}).get(_eid, {}).get("temp_c"),
+                    "source_entity": _eid,
+                },
+            )
+            entities.append(WSSensor(coordinator, entry, desc, prefix))
 
     # v1.9.0: dynamic Vigicrues river sensors — one per configured station
     if opts.get(CONF_ENABLE_VIGICRUES, False):

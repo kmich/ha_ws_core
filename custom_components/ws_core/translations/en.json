@@ -71,7 +71,18 @@
           "_go_back": "← Go back to previous step"
         },
         "data_description": {
-          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key."
+          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key. 'Home Assistant weather entity' uses an existing weather.* entity - no extra API calls."
+        }
+      },
+      "forecast_entity": {
+        "title": "Home Assistant Weather Entity",
+        "description": "Select the Home Assistant weather entity to use as the forecast provider. No external API calls will be made.",
+        "data": {
+          "forecast_entity": "Weather entity",
+          "_go_back": "← Go back to previous step"
+        },
+        "data_description": {
+          "forecast_entity": "Choose any weather.* entity already set up in Home Assistant (e.g. weather.home, weather.forecast_home)."
         }
       },
       "forecast_api_key": {
@@ -302,6 +313,7 @@
           "forecast_lon": "Forecast longitude",
           "forecast_provider": "Forecast provider",
           "forecast_api_key": "Forecast API Key",
+          "forecast_entity": "HA weather entity (for Home Assistant provider)",
           "thresh_wind_gust_ms": "Wind gust alert threshold",
           "thresh_rain_rate_mmph": "Rain rate alert threshold",
           "thresh_freeze_c": "Freeze warning threshold",
@@ -333,8 +345,9 @@
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
           "forecast_lon": "Forecast longitude",
-          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key.",
+          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key. 'Home Assistant weather entity' uses an existing weather.* entity - no extra API calls.",
           "forecast_api_key": "API key for the selected forecast provider (required for OpenWeatherMap, Pirate Weather, and Météo France).",
+          "forecast_entity": "Required when 'Home Assistant weather entity' is selected. Choose any weather.* entity already set up in Home Assistant.",
           "thresh_wind_gust_ms": "Wind gust alert threshold",
           "thresh_rain_rate_mmph": "Rain rate alert threshold",
           "thresh_freeze_c": "Freeze warning threshold",
@@ -436,6 +449,16 @@
           "enable_fwi_components": "FWI intermediate codes (FFMC/DMC/DC/ISI/BUI). Requires Fire Risk enabled to produce data",
           "enable_advanced_sensors": "Zambretti number (numeric form), hourly ET₀, smoothed wind direction",
           "enable_nowcast": "Open-Meteo 15-minute precipitation nowcast: minutes until rain starts/stops, next-hour total, intensity. No API key"
+        }
+      },
+      "indoor_rooms_opt": {
+        "title": "Indoor Room Sensors",
+        "description": "Select one temperature sensor per room to get a dedicated indoor/outdoor temperature delta sensor for each room.",
+        "data": {
+          "indoor_rooms": "Room temperature sensors"
+        },
+        "data_description": {
+          "indoor_rooms": "Each selected sensor creates a separate delta sensor (e.g. WS Temp Delta - Bedroom). Leave empty to use only the single indoor sensor from the previous step."
         }
       },
       "upload_services_opt": {
@@ -2283,7 +2306,8 @@
         "nws_noaa": "NWS/NOAA (free, no key, US only)",
         "openweathermap": "OpenWeatherMap (free tier, API key)",
         "pirate_weather": "Pirate Weather (free tier, API key)",
-        "meteo_france": "Météo France (free tier, API key)"
+        "meteo_france": "Météo France (free tier, API key)",
+        "ha_weather_entity": "Home Assistant weather entity (no API calls)"
       }
     }
   }
