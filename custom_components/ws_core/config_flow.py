@@ -54,7 +54,6 @@ from .const import (
     CONF_ENABLE_FWI_COMPONENTS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
-    CONF_INDOOR_ROOMS,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
     CONF_ENABLE_NOWCAST,
@@ -78,9 +77,8 @@ from .const import (
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
     CONF_FORECAST_PROVIDER,
-    FORECAST_PROVIDER_HA_ENTITY,
-    PROVIDERS_REQUIRING_ENTITY,
     CONF_HEMISPHERE,
+    CONF_INDOOR_ROOMS,
     CONF_MQTT_DISCOVERY_PREFIX,
     CONF_MQTT_INTERVAL_MIN,
     CONF_MQTT_STATE_PREFIX,
@@ -193,6 +191,7 @@ from .const import (
     DEFAULT_WOW_INTERVAL_MIN,
     DEFAULT_WU_INTERVAL_MIN,
     DOMAIN,
+    FORECAST_PROVIDER_HA_ENTITY,
     FORECAST_PROVIDER_MET_NO,
     FORECAST_PROVIDER_METEO_FRANCE,
     FORECAST_PROVIDER_NWS,
@@ -202,6 +201,7 @@ from .const import (
     HEMISPHERE_OPTIONS,
     OPTIONAL_SOURCES,
     PROVIDERS_REQUIRING_API_KEY,
+    PROVIDERS_REQUIRING_ENTITY,
     REQUIRED_SOURCES,
     SRC_BATTERY,
     SRC_DEW_POINT,
@@ -786,9 +786,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(
                         CONF_FORECAST_ENTITY,
                         default=self._data.get(CONF_FORECAST_ENTITY, ""),
-                    ): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="weather")
-                    ),
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="weather")),
                     vol.Optional("_go_back", default=False): selector.BooleanSelector(),
                 }
             ),
@@ -1940,9 +1938,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         translation_key="forecast_provider",
                     )
                 ),
-                vol.Optional(
-                    CONF_FORECAST_ENTITY, default=g(CONF_FORECAST_ENTITY, "")
-                ): selector.EntitySelector(
+                vol.Optional(CONF_FORECAST_ENTITY, default=g(CONF_FORECAST_ENTITY, "")): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="weather")
                 ),
                 vol.Optional(

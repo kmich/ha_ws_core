@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -108,7 +108,7 @@ class HaWeatherEntityProvider(ForecastProvider):
             return None
         try:
             dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-            return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M")
+            return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M")
         except (ValueError, AttributeError):
             return dt_str[:16] if dt_str else None
 
@@ -117,38 +117,50 @@ class HaWeatherEntityProvider(ForecastProvider):
         for entry in raw[:7]:
             dt_str = entry.get("datetime") or entry.get("date") or ""
             date = dt_str[:10] if dt_str else ""
-            out.append({
-                "date": date,
-                "tmax_c": entry.get("temperature") or entry.get("native_temperature"),
-                "tmin_c": entry.get("templow") or entry.get("native_templow"),
-                "precip_mm": entry.get("precipitation") or entry.get("native_precipitation"),
-                "wind_kmh": entry.get("wind_speed") or entry.get("native_wind_speed"),
-                "gust_kmh": entry.get("wind_gust_speed") or entry.get("native_wind_gust_speed"),
-                "weathercode": self._condition_to_wmo(entry.get("condition")),
-                "precip_prob": entry.get("precipitation_probability"),
-            })
+            out.append(
+                {
+                    "date": date,
+                    "tmax_c": entry.get("temperature") or entry.get("native_temperature"),
+                    "tmin_c": entry.get("templow") or entry.get("native_templow"),
+                    "precip_mm": entry.get("precipitation") or entry.get("native_precipitation"),
+                    "wind_kmh": entry.get("wind_speed") or entry.get("native_wind_speed"),
+                    "gust_kmh": entry.get("wind_gust_speed") or entry.get("native_wind_gust_speed"),
+                    "weathercode": self._condition_to_wmo(entry.get("condition")),
+                    "precip_prob": entry.get("precipitation_probability"),
+                }
+            )
         # Pad to 7 days with None entries if fewer returned
         while len(out) < 7:
-            out.append({
-                "date": "", "tmax_c": None, "tmin_c": None, "precip_mm": None,
-                "wind_kmh": None, "gust_kmh": None, "weathercode": None, "precip_prob": None,
-            })
+            out.append(
+                {
+                    "date": "",
+                    "tmax_c": None,
+                    "tmin_c": None,
+                    "precip_mm": None,
+                    "wind_kmh": None,
+                    "gust_kmh": None,
+                    "weathercode": None,
+                    "precip_prob": None,
+                }
+            )
         return out
 
     def _normalise_hourly(self, raw: list[dict]) -> list[dict]:
         out: list[dict] = []
         for entry in raw[:24]:
-            out.append({
-                "datetime": self._parse_dt(entry.get("datetime")) or "",
-                "temp_c": entry.get("temperature") or entry.get("native_temperature"),
-                "apparent_temp_c": entry.get("apparent_temperature") or entry.get("native_apparent_temperature"),
-                "dewpoint_c": entry.get("dew_point") or entry.get("native_dew_point"),
-                "precip_prob": entry.get("precipitation_probability"),
-                "precip_mm": entry.get("precipitation") or entry.get("native_precipitation"),
-                "weathercode": self._condition_to_wmo(entry.get("condition")),
-                "wind_kmh": entry.get("wind_speed") or entry.get("native_wind_speed"),
-                "gust_kmh": entry.get("wind_gust_speed") or entry.get("native_wind_gust_speed"),
-                "humidity": entry.get("humidity"),
-                "cloud_cover": entry.get("cloud_coverage"),
-            })
+            out.append(
+                {
+                    "datetime": self._parse_dt(entry.get("datetime")) or "",
+                    "temp_c": entry.get("temperature") or entry.get("native_temperature"),
+                    "apparent_temp_c": entry.get("apparent_temperature") or entry.get("native_apparent_temperature"),
+                    "dewpoint_c": entry.get("dew_point") or entry.get("native_dew_point"),
+                    "precip_prob": entry.get("precipitation_probability"),
+                    "precip_mm": entry.get("precipitation") or entry.get("native_precipitation"),
+                    "weathercode": self._condition_to_wmo(entry.get("condition")),
+                    "wind_kmh": entry.get("wind_speed") or entry.get("native_wind_speed"),
+                    "gust_kmh": entry.get("wind_gust_speed") or entry.get("native_wind_gust_speed"),
+                    "humidity": entry.get("humidity"),
+                    "cloud_cover": entry.get("cloud_coverage"),
+                }
+            )
         return out

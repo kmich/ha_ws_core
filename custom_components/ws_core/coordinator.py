@@ -141,7 +141,6 @@ from .const import (
     # v0.5.0 new
     CONF_ENABLE_FOG,
     CONF_ENABLE_INDOOR,
-    CONF_INDOOR_ROOMS,
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
@@ -161,7 +160,6 @@ from .const import (
     CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_ENTITY,
-    FORECAST_PROVIDER_HA_ENTITY,
     CONF_FORECAST_INTERVAL_MIN,
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
@@ -170,6 +168,7 @@ from .const import (
     CONF_GDD_CAP_C_V2,
     CONF_HDD_BASE_C,
     CONF_HEMISPHERE,
+    CONF_INDOOR_ROOMS,
     CONF_LIGHTNING_PROXIMITY_KM,
     CONF_MQTT_DISCOVERY_PREFIX,
     CONF_MQTT_INTERVAL_MIN,
@@ -287,6 +286,7 @@ from .const import (
     FORECAST_AGREEMENT_CONFLICT_PP,
     FORECAST_MAX_RETRY_S,
     FORECAST_MIN_RETRY_S,
+    FORECAST_PROVIDER_HA_ENTITY,
     # v1.5.0
     KEY_ABSOLUTE_HUMIDITY,
     KEY_AIR_DENSITY,
@@ -2305,9 +2305,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ):
                 self._blitzortung_sources[SRC_LIGHTNING_COUNT] = eid
                 _LOGGER.debug("Blitzortung lightning counter auto-detected: %s", eid)
-            if SRC_LIGHTNING_DISTANCE not in self._blitzortung_sources and (
-                "distance" in uid or "distance" in eid
-            ):
+            if SRC_LIGHTNING_DISTANCE not in self._blitzortung_sources and ("distance" in uid or "distance" in eid):
                 self._blitzortung_sources[SRC_LIGHTNING_DISTANCE] = eid
                 _LOGGER.debug("Blitzortung lightning distance auto-detected: %s", eid)
 
