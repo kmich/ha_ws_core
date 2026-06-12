@@ -2,6 +2,14 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.0.8] - 2026-06-13
+
+### Fixed
+
+- **#77**: Binary sensor translations were ignored for all eight diagnostic problem sensors (`temperature_stuck`, `humidity_stuck`, `pressure_stuck`, etc.) — the entity set a hardcoded English `_attr_name` and never set `_attr_translation_key`, so HA always displayed English regardless of system language. All problem sensors now use `_attr_translation_key` and respect every supported locale.
+- **#75**: Lightning nearest distance showed "Entity not found" when using Blitzortung as the source — the auto-discovery ran once at coordinator `__init__` time, before Blitzortung had registered its entities. Discovery now retries on every update tick until both count and distance sources are found.
+- **#74** (thanks @miczu71): All 15 periodic upload and fetch schedulers (Weather Underground, Weathercloud, PWSWeather, WOW, AWEKAS, OpenWeatherMap Stations, Windy, CWOP, MQTT, AQI, Solar forecast, Météo Vigilance, Vigicrues, Precipitation nowcast, Spatial neighbor QC) were silently failing on HA 2025+ — `async_track_time_interval` fires from a thread outside the event loop, making `hass.async_create_task()` raise `RuntimeError`. Replaced all 15 with `asyncio.sleep` loops running inside `hass.async_create_background_task`.
+
 ## [2.0.7] - 2026-06-11
 
 ### Fixed
