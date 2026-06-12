@@ -1,0 +1,81 @@
+site_name: Weather Station Core
+site_description: >
+  Turn any personal weather station into a complete weather intelligence system:
+  forecasting, nowcasting, fire danger, irrigation, lightning, and data quality.
+  150+ sensors for Home Assistant.
+site_url: https://kmich.github.io/ha_ws_core/
+repo_url: https://github.com/kmich/ha_ws_core
+repo_name: kmich/ha_ws_core
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+exclude_docs: |
+  promotion/
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Sensors Reference: sensors.md
+  - Forecast Providers: forecast_providers.md
+  - Dashboards: dashboards.md
+  - Blueprints: blueprints.md
+  - Guides:
+    - Fire Danger: guides/fire_danger.md
+    - Irrigation / ET₀: guides/irrigation.md
+    - Smart Irrigation bridge: guides/smart_irrigation.md
+    - Lightning Detection: guides/lightning.md
+    - Nowcast: guides/nowcast.md
+  - Migrating from Thermal Comfort: migrating_from_thermal_comfort.md
+  - Troubleshooting: troubleshooting.md
+  - Contributing: contributing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/kmich/ha_ws_core
