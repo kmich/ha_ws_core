@@ -11,9 +11,10 @@ Last updated: 2026-06-12
 **Audit findings:**
 - `hacs.json` and `manifest.json` are structurally valid. No blocking issues.
 - Brand assets exist at `custom_components/ws_core/brand/` (icon.png, icon@2x.png,
-  dark_icon.png, dark_icon@2x.png) but are NOT yet registered in `home-assistant/brands`.
-  This is the only blocking item for default-store submission.
-- `hacs.yml` uses `ignore: brands` as a temporary workaround until brands are registered.
+  dark_icon.png, dark_icon@2x.png). Since HA 2026.3, custom integrations serve their
+  own icons directly — no PR to `home-assistant/brands` is needed or accepted. The
+  `@2x` variants were 256×256 instead of the required 512×512; fixed in this engagement.
+- `hacs.yml` `ignore: brands` removed — no longer needed with self-hosted brand assets.
 - `validate.yml` runs hassfest + HACS action + ruff + tests + no-bytecode +
   version-consistency — all required CI is in place.
 - 156 sensor descriptions in sensor.py. All numeric sensors have `state_class` set correctly.
@@ -21,7 +22,6 @@ Last updated: 2026-06-12
 
 **Deliverables committed:**
 - `docs/promotion/hacs_default_submission.md` — pre-submission checklist and exact PR content
-- `docs/promotion/brands_pr/BRANDS_PR.md` — brands PR filing instructions and PR description
 
 ### Phase 2 — Repo front door
 
@@ -80,14 +80,7 @@ All six drafts committed under `docs/promotion/`:
 The following actions require the maintainer's direct involvement. They cannot be
 performed by an automated agent.
 
-**1. Submit brands PR to home-assistant/brands**
-- Timing: immediately — this is the blocking item for everything else
-- Instructions: `docs/promotion/brands_pr/BRANDS_PR.md`
-- What to do: fork `home-assistant/brands`, create `custom_integrations/ws_core/`
-  with the four PNG files from `custom_components/ws_core/brand/`, open PR
-- After PR is merged: remove `ignore: brands` from `.github/workflows/hacs.yml` line 18
-
-**2. Set GitHub topics on the repository**
+**1. Set GitHub topics on the repository**
 - Timing: immediately (no blocking dependency)
 - Instructions: `docs/promotion/hacs_default_submission.md` (topics list)
 - What to do: repository Settings → About gear icon → Topics → add the 13 listed topics
@@ -104,7 +97,7 @@ performed by an automated agent.
   next push to main
 
 **5. Submit to hacs/default**
-- Timing: after brands PR is merged and CI is green without `ignore: brands`
+- Timing: once CI is green on main (verify `validate.yml` passes including the HACS job)
 - Instructions: `docs/promotion/hacs_default_submission.md`
 - What to do: fork `hacs/default`, add entry to `custom_integrations.json`, open PR
 

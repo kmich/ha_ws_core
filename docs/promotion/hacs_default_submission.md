@@ -4,8 +4,7 @@
 
 Complete every item before opening the PR. A failed item is a rejection.
 
-- [ ] **Brands PR merged.** The `ws_core` brand must appear in `home-assistant/brands` under `custom_integrations/ws_core/` before HACS will accept a default-store submission. See `docs/promotion/brands_pr/` for the exact files and PR description.
-- [ ] **`ignore: brands` removed from `.github/workflows/hacs.yml`** (line 18). Only do this after the brands PR is merged; removing it before will break CI.
+- [ ] **Brand assets are correct.** Since HA 2026.3, custom integrations serve their own icons from `custom_components/ws_core/brand/`. Verify the four files exist at correct sizes: `icon.png` (256×256), `icon@2x.png` (512×512), `dark_icon.png` (256×256), `dark_icon@2x.png` (512×512). No PR to `home-assistant/brands` is needed or accepted.
 - [ ] **CI green on `main`.** All six jobs in `validate.yml` must pass: hassfest, hacs, lint, tests, no-bytecode, version-consistency, entity-validator.
 - [ ] **GitHub release exists for the current version.** The release tag must exactly match the `version` field in `manifest.json`. Releases are at https://github.com/kmich/ha_ws_core/releases.
 - [ ] **At least one tagged release is available.** HACS requires the latest release to be downloadable; verify the release ZIP contains `custom_components/ws_core/` at the root.
