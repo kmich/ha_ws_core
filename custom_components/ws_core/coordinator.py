@@ -2314,6 +2314,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not self.lightning_enabled:
             return
 
+        # Retry Blitzortung discovery on every tick until both sources are found;
+        # the initial __init__ call may run before Blitzortung has registered its entities.
+        if len(self._blitzortung_sources) < 2:
+            self._discover_blitzortung()
+
         # Use physical sensor if mapped; fall back to auto-detected Blitzortung entity
         count_raw = self._num(
             self.hass,
