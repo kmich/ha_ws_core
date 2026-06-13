@@ -272,6 +272,8 @@ SRC_LIGHTNING_DISTANCE = "lightning_dist"  # nearest strike distance (km)
 SRC_INDOOR_TEMP = "indoor_temp"
 SRC_INDOOR_HUMIDITY = "indoor_humidity"
 SRC_INDOOR_CO2 = "indoor_co2"
+SRC_SOIL_MOISTURE = "soil_moisture"      # volumetric moisture (%, 0-100 or 0-1)
+SRC_SOIL_TEMP = "soil_temperature"       # soil temperature (°C or unit-detected)
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
 OPTIONAL_SOURCES = [
@@ -285,6 +287,8 @@ OPTIONAL_SOURCES = [
     SRC_INDOOR_TEMP,
     SRC_INDOOR_HUMIDITY,
     SRC_INDOOR_CO2,
+    SRC_SOIL_MOISTURE,
+    SRC_SOIL_TEMP,
 ]
 
 # Only these sources trigger staleness warnings. Excluded: rain_total (static
@@ -448,6 +452,11 @@ KEY_CAL_SUGGESTION_PRESSURE = "cal_suggestion_pressure"
 KEY_FORECAST_SKILL = "forecast_skill"
 KEY_SOLAR_LUX_FACTOR = "solar_lux_factor"
 
+# Data keys - individual forecast Brier scores and blend weight (v2.0)
+KEY_FORECAST_BRIER_LOCAL = "forecast_brier_local"
+KEY_FORECAST_BRIER_API = "forecast_brier_api"
+KEY_FORECAST_BLEND_WEIGHT_LOCAL = "forecast_blend_weight_local"
+
 # Data keys - v1.2.0 New meteorological sensors
 KEY_FOG_PROBABILITY = "fog_probability"
 KEY_THUNDERSTORM_RISK = "thunderstorm_risk"
@@ -466,6 +475,11 @@ KEY_CONSISTENCY_FLAGS = "consistency_flags"
 KEY_CLIMATOLOGY_30D = "climatology_30d"
 KEY_TEMP_ANOMALY_30D = "temp_anomaly_30d"
 KEY_RAIN_ANOMALY_30D = "rain_anomaly_30d"
+
+# Data keys - 90-day seasonal climatology
+KEY_CLIMATOLOGY_90D = "climatology_90d"
+KEY_TEMP_ANOMALY_90D = "temp_anomaly_90d"
+KEY_RAIN_ANOMALY_90D = "rain_anomaly_90d"
 
 # ---------------------------------------------------------------------------
 # v1.3.0 - Canadian FWI (Fire Weather Index) system
@@ -587,6 +601,7 @@ KEY_RAIN_NEXT_60MIN = "rain_next_60min_mm"
 KEY_MINUTES_UNTIL_RAIN = "minutes_until_rain"
 KEY_MINUTES_UNTIL_DRY = "minutes_until_dry"
 KEY_NOWCAST_INTENSITY = "nowcast_intensity"
+KEY_NOWCAST_CONFIDENCE = "nowcast_confidence"  # "high", "medium", "low"
 KEY_RAIN_EXPECTED_1H = "rain_expected_1h"
 
 # ---------------------------------------------------------------------------
@@ -734,6 +749,20 @@ KEY_INDOOR_COMFORT = "indoor_comfort"  # composite score
 # Multiple indoor rooms: each entry is a temp sensor entity_id; one delta sensor is created per room
 CONF_INDOOR_ROOMS = "indoor_rooms"
 KEY_INDOOR_ROOMS_DATA = "indoor_rooms_data"  # dict[entity_id, {"temp_c": float, "delta_c": float}]
+
+# ---------------------------------------------------------------------------
+# v2.1 - Soil sensor group (opt-in)
+# ---------------------------------------------------------------------------
+CONF_ENABLE_SOIL = "enable_soil"
+# SRC_SOIL_MOISTURE / SRC_SOIL_TEMP defined near OPTIONAL_SOURCES above.
+DEFAULT_ENABLE_SOIL = False
+
+# Data keys - v2.1 Soil sensors
+KEY_SOIL_MOISTURE = "soil_moisture_pct"          # normalized to 0-100%
+KEY_SOIL_TEMP_C = "soil_temp_c"                  # °C
+KEY_SOIL_MOISTURE_DEFICIT = "soil_moisture_deficit_pct"  # field capacity(40%) - current
+KEY_IRRIGATION_NEED = "irrigation_need"          # text: "None"/"Low"/"Moderate"/"High"/"Critical"
+KEY_IRRIGATION_NEED_SCORE = "irrigation_need_score"  # 0-100 numeric
 
 # ---------------------------------------------------------------------------
 # v2.0 - Data quality expansion

@@ -37,6 +37,8 @@
           "indoor_temp": "Indoor temperature sensor",
           "indoor_humidity": "Indoor humidity sensor",
           "indoor_co2": "Indoor CO₂ sensor (ppm)",
+          "soil_moisture": "Soil moisture sensor (0-100% or 0-1 volumetric)",
+          "soil_temperature": "Soil temperature sensor",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -134,6 +136,7 @@
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
           "enable_lightning": "Lightning detection (accepts WH57, AS3935, or any lightning count + distance sensor)",
           "enable_indoor": "Indoor sensors (temperature, humidity, CO₂ differential)",
+          "enable_soil": "Soil sensors (moisture, temperature, irrigation need)",
           "enable_weathercloud": "Weathercloud upload",
           "enable_pwsweather": "PWSWeather upload",
           "enable_wow": "WOW (UK Met Office) upload",
@@ -405,7 +408,9 @@
           "lightning_dist": "Lightning nearest distance (km, e.g. from WH57)",
           "indoor_temp": "Indoor temperature sensor",
           "indoor_humidity": "Indoor humidity sensor",
-          "indoor_co2": "Indoor CO₂ sensor (ppm)"
+          "indoor_co2": "Indoor CO₂ sensor (ppm)",
+          "soil_moisture": "Soil moisture sensor (0-100% or 0-1 volumetric)",
+          "soil_temperature": "Soil temperature sensor"
         }
       },
       "features_opt": {
@@ -430,7 +435,8 @@
           "enable_nowcast": "Precipitation nowcast (minutes to rain)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
           "enable_lightning": "Lightning detection sensors",
-          "enable_indoor": "Indoor sensors (temperature, humidity, CO₂)"
+          "enable_indoor": "Indoor sensors (temperature, humidity, CO₂)",
+          "enable_soil": "Soil sensors (moisture, temperature, irrigation need)"
         },
         "data_description": {
           "enable_display_sensors": "Display sensors (levels, trends, health)",
@@ -624,6 +630,10 @@
     "sensor_drift_detected": {
       "title": "Sensor drift detected",
       "description": "Monotonic drift has been detected in the following sensor(s): {sensors}. This may indicate a failing sensor, loose connector, or calibration offset that has grown too large. Check your sensor and consider applying a calibration correction."
+    },
+    "large_calibration_offset": {
+      "title": "Large calibration offset applied",
+      "description": "A calibration offset of {value} was applied to {field}. Large offsets may indicate sensor hardware failure rather than calibration drift. Consider replacing the sensor."
     }
   },
   "entity": {
@@ -887,6 +897,14 @@
           "light": "Light",
           "moderate": "Moderate",
           "heavy": "Heavy"
+        }
+      },
+      "nowcast_confidence": {
+        "name": "Nowcast Confidence",
+        "state": {
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
         }
       },
       "zambretti_forecast": {
@@ -1577,6 +1595,12 @@
           }
         }
       },
+      "temp_anomaly_90d": {
+        "name": "Temperature Anomaly (90-day)"
+      },
+      "rain_anomaly_90d": {
+        "name": "Rain Anomaly (90-day)"
+      },
       "solar_lux_factor": {
         "name": "Solar Lux Factor",
         "state_attributes": {
@@ -1649,6 +1673,15 @@
             "name": "Condition"
           }
         }
+      },
+      "forecast_brier_local": {
+        "name": "Forecast Brier Score (Local)"
+      },
+      "forecast_brier_api": {
+        "name": "Forecast Brier Score (API)"
+      },
+      "forecast_blend_weight_local": {
+        "name": "Forecast Blend Weight (Local)"
       },
       "rain_today": {
         "name": "Rain Today"
@@ -2068,6 +2101,37 @@
           }
         }
       },
+      "soil_moisture": {
+        "name": "Soil Moisture",
+        "state_attributes": {
+          "deficit_pct": {
+            "name": "Moisture deficit (%)"
+          }
+        }
+      },
+      "soil_temperature": {
+        "name": "Soil Temperature"
+      },
+      "soil_moisture_deficit": {
+        "name": "Soil Moisture Deficit"
+      },
+      "irrigation_need": {
+        "name": "Irrigation Need",
+        "state_attributes": {
+          "score": {
+            "name": "Irrigation need score"
+          },
+          "soil_moisture_pct": {
+            "name": "Soil moisture (%)"
+          },
+          "soil_moisture_deficit_pct": {
+            "name": "Soil moisture deficit (%)"
+          }
+        }
+      },
+      "irrigation_need_score": {
+        "name": "Irrigation Need Score"
+      },
       "sensor_stuck": {
         "name": "Sensor Stuck Flags",
         "state_attributes": {
@@ -2225,6 +2289,9 @@
       },
       "ws_enable_indoor": {
         "name": "Feature: Indoor Sensors"
+      },
+      "ws_enable_soil": {
+        "name": "Feature: Soil Sensors"
       },
       "ws_enable_weathercloud": {
         "name": "Feature: Weathercloud Upload"
