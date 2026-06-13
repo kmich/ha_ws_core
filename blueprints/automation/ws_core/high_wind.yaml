@@ -1,0 +1,75 @@
+blueprint:
+  name: "WS Core — High Wind / Gust Alert"
+  description: >
+    Notifies when wind gusts exceed a threshold and optionally retracts
+    covers, awnings, or other wind-sensitive devices.
+    Uses a sustained-condition requirement to avoid false triggers.
+  domain: automation
+  source_url: https://github.com/Aephir/ha_ws_core
+  input:
+    wind_gust_sensor:
+      name: Wind Gust Sensor
+      description: "The ws_core wind gust sensor (e.g. sensor.ws_wind_gust)."
+      selector:
+        entity:
+          domain: sensor
+          device_class: wind_speed
+    gust_threshold:
+      name: Gust Threshold (m/s)
+      description: "Alert fires when gusts exceed this speed. 10 m/s = 36 km/h = Beaufort 5."
+      default: 10.0
+      selector:
+        number:
+          min: 5
+          max: 50
+          step: 0.5
+          unit_of_measurement: "m/s"
+    sustained_minutes:
+      name: Sustained Duration (minutes)
+      description: "Gusts must exceed threshold for this many minutes before triggering."
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 15
+          step: 1
+    notify_target:
+      name: Notification Target
+      default: notify.notify
+      selector:
+        text:
+    cover_targets:
+      name: Covers/Awnings to Retract (optional)
+      description: "Cover entities to close when high wind is detected."
+      default: {}
+      selector:
+        target:
+          entity:
+            domain: cover
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input wind_gust_sensor
+    above: !input gust_threshold
+    for:
+      minutes: !input sustained_minutes
+
+condition: []
+
+action:
+  - service: !input notify_target
+    data:
+      title: "💨 High Wind Alert"
+      message: >
+        Wind gust of {{ states(trigger.entity_id) | round(1) }} m/s
+        ({{ (states(trigger.entity_id) | float * 3.6) | round(0) }} km/h) detected —
+        above your {{ gust_threshold }} m/s threshold.
+  - if:
+      - condition: template
+        value_template: "{{ cover_targets != {} }}"
+    then:
+      - service: cover.close_cover
+        target: !input cover_targets
+
+mode: single
+max_exceeded: silent

@@ -116,6 +116,8 @@ from .algorithms import (
     zambretti_forecast,
 )
 from .const import (
+    ALERT_DEBOUNCE_OFF_TICKS,
+    ALERT_DEBOUNCE_ON_TICKS,
     CONF_AQI_INTERVAL_MIN,
     CONF_AWEKAS_INTERVAL_MIN,
     CONF_AWEKAS_PASSWORD,
@@ -413,6 +415,7 @@ from .const import (
     KEY_RAIN_THIS_WEEK_MM,
     KEY_RAIN_THIS_YEAR_MM,
     KEY_RAIN_TODAY_MM,
+    KEY_CONDITIONS_SUMMARY,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_SEA_SURFACE_TEMP,
     KEY_SENSOR_DRIFT_FLAGS,
@@ -842,6 +845,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # v1.8.4 Suppress HA Repairs notifications (issue #20)
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
+
+        # Alert hysteresis: count consecutive ticks above/below threshold
+        self._alert_debounce_raw: dict[str, int] = {}   # ticks above threshold
+        self._alert_debounce_clear: dict[str, int] = {}  # ticks below threshold
+        self._alert_active: dict[str, bool] = {}         # hysteresis state
 
         # Wind run accumulator - resets at local midnight (like rain_today)
         self._wind_run_km: float = 0.0
@@ -2418,7 +2426,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dq = "ok"
         data[KEY_DATA_QUALITY] = dq
 
-        # Configurable alerts
+        # Configurable alerts with hysteresis to prevent chatty automations
         gust_thr = float(self.entry_options.get(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
         rain_thr = float(self.entry_options.get(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
         freeze_thr = float(self.entry_options.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
@@ -2427,38 +2435,52 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         rain_rate = data.get(KEY_RAIN_RATE_FILT) or 0.0
         tc = data.get(KEY_NORM_TEMP_C)
 
-        active_alerts: list[dict] = []
-
+        # Raw trigger flags \u2014 one per alert type (before hysteresis)
+        raw_triggers: dict[str, dict] = {}
         if gust_ms is not None and float(gust_ms) >= gust_thr:
-            active_alerts.append(
-                {
-                    "type": "wind",
-                    "severity": "warning",
-                    "message": f"Extreme wind: {float(gust_ms):.1f} m/s",
-                    "icon": "mdi:weather-windy",
-                    "color": "rgba(239,68,68,0.9)",
-                }
-            )
+            raw_triggers["wind"] = {
+                "type": "wind",
+                "severity": "warning",
+                "message": f"Extreme wind: {float(gust_ms):.1f} m/s",
+                "icon": "mdi:weather-windy",
+                "color": "rgba(239,68,68,0.9)",
+            }
         if float(rain_rate) >= rain_thr:
-            active_alerts.append(
-                {
-                    "type": "rain",
-                    "severity": "warning",
-                    "message": f"Heavy rain: {float(rain_rate):.1f} mm/h",
-                    "icon": "mdi:weather-pouring",
-                    "color": "rgba(59,130,246,0.9)",
-                }
-            )
+            raw_triggers["rain"] = {
+                "type": "rain",
+                "severity": "warning",
+                "message": f"Heavy rain: {float(rain_rate):.1f} mm/h",
+                "icon": "mdi:weather-pouring",
+                "color": "rgba(59,130,246,0.9)",
+            }
         if tc is not None and float(tc) <= freeze_thr:
-            active_alerts.append(
-                {
-                    "type": "freeze",
-                    "severity": "advisory",
-                    "message": f"Freeze risk: {float(tc):.1f}\u00b0C",
-                    "icon": "mdi:snowflake-alert",
-                    "color": "rgba(147,197,253,0.9)",
-                }
-            )
+            raw_triggers["freeze"] = {
+                "type": "freeze",
+                "severity": "advisory",
+                "message": f"Freeze risk: {float(tc):.1f}\u00b0C",
+                "icon": "mdi:snowflake-alert",
+                "color": "rgba(147,197,253,0.9)",
+            }
+
+        # Apply hysteresis: alert fires after ALERT_DEBOUNCE_ON_TICKS consecutive
+        # ticks above threshold and clears after ALERT_DEBOUNCE_OFF_TICKS consecutive
+        # ticks below threshold.  This prevents chatty automations from sensor noise.
+        for alert_type in ("wind", "rain", "freeze"):
+            if alert_type in raw_triggers:
+                self._alert_debounce_raw[alert_type] = self._alert_debounce_raw.get(alert_type, 0) + 1
+                self._alert_debounce_clear[alert_type] = 0
+                if self._alert_debounce_raw[alert_type] >= ALERT_DEBOUNCE_ON_TICKS:
+                    self._alert_active[alert_type] = True
+            else:
+                self._alert_debounce_clear[alert_type] = self._alert_debounce_clear.get(alert_type, 0) + 1
+                self._alert_debounce_raw[alert_type] = 0
+                if self._alert_debounce_clear[alert_type] >= ALERT_DEBOUNCE_OFF_TICKS:
+                    self._alert_active[alert_type] = False
+
+        active_alerts: list[dict] = [
+            info for alert_type, info in raw_triggers.items()
+            if self._alert_active.get(alert_type, False)
+        ]
 
         if active_alerts:
             # Highest severity wins for state; warnings > advisories
@@ -2488,6 +2510,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ir.async_delete_issue(self.hass, DOMAIN, "missing_source_entities")
                 ir.async_delete_issue(self.hass, DOMAIN, "stale_sensors")
                 ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
+                ir.async_delete_issue(self.hass, DOMAIN, "stuck_sensors")
+                ir.async_delete_issue(self.hass, DOMAIN, "sensor_drift_detected")
             else:
                 if missing_entities:
                     ir.async_create_issue(
@@ -2531,6 +2555,38 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 else:
                     ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
+
+                # Stuck sensors (data quality; gated on CONF_ENABLE_DIAGNOSTICS not
+                # required — hardware failures affect all users)
+                stuck_flags = data.get(KEY_SENSOR_STUCK) or []
+                if stuck_flags:
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        "stuck_sensors",
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="stuck_sensors",
+                        translation_placeholders={"sensors": ", ".join(str(s) for s in stuck_flags)},
+                    )
+                else:
+                    ir.async_delete_issue(self.hass, DOMAIN, "stuck_sensors")
+
+                # Drifting sensors
+                drift_status = data.get(KEY_SENSOR_DRIFT_FLAGS)
+                drift_details = data.get("_drift_details") or []
+                if drift_status == "warning" and drift_details:
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        "sensor_drift_detected",
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="sensor_drift_detected",
+                        translation_placeholders={"sensors": ", ".join(str(s) for s in drift_details)},
+                    )
+                else:
+                    ir.async_delete_issue(self.hass, DOMAIN, "sensor_drift_detected")
 
     # ------------------------------------------------------------------
     # v1.2.0 - Fog, precipitation type, thunderstorm index
@@ -2810,6 +2866,51 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         data[KEY_CONSISTENCY_FLAGS] = "warning" if flags else "ok"
         data["_consistency_details"] = flags
+
+    # ------------------------------------------------------------------
+    # Conditions summary — human-readable text for voice assistants
+    # ------------------------------------------------------------------
+
+    def _compute_conditions_summary(self, data: dict) -> None:
+        """Compose a single-line current conditions string.
+
+        Combines temperature, feels-like (when meaningfully different), rain,
+        and wind into a terse sentence suitable for Alexa/Google/HA Assist and
+        Lovelace display cards.
+        """
+        parts: list[str] = []
+        tc = data.get(KEY_NORM_TEMP_C)
+        feels = data.get(KEY_FEELS_LIKE_C)
+        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+        wind_dir = data.get(KEY_WIND_QUADRANT)
+        rain_rate = data.get(KEY_RAIN_RATE_FILT) or 0.0
+        humidity = data.get(KEY_NORM_HUMIDITY)
+        zambretti = data.get(KEY_ZAMBRETTI_FORECAST)
+
+        if tc is not None:
+            parts.append(f"{float(tc):.1f}°C")
+            if feels is not None and abs(float(feels) - float(tc)) >= 2.0:
+                parts.append(f"feels like {float(feels):.1f}°C")
+
+        if float(rain_rate) > 0:
+            parts.append(f"{float(rain_rate):.1f} mm/h rain")
+        elif zambretti and zambretti not in ("Settled fine", "Fine", "Becoming fine"):
+            # Only include forecast if it's not obviously sunny
+            pass  # zambretti already in forecast_tiles
+
+        if wind_ms is not None and float(wind_ms) >= 1.0:
+            wind_str = f"{float(wind_ms):.0f} m/s"
+            if wind_dir:
+                wind_str += f" {wind_dir}"
+            if gust_ms is not None and float(gust_ms) >= float(wind_ms) * 1.5 and float(gust_ms) >= 5.0:
+                wind_str += f" gusting {float(gust_ms):.0f}"
+            parts.append(wind_str)
+
+        if humidity is not None:
+            parts.append(f"RH {float(humidity):.0f}%")
+
+        data[KEY_CONDITIONS_SUMMARY] = ", ".join(parts) if parts else "No data"
 
     # ------------------------------------------------------------------
     # v1.2.0 - Learning sensors: publish EMA results into data dict
@@ -3213,6 +3314,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_drift_detection(data, now)
         self._compute_consistency_checks(data, now)
         self._compute_learning_sensors(data)
+        self._compute_conditions_summary(data)
 
         # Solar lux factor learning (A4): update on clear days near solar noon
         if lux is not None and self._learning_state.solar_lux_factor:

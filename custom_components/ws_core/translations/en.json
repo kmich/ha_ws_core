@@ -616,6 +616,14 @@
     "forecast_api_failures": {
       "title": "Forecast provider API failures",
       "description": "The active forecast provider ({provider}) has failed {failures} consecutive times. Forecast data may be stale. Check your internet connection and provider settings. The integration will retry automatically with exponential backoff."
+    },
+    "stuck_sensors": {
+      "title": "Weather station sensor(s) appear stuck",
+      "description": "The following sensors have reported the same value for an extended period and may have a hardware fault: {sensors}. Check sensor connections and clean any obstructions (e.g. blocked rain gauge, frozen anemometer)."
+    },
+    "sensor_drift_detected": {
+      "title": "Sensor drift detected",
+      "description": "Monotonic drift has been detected in the following sensor(s): {sensors}. This may indicate a failing sensor, loose connector, or calibration offset that has grown too large. Check your sensor and consider applying a calibration correction."
     }
   },
   "entity": {
@@ -1616,6 +1624,29 @@
           },
           "n_outcomes": {
             "name": "Sample count"
+          }
+        }
+      },
+      "conditions_summary": {
+        "name": "Current Conditions",
+        "state_attributes": {
+          "temperature_c": {
+            "name": "Temperature (°C)"
+          },
+          "feels_like_c": {
+            "name": "Feels like (°C)"
+          },
+          "rain_rate_mmph": {
+            "name": "Rain rate (mm/h)"
+          },
+          "wind_speed_ms": {
+            "name": "Wind speed (m/s)"
+          },
+          "wind_direction": {
+            "name": "Wind direction"
+          },
+          "condition": {
+            "name": "Condition"
           }
         }
       },

@@ -66,6 +66,7 @@ from .const import (
     KEY_AIR_DENSITY,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
+    KEY_CONDITIONS_SUMMARY,
     # v0.7.0
     KEY_AQI,
     KEY_AQI_LEVEL,
@@ -2036,6 +2037,21 @@ SENSORS: list[WSSensorDescription] = [
             "n_outcomes": d.get("_forecast_skill_n_outcomes", 0),
         },
     ),
+    # Current conditions text summary (always-on, voice/Lovelace)
+    WSSensorDescription(
+        key=KEY_CONDITIONS_SUMMARY,
+        translation_key="conditions_summary",
+        name="WS Current Conditions",
+        icon="mdi:weather-partly-cloudy",
+        attrs_fn=lambda d: {
+            "temperature_c": d.get("norm_temperature_c"),
+            "feels_like_c": d.get("feels_like_c"),
+            "rain_rate_mmph": d.get("rain_rate_mmph_filtered"),
+            "wind_speed_ms": d.get("norm_wind_speed_ms"),
+            "wind_direction": d.get("wind_quadrant"),
+            "condition": d.get("current_condition"),
+        },
+    ),
 ]
 
 # Sensor-to-feature-toggle mapping for granular control
@@ -2489,6 +2505,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_WIND_RUN_MONTH_KM: "wind_run_month",
             KEY_NET_RADIATION: "net_radiation",
             KEY_RAIN_TODAY_MM: "rain_today_mm",
+            KEY_CONDITIONS_SUMMARY: "conditions_summary",
         }
         if key in overrides:
             return overrides[key]

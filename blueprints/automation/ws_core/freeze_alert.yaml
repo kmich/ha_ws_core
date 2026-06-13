@@ -1,0 +1,66 @@
+blueprint:
+  name: "WS Core — Freeze Alert"
+  description: >
+    Notifies when temperature drops to or below a freeze threshold and
+    optionally calls a script (e.g. to stop irrigation controllers).
+  domain: automation
+  source_url: https://github.com/Aephir/ha_ws_core
+  input:
+    temperature_sensor:
+      name: Temperature Sensor
+      description: "The ws_core temperature sensor (e.g. sensor.ws_temperature)."
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    freeze_threshold:
+      name: Freeze Threshold (°C)
+      description: "Alert fires when temperature drops at or below this value."
+      default: 0
+      selector:
+        number:
+          min: -10
+          max: 5
+          step: 0.5
+          unit_of_measurement: "°C"
+    notify_target:
+      name: Notification Target
+      description: "The notify service to call."
+      default: notify.notify
+      selector:
+        text:
+    irrigation_switch:
+      name: Irrigation Switch (optional)
+      description: "A switch to turn OFF when frost is detected (e.g. your irrigation controller)."
+      default: {}
+      selector:
+        entity:
+          domain: switch
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input temperature_sensor
+    at_or_below: !input freeze_threshold
+    for:
+      minutes: 3
+
+condition: []
+
+action:
+  - service: !input notify_target
+    data:
+      title: "❄️ Freeze Alert"
+      message: >
+        Temperature is {{ states(trigger.entity_id) | round(1) }}°C —
+        at or below your {{ freeze_threshold }}°C frost threshold.
+        Protect sensitive plants and outdoor pipes.
+  - if:
+      - condition: template
+        value_template: "{{ irrigation_switch != {} and irrigation_switch != '' }}"
+    then:
+      - service: switch.turn_off
+        target:
+          entity_id: !input irrigation_switch
+
+mode: single
+max_exceeded: silent

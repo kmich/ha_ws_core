@@ -217,6 +217,9 @@ KEY_PRESSURE_TREND_HPAH = "pressure_trend_hpah"
 # Sea surface temperature (Open-Meteo Marine API)
 KEY_SEA_SURFACE_TEMP = "sea_surface_temperature"
 
+# Current conditions text summary (voice / Lovelace)
+KEY_CONDITIONS_SUMMARY = "conditions_summary"
+
 # Sensor quality / validation flags
 KEY_SENSOR_QUALITY_FLAGS = "sensor_quality_flags"
 
@@ -334,6 +337,10 @@ DRIFT_STUCK_BUCKET_MIN_RATE: float = 0.1  # mm/h minimum to count as non-zero
 DRIFT_STUCK_RATE_RANGE_MAX: float = 0.1  # mm/h max spread to flag as stuck
 
 CONFIG_VERSION = 2
+
+# Alert hysteresis: ticks above/below threshold before state changes
+ALERT_DEBOUNCE_ON_TICKS: int = 2   # consecutive ticks above threshold → fire
+ALERT_DEBOUNCE_OFF_TICKS: int = 3  # consecutive ticks below threshold → clear
 
 # ---------------------------------------------------------------------------
 # v0.7.0 - Air Quality (Open-Meteo AQI, free/no key)
