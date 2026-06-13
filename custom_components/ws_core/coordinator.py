@@ -40,7 +40,6 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .models import WsData
 from .algorithms import (
     CONDITION_COLORS,
     CONDITION_DESCRIPTIONS,
@@ -509,6 +508,7 @@ from .const import (
     VALID_TEMP_MIN_C,
     WIND_SMOOTH_ALPHA,
 )
+from .models import WsData
 from .providers import get_provider
 
 try:

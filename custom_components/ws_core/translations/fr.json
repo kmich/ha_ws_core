@@ -405,7 +405,7 @@
           "lightning_dist": "Distance de l'éclair le plus proche (km, ex: via WH57)",
           "indoor_temp": "Capteur de température intérieure",
           "indoor_humidity": "Capteur d'humidité intérieure",
-          "indoor_co2": "Capteur de CO₂ intérieur (ppm)",
+          "indoor_co2": "Capteur de CO₂ intérieur (ppm)"
         }
       },
       "features_opt": {
@@ -448,7 +448,7 @@
           "enable_diagnostics": "Dérive des capteurs, cohérence des données, indicateurs de qualité, fiabilité des prévisions, facteur d'ensoleillement, normales de saison",
           "enable_fwi_components": "Codes intermédiaires IFM (FFMC/DMC/DC/ISI/BUI). Nécessite l'activation de l'Indice de risque d'incendie pour générer des données.",
           "enable_advanced_sensors": "Code Zambretti (format numérique), ET₀ horaire, direction du vent lissée",
-          "enable_nowcast": "Prévision immédiate Open-Meteo à 15 minutes : minutes avant le début/la fin de la pluie, cumul pour la prochaine heure, intensité. Sans clé API.",
+          "enable_nowcast": "Prévision immédiate Open-Meteo à 15 minutes : minutes avant le début/la fin de la pluie, cumul pour la prochaine heure, intensité. Sans clé API."
         }
        }, 
        "indoor_rooms_opt": {
