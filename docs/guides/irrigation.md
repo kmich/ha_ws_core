@@ -80,3 +80,60 @@ rainfall accumulation.
 
 See the [Smart Irrigation Bridge guide](smart_irrigation.md) for step-by-step
 configuration of ws_core's ET₀ as an input to the Smart Irrigation HA integration.
+
+---
+
+## Soil sensor integration (v2.1+)
+
+When soil moisture or temperature sensors are available, enable the **Soil Sensors** feature group in Configure → Features.
+
+### Enabling soil sensors
+
+1. Go to Settings → Devices & Services → Weather Station Core → Configure
+2. On the **Sources** step, map your soil moisture sensor and/or soil temperature sensor
+3. On the **Features** step, enable **Soil sensors**
+4. Restart is not required — sensors appear on the next coordinator update
+
+### Sensors added
+
+| Sensor | Description |
+|---|---|
+| `sensor.ws_soil_moisture` | Volumetric moisture %. Accepts 0–100% or 0–1 (auto-detected) |
+| `sensor.ws_soil_temperature` | Soil temperature in °C |
+| `sensor.ws_soil_moisture_deficit` | Difference between 40% field capacity and current moisture |
+| `sensor.ws_irrigation_need` | Text label: None / Low / Moderate / High / Critical |
+| `sensor.ws_irrigation_need_score` | 0–100 demand score |
+
+### Irrigation need score calculation
+
+```
+score = min(100, soil_deficit × 1.5 + max(0, ET₀_today − rain_today) × 5)
+```
+
+| Score | Label |
+|---|---|
+| 0–9 | None |
+| 10–24 | Low |
+| 25–49 | Moderate |
+| 50–74 | High |
+| 75–100 | Critical |
+
+### Example automation: irrigate only when needed
+
+```yaml
+alias: "Garden: irrigate when soil needs water"
+trigger:
+  - platform: time
+    at: "06:00:00"
+condition:
+  - condition: state
+    entity_id: sensor.ws_irrigation_need
+    state_not: "None"
+  - condition: state
+    entity_id: binary_sensor.ws_rain_expected_1h
+    state: "off"
+action:
+  - service: switch.turn_on
+    target:
+      entity_id: switch.garden_irrigation
+```

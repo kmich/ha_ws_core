@@ -18,80 +18,87 @@ Each is a single YAML file that imports into HA as a configurable automation tem
 
 ## Available blueprints
 
-### Frost Alert (`frost_alert.yaml`)
+### Heat Alert (`heat_alert.yaml`)
 
-Sends a notification when the temperature drops below a configurable threshold.
-Optionally requires temperature to be falling before alerting (filters out false
-positives when the station is warming up from a cold start).
+Sends a notification when the feels-like temperature (apparent temperature) stays above
+a configurable threshold for a sustained period. Uses the ws_core alert hysteresis, so
+a single brief spike won't trigger.
 
 **Configurable parameters:**
-- Notification service (e.g. `notify.mobile_app_phone`)
-- Temperature threshold (default: 2 °C)
-- Require falling temperature: yes / no
+- Feels-Like Temperature Sensor (e.g. `sensor.ws_feels_like`)
+- Heat threshold (°C, default: 35 °C, range 20–55 °C)
+- Notification target (e.g. `notify.mobile_app_phone`)
+- Cooldown between repeated notifications (minutes, default: 60)
 
-**Required entities:** `sensor.ws_temperature`
+**Required entities:** `sensor.ws_feels_like` (or any temperature sensor with device class `temperature`)
 
 ---
 
-### Storm Alert (`storm_alert.yaml`)
+### Freeze Alert (`freeze_alert.yaml`)
 
-Triggers when rapid pressure drop is combined with high wind. Uses `sensor.ws_pressure_trend`
-state and `sensor.ws_wind_gust` value together for a two-factor check.
+Notifies when temperature drops to or below a freeze threshold. Optionally calls a
+switch off — useful for shutting down irrigation controllers automatically before frost.
 
 **Configurable parameters:**
-- Notification service
-- Minimum gust speed (m/s)
-- Pressure trend states that trigger (default: "Falling Rapidly")
+- Temperature sensor (e.g. `sensor.ws_temperature`)
+- Freeze threshold (°C, default: 0 °C, range −10 to +5 °C)
+- Notification target
+- Irrigation switch to turn off (optional)
 
-**Required entities:** `sensor.ws_pressure_trend`, `sensor.ws_wind_gust`
+**Required entities:** `sensor.ws_temperature` (or any temperature sensor)
 
 ---
 
-### Irrigation Rain Skip (`irrigation_rain_skip.yaml`)
+### Rain Start / Stop (`rain_start.yaml`)
 
-Suppresses an irrigation schedule when either recent rainfall exceeds a threshold
-or rain is expected in the next hour. Pairs with the Smart Irrigation integration
-or any irrigation integration that exposes a skip/enable switch.
+Triggers when rain starts (rate rises above a minimum threshold) or stops. Uses the
+filtered rain rate sensor so brief sensor noise doesn't cause false positives.
+Supports optional extra actions on start and stop — for example closing an awning
+when rain starts or reopening it after rain stops.
 
 **Configurable parameters:**
-- Rain threshold for the past 24h (mm)
-- Whether to use the nowcast rain expected flag
-- The switch or input_boolean to toggle when skipping
+- Rain Rate Sensor (e.g. `sensor.ws_rain_rate`)
+- Minimum rain rate to be considered raining (mm/h, default: 0.5)
+- Trigger on: rain starts / rain stops / both (default: both)
+- Notification target
+- Additional action on rain start (optional — e.g. close a cover)
+- Additional action on rain stop (optional)
 
-**Required entities:** `sensor.ws_rain_last_24h`
-**Optional:** `binary_sensor.ws_rain_expected_1h` (requires Precipitation Nowcast enabled)
+**Required entities:** `sensor.ws_rain_rate`
 
 ---
 
-### Lightning Safety (`lightning_safety.yaml`)
+### High Wind / Gust Alert (`high_wind.yaml`)
 
-Triggers when lightning is detected within a configurable distance and the
-clearance timer has not yet reached the safe threshold (30 minutes by default).
-Sends a notification or triggers a scene.
+Notifies when wind gusts exceed a threshold for a sustained duration. Optionally
+retracts covers, awnings, or other wind-sensitive devices automatically.
 
 **Configurable parameters:**
-- Notification service
-- Maximum safe distance (km)
-- Clearance threshold (minutes, default: 30)
+- Wind Gust Sensor (e.g. `sensor.ws_wind_gust`)
+- Gust threshold (m/s, default: 10.0 m/s = ~36 km/h = Beaufort 5)
+- Sustained duration before triggering (minutes, default: 2)
+- Notification target
+- Cover / awning entities to retract (optional)
 
-**Required entities:** `sensor.ws_lightning_proximity` or `sensor.ws_lightning_clearance`
-**Requires:** Lightning Detection feature enabled
+**Required entities:** `sensor.ws_wind_gust`
 
 ---
 
-### Fire Danger Alert (`fire_danger_alert.yaml`)
+### Poor Air Quality Alert (`poor_aqi.yaml`)
 
-Notifies when the fire risk score reaches or exceeds a configurable level.
-Optionally triggers only when the score has been at that level for a minimum
-duration (avoids alerts on transient spikes).
+Notifies when the Air Quality Index crosses a configurable threshold. Optionally
+closes windows or activates air purifiers. Trigger is debounced — AQI must be above
+the threshold for 10 minutes before alerting.
 
 **Configurable parameters:**
-- Notification service
-- Minimum fire risk score to trigger (1-10 scale, default: 6)
-- Require sustained duration: yes / no
+- AQI Sensor (e.g. `sensor.ws_air_quality_index`)
+- AQI alert threshold (default: 100 — "Unhealthy for Sensitive Groups")
+- Notification target
+- Window / vent cover or switch entities to close (optional)
+- Air purifier switch or fan entities to activate (optional)
 
-**Required entities:** `sensor.ws_fire_risk_score`
-**Requires:** Fire Risk feature enabled
+**Required entities:** `sensor.ws_air_quality_index`
+**Requires:** Air Quality feature enabled in Configure → Features
 
 ---
 

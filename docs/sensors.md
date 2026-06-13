@@ -1,6 +1,6 @@
 # Sensors Reference
 
-Complete list of entities created by Weather Station Core at v2.0.7.
+Complete list of entities created by Weather Station Core at v2.1.0.
 
 Entity IDs shown use the default prefix `ws`. If you chose a different prefix during
 setup, replace `ws` with your prefix.
@@ -42,6 +42,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_rain_probability_combined` | % | Brier-score blended local + NWP |
 | `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` |
 | `sensor.ws_pressure_trend` | — | WMO No. 306 classification + rate |
+| `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Useful for TTS and Assist. |
 | `sensor.ws_rain_last_1h` | mm | Rolling 1-hour rainfall |
 | `sensor.ws_rain_last_24h` | mm | Rolling 24-hour rainfall |
 | `sensor.ws_rain_today` | mm | Today's accumulated rainfall |
@@ -91,6 +92,7 @@ Refreshes every 15 minutes.
 | `sensor.ws_minutes_until_dry` | min | Minutes until rain stops (when currently raining) |
 | `sensor.ws_rain_next_60min` | mm | Total precipitation expected in the next 60 minutes |
 | `sensor.ws_nowcast_intensity` | — | none / light / moderate / heavy |
+| `sensor.ws_nowcast_confidence` | — | `high` / `medium` / `low` — agreement between local gauge and NWP grid for the 0–30 min window |
 | `binary_sensor.ws_rain_expected_1h` | — | On when rain is expected within 60 minutes |
 
 ---
@@ -277,6 +279,25 @@ Via Open-Meteo Marine API (free, no API key).
 | `sensor.ws_climatology_30d` | Rolling 30-day climatology summary |
 | `sensor.ws_temperature_anomaly_30d` | Today's mean temperature vs 30-day rolling mean |
 | `sensor.ws_rain_anomaly_30d` | Today's rain vs 30-day rolling daily average |
+| `sensor.ws_forecast_brier_local` | Brier score for local sensor model (lower is better; requires ≥10 outcomes) |
+| `sensor.ws_forecast_brier_api` | Brier score for NWP API model |
+| `sensor.ws_forecast_blend_weight_local` | Current learned weight (%) of the local model in the blended probability |
+| `sensor.ws_temp_anomaly_90d` | Temperature anomaly (°C) — recent 30d mean vs 90d seasonal baseline (requires ≥60 days of data) |
+| `sensor.ws_rain_anomaly_90d` | Precipitation anomaly (mm/d) — recent 30d mean vs 90d seasonal baseline |
+
+---
+
+## Feature: Soil Sensors
+
+Requires: soil moisture or soil temperature source sensors mapped in Configure → Sources, and **Soil Sensors** enabled in Configure → Features.
+
+| Entity ID | Unit | State Class | Description |
+|---|---|---|---|
+| `sensor.ws_soil_moisture` | % | measurement | Volumetric soil moisture (auto-normalised from 0–1 or 0–100 input) |
+| `sensor.ws_soil_temperature` | °C | measurement | Soil temperature |
+| `sensor.ws_soil_moisture_deficit` | % | measurement | Deficit from field capacity (40% FC assumed for loam soil) |
+| `sensor.ws_irrigation_need` | — | — | Text label: None / Low / Moderate / High / Critical |
+| `sensor.ws_irrigation_need_score` | — | measurement | 0–100 irrigation demand score (soil deficit + net ET₀) |
 
 ---
 

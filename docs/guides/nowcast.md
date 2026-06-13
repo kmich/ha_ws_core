@@ -28,6 +28,7 @@ Requires: forecast coordinates set in the Forecast configuration step.
 | `sensor.ws_minutes_until_dry` | min | Minutes until rain is expected to stop. State is `unknown` when it is not currently raining. |
 | `sensor.ws_rain_next_60min` | mm | Total precipitation expected in the next 60 minutes. |
 | `sensor.ws_nowcast_intensity` | — | Peak intensity in the next hour: `none` / `light` / `moderate` / `heavy` |
+| `sensor.ws_nowcast_confidence` | — | Agreement between local gauge and NWP grid: `high` / `medium` / `low` |
 | `binary_sensor.ws_rain_expected_1h` | — | On when measurable rain is expected within 60 minutes. |
 
 All sensors update every 15 minutes.
@@ -43,6 +44,22 @@ when rain starts, when it stops, and the peak rate in the window.
 The sensor uses your configured forecast coordinates (latitude/longitude from the
 Forecast step), not your physical GPS location. In most cases these are the same; if
 you have set a custom location in the Forecast step, that is used.
+
+---
+
+## Local gauge blending (v2.1+)
+
+For the first 30 minutes of the nowcast window — where the local rain gauge is ground truth — ws_core blends live local measurements into the NWP forecast:
+
+| Time bucket | Local weight | NWP weight |
+|---|---|---|
+| 0–15 min | 70% | 30% |
+| 15–30 min | 50% | 50% |
+| 30+ min | 0% (pure NWP) | 100% |
+
+Blending only activates when the local gauge reports > 0.05 mm per 15-minute period. When the gauge is dry but NWP predicts rain, the `sensor.ws_nowcast_confidence` sensor shows `low`. When both agree, it shows `high`.
+
+The `sensor.ws_nowcast_confidence` entity is a diagnostic sensor gated behind the Precipitation Nowcast feature toggle.
 
 ---
 
