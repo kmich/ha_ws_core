@@ -2,6 +2,63 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.1.0] - 2026-06-13
+
+### Added
+
+- **Nowcast local blending.** The precipitation nowcast now blends live local gauge data into the first two 15-minute NWP buckets (70% local / 30% NWP for t+0–15 min; 50/50 at t+15–30 min) when the local rain rate sensor confirms active precipitation. A new diagnostic sensor `sensor.ws_nowcast_confidence` (`high` / `medium` / `low`) reflects how well the local gauge and NWP grid agree. Sensor is gated behind the Precipitation Nowcast feature toggle.
+
+- **Soil sensor support.** New optional feature group (disabled by default) that reads soil moisture (volumetric %, auto-normalised from 0–1 or 0–100 formats) and soil temperature sensors. Derives:
+  - `sensor.ws_soil_moisture` — volumetric soil moisture %
+  - `sensor.ws_soil_temperature` — soil temperature °C
+  - `sensor.ws_soil_moisture_deficit` — field-capacity deficit (40% FC minus current)
+  - `sensor.ws_irrigation_need` — text label: None / Low / Moderate / High / Critical
+  - `sensor.ws_irrigation_need_score` — 0–100 numeric irrigation demand score based on soil deficit and net ET₀ demand
+  Enable in Configure → Features → Soil sensors.
+
+- **Seasonal anomaly sensors (90-day climatology).** The rolling climatology buffer has been extended from 30 to 90 days. Two new diagnostic sensors compare the most recent 30-day period against the 90-day seasonal baseline:
+  - `sensor.ws_temp_anomaly_90d` — temperature anomaly (°C above/below the 90-day mean)
+  - `sensor.ws_rain_anomaly_90d` — precipitation anomaly (mm/d above/below the 90-day mean)
+  Both sensors activate after 60 days of data and are gated behind the Diagnostics feature toggle.
+
+- **Individual forecast skill sensors.** Three new diagnostic entities expose the per-source Brier score and learned blend weight that the self-learning rain probability system maintains internally:
+  - `sensor.ws_forecast_brier_local` — Brier score for the local sensor model (lower is better)
+  - `sensor.ws_forecast_brier_api` — Brier score for the NWP API model
+  - `sensor.ws_forecast_blend_weight_local` — current learned weight of the local model (%)
+  All three are gated behind the Diagnostics feature toggle and require ≥10 verified forecast outcomes.
+
+- **Alert hysteresis / debounce.** Wind, rain, and freeze alert states now require a condition to be sustained for 2 consecutive update ticks before activating, and must be absent for 3 ticks before clearing. Eliminates chatty automations caused by sensor noise around threshold boundaries. Configurable via `ALERT_DEBOUNCE_ON_TICKS` and `ALERT_DEBOUNCE_OFF_TICKS` in `const.py`.
+
+- **Current conditions text summary.** New always-on sensor `sensor.ws_conditions_summary` provides a human-readable description of current conditions (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Useful for notification templates, TTS announcements, and Assist voice responses. Attributes include temperature, feels-like, humidity, rain rate, wind, and condition label.
+
+- **HA Repairs issues for sensor faults.** Two new issue types appear in Settings → Repairs when sensor hardware problems are detected:
+  - `stuck_sensors` — fires when one or more sensors report an unchanged value for an extended period (typical of frozen/failed sensor hardware)
+  - `sensor_drift_detected` — fires when a sensor's value diverges from its historical pattern beyond expected bounds (e.g. mounting shift, electronics degradation)
+  Both issues are cleared automatically when the sensor recovers or when Suppress Notifications is enabled.
+
+- **Five automation blueprints.** Import-ready blueprints in `blueprints/automation/ws_core/`:
+  - `heat_alert.yaml` — notifies when feels-like exceeds a threshold for ≥5 minutes
+  - `freeze_alert.yaml` — notifies when temperature drops to or below a freeze threshold; optionally shuts off an irrigation switch
+  - `rain_start.yaml` — triggers on rain start and/or stop; configurable rain rate threshold, optional actions for each event
+  - `high_wind.yaml` — notifies on gust exceedances; optionally retracts covers/awnings
+  - `poor_aqi.yaml` — notifies when AQI exceeds threshold for ≥10 minutes; optionally closes windows and activates air purifiers
+
+- **Calibration service range validation.** The `ws_core.apply_calibration` service now enforces the same bounds used by the UI number entities via voluptuous `Range()` validators (temp ±10 °C, humidity ±20%, pressure ±10 hPa, wind ±5 m/s). A HA Repairs advisory (`large_calibration_offset`) fires when any applied offset exceeds 50% of its maximum, suggesting possible sensor hardware failure rather than calibration drift.
+
+- **`WsData` typed coordinator model.** A new `models.py` module introduces `WsData(dict)` — a `dict` subclass with typed annotations for all ~140 coordinator data fields. IDE tools now provide autocomplete and type hints for all sensor data keys with zero breaking changes to existing code.
+
+- **Voice/Assist optimisation.** The `weather.*` entity now sets `native_precipitation_unit = mm` and `suggested_display_precision = 1` for cleaner display in the frontend and Assist responses. The `attribution` property now always returns a non-null string.
+
+### Changed
+
+- **Climatology buffer extended from 30 to 90 days.** The rolling climatology window (`CLIMATOLOGY_WINDOW`) has been increased from 30 to 90 days. The existing 30-day anomaly sensors (`sensor.ws_temp_anomaly_30d`, `sensor.ws_rain_anomaly_30d`) are unaffected and continue to use the most recent 30 days; they now have a richer baseline to compare against.
+
+- **`suggested_display_precision = 1` added to temperature and precipitation sensors.** All temperature sensors (dew point, feels-like, wet-bulb, frost point, 24h high/low/average) and precipitation sensors (rain rate, 1h/24h/today/week/month/year accumulators) now declare 1 decimal place as the preferred display precision for the HA frontend statistics graphs.
+
+### Fixed
+
+- **Calibration service accepted out-of-range offsets.** Offsets larger than the sensor's expected calibration range (e.g. `cal_temp_c: 100`) were silently written to the config entry options, corrupting all derived sensors. Voluptuous range validation now rejects these before writing.
+
 ## [2.0.8] - 2026-06-13
 
 ### Fixed
