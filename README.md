@@ -14,7 +14,7 @@ precipitation nowcasting, fire danger, irrigation, lightning detection, and data
 
 ## Why ws_core
 
-Capabilities verified against `custom_components/ws_core/` at v2.0.7.
+Capabilities verified against `custom_components/ws_core/` at v2.1.0.
 Each point describes functionality not available in any other Home Assistant weather integration.
 
 - **Precipitation nowcast with minutes-until-rain.** `sensor.ws_minutes_until_rain`
@@ -43,6 +43,12 @@ Each point describes functionality not available in any other Home Assistant wea
 - **Adaptive rain probability.** `sensor.ws_rain_probability_combined` uses a
   rolling 90-day Brier-score blend that learns, per location, whether local sensors
   or the NWP provider have been more accurate.
+- **Nowcast ground-truth blending.** For the critical first 30 minutes, ws_core blends the live local rain gauge into the Open-Meteo NWP buckets (70 % local / 30 % NWP tapering to 50/50). A `sensor.ws_nowcast_confidence` diagnostic reflects how well the local gauge and NWP grid agree.
+- **Soil sensors and irrigation need.** Optional soil moisture and soil temperature inputs (volumetric, 0–100 % or 0–1 auto-detected) produce a soil moisture deficit, an irrigation need score (0–100), and a human-readable irrigation need label (None / Low / Moderate / High / Critical) informed by soil deficit and net ET₀ demand.
+- **90-day seasonal anomaly sensors.** The rolling climatology buffer extended from 30 to 90 days feeds `sensor.ws_temp_anomaly_90d` and `sensor.ws_rain_anomaly_90d`, which compare the recent 30-day period against the 90-day seasonal baseline — turning ws_core into a micro-climate record that grows more valuable over time.
+- **Alert hysteresis.** Wind, rain, and freeze alert states require a condition to be sustained for multiple consecutive update ticks before activating (and multiple ticks clear before de-activating). Eliminates chatty automations from sensor noise around threshold boundaries.
+- **Human-readable conditions summary.** `sensor.ws_conditions_summary` produces a one-line description of current conditions useful for TTS, notifications, and Assist voice responses.
+- **Five import-ready automation blueprints.** Heat alert, freeze alert, rain start/stop, high wind gust, and poor air quality — all with configurable thresholds and optional device actions.
 
 ---
 
