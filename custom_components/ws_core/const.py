@@ -272,8 +272,8 @@ SRC_LIGHTNING_DISTANCE = "lightning_dist"  # nearest strike distance (km)
 SRC_INDOOR_TEMP = "indoor_temp"
 SRC_INDOOR_HUMIDITY = "indoor_humidity"
 SRC_INDOOR_CO2 = "indoor_co2"
-SRC_SOIL_MOISTURE = "soil_moisture"      # volumetric moisture (%, 0-100 or 0-1)
-SRC_SOIL_TEMP = "soil_temperature"       # soil temperature (°C or unit-detected)
+SRC_SOIL_MOISTURE = "soil_moisture"  # volumetric moisture (%, 0-100 or 0-1)
+SRC_SOIL_TEMP = "soil_temperature"  # soil temperature (°C or unit-detected)
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
 OPTIONAL_SOURCES = [
@@ -343,7 +343,7 @@ DRIFT_STUCK_RATE_RANGE_MAX: float = 0.1  # mm/h max spread to flag as stuck
 CONFIG_VERSION = 2
 
 # Alert hysteresis: ticks above/below threshold before state changes
-ALERT_DEBOUNCE_ON_TICKS: int = 2   # consecutive ticks above threshold → fire
+ALERT_DEBOUNCE_ON_TICKS: int = 2  # consecutive ticks above threshold → fire
 ALERT_DEBOUNCE_OFF_TICKS: int = 3  # consecutive ticks below threshold → clear
 
 # ---------------------------------------------------------------------------
@@ -758,10 +758,10 @@ CONF_ENABLE_SOIL = "enable_soil"
 DEFAULT_ENABLE_SOIL = False
 
 # Data keys - v2.1 Soil sensors
-KEY_SOIL_MOISTURE = "soil_moisture_pct"          # normalized to 0-100%
-KEY_SOIL_TEMP_C = "soil_temp_c"                  # °C
+KEY_SOIL_MOISTURE = "soil_moisture_pct"  # normalized to 0-100%
+KEY_SOIL_TEMP_C = "soil_temp_c"  # °C
 KEY_SOIL_MOISTURE_DEFICIT = "soil_moisture_deficit_pct"  # field capacity(40%) - current
-KEY_IRRIGATION_NEED = "irrigation_need"          # text: "None"/"Low"/"Moderate"/"High"/"Critical"
+KEY_IRRIGATION_NEED = "irrigation_need"  # text: "None"/"Low"/"Moderate"/"High"/"Critical"
 KEY_IRRIGATION_NEED_SCORE = "irrigation_need_score"  # 0-100 numeric
 
 # ---------------------------------------------------------------------------

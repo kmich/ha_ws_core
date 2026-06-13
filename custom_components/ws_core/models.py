@@ -1,4 +1,5 @@
 """Typed coordinator data model for ws_core."""
+
 from __future__ import annotations
 
 from typing import Any

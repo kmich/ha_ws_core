@@ -247,10 +247,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Calibration bounds must match number.py entity limits.
     # Threshold for the "large offset" Repairs advisory is 50 % of each max.
     _CAL_LARGE_THRESHOLD = {
-        CONF_CAL_TEMP_C: 5.0,        # 50 % of 10.0
-        CONF_CAL_HUMIDITY: 10.0,     # 50 % of 20.0
+        CONF_CAL_TEMP_C: 5.0,  # 50 % of 10.0
+        CONF_CAL_HUMIDITY: 10.0,  # 50 % of 20.0
         CONF_CAL_PRESSURE_HPA: 5.0,  # 50 % of 10.0
-        CONF_CAL_WIND_MS: 2.5,       # 50 % of 5.0
+        CONF_CAL_WIND_MS: 2.5,  # 50 % of 5.0
     }
 
     SERVICE_APPLY_CALIBRATION_SCHEMA = vol.Schema(

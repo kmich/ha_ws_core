@@ -864,9 +864,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
 
         # Alert hysteresis: count consecutive ticks above/below threshold
-        self._alert_debounce_raw: dict[str, int] = {}   # ticks above threshold
+        self._alert_debounce_raw: dict[str, int] = {}  # ticks above threshold
         self._alert_debounce_clear: dict[str, int] = {}  # ticks below threshold
-        self._alert_active: dict[str, bool] = {}         # hysteresis state
+        self._alert_active: dict[str, bool] = {}  # hysteresis state
 
         # Wind run accumulator - resets at local midnight (like rain_today)
         self._wind_run_km: float = 0.0
@@ -2574,8 +2574,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._alert_active[alert_type] = False
 
         active_alerts: list[dict] = [
-            info for alert_type, info in raw_triggers.items()
-            if self._alert_active.get(alert_type, False)
+            info for alert_type, info in raw_triggers.items() if self._alert_active.get(alert_type, False)
         ]
 
         if active_alerts:
@@ -2866,9 +2865,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     baseline_rain = stats_baseline.get("rain_total_avg_day")
                     recent_rain = stats_recent.get("rain_total_avg_day")
                     if baseline_rain is not None and recent_rain is not None:
-                        data[KEY_RAIN_ANOMALY_90D] = round(
-                            float(recent_rain) - float(baseline_rain), 1
-                        )
+                        data[KEY_RAIN_ANOMALY_90D] = round(float(recent_rain) - float(baseline_rain), 1)
 
     # ------------------------------------------------------------------
     # v1.2.0 - Sensor drift detection (C1)
