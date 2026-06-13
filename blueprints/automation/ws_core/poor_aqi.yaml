@@ -1,0 +1,86 @@
+blueprint:
+  name: "WS Core — Poor Air Quality Alert"
+  description: >
+    Notifies when the Air Quality Index crosses a configurable threshold
+    and optionally closes windows or activates air purifiers.
+    Requires the Air Quality feature to be enabled in ws_core (Settings →
+    Integrations → ws_core → Configure → Enable Air Quality).
+  domain: automation
+  source_url: https://github.com/Aephir/ha_ws_core
+  input:
+    aqi_sensor:
+      name: AQI Sensor
+      description: "The ws_core Air Quality Index sensor (e.g. sensor.ws_air_quality_index)."
+      selector:
+        entity:
+          domain: sensor
+    aqi_threshold:
+      name: AQI Alert Threshold
+      description: >
+        Trigger level. US EPA categories:
+        0-50 Good, 51-100 Moderate, 101-150 Unhealthy for Sensitive Groups,
+        151-200 Unhealthy, 201-300 Very Unhealthy, 301+ Hazardous.
+      default: 100
+      selector:
+        number:
+          min: 50
+          max: 300
+          step: 1
+    notify_target:
+      name: Notification Target
+      default: notify.notify
+      selector:
+        text:
+    window_covers:
+      name: Windows / Vents to Close (optional)
+      description: "Cover or switch entities to close/turn off when air quality is poor."
+      default: {}
+      selector:
+        target:
+          entity:
+            domain:
+              - cover
+              - switch
+    air_purifier:
+      name: Air Purifier to Activate (optional)
+      description: "A switch or fan entity to turn ON when air quality is poor."
+      default: {}
+      selector:
+        target:
+          entity:
+            domain:
+              - switch
+              - fan
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input aqi_sensor
+    above: !input aqi_threshold
+    for:
+      minutes: 10
+
+condition: []
+
+action:
+  - service: !input notify_target
+    data:
+      title: "😷 Poor Air Quality"
+      message: >
+        AQI is {{ states(trigger.entity_id) | int }} —
+        above your {{ aqi_threshold }} threshold.
+        Consider closing windows and limiting outdoor activity.
+  - if:
+      - condition: template
+        value_template: "{{ window_covers != {} }}"
+    then:
+      - service: homeassistant.turn_off
+        target: !input window_covers
+  - if:
+      - condition: template
+        value_template: "{{ air_purifier != {} }}"
+    then:
+      - service: homeassistant.turn_on
+        target: !input air_purifier
+
+mode: single
+max_exceeded: silent

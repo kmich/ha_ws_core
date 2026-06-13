@@ -226,6 +226,11 @@ def _make_coordinator(
     from custom_components.ws_core.coordinator import WSStationRuntime
     coord.runtime = WSStationRuntime()
 
+    # v2.1 alert hysteresis state
+    coord._alert_debounce_raw: dict = {}
+    coord._alert_debounce_clear: dict = {}
+    coord._alert_active: dict = {}
+
     return coord
 
 
@@ -406,6 +411,9 @@ class TestComputeHealth:
         coord.entry_options = {"thresh_wind_gust_ms": 10.0}
         data = {KEY_NORM_WIND_GUST_MS: 15.0, "rain_rate_mmph_filtered": 0.0}
         now = datetime.now(timezone.utc)
+        # Call twice to satisfy ALERT_DEBOUNCE_ON_TICKS = 2
+        coord._compute_health(data, now, missing=[], missing_entities=[])
+        coord._compute_health(data, now, missing=[], missing_entities=[])
         coord._compute_health(data, now, missing=[], missing_entities=[])
         assert data[KEY_ALERT_STATE] == "warning"
 

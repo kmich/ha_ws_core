@@ -118,6 +118,9 @@ def _make_coordinator(**overrides):
     coord.forecast_interval_min = 30
     coord.suppress_notifications = False  # v1.8.4
     coord.runtime = WSStationRuntime()
+    coord._alert_debounce_raw: dict = {}
+    coord._alert_debounce_clear: dict = {}
+    coord._alert_active: dict = {}
     return coord, hass, states
 
 
@@ -129,7 +132,7 @@ class TestConfigFlowStructure:
     """Verify config flow step definitions and translation coverage."""
 
     def test_all_steps_have_translations(self):
-        with open("custom_components/ws_core/strings.json") as f:
+        with open("custom_components/ws_core/strings.json", encoding="utf-8") as f:
             strings = json.load(f)
         config_steps = set(strings.get("config", {}).get("step", {}).keys())
         # Every config step should have a title/description and data dict
@@ -139,14 +142,14 @@ class TestConfigFlowStructure:
 
     def test_no_zambretti_toggle_in_features(self):
         """Zambretti should be non-disableable: no toggle in features step."""
-        with open("custom_components/ws_core/strings.json") as f:
+        with open("custom_components/ws_core/strings.json", encoding="utf-8") as f:
             strings = json.load(f)
         features = strings["config"]["step"]["features"]["data"]
         assert "enable_zambretti" not in features, "Zambretti toggle should be removed"
 
     def test_go_back_in_all_non_user_steps(self):
         """Every config step except 'user' should have _go_back translation."""
-        with open("custom_components/ws_core/strings.json") as f:
+        with open("custom_components/ws_core/strings.json", encoding="utf-8") as f:
             strings = json.load(f)
         for step_id, step_data in strings["config"]["step"].items():
             if step_id == "user":
@@ -162,14 +165,14 @@ class TestConfigFlowStructure:
 
     def test_options_error_section_exists(self):
         """v1.0.1 fix: options.error section for label translation."""
-        with open("custom_components/ws_core/strings.json") as f:
+        with open("custom_components/ws_core/strings.json", encoding="utf-8") as f:
             strings = json.load(f)
         assert "error" in strings.get("options", {}), "options.error section missing"
 
     def test_strings_and_translations_in_sync(self):
-        with open("custom_components/ws_core/strings.json") as f:
+        with open("custom_components/ws_core/strings.json", encoding="utf-8") as f:
             s = json.load(f)
-        with open("custom_components/ws_core/translations/en.json") as f:
+        with open("custom_components/ws_core/translations/en.json", encoding="utf-8") as f:
             e = json.load(f)
         assert s == e
 
@@ -223,6 +226,9 @@ class TestAlertAccumulation:
             "thresh_rain_rate_mmph": rain_thr,
             "thresh_freeze_c": freeze_thr,
         }
+        # Call twice to satisfy ALERT_DEBOUNCE_ON_TICKS = 2
+        coord._compute_health(data, datetime.now(timezone.utc), [], [])
+        coord._compute_health(data, datetime.now(timezone.utc), [], [])
         coord._compute_health(data, datetime.now(timezone.utc), [], [])
         return data
 
@@ -371,7 +377,7 @@ class TestSensorEntities:
     def test_all_sensor_keys_have_unique_slugs(self):
         """Every sensor slug override should be unique."""
         import re
-        with open("custom_components/ws_core/sensor.py") as f:
+        with open("custom_components/ws_core/sensor.py", encoding="utf-8") as f:
             content = f.read()
         block = content[content.find("overrides = {"):content.find("return overrides[key]")]
         slugs = re.findall(r':\s*"(\w+)"', block)
@@ -420,7 +426,7 @@ class TestDiagnostics:
 
         import json
 
-        with open("custom_components/ws_core/manifest.json") as f:
+        with open("custom_components/ws_core/manifest.json", encoding="utf-8") as f:
             expected_version = json.load(f)["version"]
 
         assert isinstance(result, dict)
@@ -464,7 +470,7 @@ class TestDiagnostics:
 
 class TestVersionConsistency:
     def _manifest_version(self):
-        with open("custom_components/ws_core/manifest.json") as f:
+        with open("custom_components/ws_core/manifest.json", encoding="utf-8") as f:
             return json.load(f)["version"]
 
     def test_manifest_version(self):
