@@ -414,6 +414,7 @@ class TestComputeHealth:
         # Call twice to satisfy ALERT_DEBOUNCE_ON_TICKS = 2
         coord._compute_health(data, now, missing=[], missing_entities=[])
         coord._compute_health(data, now, missing=[], missing_entities=[])
+        coord._compute_health(data, now, missing=[], missing_entities=[])
         assert data[KEY_ALERT_STATE] == "warning"
 
 

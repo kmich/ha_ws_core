@@ -229,6 +229,7 @@ class TestAlertAccumulation:
         # Call twice to satisfy ALERT_DEBOUNCE_ON_TICKS = 2
         coord._compute_health(data, datetime.now(timezone.utc), [], [])
         coord._compute_health(data, datetime.now(timezone.utc), [], [])
+        coord._compute_health(data, datetime.now(timezone.utc), [], [])
         return data
 
     def test_no_alerts(self):
