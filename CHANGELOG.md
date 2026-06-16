@@ -2,6 +2,17 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.1.2] - 2026-06-16
+
+### Fixed
+
+- **CWOP skipped in options flow when combined with other uploaders (#83).** The upload-service step chain was incomplete in four handlers (`pwsweather`, `wow`, `awekas`, `owm_stations`): each jumped straight to MQTT/alerts after its own step, bypassing all later steps (OWM Stations, Windy, CWOP). Enabling PWSWeather + CWOP simultaneously left CWOP unconfigured and silently disabled. The chain now walks all remaining steps in the correct order.
+- **Blitzortung auto-discovery misses some installs (#75).** Discovery now also matches by `sensor.blitzortung_*` entity_id prefix, covering forks or installs where the integration platform name differs. The lightning counter pattern now also checks for `"count"` in the entity_id (previously only `"counter"` was checked there).
+
+### Changed
+
+- **French translations (PR #81).** Added translations for soil sensors, `conditions_summary`, `forecast_brier_*`, `nowcast_confidence`, 90-day anomaly sensors, and various terminology improvements contributed by Benjamin45590. Corrected two strings that were accidentally left in English.
+
 ## [2.1.0] - 2026-06-13
 
 ### Added
