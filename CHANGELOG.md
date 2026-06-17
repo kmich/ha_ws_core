@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.1.3] - 2026-06-16
+
+### Fixed
+
+- **CWOP skipped in options flow (Configure) when combined with other uploaders (#83).** The previous fix (v2.1.2) corrected the initial setup wizard but missed the options flow (Configure button), which has a separate set of step handlers. All five options flow upload handlers (`weathercloud_opt`, `pwsweather_opt`, `wow_opt`, `awekas_opt`, `owm_stations_opt`) had the same incomplete chain and now correctly route to CWOP before MQTT/save.
+
 ## [2.1.2] - 2026-06-16
 
 ### Fixed
