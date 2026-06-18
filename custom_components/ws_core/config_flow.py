@@ -1756,7 +1756,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_THRESH_RAIN_RATE_MMPH] = _convert_rain_to_mmph(
                     float(user_input[CONF_THRESH_RAIN_RATE_MMPH]), rain_meas
                 )
-                self._data[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(float(user_input[CONF_THRESH_FREEZE_C]), temp_u == "°F")
+                self._data[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(
+                    float(user_input[CONF_THRESH_FREEZE_C]), temp_u == "°F"
+                )
                 self._data[CONF_RAIN_FILTER_ALPHA] = float(user_input[CONF_RAIN_FILTER_ALPHA])
                 self._data[CONF_PRESSURE_TREND_WINDOW_H] = int(user_input[CONF_PRESSURE_TREND_WINDOW_H])
                 self._data[CONF_STALENESS_S] = int(user_input[CONF_STALENESS_S])
@@ -1961,7 +1963,9 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             last_step=False,
         )
 
-    def _build_core_schema(self, imperial: bool, gust_u: str, rain_u: str, temp_u: str, rain_meas: str = "mm") -> vol.Schema:
+    def _build_core_schema(
+        self, imperial: bool, gust_u: str, rain_u: str, temp_u: str, rain_meas: str = "mm"
+    ) -> vol.Schema:
         g = self._get
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
         default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
@@ -2010,22 +2014,16 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_PRESSURE_UNIT, default=g(CONF_PRESSURE_UNIT, DEFAULT_PRESSURE_UNIT)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=PRESSURE_UNIT_OPTIONS, mode="list")
-                ),
+                ): selector.SelectSelector(selector.SelectSelectorConfig(options=PRESSURE_UNIT_OPTIONS, mode="list")),
                 vol.Optional(CONF_RAIN_UNIT, default=g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT)): selector.SelectSelector(
                     selector.SelectSelectorConfig(options=RAIN_UNIT_OPTIONS, mode="list")
                 ),
                 vol.Optional(
                     CONF_DISTANCE_UNIT, default=g(CONF_DISTANCE_UNIT, DEFAULT_DISTANCE_UNIT)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=DISTANCE_UNIT_OPTIONS, mode="list")
-                ),
+                ): selector.SelectSelector(selector.SelectSelectorConfig(options=DISTANCE_UNIT_OPTIONS, mode="list")),
                 vol.Optional(
                     CONF_ALTITUDE_UNIT, default=g(CONF_ALTITUDE_UNIT, DEFAULT_ALTITUDE_UNIT)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=ALTITUDE_UNIT_OPTIONS, mode="list")
-                ),
+                ): selector.SelectSelector(selector.SelectSelectorConfig(options=ALTITUDE_UNIT_OPTIONS, mode="list")),
                 vol.Optional(
                     CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)
                 ): selector.BooleanSelector(),
