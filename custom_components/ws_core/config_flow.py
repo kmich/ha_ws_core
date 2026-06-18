@@ -101,6 +101,10 @@ from .const import (
     CONF_SOLAR_PANEL_AZIMUTH,
     CONF_SOLAR_PANEL_TILT,
     CONF_SOLAR_PEAK_KW,
+    CONF_ALTITUDE_UNIT,
+    CONF_DISTANCE_UNIT,
+    CONF_PRESSURE_UNIT,
+    CONF_RAIN_UNIT,
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_TEMP_UNIT,
@@ -108,6 +112,7 @@ from .const import (
     CONF_THRESH_RAIN_RATE_MMPH,
     CONF_THRESH_WIND_GUST_MS,
     CONF_UNITS_MODE,
+    CONF_WIND_UNIT,
     CONF_VIGICRUES_STATION_CODE,
     CONF_VIGICRUES_STATIONS,
     CONF_WC_API_KEY,
@@ -182,12 +187,17 @@ from .const import (
     DEFAULT_SOLAR_PANEL_AZIMUTH,
     DEFAULT_SOLAR_PANEL_TILT,
     DEFAULT_SOLAR_PEAK_KW,
+    DEFAULT_ALTITUDE_UNIT,
+    DEFAULT_DISTANCE_UNIT,
+    DEFAULT_PRESSURE_UNIT,
+    DEFAULT_RAIN_UNIT,
     DEFAULT_STALENESS_S,
     DEFAULT_TEMP_UNIT,
     DEFAULT_THRESH_FREEZE_C,
     DEFAULT_THRESH_RAIN_RATE_MMPH,
     DEFAULT_THRESH_WIND_GUST_MS,
     DEFAULT_UNITS_MODE,
+    DEFAULT_WIND_UNIT,
     DEFAULT_WC_INTERVAL_MIN,
     DEFAULT_WINDY_INTERVAL_MIN,
     DEFAULT_WOW_INTERVAL_MIN,
@@ -216,8 +226,13 @@ from .const import (
     SRC_UV,
     SRC_WIND,
     SRC_WIND_DIR,
+    ALTITUDE_UNIT_OPTIONS,
+    DISTANCE_UNIT_OPTIONS,
+    PRESSURE_UNIT_OPTIONS,
+    RAIN_UNIT_OPTIONS,
     UNITS_MODE_OPTIONS,
     VALID_ELEVATION_MAX_M,
+    WIND_UNIT_OPTIONS,
     VALID_ELEVATION_MIN_M,
     VALID_TEMP_MAX_C,
     VALID_TEMP_MIN_C,
@@ -710,6 +725,11 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return back
             self._data[CONF_UNITS_MODE] = user_input[CONF_UNITS_MODE]
             self._data[CONF_TEMP_UNIT] = user_input[CONF_TEMP_UNIT]
+            self._data[CONF_WIND_UNIT] = user_input[CONF_WIND_UNIT]
+            self._data[CONF_PRESSURE_UNIT] = user_input[CONF_PRESSURE_UNIT]
+            self._data[CONF_RAIN_UNIT] = user_input[CONF_RAIN_UNIT]
+            self._data[CONF_DISTANCE_UNIT] = user_input[CONF_DISTANCE_UNIT]
+            self._data[CONF_ALTITUDE_UNIT] = user_input[CONF_ALTITUDE_UNIT]
             return await self.async_step_forecast()
 
         # Guess sensible defaults from HA unit system
@@ -741,6 +761,21 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             ],
                             mode="list",
                         )
+                    ),
+                    vol.Required(CONF_WIND_UNIT, default=DEFAULT_WIND_UNIT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=WIND_UNIT_OPTIONS, mode="list")
+                    ),
+                    vol.Required(CONF_PRESSURE_UNIT, default=DEFAULT_PRESSURE_UNIT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=PRESSURE_UNIT_OPTIONS, mode="list")
+                    ),
+                    vol.Required(CONF_RAIN_UNIT, default=DEFAULT_RAIN_UNIT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=RAIN_UNIT_OPTIONS, mode="list")
+                    ),
+                    vol.Required(CONF_DISTANCE_UNIT, default=DEFAULT_DISTANCE_UNIT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=DISTANCE_UNIT_OPTIONS, mode="list")
+                    ),
+                    vol.Required(CONF_ALTITUDE_UNIT, default=DEFAULT_ALTITUDE_UNIT): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=ALTITUDE_UNIT_OPTIONS, mode="list")
                     ),
                 }
             ),
@@ -1958,6 +1993,27 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         ],
                         mode="list",
                     )
+                ),
+                vol.Optional(CONF_WIND_UNIT, default=g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=WIND_UNIT_OPTIONS, mode="list")
+                ),
+                vol.Optional(
+                    CONF_PRESSURE_UNIT, default=g(CONF_PRESSURE_UNIT, DEFAULT_PRESSURE_UNIT)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=PRESSURE_UNIT_OPTIONS, mode="list")
+                ),
+                vol.Optional(CONF_RAIN_UNIT, default=g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=RAIN_UNIT_OPTIONS, mode="list")
+                ),
+                vol.Optional(
+                    CONF_DISTANCE_UNIT, default=g(CONF_DISTANCE_UNIT, DEFAULT_DISTANCE_UNIT)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=DISTANCE_UNIT_OPTIONS, mode="list")
+                ),
+                vol.Optional(
+                    CONF_ALTITUDE_UNIT, default=g(CONF_ALTITUDE_UNIT, DEFAULT_ALTITUDE_UNIT)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=ALTITUDE_UNIT_OPTIONS, mode="list")
                 ),
                 vol.Optional(
                     CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)
