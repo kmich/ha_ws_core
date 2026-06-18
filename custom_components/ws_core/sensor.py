@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -2760,10 +2761,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             self._restored_value = None
 
         if self._unit_group and val is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 val = self._apply_unit_conversion(float(val))
-            except (TypeError, ValueError):
-                pass
 
         return val
 
