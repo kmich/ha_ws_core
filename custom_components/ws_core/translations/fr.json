@@ -54,10 +54,15 @@
       },
       "display": {
         "title": "Unités d'affichage",
-        "description": "Choisissez comment les valeurs sont affichées. « Auto » suit les unités de Home Assistant.",
+        "description": "Choisissez comment les valeurs sont affichées. « Auto » suit les unités de Home Assistant. Les paramètres individuels ont priorité sur le préréglage.",
         "data": {
-          "units_mode": "Vent / pluie / pression",
+          "units_mode": "Préréglage d'unités",
           "temp_unit": "Unité de température",
+          "wind_unit": "Unité de vitesse du vent",
+          "pressure_unit": "Unité de pression",
+          "rain_unit": "Unité de précipitation",
+          "distance_unit": "Unité de distance",
+          "altitude_unit": "Unité d'altitude",
           "_go_back": "← Retour à l'étape précédente"
         }
       },
@@ -308,8 +313,13 @@
           "hemisphere": "Hémisphère",
           "climate_region": "Région climatique",
           "elevation_m": "Altitude de la station",
-          "units_mode": "Unités : vent, pluie, pression",
+          "units_mode": "Préréglage d'unités",
           "temp_unit": "Unité de température",
+          "wind_unit": "Unité de vitesse du vent",
+          "pressure_unit": "Unité de pression",
+          "rain_unit": "Unité de précipitation",
+          "distance_unit": "Unité de distance",
+          "altitude_unit": "Unité d'altitude",
           "forecast_enabled": "Activer les prévisions",
           "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
           "forecast_lat": "Latitude des prévisions",
@@ -342,8 +352,13 @@
           "hemisphere": "Hémisphère",
           "climate_region": "Région climatique",
           "elevation_m": "Altitude de la station",
-          "units_mode": "Unités : vent, pluie, pression",
-          "temp_unit": "Unité de température",
+          "units_mode": "Définit un système d'unités de base. Les réglages individuels ci-dessous ont priorité.",
+          "temp_unit": "Remplace l'unité de température. « Auto » suit les paramètres HA.",
+          "wind_unit": "Remplace l'unité de vitesse du vent. « Auto » suit les paramètres HA.",
+          "pressure_unit": "Remplace l'unité de pression. « Auto » suit les paramètres HA.",
+          "rain_unit": "Remplace l'unité de précipitation. « Auto » suit les paramètres HA.",
+          "distance_unit": "Remplace l'unité de distance (ex. distance foudre). « Auto » suit les paramètres HA.",
+          "altitude_unit": "Remplace l'unité d'altitude (ex. base des nuages, niveau de gel). « Auto » suit les paramètres HA.",
           "forecast_enabled": "Activer les prévisions",
           "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
           "forecast_lat": "Latitude des prévisions",
@@ -2395,6 +2410,51 @@
         "auto": "Automatique (suit Home Assistant)",
         "metric": "Métrique (km/h, mm, hPa)",
         "imperial": "Impérial (mph, in, inHg)"
+      }
+    },
+    "temp_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "C": "Celsius (°C)",
+        "F": "Fahrenheit (°F)"
+      }
+    },
+    "wind_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "m/s": "m/s (mètres par seconde)",
+        "km/h": "km/h (kilomètres par heure)",
+        "mph": "mph (miles par heure)",
+        "kn": "kn (nœuds)"
+      }
+    },
+    "pressure_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "hPa": "hPa (hectopascals)",
+        "inHg": "inHg (pouces de mercure)",
+        "mmHg": "mmHg (millimètres de mercure)"
+      }
+    },
+    "rain_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "mm": "mm (millimètres)",
+        "in": "in (pouces)"
+      }
+    },
+    "distance_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "km": "km (kilomètres)",
+        "mi": "mi (miles)"
+      }
+    },
+    "altitude_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "m": "m (mètres)",
+        "ft": "ft (pieds)"
       }
     },
     "forecast_provider": {

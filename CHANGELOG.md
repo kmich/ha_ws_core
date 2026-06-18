@@ -2,6 +2,20 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.2.0] - 2026-06-18
+
+### Added
+
+- **Per-measurement unit selection (#84).** The "Display units" step in the setup wizard and the Configure dialog now expose individual unit selectors for every measurement type, in addition to the existing overall units preset:
+  - **Wind speed** - m/s, km/h, mph, kn (knots)
+  - **Pressure** - hPa, inHg, mmHg
+  - **Rainfall** - mm, in
+  - **Distance** (lightning distance) - km, mi
+  - **Altitude** (cloud base, freezing level) - m, ft
+  - All new selectors default to `auto`, which follows your Home Assistant unit system - fully backward-compatible with existing installs.
+  - Individual selections take precedence over the overall units preset. Alert thresholds in the alerts step display in the configured unit.
+  - Sensors that restore their last known value (ET0, rain accumulators, max gust, max rain rate) automatically discard stale restored values when the unit preference changes between restarts, preventing display corruption.
+
 ## [2.1.3] - 2026-06-16
 
 ### Fixed

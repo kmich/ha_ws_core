@@ -31,7 +31,7 @@ Weather Station Core reads raw sensor data from your existing weather station (E
 - **ET₀ evapotranspiration** (Hargreaves-Samani, upgrades to Penman-Monteith with solar radiation sensor)
 - **Pluggable forecast provider** - Open-Meteo (default), Met.no, NWS/NOAA, OpenWeatherMap, Pirate Weather, Météo France, or any existing **Home Assistant `weather.*` entity** — switch provider from the Configure menu at any time, no reinstall needed
 - **`apply_calibration` service** - write temperature, humidity, pressure, or wind calibration offsets from an automation or Developer Tools without opening the config flow
-- **Full imperial unit support** - all sensors with a `device_class` auto-convert to °F / mph / inches when HA is set to imperial
+- **Per-measurement unit selection** - choose wind speed (m/s, km/h, mph, kn), pressure (hPa, inHg, mmHg), rainfall (mm, in), distance (km, mi), and altitude (m, ft) independently; all default to auto so existing installs are unaffected
 - **Ground-truth nowcast blending** — local rain gauge blended into the 0–30 min NWP forecast window; `nowcast_confidence` sensor shows agreement level
 - **Soil sensor support** — soil moisture, temperature, deficit, and irrigation need (None/Low/Moderate/High/Critical) from optional soil sensors
 - **90-day seasonal anomaly sensors** — temperature and rain anomaly vs the 90-day micro-climate baseline

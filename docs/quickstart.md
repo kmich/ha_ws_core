@@ -88,9 +88,21 @@ used to auto-detect your location if you have them set.
 
 ### Step 5 — Display units
 
-Choose your preferred units for temperature, wind speed, rainfall, and pressure.
-These control how sensor values are displayed without affecting the underlying
-calculations.
+Choose how sensor values are displayed. There is an overall units preset (Auto /
+Metric / Imperial) plus individual overrides for each measurement type:
+
+| Measurement | Options |
+|---|---|
+| Temperature | Auto, Celsius (°C), Fahrenheit (°F) |
+| Wind speed | Auto, m/s, km/h, mph, kn |
+| Pressure | Auto, hPa, inHg, mmHg |
+| Rainfall | Auto, mm, in |
+| Distance (e.g. lightning) | Auto, km, mi |
+| Altitude (e.g. cloud base) | Auto, m, ft |
+
+All default to `auto`, which follows your Home Assistant unit system. Individual
+overrides take precedence over the preset. These control display only - underlying
+calculations always use SI units internally.
 
 ### Step 6 — Forecast provider
 

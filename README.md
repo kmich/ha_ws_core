@@ -14,7 +14,7 @@ precipitation nowcasting, fire danger, irrigation, lightning detection, and data
 
 ## Why ws_core
 
-Capabilities verified against `custom_components/ws_core/` at v2.1.0.
+Capabilities verified against `custom_components/ws_core/` at v2.2.0.
 Each point describes functionality not available in any other Home Assistant weather integration.
 
 - **Precipitation nowcast with minutes-until-rain.** `sensor.ws_minutes_until_rain`
@@ -94,15 +94,14 @@ groups (fire danger, nowcast, UTCI, lightning, etc.) from the device page or via
 
 ---
 
-## What's New in 2.0.7
+## What's New in 2.2.0
 
-- **Configure dialog fixes** — editing source sensors no longer fails with "Unknown error
-  occurred" (#70), and the general settings step no longer blocks with "Entity is neither
-  a valid entity ID nor a valid UUID" when no HA weather entity is selected (#71).
-- **Weather Underground uploads fixed** (thanks @miczu71, #72) — credential validation
-  now checks the station key (password) against the actual PWS upload endpoint, so valid
-  credentials save correctly and uploads are sent. The field is relabelled "Station key
-  (password)" to match `wunderground.com/member/devices`.
+- **Per-measurement unit selection (#84).** The Display Units step now has individual
+  selectors for wind speed (m/s, km/h, mph, kn), pressure (hPa, inHg, mmHg), rainfall
+  (mm, in), distance (km, mi), and altitude (m, ft) - on top of the existing
+  temperature and overall units preset. All default to `auto` (follows your HA unit
+  system) so existing installs are unaffected. Alert thresholds in the wizard and
+  Configure dialog automatically display in your chosen unit.
 
 ## What's New in 2.0
 
@@ -222,7 +221,7 @@ The setup wizard walks you through:
 | 2. Required sensors | Map your 7 mandatory sensor entities |
 | 3. Optional sensors | Map illuminance, UV, dew point, battery, solar radiation (leave blank to skip) |
 | 4. Location and climate | Hemisphere, climate region, elevation (auto-detected from HA) |
-| 5. Display units | Temperature, wind, rain, pressure unit preferences |
+| 5. Display units | Units preset plus per-measurement overrides: temperature, wind (m/s/km/h/mph/kn), pressure (hPa/inHg/mmHg), rain (mm/in), distance (km/mi), altitude (m/ft) |
 | 6. Forecast | Enable/disable 7-day forecast, coordinates, forecast provider |
 | 7. Features | Toggle feature groups: fire risk, fog, thunderstorm, sea temp, WU upload, air quality, pollen, moon, solar forecast, comfort indices, Meteo Vigilance, Vigicrues, station diagnostics, FWI components, advanced sensors, precipitation nowcast |
 | 8. Alerts | Wind/rain/freeze thresholds |

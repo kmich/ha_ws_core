@@ -54,10 +54,15 @@
       },
       "display": {
         "title": "Display units",
-        "description": "Choose how values are displayed. 'Auto' follows your Home Assistant unit system setting.",
+        "description": "Choose how sensor values are displayed. 'Auto' follows your Home Assistant unit system for each measurement. Individual unit overrides take precedence over the preset.",
         "data": {
-          "units_mode": "Wind / rain / pressure units",
+          "units_mode": "Units preset",
           "temp_unit": "Temperature unit",
+          "wind_unit": "Wind speed unit",
+          "pressure_unit": "Pressure unit",
+          "rain_unit": "Rainfall unit",
+          "distance_unit": "Distance unit",
+          "altitude_unit": "Altitude unit",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -308,8 +313,13 @@
           "hemisphere": "Hemisphere",
           "climate_region": "Climate region",
           "elevation_m": "Station elevation",
-          "units_mode": "Wind / rain / pressure units",
+          "units_mode": "Units preset",
           "temp_unit": "Temperature unit",
+          "wind_unit": "Wind speed unit",
+          "pressure_unit": "Pressure unit",
+          "rain_unit": "Rainfall unit",
+          "distance_unit": "Distance unit",
+          "altitude_unit": "Altitude unit",
           "forecast_enabled": "Enable forecast",
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
@@ -342,8 +352,13 @@
           "hemisphere": "Hemisphere",
           "climate_region": "Climate region",
           "elevation_m": "Station elevation",
-          "units_mode": "Wind / rain / pressure units",
-          "temp_unit": "Temperature unit",
+          "units_mode": "Sets a baseline unit system. Individual unit overrides below take precedence.",
+          "temp_unit": "Override temperature display. 'Auto' follows your HA unit system.",
+          "wind_unit": "Override wind speed display. 'Auto' follows your HA unit system.",
+          "pressure_unit": "Override pressure display. 'Auto' follows your HA unit system.",
+          "rain_unit": "Override rainfall display. 'Auto' follows your HA unit system.",
+          "distance_unit": "Override distance display (e.g. lightning distance). 'Auto' follows your HA unit system.",
+          "altitude_unit": "Override altitude display (e.g. cloud base, freezing level). 'Auto' follows your HA unit system.",
           "forecast_enabled": "Enable forecast",
           "forecast_interval_min": "Forecast refresh interval",
           "forecast_lat": "Forecast latitude",
@@ -2395,6 +2410,51 @@
         "auto": "Auto (follow Home Assistant)",
         "metric": "Metric (km/h, mm, hPa)",
         "imperial": "Imperial (mph, in, inHg)"
+      }
+    },
+    "temp_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "C": "Celsius (°C)",
+        "F": "Fahrenheit (°F)"
+      }
+    },
+    "wind_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "m/s": "m/s (metres per second)",
+        "km/h": "km/h (kilometres per hour)",
+        "mph": "mph (miles per hour)",
+        "kn": "kn (knots)"
+      }
+    },
+    "pressure_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "hPa": "hPa (hectopascals)",
+        "inHg": "inHg (inches of mercury)",
+        "mmHg": "mmHg (millimetres of mercury)"
+      }
+    },
+    "rain_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "mm": "mm (millimetres)",
+        "in": "in (inches)"
+      }
+    },
+    "distance_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "km": "km (kilometres)",
+        "mi": "mi (miles)"
+      }
+    },
+    "altitude_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "m": "m (metres)",
+        "ft": "ft (feet)"
       }
     },
     "forecast_provider": {
