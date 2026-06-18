@@ -2524,10 +2524,18 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         if self._desc.key in self._RESTORE_KEYS:
             last_state = await self.async_get_last_state()
             if last_state is not None and last_state.state not in ("unknown", "unavailable", None, ""):
-                try:
-                    self._restored_value = float(last_state.state)
-                except (ValueError, TypeError):
-                    self._restored_value = last_state.state
+                # If the unit changed (e.g. user switched from mm to in), the
+                # stored state value is in the old unit. Discard it to avoid
+                # showing a stale value in the wrong unit until the coordinator
+                # provides the first real reading.
+                last_unit = last_state.attributes.get("unit_of_measurement")
+                if self._unit_group and last_unit and last_unit != self._attr_native_unit_of_measurement:
+                    self._restored_value = None
+                else:
+                    try:
+                        self._restored_value = float(last_state.state)
+                    except (ValueError, TypeError):
+                        self._restored_value = last_state.state
             else:
                 self._restored_value = None
 
