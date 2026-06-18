@@ -2412,30 +2412,6 @@
         "imperial": "Impérial (mph, in, inHg)"
       }
     },
-    "temp_unit": {
-      "options": {
-        "auto": "Automatique (suit Home Assistant)",
-        "C": "Celsius (°C)",
-        "F": "Fahrenheit (°F)"
-      }
-    },
-    "wind_unit": {
-      "options": {
-        "auto": "Automatique (suit Home Assistant)",
-        "m/s": "m/s (mètres par seconde)",
-        "km/h": "km/h (kilomètres par heure)",
-        "mph": "mph (miles par heure)",
-        "kn": "kn (nœuds)"
-      }
-    },
-    "pressure_unit": {
-      "options": {
-        "auto": "Automatique (suit Home Assistant)",
-        "hPa": "hPa (hectopascals)",
-        "inHg": "inHg (pouces de mercure)",
-        "mmHg": "mmHg (millimètres de mercure)"
-      }
-    },
     "rain_unit": {
       "options": {
         "auto": "Automatique (suit Home Assistant)",
