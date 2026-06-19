@@ -2478,6 +2478,21 @@
         "meteo_france": "Météo France (free tier, API key)",
         "ha_weather_entity": "Home Assistant weather entity (no API calls)"
       }
+    },
+    "hemisphere": {
+      "options": {
+        "northern": "Northern",
+        "southern": "Southern"
+      }
+    },
+    "climate_region": {
+      "options": {
+        "tropical": "Tropical",
+        "dry": "Dry",
+        "temperate": "Temperate",
+        "continental": "Continental",
+        "polar": "Polar"
+      }
     }
   }
 }

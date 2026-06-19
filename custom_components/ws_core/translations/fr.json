@@ -2458,6 +2458,21 @@
         "meteo_france": "Météo France (Clé API requise, offre gratuite)",
         "ha_weather_entity": "Entité météo de Home Assistant"
       }
+    },
+    "hemisphere": {
+      "options": {
+        "northern": "Hémisphère Nord",
+        "southern": "Hémisphère Sud"
+      }
+    },
+    "climate_region": {
+      "options": {
+        "tropical": "Tropicale",
+        "dry": "Sèche",
+        "temperate": "Tempérée",
+        "continental": "Continentale",
+        "polar": "Polaire"
+      }
     }
   }
 }

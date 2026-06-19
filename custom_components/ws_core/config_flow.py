@@ -760,7 +760,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_TEMP_UNIT, default=default_temp): selector.SelectSelector(
                         selector.SelectSelectorConfig(
                             options=[
-                                {"value": "auto", "label": "Auto (follow Home Assistant)"},
+                                {"value": "auto", "label": "Auto"},
                                 {"value": "C", "label": "Celsius (°C)"},
                                 {"value": "F", "label": "Fahrenheit (°F)"},
                             ],
@@ -1989,14 +1989,14 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
                 vol.Optional(CONF_HEMISPHERE, default=g(CONF_HEMISPHERE, DEFAULT_HEMISPHERE)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in HEMISPHERE_OPTIONS], mode="list"
+                        options=HEMISPHERE_OPTIONS, mode="list", translation_key="hemisphere"
                     )
                 ),
                 vol.Optional(
                     CONF_CLIMATE_REGION, default=g(CONF_CLIMATE_REGION, DEFAULT_CLIMATE_REGION)
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in CLIMATE_REGION_OPTIONS], mode="dropdown"
+                        options=CLIMATE_REGION_OPTIONS, mode="dropdown", translation_key="climate_region"
                     )
                 ),
                 vol.Optional(
@@ -2018,7 +2018,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(CONF_TEMP_UNIT, default=g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=[
-                            {"value": "auto", "label": "Auto (follow Home Assistant)"},
+                            {"value": "auto", "label": "Auto"},
                             {"value": "C", "label": "Celsius (°C)"},
                             {"value": "F", "label": "Fahrenheit (°F)"},
                         ],
