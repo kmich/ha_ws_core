@@ -1988,9 +1988,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             {
                 vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
                 vol.Optional(CONF_HEMISPHERE, default=g(CONF_HEMISPHERE, DEFAULT_HEMISPHERE)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=HEMISPHERE_OPTIONS, mode="list", translation_key="hemisphere"
-                    )
+                    selector.SelectSelectorConfig(options=HEMISPHERE_OPTIONS, mode="list", translation_key="hemisphere")
                 ),
                 vol.Optional(
                     CONF_CLIMATE_REGION, default=g(CONF_CLIMATE_REGION, DEFAULT_CLIMATE_REGION)
