@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import sys
-from collections import deque
 from datetime import timedelta
 from unittest.mock import patch
 

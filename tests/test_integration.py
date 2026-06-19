@@ -7,8 +7,8 @@ diagnostics, and alert accumulation -- all with mocked HA environment.
 import json
 import os
 import sys
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,17 +17,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from custom_components.ws_core.const import (
     CONF_CLIMATE_REGION,
     CONF_ELEVATION_M,
-    CONF_ENABLE_AIR_QUALITY,
-    CONF_ENABLE_DISPLAY_SENSORS,
     CONF_ENABLE_ZAMBRETTI,
     CONF_FORECAST_ENABLED,
     CONF_HEMISPHERE,
-    CONF_NAME,
-    CONF_PREFIX,
     CONF_SOURCES,
     CONF_STALENESS_S,
-    DEFAULT_NAME,
-    DEFAULT_PREFIX,
     DOMAIN,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
@@ -45,7 +39,6 @@ from custom_components.ws_core.const import (
     SRC_WIND_DIR,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -54,7 +47,7 @@ def _make_state(state_val, unit="", last_updated=None):
     mock = MagicMock()
     mock.state = str(state_val)
     mock.attributes = {"unit_of_measurement": unit}
-    mock.last_updated = last_updated or datetime.now(timezone.utc)
+    mock.last_updated = last_updated or datetime.now(UTC)
     return mock
 
 
@@ -87,7 +80,7 @@ def _make_coordinator(**overrides):
     hass.config.latitude = 37.9
     hass.config.longitude = 23.7
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     states = {
         "sensor.temp": _make_state(22.0, "degC", now),
         "sensor.hum": _make_state(55.0, "%", now),
@@ -227,9 +220,9 @@ class TestAlertAccumulation:
             "thresh_freeze_c": freeze_thr,
         }
         # Call twice to satisfy ALERT_DEBOUNCE_ON_TICKS = 2
-        coord._compute_health(data, datetime.now(timezone.utc), [], [])
-        coord._compute_health(data, datetime.now(timezone.utc), [], [])
-        coord._compute_health(data, datetime.now(timezone.utc), [], [])
+        coord._compute_health(data, datetime.now(UTC), [], [])
+        coord._compute_health(data, datetime.now(UTC), [], [])
+        coord._compute_health(data, datetime.now(UTC), [], [])
         return data
 
     def test_no_alerts(self):
@@ -311,7 +304,7 @@ class TestAPIResponseHandling:
         # Call _compute_forecast if it exists
         if hasattr(coord, "_compute_forecast"):
             try:
-                coord._compute_forecast(data, datetime.now(timezone.utc), empty_response)
+                coord._compute_forecast(data, datetime.now(UTC), empty_response)
             except (KeyError, TypeError):
                 pytest.fail("_compute_forecast crashed on empty response")
 
@@ -326,7 +319,7 @@ class TestAPIResponseHandling:
         coord.entry_options = {}
         # Should not crash with None rain_rate
         try:
-            coord._compute_health(data, datetime.now(timezone.utc), [], [])
+            coord._compute_health(data, datetime.now(UTC), [], [])
         except (TypeError, ValueError):
             pytest.fail("_compute_health crashed on None rain_rate")
 
@@ -335,7 +328,7 @@ class TestAPIResponseHandling:
         coord, _, states = _make_coordinator()
         states["sensor.temp"] = _make_state("unavailable", "degC")
         data = {}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tc, *_ = coord._compute_raw_readings(data, now)
         assert tc is None  # Should gracefully return None, not crash
 
@@ -351,13 +344,13 @@ class TestSensorEntities:
         """The Zambretti forecast text and current condition are always enabled
         (not gated). The Zambretti number is opt-in via Advanced Sensors (v1.6.2)."""
         try:
-            from custom_components.ws_core.sensor import _FEATURE_TOGGLE_MAP
             from custom_components.ws_core.const import (
+                CONF_ENABLE_ADVANCED_SENSORS,
+                KEY_CURRENT_CONDITION,
                 KEY_ZAMBRETTI_FORECAST,
                 KEY_ZAMBRETTI_NUMBER,
-                KEY_CURRENT_CONDITION,
-                CONF_ENABLE_ADVANCED_SENSORS,
             )
+            from custom_components.ws_core.sensor import _FEATURE_TOGGLE_MAP
 
             # Forecast text + current condition stay always-on
             assert KEY_ZAMBRETTI_FORECAST not in _FEATURE_TOGGLE_MAP
@@ -404,8 +397,9 @@ class TestDiagnostics:
 
     def test_diagnostics_returns_valid_dict(self):
         import asyncio
-        from custom_components.ws_core.diagnostics import async_get_config_entry_diagnostics
+
         from custom_components.ws_core.coordinator import WSStationCoordinator, WSStationRuntime
+        from custom_components.ws_core.diagnostics import async_get_config_entry_diagnostics
 
         hass = MagicMock()
         entry = MagicMock()
@@ -448,6 +442,7 @@ class TestDiagnostics:
 
     def test_diagnostics_handles_no_coordinator(self):
         import asyncio
+
         from custom_components.ws_core.diagnostics import async_get_config_entry_diagnostics
 
         hass = MagicMock()

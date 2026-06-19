@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -80,9 +80,8 @@ class TestDeriveNowcast:
         assert r["next_60min_mm"] == 0.0
 
     def test_tz_aware_now_is_coerced(self):
-        from datetime import timezone
 
-        now = datetime(2026, 5, 22, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 5, 22, 12, 0, tzinfo=UTC)
         times, precip = _buckets(datetime(2026, 5, 22, 12, 0), [0.0, 0.3, 0.0, 0.0])
         r = derive_nowcast(times, precip, now)
         assert r["minutes_until_rain"] == 15

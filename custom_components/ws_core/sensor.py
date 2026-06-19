@@ -140,10 +140,10 @@ from .const import (
     KEY_IRRIGATION_NEED,
     KEY_IRRIGATION_NEED_SCORE,
     KEY_LEAF_WETNESS,
+    KEY_LIGHTNING_AZIMUTH,
     KEY_LIGHTNING_CLEARANCE_MIN,
     KEY_LIGHTNING_COUNT_1H,
     KEY_LIGHTNING_DISTANCE_KM,
-    KEY_LIGHTNING_AZIMUTH,
     KEY_LIGHTNING_PROXIMITY,
     KEY_LIGHTNING_RATE_1H,
     KEY_LUX,
@@ -1901,7 +1901,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:moon-waxing-crescent",
         device_class=SensorDeviceClass.ENUM,
         options=[
-            "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous", 
+            "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous",
             "full_moon", "waning_gibbous", "last_quarter", "waning_crescent"
         ],
         attrs_fn=lambda d: {

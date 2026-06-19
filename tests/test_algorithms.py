@@ -1,32 +1,55 @@
 """Unit tests for ws_core meteorological algorithms."""
 from __future__ import annotations
-import sys, os
+
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
+
 from custom_components.ws_core.algorithms import (
-    calculate_dew_point, calculate_sea_level_pressure, calculate_apparent_temperature,
-    wind_speed_to_beaufort, beaufort_description, direction_to_quadrant,
-    pressure_trend_display, zambretti_forecast, ZAMBRETTI_TEXTS,
-    uv_burn_time_minutes, uv_level,
-    calculate_us_aqi, aqi_level, pollen_level, pollen_overall,
-    calculate_moon_phase, calculate_moon_illumination, moon_display_string,
-    et0_hargreaves, et0_penman_monteith,
+    ZAMBRETTI_TEXTS,
     KalmanFilter,
-    calculate_heat_index, calculate_wind_chill, calculate_humidex,
-    calculate_vpd, calculate_absolute_humidity, calculate_delta_t,
-    calculate_thw_index, calculate_thsw_index,
-    calculate_clearness_index, clearness_to_cloud_cover,
-    calculate_wet_bulb,
-    compute_fwi,
-    calculate_rain_probability,
-    calculate_utci,
-    calculate_cloud_base_m,
-    calculate_freezing_level_m,
-    calculate_wbgt_simplified,
-    calculate_wbgt_outdoor,
-    fog_probability,
+    aqi_level,
+    beaufort_description,
+    calculate_absolute_humidity,
     calculate_air_density,
+    calculate_apparent_temperature,
+    calculate_clearness_index,
+    calculate_cloud_base_m,
+    calculate_delta_t,
+    calculate_dew_point,
+    calculate_freezing_level_m,
+    calculate_heat_index,
+    calculate_humidex,
+    calculate_moon_illumination,
+    calculate_moon_phase,
+    calculate_rain_probability,
+    calculate_sea_level_pressure,
+    calculate_thsw_index,
+    calculate_thw_index,
+    calculate_us_aqi,
+    calculate_utci,
+    calculate_vpd,
+    calculate_wbgt_outdoor,
+    calculate_wbgt_simplified,
+    calculate_wet_bulb,
+    calculate_wind_chill,
+    clearness_to_cloud_cover,
+    compute_fwi,
+    direction_to_quadrant,
+    et0_hargreaves,
+    et0_penman_monteith,
+    fog_probability,
+    moon_display_string,
+    pollen_level,
+    pollen_overall,
+    pressure_trend_display,
+    uv_burn_time_minutes,
+    uv_level,
+    wind_speed_to_beaufort,
+    zambretti_forecast,
 )
 
 

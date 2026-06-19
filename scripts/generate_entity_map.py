@@ -16,7 +16,7 @@ import json
 import pathlib
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 ROOT = pathlib.Path(__file__).parent.parent
 
@@ -192,7 +192,7 @@ def _badge(desc: dict) -> str:
 
 def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> str:
     version = manifest.get("version", "unknown")
-    generated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    generated = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     sections_html = ""
     ungrouped = []

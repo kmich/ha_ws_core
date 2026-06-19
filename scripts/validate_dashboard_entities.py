@@ -125,7 +125,7 @@ def validate(prefix: str = "ws", verbose: bool = False) -> bool:
             all_ok = False
             print(f"\n❌ {dash_path.name}: {len(broken)} broken entity ref(s)")
             for eid, lines in sorted(broken.items()):
-                line_str = ", ".join(str(l) for l in lines[:5])
+                line_str = ", ".join(str(line_num) for line_num in lines[:5])
                 if len(lines) > 5:
                     line_str += f" (+{len(lines)-5} more)"
                 print(f"   BROKEN  {eid}  (lines: {line_str})")

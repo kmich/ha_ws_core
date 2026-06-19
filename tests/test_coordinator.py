@@ -5,14 +5,11 @@ without requiring a full Home Assistant environment. We mock the HA
 state machine and test each _compute_* sub-method in isolation.
 """
 
-import math
 import os
 import sys
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -23,23 +20,15 @@ from custom_components.ws_core.const import (
     CONF_HEMISPHERE,
     CONF_SOURCES,
     CONF_STALENESS_S,
-    KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
     KEY_FEELS_LIKE_C,
     KEY_FROST_POINT_C,
     KEY_HEALTH_DISPLAY,
-    KEY_NORM_HUMIDITY,
-    KEY_NORM_PRESSURE_HPA,
-    KEY_NORM_TEMP_C,
-    KEY_NORM_WIND_DIR_DEG,
     KEY_NORM_WIND_GUST_MS,
-    KEY_NORM_WIND_SPEED_MS,
     KEY_PACKAGE_OK,
-    KEY_PRESSURE_TREND_HPAH,
     KEY_SEA_LEVEL_PRESSURE_HPA,
-    KEY_SENSOR_QUALITY_FLAGS,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_QUADRANT,
@@ -54,7 +43,6 @@ from custom_components.ws_core.const import (
     SRC_WIND_DIR,
 )
 
-
 # ---------------------------------------------------------------------------
 # Mock helpers
 # ---------------------------------------------------------------------------
@@ -65,7 +53,7 @@ def _make_state(state_val: str, unit: str = "", last_updated=None):
     mock = MagicMock()
     mock.state = state_val
     mock.attributes = {"unit_of_measurement": unit}
-    mock.last_updated = last_updated or datetime.now(timezone.utc)
+    mock.last_updated = last_updated or datetime.now(UTC)
     return mock
 
 
@@ -100,7 +88,7 @@ def _make_coordinator(
     hass.config.latitude = 37.9
     hass.config.longitude = 23.7
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     states = {
         "sensor.temp": _make_state(str(temp), "°C", now),
         "sensor.hum": _make_state(str(humidity), "%", now),
@@ -243,7 +231,7 @@ class TestComputeRawReadings:
     def test_reads_all_sources(self):
         coord = _make_coordinator()
         data = {}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         tc, rh, p, ws, gs, wd, rain, lux, uv = coord._compute_raw_readings(data, now)
 
         assert tc == 22.0
@@ -260,7 +248,7 @@ class TestComputeRawReadings:
         # Change the unit to F
         coord.hass.states.get("sensor.temp").attributes["unit_of_measurement"] = "°F"
         data = {}
-        tc, *_ = coord._compute_raw_readings(data, datetime.now(timezone.utc))
+        tc, *_ = coord._compute_raw_readings(data, datetime.now(UTC))
         assert abs(tc - 25.0) < 0.1, f"77°F should be 25°C, got {tc}"
 
     def test_missing_sensor_returns_none(self):
@@ -268,7 +256,7 @@ class TestComputeRawReadings:
         coord.hass.states.get = lambda eid: None  # all sensors missing
         data = {}
         tc, rh, p, ws, gs, wd, rain, lux, uv = coord._compute_raw_readings(
-            data, datetime.now(timezone.utc)
+            data, datetime.now(UTC)
         )
         assert tc is None
         assert rh is None
@@ -283,7 +271,7 @@ class TestComputeDerivedTemperature:
     def test_computes_dew_point(self):
         coord = _make_coordinator()
         data = {}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         dew = coord._compute_derived_temperature(data, now, 25.0, 60.0, 3.0)
         assert dew is not None
         assert 15.0 < dew < 18.0
@@ -292,27 +280,27 @@ class TestComputeDerivedTemperature:
     def test_computes_frost_point(self):
         coord = _make_coordinator()
         data = {}
-        coord._compute_derived_temperature(data, datetime.now(timezone.utc), -5.0, 80.0, 2.0)
+        coord._compute_derived_temperature(data, datetime.now(UTC), -5.0, 80.0, 2.0)
         assert KEY_FROST_POINT_C in data
         assert data[KEY_FROST_POINT_C] < -5.0
 
     def test_computes_wet_bulb(self):
         coord = _make_coordinator()
         data = {}
-        coord._compute_derived_temperature(data, datetime.now(timezone.utc), 30.0, 50.0, 2.0)
+        coord._compute_derived_temperature(data, datetime.now(UTC), 30.0, 50.0, 2.0)
         assert KEY_WET_BULB_C in data
         assert 18.0 < data[KEY_WET_BULB_C] < 25.0
 
     def test_computes_feels_like(self):
         coord = _make_coordinator()
         data = {}
-        coord._compute_derived_temperature(data, datetime.now(timezone.utc), 30.0, 70.0, 5.0)
+        coord._compute_derived_temperature(data, datetime.now(UTC), 30.0, 70.0, 5.0)
         assert KEY_FEELS_LIKE_C in data
 
     def test_handles_none_gracefully(self):
         coord = _make_coordinator()
         data = {}
-        dew = coord._compute_derived_temperature(data, datetime.now(timezone.utc), None, None, None)
+        dew = coord._compute_derived_temperature(data, datetime.now(UTC), None, None, None)
         assert dew is None
         assert KEY_DEW_POINT_C not in data
 
@@ -326,14 +314,14 @@ class TestComputeDerivedPressure:
     def test_computes_mslp(self):
         coord = _make_coordinator(elevation=100.0)
         data = {}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         trend, mslp = coord._compute_derived_pressure(data, now, 20.0, 1000.0, 60.0)
         assert KEY_SEA_LEVEL_PRESSURE_HPA in data
         assert data[KEY_SEA_LEVEL_PRESSURE_HPA] > 1000.0  # MSLP > station pressure at elevation
 
     def test_pressure_history_accumulates(self):
         coord = _make_coordinator()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for i in range(5):
             data = {}
             t = now + timedelta(minutes=i * 16)
@@ -343,7 +331,7 @@ class TestComputeDerivedPressure:
     def test_zambretti_computed(self):
         coord = _make_coordinator()
         data = {KEY_WIND_QUADRANT: "N"}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         coord._compute_derived_pressure(data, now, 20.0, 1013.0, 60.0)
         assert KEY_ZAMBRETTI_FORECAST in data
         assert KEY_ZAMBRETTI_NUMBER in data
@@ -360,24 +348,24 @@ class TestComputeDerivedWind:
     def test_computes_beaufort(self):
         coord = _make_coordinator()
         data = {}
-        coord._compute_derived_wind(data, datetime.now(timezone.utc), 5.5, 8.0, 270.0)
+        coord._compute_derived_wind(data, datetime.now(UTC), 5.5, 8.0, 270.0)
         assert KEY_WIND_BEAUFORT in data
         assert data[KEY_WIND_BEAUFORT] == 4  # 5.5 m/s is at Beaufort 3/4 boundary
 
     def test_computes_quadrant(self):
         coord = _make_coordinator()
         data = {}
-        coord._compute_derived_wind(data, datetime.now(timezone.utc), 3.0, 5.0, 90.0)
+        coord._compute_derived_wind(data, datetime.now(UTC), 3.0, 5.0, 90.0)
         assert data[KEY_WIND_QUADRANT] == "E"
 
     def test_smoothes_direction(self):
         coord = _make_coordinator()
         # First reading
         data = {}
-        coord._compute_derived_wind(data, datetime.now(timezone.utc), 3.0, 5.0, 0.0)
+        coord._compute_derived_wind(data, datetime.now(UTC), 3.0, 5.0, 0.0)
         # Second reading at 180° should smooth
         data2 = {}
-        coord._compute_derived_wind(data2, datetime.now(timezone.utc), 3.0, 5.0, 180.0)
+        coord._compute_derived_wind(data2, datetime.now(UTC), 3.0, 5.0, 180.0)
         smooth = coord.runtime.smoothed_wind_dir
         assert smooth is not None
         # Should be between 0 and 180, not a jump
@@ -393,7 +381,7 @@ class TestComputeHealth:
     def test_all_healthy(self):
         coord = _make_coordinator()
         data = {}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         coord._compute_health(data, now, missing=[], missing_entities=[])
         assert data[KEY_PACKAGE_OK] is True
         assert data[KEY_HEALTH_DISPLAY] in ("online", "degraded")
@@ -401,7 +389,7 @@ class TestComputeHealth:
     def test_missing_sources(self):
         coord = _make_coordinator()
         data = {}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         coord._compute_health(data, now, missing=["temperature"], missing_entities=[])
         assert data[KEY_PACKAGE_OK] is False
         assert "ERROR" in data.get(KEY_DATA_QUALITY, "") or "missing" in data.get(KEY_DATA_QUALITY, "").lower()
@@ -410,7 +398,7 @@ class TestComputeHealth:
         coord = _make_coordinator()
         coord.entry_options = {"thresh_wind_gust_ms": 10.0}
         data = {KEY_NORM_WIND_GUST_MS: 15.0, "rain_rate_mmph_filtered": 0.0}
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Call twice to satisfy ALERT_DEBOUNCE_ON_TICKS = 2
         coord._compute_health(data, now, missing=[], missing_entities=[])
         coord._compute_health(data, now, missing=[], missing_entities=[])
@@ -491,7 +479,7 @@ class TestRollingWindows:
     def test_append_and_prune(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
         history = deque()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Add values spanning 26 hours
         for i in range(26):
             WSStationCoordinator._append_and_prune_24h(
@@ -505,7 +493,7 @@ class TestRollingWindows:
     def test_rain_accum_handles_reset(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
         history = deque()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Simulate: 0, 1, 2, 0 (reset), 1
         for i, val in enumerate([0.0, 1.0, 2.0, 0.0, 1.0]):
             history.append((now + timedelta(minutes=i * 15), val))
