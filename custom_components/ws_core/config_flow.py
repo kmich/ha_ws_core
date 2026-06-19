@@ -758,10 +758,11 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_TEMP_UNIT, default=default_temp): selector.SelectSelector(
                         selector.SelectSelectorConfig(
                             options=[
-                            {"value": "auto", "label": "Auto (follow Home Assistant)"},
-                            {"value": "C", "label": "Celsius (°C)"},
-                            {"value": "F", "label": "Fahrenheit (°F)"},
-                        ], mode="list"
+                                {"value": "auto", "label": "Auto (follow Home Assistant)"},
+                                {"value": "C", "label": "Celsius (°C)"},
+                                {"value": "F", "label": "Fahrenheit (°F)"},
+                            ],
+                            mode="list",
                         )
                     ),
                     vol.Required(CONF_WIND_UNIT, default=DEFAULT_WIND_UNIT): selector.SelectSelector(
@@ -2018,7 +2019,8 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                             {"value": "auto", "label": "Auto (follow Home Assistant)"},
                             {"value": "C", "label": "Celsius (°C)"},
                             {"value": "F", "label": "Fahrenheit (°F)"},
-                        ], mode="list"
+                        ],
+                        mode="list",
                     )
                 ),
                 vol.Optional(CONF_WIND_UNIT, default=g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT)): selector.SelectSelector(

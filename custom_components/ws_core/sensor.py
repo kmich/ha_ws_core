@@ -1901,8 +1901,14 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:moon-waxing-crescent",
         device_class=SensorDeviceClass.ENUM,
         options=[
-            "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous",
-            "full_moon", "waning_gibbous", "last_quarter", "waning_crescent"
+            "new_moon",
+            "waxing_crescent",
+            "first_quarter",
+            "waxing_gibbous",
+            "full_moon",
+            "waning_gibbous",
+            "last_quarter",
+            "waning_crescent",
         ],
         attrs_fn=lambda d: {
             "phase": d.get(KEY_MOON_PHASE),
