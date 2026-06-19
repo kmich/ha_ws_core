@@ -2207,7 +2207,13 @@
         "name": "{river} - River Flow"
       },
       "frost_risk": {
-        "name": "Frost Risk"
+        "name": "Frost Risk",
+        "state": {
+          "no_risk": "No Risk",
+          "unlikely": "Unlikely",
+          "probable": "Probable",
+          "high": "High"
+        }
       }
     },
     "select": {
@@ -2472,14 +2478,6 @@
         "meteo_france": "Météo France (free tier, API key)",
         "ha_weather_entity": "Home Assistant weather entity (no API calls)"
       }
-    }
-  },
-  "state": {
-    "frost_risk": {
-      "no_risk": "No Risk",
-      "unlikely": "Unlikely",
-      "probable": "Probable",
-      "high": "High"
     }
   }
 }

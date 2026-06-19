@@ -578,6 +578,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data[CONF_NAME] = str(user_input.get(CONF_NAME) or DEFAULT_NAME)
             self._data[CONF_PREFIX] = _sanitize_prefix(str(user_input.get(CONF_PREFIX) or DEFAULT_PREFIX))
+            await self.async_set_unique_id(self._data[CONF_PREFIX])
+            self._abort_if_unique_id_configured()
             return await self.async_step_required_sources()
 
         return self._show_step(

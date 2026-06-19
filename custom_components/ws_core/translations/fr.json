@@ -2187,7 +2187,13 @@
         "name": "{river} - Débit"
       },
       "frost_risk": {
-        "name": "Risque de gel"
+        "name": "Risque de gel",
+        "state": {
+          "no_risk": "Aucun risque",
+          "unlikely": "Peu probable",
+          "probable": "Probable",
+          "high": "Élevé"
+        }
       }
     },
     "select": {
@@ -2452,14 +2458,6 @@
         "meteo_france": "Météo France (Clé API requise, offre gratuite)",
         "ha_weather_entity": "Entité météo de Home Assistant"
       }
-    }
-  },
-  "state": {
-    "frost_risk": {
-      "no_risk": "Aucun risque",
-      "unlikely": "Peu probable",
-      "probable": "Probable",
-      "high": "Élevé"
     }
   }
 }
