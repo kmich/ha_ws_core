@@ -143,6 +143,7 @@ from .const import (
     KEY_LIGHTNING_CLEARANCE_MIN,
     KEY_LIGHTNING_COUNT_1H,
     KEY_LIGHTNING_DISTANCE_KM,
+    KEY_LIGHTNING_AZIMUTH,
     KEY_LIGHTNING_PROXIMITY,
     KEY_LIGHTNING_RATE_1H,
     KEY_LUX,
@@ -532,7 +533,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:calendar-weather",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get(KEY_FORECAST) or {}).get("provider") if d.get(KEY_FORECAST) else None,
-        attrs_fn=lambda d: d.get(KEY_FORECAST) or {},
+        attrs_fn=lambda d: {"forecast": (d.get(KEY_FORECAST) or {}).get("daily", [])},
     ),
     WSSensorDescription(
         key=KEY_FORECAST_PROVIDER,
@@ -1018,6 +1019,14 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "proximity": d.get(KEY_LIGHTNING_PROXIMITY),
         },
+    ),
+    WSSensorDescription(
+        key=KEY_LIGHTNING_AZIMUTH,
+        translation_key="lightning_azimuth",
+        name="WS Lightning Azimuth",
+        icon="mdi:compass",
+        native_unit="°",
+        state_class=SensorStateClass.MEASUREMENT,
     ),
     WSSensorDescription(
         key=KEY_LIGHTNING_RATE_1H,
@@ -1768,6 +1777,8 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="irrigation_need",
         name="WS Irrigation Need",
         icon="mdi:sprinkler",
+        device_class=SensorDeviceClass.ENUM,
+        options=["None", "Low", "Moderate", "High", "Critical"],
         native_unit=None,
         state_class=None,
         attrs_fn=lambda d: {
@@ -1888,6 +1899,11 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="moon",
         name="WS Moon",
         icon="mdi:moon-waxing-crescent",
+        device_class=SensorDeviceClass.ENUM,
+        options=[
+            "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous", 
+            "full_moon", "waning_gibbous", "last_quarter", "waning_crescent"
+        ],
         attrs_fn=lambda d: {
             "phase": d.get(KEY_MOON_PHASE),
             "illumination_pct": d.get(KEY_MOON_ILLUMINATION_PCT),
@@ -2300,6 +2316,7 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # v2.0 - lightning sensors
     KEY_LIGHTNING_COUNT_1H: CONF_ENABLE_LIGHTNING,
     KEY_LIGHTNING_DISTANCE_KM: CONF_ENABLE_LIGHTNING,
+    KEY_LIGHTNING_AZIMUTH: CONF_ENABLE_LIGHTNING,
     KEY_LIGHTNING_RATE_1H: CONF_ENABLE_LIGHTNING,
     KEY_LIGHTNING_CLEARANCE_MIN: CONF_ENABLE_LIGHTNING,
     KEY_LIGHTNING_PROXIMITY: CONF_ENABLE_LIGHTNING,

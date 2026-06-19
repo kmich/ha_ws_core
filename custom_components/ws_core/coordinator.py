@@ -2468,15 +2468,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if SRC_LIGHTNING_DISTANCE not in self._blitzortung_sources and ("distance" in uid or "distance" in eid):
                 self._blitzortung_sources[SRC_LIGHTNING_DISTANCE] = eid
                 _LOGGER.debug("Blitzortung lightning distance auto-detected: %s", eid)
+            if SRC_LIGHTNING_AZIMUTH not in self._blitzortung_sources and ("azimuth" in uid or "azimuth" in eid):
+                self._blitzortung_sources[SRC_LIGHTNING_AZIMUTH] = eid
+                _LOGGER.debug("Blitzortung lightning azimuth auto-detected: %s", eid)
 
     def _compute_lightning(self, data: dict, now: Any) -> None:
         """Derive lightning sensors from optional strike count + distance inputs.  (v2.0)"""
         if not self.lightning_enabled:
             return
 
-        # Retry Blitzortung discovery on every tick until both sources are found;
+        # Retry Blitzortung discovery on every tick until at least count or distance is found;
         # the initial __init__ call may run before Blitzortung has registered its entities.
-        if len(self._blitzortung_sources) < 2:
+        if len(self._blitzortung_sources) < 1:
             self._discover_blitzortung()
 
         # Use physical sensor if mapped; fall back to auto-detected Blitzortung entity
@@ -2488,10 +2491,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass,
             self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE),
         )
+        azimuth_raw = self._num(
+            self.hass,
+            self.sources.get(SRC_LIGHTNING_AZIMUTH) or self._blitzortung_sources.get(SRC_LIGHTNING_AZIMUTH),
+        )
 
-        # Strike distance passthrough
+        # Strike distance and azimuth passthrough
         if dist_raw is not None:
             data[KEY_LIGHTNING_DISTANCE_KM] = round(float(dist_raw), 1)
+        if azimuth_raw is not None:
+            data[KEY_LIGHTNING_AZIMUTH] = int(float(azimuth_raw))
+        if dist_raw is not None:
             prox_km = self._lightning_proximity_km
             data[KEY_LIGHTNING_PROXIMITY] = "near" if float(dist_raw) <= prox_km else "clear"
 
@@ -3718,7 +3728,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             illum_pct = round(illum_frac * 100)
             data[KEY_MOON_PHASE] = phase_key
             data[KEY_MOON_ILLUMINATION_PCT] = illum_pct
-            data[KEY_MOON_DISPLAY] = moon_display_string(phase_key, illum_pct)
+            data[KEY_MOON_DISPLAY] = phase_key
             data[KEY_MOON_AGE_DAYS] = age
             data[KEY_MOON_NEXT_FULL] = moon_next_phase_days(local_now.year, local_now.month, local_now.day, 14.77)
             data[KEY_MOON_NEXT_NEW] = moon_next_phase_days(local_now.year, local_now.month, local_now.day, 0.0)

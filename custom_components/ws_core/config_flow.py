@@ -757,28 +757,33 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Required(CONF_TEMP_UNIT, default=default_temp): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[
-                                {"value": "auto", "label": "Auto (follow Home Assistant)"},
-                                {"value": "C", "label": "Celsius (°C)"},
-                                {"value": "F", "label": "Fahrenheit (°F)"},
-                            ],
-                            mode="list",
+                            options=TEMP_UNIT_OPTIONS, mode="list", translation_key="temp_unit"
                         )
                     ),
                     vol.Required(CONF_WIND_UNIT, default=DEFAULT_WIND_UNIT): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=WIND_UNIT_OPTIONS, mode="list")
+                        selector.SelectSelectorConfig(
+                            options=WIND_UNIT_OPTIONS, mode="list", translation_key="wind_unit"
+                        )
                     ),
                     vol.Required(CONF_PRESSURE_UNIT, default=DEFAULT_PRESSURE_UNIT): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=PRESSURE_UNIT_OPTIONS, mode="list")
+                        selector.SelectSelectorConfig(
+                            options=PRESSURE_UNIT_OPTIONS, mode="list", translation_key="pressure_unit"
+                        )
                     ),
                     vol.Required(CONF_RAIN_UNIT, default=DEFAULT_RAIN_UNIT): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=RAIN_UNIT_OPTIONS, mode="list")
+                        selector.SelectSelectorConfig(
+                            options=RAIN_UNIT_OPTIONS, mode="list", translation_key="rain_unit"
+                        )
                     ),
                     vol.Required(CONF_DISTANCE_UNIT, default=DEFAULT_DISTANCE_UNIT): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=DISTANCE_UNIT_OPTIONS, mode="list")
+                        selector.SelectSelectorConfig(
+                            options=DISTANCE_UNIT_OPTIONS, mode="list", translation_key="distance_unit"
+                        )
                     ),
                     vol.Required(CONF_ALTITUDE_UNIT, default=DEFAULT_ALTITUDE_UNIT): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=ALTITUDE_UNIT_OPTIONS, mode="list")
+                        selector.SelectSelectorConfig(
+                            options=ALTITUDE_UNIT_OPTIONS, mode="list", translation_key="altitude_unit"
+                        )
                     ),
                 }
             ),
@@ -1976,12 +1981,16 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             {
                 vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
                 vol.Optional(CONF_HEMISPHERE, default=g(CONF_HEMISPHERE, DEFAULT_HEMISPHERE)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=HEMISPHERE_OPTIONS, mode="list")
+                    selector.SelectSelectorConfig(
+                        options=HEMISPHERE_OPTIONS, mode="list", translation_key="hemisphere"
+                    )
                 ),
                 vol.Optional(
                     CONF_CLIMATE_REGION, default=g(CONF_CLIMATE_REGION, DEFAULT_CLIMATE_REGION)
                 ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=CLIMATE_REGION_OPTIONS, mode="dropdown")
+                    selector.SelectSelectorConfig(
+                        options=CLIMATE_REGION_OPTIONS, mode="dropdown", translation_key="climate_region"
+                    )
                 ),
                 vol.Optional(
                     CONF_ELEVATION_M, default=g(CONF_ELEVATION_M, DEFAULT_ELEVATION_M)
@@ -2001,29 +2010,40 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 vol.Optional(CONF_TEMP_UNIT, default=g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[
-                            {"value": "auto", "label": "Auto (follow Home Assistant)"},
-                            {"value": "C", "label": "Celsius (°C)"},
-                            {"value": "F", "label": "Fahrenheit (°F)"},
-                        ],
-                        mode="list",
+                        options=TEMP_UNIT_OPTIONS, mode="list", translation_key="temp_unit"
                     )
                 ),
                 vol.Optional(CONF_WIND_UNIT, default=g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=WIND_UNIT_OPTIONS, mode="list")
+                    selector.SelectSelectorConfig(
+                        options=WIND_UNIT_OPTIONS, mode="list", translation_key="wind_unit"
+                    )
                 ),
                 vol.Optional(
                     CONF_PRESSURE_UNIT, default=g(CONF_PRESSURE_UNIT, DEFAULT_PRESSURE_UNIT)
-                ): selector.SelectSelector(selector.SelectSelectorConfig(options=PRESSURE_UNIT_OPTIONS, mode="list")),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=PRESSURE_UNIT_OPTIONS, mode="list", translation_key="pressure_unit"
+                    )
+                ),
                 vol.Optional(CONF_RAIN_UNIT, default=g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=RAIN_UNIT_OPTIONS, mode="list")
+                    selector.SelectSelectorConfig(
+                        options=RAIN_UNIT_OPTIONS, mode="list", translation_key="rain_unit"
+                    )
                 ),
                 vol.Optional(
                     CONF_DISTANCE_UNIT, default=g(CONF_DISTANCE_UNIT, DEFAULT_DISTANCE_UNIT)
-                ): selector.SelectSelector(selector.SelectSelectorConfig(options=DISTANCE_UNIT_OPTIONS, mode="list")),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=DISTANCE_UNIT_OPTIONS, mode="list", translation_key="distance_unit"
+                    )
+                ),
                 vol.Optional(
                     CONF_ALTITUDE_UNIT, default=g(CONF_ALTITUDE_UNIT, DEFAULT_ALTITUDE_UNIT)
-                ): selector.SelectSelector(selector.SelectSelectorConfig(options=ALTITUDE_UNIT_OPTIONS, mode="list")),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ALTITUDE_UNIT_OPTIONS, mode="list", translation_key="altitude_unit"
+                    )
+                ),
                 vol.Optional(
                     CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)
                 ): selector.BooleanSelector(),
