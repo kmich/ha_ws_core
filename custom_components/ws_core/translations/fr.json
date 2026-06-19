@@ -782,7 +782,12 @@
         }
       },
       "forecast_daily": {
-        "name": "Prévisions quotidiennes"
+        "name": "Prévisions journalières",
+        "state_attributes": {
+          "forecast": {
+            "name": "Prévisions"
+          }
+        }
       },
       "forecast_provider": {
         "name": "Fournisseur de prévisions",
@@ -1472,6 +1477,16 @@
           "days_to_new_moon": {
             "name": "Jours avant la nouvelle lune"
           }
+        },
+        "state": {
+          "new_moon": "Nouvelle lune",
+          "waxing_crescent": "Premier croissant",
+          "first_quarter": "Premier quartier",
+          "waxing_gibbous": "Lune gibbeuse croissante",
+          "full_moon": "Pleine lune",
+          "waning_gibbous": "Lune gibbeuse décroissante",
+          "last_quarter": "Dernier quartier",
+          "waning_crescent": "Dernier croissant"
         }
       },
       "moon_illumination": {
@@ -2142,6 +2157,13 @@
           "soil_moisture_deficit_pct": {
             "name": "Déficit en eau du sol (%)"
           }
+        },
+        "state": {
+          "none": "Aucun",
+          "low": "Faible",
+          "moderate": "Modéré",
+          "high": "Élevé",
+          "critical": "Critique"
         }
       },
       "irrigation_need_score": {
@@ -2429,21 +2451,21 @@
     },
     "rain_unit": {
       "options": {
-        "auto": "Automatique (suit Home Assistant)",
+        "auto": "Auto (suit Home Assistant)",
         "mm": "mm (millimètres)",
         "in": "in (pouces)"
       }
     },
     "distance_unit": {
       "options": {
-        "auto": "Automatique (suit Home Assistant)",
+        "auto": "Auto (suit Home Assistant)",
         "km": "km (kilomètres)",
         "mi": "mi (miles)"
       }
     },
     "altitude_unit": {
       "options": {
-        "auto": "Automatique (suit Home Assistant)",
+        "auto": "Auto (suit Home Assistant)",
         "m": "m (mètres)",
         "ft": "ft (pieds)"
       }
@@ -2457,6 +2479,30 @@
         "pirate_weather": "Pirate Weather (Clé API requise, offre gratuite)",
         "meteo_france": "Météo France (Clé API requise, offre gratuite)",
         "ha_weather_entity": "Entité météo de Home Assistant"
+      }
+    },
+    "temp_unit": {
+      "options": {
+        "auto": "Auto (suit Home Assistant)",
+        "C": "Celsius (°C)",
+        "F": "Fahrenheit (°F)"
+      }
+    },
+    "wind_unit": {
+      "options": {
+        "auto": "Auto (suit Home Assistant)",
+        "m/s": "m/s",
+        "km/h": "km/h",
+        "mph": "mph",
+        "kn": "kn"
+      }
+    },
+    "pressure_unit": {
+      "options": {
+        "auto": "Auto (suit Home Assistant)",
+        "hPa": "hPa",
+        "inHg": "inHg",
+        "mmHg": "mmHg"
       }
     }
   }
