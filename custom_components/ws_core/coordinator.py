@@ -2293,15 +2293,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_IRRIGATION_NEED_SCORE] = round(score, 0)
 
         if score < 10:
-            need_label = "None"
+            need_label = "none"
         elif score < 25:
-            need_label = "Low"
+            need_label = "low"
         elif score < 50:
-            need_label = "Moderate"
+            need_label = "moderate"
         elif score < 75:
-            need_label = "High"
+            need_label = "high"
         else:
-            need_label = "Critical"
+            need_label = "critical"
         data[KEY_IRRIGATION_NEED] = need_label
 
     async def _async_fetch_neighbor_qc(self) -> None:

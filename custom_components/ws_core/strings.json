@@ -2154,11 +2154,11 @@
           }
         },
         "state": {
-          "None": "None",
-          "Low": "Low",
-          "Moderate": "Moderate",
-          "High": "High",
-          "Critical": "Critical"
+          "none": "None",
+          "low": "Low",
+          "moderate": "Moderate",
+          "high": "High",
+          "critical": "Critical"
         }
       },
       "irrigation_need_score": {
@@ -2462,48 +2462,6 @@
         "pirate_weather": "Pirate Weather (free tier, API key)",
         "meteo_france": "Météo France (free tier, API key)",
         "ha_weather_entity": "Home Assistant weather entity (no API calls)"
-      }
-    },
-    "hemisphere": {
-      "options": {
-        "Northern": "Northern",
-        "Southern": "Southern"
-      }
-    },
-    "climate_region": {
-      "options": {
-        "Atlantic Europe": "Atlantic Europe",
-        "Mediterranean": "Mediterranean",
-        "Continental Europe": "Continental Europe",
-        "Scandinavia": "Scandinavia",
-        "North America East": "North America East",
-        "North America West": "North America West",
-        "Australia": "Australia",
-        "Custom": "Custom"
-      }
-    },
-    "temp_unit": {
-      "options": {
-        "auto": "Auto (follow Home Assistant)",
-        "C": "Celsius (°C)",
-        "F": "Fahrenheit (°F)"
-      }
-    },
-    "wind_unit": {
-      "options": {
-        "auto": "Auto (follow Home Assistant)",
-        "m/s": "m/s (metres per second)",
-        "km/h": "km/h (kilometres per hour)",
-        "mph": "mph (miles per hour)",
-        "kn": "kn (knots)"
-      }
-    },
-    "pressure_unit": {
-      "options": {
-        "auto": "Auto (follow Home Assistant)",
-        "hPa": "hPa (hectopascals)",
-        "inHg": "inHg (inches of mercury)",
-        "mmHg": "mmHg (millimetres of mercury)"
       }
     }
   }
