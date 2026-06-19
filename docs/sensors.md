@@ -264,6 +264,7 @@ Via Open-Meteo Marine API (free, no API key).
 |---|---|
 | `sensor.ws_vigilance` | Météo-France Vigilance — `vert` / `jaune` / `orange` / `rouge` |
 | `sensor.ws_river_level` | Vigicrues water height at nearest station (m) |
+| `sensor.ws_river_flow` | Vigicrues water flow at nearest station (m³/s) |
 
 ---
 
@@ -279,6 +280,7 @@ Via Open-Meteo Marine API (free, no API key).
 | `sensor.ws_climatology_30d` | Rolling 30-day climatology summary |
 | `sensor.ws_temperature_anomaly_30d` | Today's mean temperature vs 30-day rolling mean |
 | `sensor.ws_rain_anomaly_30d` | Today's rain vs 30-day rolling daily average |
+| `sensor.ws_frost_risk` | Frost risk diagnostic (`no_risk`, `unlikely`, `probable`, `high`) |
 | `sensor.ws_forecast_brier_local` | Brier score for local sensor model (lower is better; requires ≥10 outcomes) |
 | `sensor.ws_forecast_brier_api` | Brier score for NWP API model |
 | `sensor.ws_forecast_blend_weight_local` | Current learned weight (%) of the local model in the blended probability |

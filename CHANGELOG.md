@@ -2,6 +2,18 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.3.0] - 2026-06-19
+
+### Added
+
+- **Descriptive Frost Risk diagnostic sensor (#90).** A new optional `sensor.ws_frost_risk` provides a categorized text state (`no_risk`, `unlikely`, `probable`, `high`) based on the current and forecasted daily minimum temperatures.
+
+### Fixed
+
+- **Vigicrues Entity Naming & Localization (#89).** Vigicrues sensors (`ws_river_level` and `ws_river_flow`) no longer have hardcoded English prefixes ("WS River Level — ") and now use Home Assistant's native translation system with dynamic placeholders for the station/river name, supporting full localization (e.g. French "Hauteur d'eau").
+- **Translation Placeholder Mismatch in French (#91).** Corrected a schema error in `fr.json` for the `forecast_api_failures` error message where `{provider}` was missing, causing a formatting exception.
+- **Config Flow Discoverability Hassfest Error.** The config flow now correctly sets an `async_set_unique_id` to comply with Home Assistant architectural requirements for discoverable configurations containing MQTT dependencies.
+
 ## [2.2.0] - 2026-06-18
 
 ### Added

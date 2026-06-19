@@ -457,6 +457,7 @@ France only. No API key required.
 | Entity | Unit | Description |
 |---|---|---|
 | `sensor.ws_river_level` | m | Real-time water height at the nearest gauging station |
+| `sensor.ws_river_flow` | m³/s | Real-time water flow at the nearest gauging station |
 
 ### Optional: Station Diagnostics (`enable_diagnostics`)
 
@@ -470,6 +471,7 @@ France only. No API key required.
 | `sensor.ws_climatology_30d` | Rolling 30-day climatology summary |
 | `sensor.ws_temperature_anomaly_30d` | Today's mean temperature vs 30-day rolling mean |
 | `sensor.ws_rain_anomaly_30d` | Today's rain vs 30-day rolling daily average |
+| `sensor.ws_frost_risk` | Computed frost risk diagnostic (`no_risk`, `unlikely`, `probable`, `high`) |
 
 ### Optional: Network Uploads
 
