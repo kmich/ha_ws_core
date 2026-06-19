@@ -2891,15 +2891,16 @@ class WSRiverSensor(CoordinatorEntity, SensorEntity):
         return (self.coordinator.data or {}).get("_vigicrues_auto_code", "")
 
     @property
-    def name(self) -> str:
-        """River name + level, updated once the coordinator has the metadata."""
+    def translation_key(self) -> str:
+        return "vigicrues_river_level"
+
+    @property
+    def translation_placeholders(self) -> dict[str, str]:
         d = self.coordinator.data or {}
         code = self._resolved_code()
         river = d.get(f"_river_name_{code}") or self._river_name
-        if river:
-            return f"WS River Level — {river}"
         station = d.get(f"_river_station_name_{code}") or self._station_name
-        return f"WS River Level — {station}" if station else "WS River Level"
+        return {"river": river or station or "Unknown"}
 
     @property
     def native_value(self):
@@ -2931,7 +2932,7 @@ class WSRiverFlowSensor(CoordinatorEntity, SensorEntity):
     """
 
     _attr_has_entity_name = True
-    _attr_icon = "mdi:water-flow"
+    _attr_icon = "mdi:water-sync"
     _attr_native_unit_of_measurement = "m³/s"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_device_class = None
@@ -2967,14 +2968,16 @@ class WSRiverFlowSensor(CoordinatorEntity, SensorEntity):
         return (self.coordinator.data or {}).get("_vigicrues_auto_code", "")
 
     @property
-    def name(self) -> str:
+    def translation_key(self) -> str:
+        return "vigicrues_river_flow"
+
+    @property
+    def translation_placeholders(self) -> dict[str, str]:
         d = self.coordinator.data or {}
         code = self._resolved_code
         river = d.get(f"_river_name_{code}") or self._river_name
-        if river:
-            return f"WS River Flow — {river}"
         station = d.get(f"_river_station_name_{code}") or self._station_name
-        return f"WS River Flow — {station}" if station else "WS River Flow"
+        return {"river": river or station or "Unknown"}
 
     @property
     def native_value(self):

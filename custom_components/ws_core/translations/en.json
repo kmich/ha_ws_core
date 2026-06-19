@@ -2199,6 +2199,15 @@
       },
       "lightning_azimuth": {
         "name": "Lightning azimuth"
+      },
+      "vigicrues_river_level": {
+        "name": "{river} - River Level"
+      },
+      "vigicrues_river_flow": {
+        "name": "{river} - River Flow"
+      },
+      "frost_risk": {
+        "name": "Frost Risk"
       }
     },
     "select": {
@@ -2463,6 +2472,14 @@
         "meteo_france": "Météo France (free tier, API key)",
         "ha_weather_entity": "Home Assistant weather entity (no API calls)"
       }
+    }
+  },
+  "state": {
+    "frost_risk": {
+      "no_risk": "No Risk",
+      "unlikely": "Unlikely",
+      "probable": "Probable",
+      "high": "High"
     }
   }
 }

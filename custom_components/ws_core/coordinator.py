@@ -349,6 +349,7 @@ from .const import (
     KEY_FORECAST_TILES,
     KEY_FREEZING_LEVEL_M,
     KEY_FROST_POINT_C,
+    KEY_FROST_RISK,
     KEY_FROST_STREAK,
     KEY_FWI,
     KEY_FWI_BUI,
@@ -2822,6 +2823,32 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # v1.2.0 - GDD accumulation, streak counters
     # ------------------------------------------------------------------
 
+    def _compute_frost_risk(self, data: dict, tc: float | None) -> None:
+        if tc is None:
+            return
+
+        forecast = data.get(KEY_FORECAST)
+        forecast_min = None
+        if forecast and isinstance(forecast, dict) and forecast.get("daily"):
+            daily = forecast["daily"]
+            if len(daily) > 0:
+                forecast_min = daily[0].get("templow")
+                if forecast_min is None:
+                    forecast_min = daily[0].get("temperature")
+
+        min_temp = float(tc)
+        if forecast_min is not None:
+            min_temp = min(min_temp, float(forecast_min))
+
+        if min_temp < 0:
+            data[KEY_FROST_RISK] = "high"
+        elif min_temp < 2:
+            data[KEY_FROST_RISK] = "probable"
+        elif min_temp < 4:
+            data[KEY_FROST_RISK] = "unlikely"
+        else:
+            data[KEY_FROST_RISK] = "no_risk"
+
     def _compute_streaks(self, data: dict, now: Any) -> None:
         """Update dry/heat/frost streak counters (RestoreEntity-backed in v0.3.0).
 
@@ -3572,6 +3599,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if fc and fc.get("daily"):
             data[KEY_FORECAST_TILES] = self._build_forecast_tiles(fc["daily"])
 
+        # Frost risk
+        self._compute_frost_risk(data, tc)
         # Rain today (resets at local midnight)
         data[KEY_RAIN_TODAY_MM] = self._rain_today_mm
 
