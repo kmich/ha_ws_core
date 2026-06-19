@@ -782,12 +782,7 @@
         }
       },
       "forecast_daily": {
-        "name": "Forecast Daily",
-        "state_attributes": {
-          "forecast": {
-            "name": "Forecast"
-          }
-        }
+        "name": "Forecast Daily"
       },
       "forecast_provider": {
         "name": "Forecast Provider",
@@ -2482,30 +2477,6 @@
         "pirate_weather": "Pirate Weather (free tier, API key)",
         "meteo_france": "Météo France (free tier, API key)",
         "ha_weather_entity": "Home Assistant weather entity (no API calls)"
-      }
-    },
-    "temp_unit": {
-      "options": {
-        "auto": "Auto (follow Home Assistant)",
-        "C": "Celsius (°C)",
-        "F": "Fahrenheit (°F)"
-      }
-    },
-    "wind_unit": {
-      "options": {
-        "auto": "Auto (follow Home Assistant)",
-        "m/s": "m/s",
-        "km/h": "km/h",
-        "mph": "mph",
-        "kn": "kn"
-      }
-    },
-    "pressure_unit": {
-      "options": {
-        "auto": "Auto (follow Home Assistant)",
-        "hPa": "hPa",
-        "inHg": "inHg",
-        "mmHg": "mmHg"
       }
     }
   }
