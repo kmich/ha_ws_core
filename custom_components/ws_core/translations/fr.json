@@ -375,16 +375,7 @@
           "cal_temp_c": "Correction de la température",
           "cal_humidity": "Correction de l'humidité",
           "cal_pressure_hpa": "Correction de la pression atmosphérique",
-          "cal_wind_ms": "Correction de la vitesse du vent",
-          "enable_display_sensors": "Capteurs descriptifs (niveaux, tendances, santé)",
-          "enable_fire_risk_score": "Indice de risque d'incendie",
-          "enable_sea_temp": "Température de la mer",
-          "sea_temp_lat": "Latitude pour la température",
-          "sea_temp_lon": "Longitude pour la température",
-          "enable_wunderground": "Envoi vers Weather Underground",
-          "wu_station_id": "ID de la station WU",
-          "wu_api_key": "Clé API WU",
-          "wu_interval_min": "Intervalle d'envoi WU"
+          "cal_wind_ms": "Correction de la vitesse du vent"
         }
       },
       "forecast_api_key_opt": {
@@ -421,6 +412,7 @@
           "solar_radiation": "Rayonnement solaire (W/m², pour ET₀ Penman-Monteith)",
           "lightning_count": "Nombre d'impacts de foudre (cumulé, ex: via Capteur physique ou Blitzortung)",
           "lightning_dist": "Distance de l'éclair le plus proche (km, ex: via Capteur physique ou Blitzortung)",
+          "lightning_azimuth": "Azimut de la foudre (degrés, ex: via Capteur physique ou Blitzortung)",
           "indoor_temp": "Capteur de température intérieure",
           "indoor_humidity": "Capteur d'humidité intérieure",
           "indoor_co2": "Capteur de CO₂ intérieur (ppm)",
@@ -635,9 +627,9 @@
       "description": "Les capteurs suivants n'ont pas été mis à jour pendant le délai d'inactivité autorisé : {sensors}. Vérifiez que les capteurs de votre station météo sont en ligne et connecté."
     },
     "forecast_api_failures": {
-      "title": "Échecs de l'API de prévisions Open-Meteo",
-      "description": "L'API de prévisions Open-Meteo a échoué {failures} fois consécutives. Les données de prévision peuvent être obsolètes. Vérifiez votre connexion Internet. L'intégration réessaiera automatiquement avec un backoff exponentiel."
-       },
+      "title": "Échecs de l'API de prévisions ({provider})",
+      "description": "L'API de prévisions ({provider}) a échoué {failures} fois consécutives. Les données de prévision peuvent être obsolètes. Vérifiez votre connexion Internet. L'intégration réessaiera automatiquement avec un backoff exponentiel."
+    },
     "stuck_sensors": {
       "title": "Capteur(s) de la station météo bloqué(s)",
       "description": "Les capteurs suivants ont renvoyé la même valeur pendant une période prolongée et peuvent présenter un défaut matériel : {sensors}. Vérifiez les connexions des capteurs et éliminez toute obstruction (par ex. pluviomètre bouché, anémomètre gelé)."
