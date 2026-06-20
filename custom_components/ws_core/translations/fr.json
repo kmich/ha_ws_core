@@ -2198,7 +2198,7 @@
          }
       },
       "lightning_azimuth": {
-        "name": "Lightning azimuth"
+        "name": "Azimut de la foudre"
       },
       "vigicrues_river_level": {
         "name": "{river} - Hauteur d'eau"
