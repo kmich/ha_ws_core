@@ -307,7 +307,7 @@ Five automation blueprints are provided in `blueprints/automation/ws_core/`:
 - **Lightning Safety** — Notify when lightning is detected nearby
 - **Fire Danger Alert** — Alert when fire danger reaches a configurable level
 
-See [blueprints/README.md](blueprints/README.md) for installation instructions.
+See [the blueprints folder](https://github.com/kmich/ha_ws_core/tree/main/blueprints) for installation instructions.
 
 ---
 
@@ -328,7 +328,7 @@ Contributions are welcome. Open an issue first to discuss what you'd like to cha
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/kmich/ha_ws_core/blob/main/LICENSE)
 
 ---
 
