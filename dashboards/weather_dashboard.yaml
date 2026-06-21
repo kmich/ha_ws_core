@@ -518,7 +518,7 @@ views:
                       const tempLow = isNaN(tempLowVal) ? '--' : tempLowVal.toFixed(0);
 
                       const feelsLike = parseFloat(states['sensor.ws_feels_like']?.state) || 0;
-                      const comfort = states['sensor.ws_humidity_level']?.state || 'Comfortable';
+                      const comfort = (states['sensor.ws_humidity_level']?.state || 'Comfortable').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
                       const rainProb = parseInt(states['sensor.ws_rain_probability_combined']?.state) || 0;
                       const probColor = rainProb >= 70 ? '#3B82F6' : rainProb >= 40 ? '#60A5FA' : '#4ADE80';
@@ -698,7 +698,7 @@ views:
                       const color = dispAttrs.color || '#4ADE80';
                       const pct = parseFloat(dispAttrs.bar_percent) || 50;
 
-                      const comfort = states['sensor.ws_humidity_level']?.state || 'Comfortable';
+                      const comfort = (states['sensor.ws_humidity_level']?.state || 'Comfortable').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                       const humid = parseFloat(states['sensor.ws_humidity']?.state) || 0;
 
                       return `
@@ -822,7 +822,7 @@ views:
 
                       const uvAttrs = states['sensor.ws_uv_level']?.attributes || {};
                       const uv = parseFloat(uvAttrs.uv_index) || 0;
-                      const uvDesc = states['sensor.ws_uv_level']?.state || 'Low';
+                      const uvDesc = (states['sensor.ws_uv_level']?.state || 'Low').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                       const uvColor = uv >= 8 ? '#EF4444' : uv >= 6 ? '#F97316' : uv >= 3 ? '#F59E0B' : '#4ADE80';
 
                       const isDay = states['sun.sun']?.state === 'above_horizon';
@@ -1063,7 +1063,7 @@ views:
                         [[[ 
                           const h = parseFloat(entity?.state);
                           if (isNaN(h)) return `<div style="color:rgba(255,255,255,0.75);">N/A</div>`;
-                          const hDesc = states['sensor.ws_humidity_level']?.state || 'Comfortable';
+                          const hDesc = (states['sensor.ws_humidity_level']?.state || 'Comfortable').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                           const hColor = h > 80 ? '#F97316' : h > 70 ? '#FBBF24' : h > 40 ? '#22D3EE' : h > 20 ? '#FDE68A' : '#F87171';
                           return `
                             <div style="display:flex; align-items:center; gap:10px; height:100%;">
@@ -2215,7 +2215,7 @@ views:
                       var low = parseFloat((states['sensor.ws_temperature_low_24h'] || {}).state);
                       var avg = parseFloat((states['sensor.ws_temperature_avg_24h'] || {}).state);
                       var humid = parseFloat((states['sensor.ws_humidity'] || {}).state);
-                      var humLevel = (states['sensor.ws_humidity_level'] || {}).state || '';
+                      var humLevel = ((states['sensor.ws_humidity_level'] || {}).state || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                       var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
                       var tBand = isNaN(current) ? ['--','rgba(255,255,255,0.4)'] : current >= 35 ? ['Very hot','#ef4444'] : current >= 30 ? ['Hot','#f97316'] : current >= 24 ? ['Warm','#f59e0b'] : current >= 18 ? ['Comfortable','#10b981'] : current >= 10 ? ['Cool','#14b8a6'] : current >= 0 ? ['Cold','#06b6d4'] : ['Freezing','#3b82f6'];
                       var tBadge = '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + tBand[1] + '22;border:1px solid ' + tBand[1] + '55;font-size:13px;font-weight:600;color:' + tBand[1] + ';">' + tBand[0] + '</div>';
@@ -2477,7 +2477,7 @@ views:
                     [[[
                       var mslp = parseFloat(entity && entity.state);
                       var station = parseFloat((states['sensor.ws_station_pressure'] || {}).state);
-                      var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
+                      var trend = ((states['sensor.ws_pressure_trend'] || {}).state || '--').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                       var change3h = parseFloat((states['sensor.ws_pressure_change_window'] || {}).state);
                       var zambrettiRaw = (states['sensor.ws_zambretti_forecast'] || {}).state || '';
                       var zambretti = (window._zl && window._zl[zambrettiRaw]) || zambrettiRaw.replace(/_/g, ' ') || '--';
@@ -2558,7 +2558,7 @@ views:
                       var forecastRaw2 = (entity && entity.state) || '';
                       var forecast = (window._zl && window._zl[forecastRaw2]) || forecastRaw2.replace(/_/g, ' ') || '--';
                       var zNum = (states['sensor.ws_zambretti_number'] || {}).state || '--';
-                      var trend = (states['sensor.ws_pressure_trend'] || {}).state || '--';
+                      var trend = ((states['sensor.ws_pressure_trend'] || {}).state || '--').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                       var trendRaw = parseFloat((states['sensor.ws_pressure_trend'] || {}).state);
                       var change = parseFloat((states['sensor.ws_pressure_change_window'] || {}).state);
                       var trendColor = !isNaN(change) ? (change > 0.8 ? '#10b981' : change < -0.8 ? '#ef4444' : 'rgba(255,255,255,0.7)') : 'rgba(255,255,255,0.7)';
