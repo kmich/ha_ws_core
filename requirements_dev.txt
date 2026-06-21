@@ -1,4 +1,8 @@
 pytest>=8.0
 pytest-homeassistant-custom-component>=0.13
 pytest-socket>=0.7.0
+pytest-asyncio
 ruff>=0.4
+homeassistant
+voluptuous
+aiohttp

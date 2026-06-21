@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest pytest-asyncio ruff homeassistant voluptuous aiohttp
+          pip install -r requirements_dev.txt
 
       - name: Lint with ruff
         run: |
