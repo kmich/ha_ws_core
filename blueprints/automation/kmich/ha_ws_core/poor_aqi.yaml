@@ -1,0 +1,34 @@
+blueprint:
+  name: "WS Core: Poor Air Quality"
+  description: "Send an alert when the AQI exceeds healthy levels."
+  domain: automation
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/poor_aqi.yaml
+  input:
+    aqi_entity:
+      name: AQI Sensor
+      description: Your WS Core AQI entity
+      default: sensor.ws_air_quality_index
+      selector:
+        entity:
+          domain: sensor
+    aqi_threshold:
+      name: AQI Threshold
+      description: "AQI level above which to trigger (Default: 100 for Unhealthy for Sensitive Groups)"
+      default: 100
+      selector:
+        number:
+          min: 50
+          max: 300
+          step: 10
+    action:
+      name: Action
+      description: Action to run (e.g. turn on air purifiers, send notification)
+      selector:
+        action: {}
+trigger:
+  - platform: numeric_state
+    entity_id: !input aqi_entity
+    above: !input aqi_threshold
+action:
+  - choose: []
+    default: !input action

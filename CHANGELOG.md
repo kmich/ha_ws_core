@@ -2,6 +2,29 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.4.0] - 2026-06-21
+
+### 🚀 Major Adoption & UX Update (The "Launch" Release)
+
+This release drastically simplifies the setup process and cleans up the Home Assistant UI, preparing the integration for the default HACS store.
+
+### Added
+
+- **Auto-Discovery:** The Config Flow now actively scans your Home Assistant instance for Ecowitt, WeatherFlow, and Ambient Weather integrations. If found, it automatically fills in all 7 required sensor mappings for a "one-click" setup experience.
+- **Onboarding Dashboards:** The success screen of the configuration flow now directly links to the recommended UI dashboards and automation blueprints.
+- **New Blueprints:** Added native `heat_stress` (UTCI) and `poor_aqi` blueprints. All blueprints now include `source_url` for seamless 1-click importing via the HA UI.
+- **Hardware Mapping Guide:** Added a comprehensive [Hardware Mapping Guide](docs/hardware_mapping.md) for users with manual setups.
+
+### Changed
+
+- **Taming Entity Vomit:** Over 30 "advanced" niche sensors (like ET0, FWI sub-components, and Frost Point) are now disabled by default for new installations to prevent dashboard clutter. You can easily re-enable them in the Entities UI.
+- **Diagnostic Categories:** 10+ debugging and internal state entities (e.g., Climatology Stats, Package OK) have been moved to the Home Assistant `DIAGNOSTIC` category, hiding them from auto-generated Lovelace dashboards.
+- **README & Science Docs:** Completely rewrote the `README.md` to focus on practical automations and outcomes. Moved the dense meteorological formulas into a dedicated `docs/science.md` file.
+
+### Fixed
+
+- **Windows Compatibility:** Resolved a massive test suite failure (`pytest-socket` breaking the `ProactorEventLoop`) that prevented Windows developers from running the tests locally. The suite is now 100% green.
+
 ## [2.3.0] - 2026-06-19
 
 ### Added

@@ -1,0 +1,34 @@
+blueprint:
+  name: "WS Core: Heat Stress Warning"
+  description: "Send an alert when the UTCI (Universal Thermal Climate Index) reaches a dangerous level."
+  domain: automation
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/heat_stress.yaml
+  input:
+    utci_entity:
+      name: UTCI Sensor
+      description: Your WS Core UTCI entity
+      default: sensor.ws_utci
+      selector:
+        entity:
+          domain: sensor
+    utci_threshold:
+      name: UTCI Threshold (°C)
+      description: "UTCI level above which to trigger (Default: 32°C for Strong Heat Stress)"
+      default: 32.0
+      selector:
+        number:
+          min: 26.0
+          max: 46.0
+          step: 1.0
+    action:
+      name: Action
+      description: Action to run (e.g. notify mobile app)
+      selector:
+        action: {}
+trigger:
+  - platform: numeric_state
+    entity_id: !input utci_entity
+    above: !input utci_threshold
+action:
+  - choose: []
+    default: !input action
