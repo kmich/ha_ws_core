@@ -69,11 +69,11 @@ Check out the `dashboards/` directory for the YAML code. We provide:
 
 Don't reinvent the wheel. We've included import-ready blueprints to automate your home based on your local weather:
 
-* [**Rain Start Warning:**](blueprints/automation/rain_start.yaml) Announce over TTS or send a push notification when rain is expected in the next few minutes.
-* [**Freeze Warning:**](blueprints/automation/freeze_alert.yaml) Trigger actions when the temperature drops below freezing.
-* [**High Wind Gusts:**](blueprints/automation/high_wind.yaml) Automatically retract your awnings or close the blinds when a high gust is recorded.
-* [**Heat Stress / UTCI:**](blueprints/automation/heat_stress.yaml) Notify when outdoor conditions become dangerous for work or exercise.
-* [**Poor Air Quality:**](blueprints/automation/poor_aqi.yaml) Close the windows and turn on the air purifiers when PM2.5 spikes.
+* [**Rain Start Warning:**](blueprints/automation/ws_core/rain_start.yaml) Announce over TTS or send a push notification when rain is expected in the next few minutes.
+* [**Freeze Warning:**](blueprints/automation/ws_core/freeze_alert.yaml) Trigger actions when the temperature drops below freezing.
+* [**High Wind Gusts:**](blueprints/automation/ws_core/high_wind.yaml) Automatically retract your awnings or close the blinds when a high gust is recorded.
+* [**Heat Stress / UTCI:**](blueprints/automation/ws_core/heat_stress.yaml) Notify when outdoor conditions become dangerous for work or exercise.
+* [**Poor Air Quality:**](blueprints/automation/ws_core/poor_aqi.yaml) Close the windows and turn on the air purifiers when PM2.5 spikes.
 
 ---
 

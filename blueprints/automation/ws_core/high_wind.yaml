@@ -1,75 +1,59 @@
 blueprint:
-  name: "WS Core — High Wind / Gust Alert"
-  description: >
-    Notifies when wind gusts exceed a threshold and optionally retracts
-    covers, awnings, or other wind-sensitive devices.
-    Uses a sustained-condition requirement to avoid false triggers.
+  name: "WS Core: Storm Warning"
+  description: >-
+    Send a notification when the pressure trend indicates a rapid drop
+    combined with increasing wind, suggesting an approaching storm front.
   domain: automation
-  source_url: https://github.com/Aephir/ha_ws_core
+    source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/high_wind.yaml
   input:
-    wind_gust_sensor:
-      name: Wind Gust Sensor
-      description: "The ws_core wind gust sensor (e.g. sensor.ws_wind_gust)."
+    pressure_trend_entity:
+      name: Pressure trend sensor
+      default: sensor.ws_pressure_trend
       selector:
         entity:
           domain: sensor
-          device_class: wind_speed
-    gust_threshold:
-      name: Gust Threshold (m/s)
-      description: "Alert fires when gusts exceed this speed. 10 m/s = 36 km/h = Beaufort 5."
-      default: 10.0
+    wind_gust_entity:
+      name: Wind gust sensor
+      default: sensor.ws_wind_gust
+      selector:
+        entity:
+          domain: sensor
+    wind_gust_threshold:
+      name: Wind gust threshold (m/s)
+      description: Minimum gust speed to consider storm-worthy
+      default: 15.0
       selector:
         number:
-          min: 5
-          max: 50
-          step: 0.5
-          unit_of_measurement: "m/s"
-    sustained_minutes:
-      name: Sustained Duration (minutes)
-      description: "Gusts must exceed threshold for this many minutes before triggering."
-      default: 2
-      selector:
-        number:
-          min: 1
-          max: 15
+          min: 8
+          max: 30
           step: 1
+          unit_of_measurement: "m/s"
     notify_target:
-      name: Notification Target
-      default: notify.notify
+      name: Notification service
+      default: notify.persistent_notification
       selector:
         text:
-    cover_targets:
-      name: Covers/Awnings to Retract (optional)
-      description: "Cover entities to close when high wind is detected."
-      default: {}
-      selector:
-        target:
-          entity:
-            domain: cover
+
+variables:
+  gust_sensor: !input wind_gust_entity
+  trend_sensor: !input pressure_trend_entity
 
 trigger:
-  - platform: numeric_state
-    entity_id: !input wind_gust_sensor
-    above: !input gust_threshold
-    for:
-      minutes: !input sustained_minutes
+  - platform: state
+    entity_id: !input pressure_trend_entity
+    to:
+      - "Falling Rapidly"
 
-condition: []
+condition:
+  - condition: numeric_state
+    entity_id: !input wind_gust_entity
+    above: !input wind_gust_threshold
 
 action:
   - service: !input notify_target
     data:
-      title: "💨 High Wind Alert"
-      message: >
-        Wind gust of {{ states(trigger.entity_id) | round(1) }} m/s
-        ({{ (states(trigger.entity_id) | float * 3.6) | round(0) }} km/h) detected —
-        above your {{ gust_threshold }} m/s threshold.
-  - if:
-      - condition: template
-        value_template: "{{ cover_targets != {} }}"
-    then:
-      - service: cover.close_cover
-        target: !input cover_targets
-
-mode: single
-max_exceeded: silent
+      title: "⛈️ Storm Warning"
+      message: >-
+        Barometric pressure is falling rapidly with wind gusts
+        of {{ states(gust_sensor) }} m/s.
+        Secure outdoor furniture and close windows.
