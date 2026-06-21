@@ -52,7 +52,7 @@ That's it! After the wizard completes, 50+ derived sensors appear automatically.
 
 ## 📊 The "Wow" Dashboards
 
-People buy with their eyes. `ws_core` comes with drop-in, premium Lovelace dashboards for your data.
+`ws_core` comes with drop-in, premium Lovelace dashboards for your data.
 
 | Mobile View | Desktop View |
 |---|---|
