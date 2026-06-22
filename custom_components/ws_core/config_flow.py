@@ -81,6 +81,7 @@ from .const import (
     CONF_FORECAST_LAT,
     CONF_FORECAST_LON,
     CONF_FORECAST_PROVIDER,
+    CONF_HDD_BASE_C,
     CONF_HEMISPHERE,
     CONF_INDOOR_ROOMS,
     CONF_MQTT_DISCOVERY_PREFIX,
@@ -108,6 +109,9 @@ from .const import (
     CONF_SOLAR_PEAK_KW,
     CONF_SOURCES,
     CONF_STALENESS_S,
+    SRC_LIGHTNING_AZIMUTH,
+    SRC_LIGHTNING_COUNT,
+    SRC_LIGHTNING_DISTANCE,
     CONF_TEMP_UNIT,
     CONF_THRESH_FREEZE_C,
     CONF_THRESH_RAIN_RATE_MMPH,
@@ -174,6 +178,7 @@ from .const import (
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_FORECAST_PROVIDER,
+    DEFAULT_HDD_BASE_C,
     DEFAULT_HEMISPHERE,
     DEFAULT_MQTT_DISCOVERY_PREFIX,
     DEFAULT_MQTT_INTERVAL_MIN,
@@ -521,7 +526,7 @@ _ENTITY_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain=
 # ---------------------------------------------------------------------------
 
 
-def _validate_numeric_sensor(hass: HomeAssistant, eid: str) -> str | None:
+def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool = False) -> str | None:
     """Validate that a sensor entity exists and has a numeric state.
 
     Returns an error key string on failure, or ``None`` when acceptable.
@@ -530,15 +535,29 @@ def _validate_numeric_sensor(hass: HomeAssistant, eid: str) -> str | None:
 
     Shared by both the config flow and the options flow so source-sensor
     validation behaves identically in either (issue #70).
+
+    ``allow_unknown`` relaxes the check for sensors that legitimately sit at
+    "unknown" most of the time (e.g. lightning distance/azimuth/count, which
+    only carry a value during/after a strike). When True, the entity must
+    still exist in HA, but "unknown"/"unavailable" states are accepted
+    instead of being rejected as "entity_not_found" (issue #88).
     """
     st = hass.states.get(eid)
-    if st is None or st.state in ("unknown", "unavailable"):
+    if st is None:
         return "entity_not_found"
+    if st.state in ("unknown", "unavailable"):
+        return None if allow_unknown else "entity_not_found"
     try:
         float(st.state)
     except (ValueError, TypeError):
         return "not_numeric"
     return None
+
+
+# Optional source keys whose sensors are normally idle/"unknown" outside of
+# an active event (currently: lightning distance/azimuth/count). These are
+# exempted from the strict numeric-state check above (issue #88).
+_ALLOW_UNKNOWN_SOURCE_KEYS = {SRC_LIGHTNING_DISTANCE, SRC_LIGHTNING_AZIMUTH, SRC_LIGHTNING_COUNT}
 
 
 # ---------------------------------------------------------------------------
@@ -596,9 +615,15 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await handler()
         return None
 
-    def _validate_numeric_sensor(self, eid: str) -> str | None:
-        """Validate a source sensor (delegates to the shared module-level helper)."""
-        return _validate_numeric_sensor(self.hass, eid)
+    def _validate_numeric_sensor(self, eid: str, source_key: str | None = None) -> str | None:
+        """Validate a source sensor (delegates to the shared module-level helper).
+
+        When ``source_key`` identifies a sensor that is normally idle/"unknown"
+        outside of an active event (lightning distance/azimuth/count), the
+        "unknown"/"unavailable" state is tolerated (issue #88).
+        """
+        allow_unknown = source_key in _ALLOW_UNKNOWN_SOURCE_KEYS
+        return _validate_numeric_sensor(self.hass, eid, allow_unknown=allow_unknown)
 
     # ------------------------------------------------------------------
     # Step 1: Name & prefix
@@ -638,7 +663,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if not eid:
                     errors[k] = "required"
                 else:
-                    err = self._validate_numeric_sensor(eid)
+                    err = self._validate_numeric_sensor(eid, source_key=k)
                     if err:
                         errors[k] = err
             if not errors:
@@ -670,7 +695,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 eid = user_input.get(k)
                 if not eid:
                     continue
-                err = self._validate_numeric_sensor(eid)
+                err = self._validate_numeric_sensor(eid, source_key=k)
                 if err:
                     errors[k] = err
                 else:
@@ -788,37 +813,44 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Required(CONF_TEMP_UNIT, default=default_temp): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[
-                                {"value": "auto", "label": "Auto"},
-                                {"value": "C", "label": "Celsius (°C)"},
-                                {"value": "F", "label": "Fahrenheit (°F)"},
-                            ],
+                            options=["auto", "C", "F"],
                             mode="list",
+                            translation_key="temp_unit",
                         )
                     ),
                     vol.Required(CONF_WIND_UNIT, default=DEFAULT_WIND_UNIT): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[{"value": o, "label": o} for o in WIND_UNIT_OPTIONS], mode="list"
+                            options=list(WIND_UNIT_OPTIONS),
+                            mode="list",
+                            translation_key="wind_unit",
                         )
                     ),
                     vol.Required(CONF_PRESSURE_UNIT, default=DEFAULT_PRESSURE_UNIT): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[{"value": o, "label": o} for o in PRESSURE_UNIT_OPTIONS], mode="list"
+                            options=list(PRESSURE_UNIT_OPTIONS),
+                            mode="list",
+                            translation_key="pressure_unit",
                         )
                     ),
                     vol.Required(CONF_RAIN_UNIT, default=DEFAULT_RAIN_UNIT): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[{"value": o, "label": o} for o in RAIN_UNIT_OPTIONS], mode="list"
+                            options=list(RAIN_UNIT_OPTIONS),
+                            mode="list",
+                            translation_key="rain_unit",
                         )
                     ),
                     vol.Required(CONF_DISTANCE_UNIT, default=DEFAULT_DISTANCE_UNIT): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[{"value": o, "label": o} for o in DISTANCE_UNIT_OPTIONS], mode="list"
+                            options=list(DISTANCE_UNIT_OPTIONS),
+                            mode="list",
+                            translation_key="distance_unit",
                         )
                     ),
                     vol.Required(CONF_ALTITUDE_UNIT, default=DEFAULT_ALTITUDE_UNIT): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[{"value": o, "label": o} for o in ALTITUDE_UNIT_OPTIONS], mode="list"
+                            options=list(ALTITUDE_UNIT_OPTIONS),
+                            mode="list",
+                            translation_key="altitude_unit",
                         )
                     ),
                 }
@@ -980,6 +1012,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_ENABLE_DEGREE_DAYS] = bool(
                 user_input.get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)
             )
+            self._data[CONF_HDD_BASE_C] = float(user_input.get(CONF_HDD_BASE_C, DEFAULT_HDD_BASE_C))
             self._data[CONF_ENABLE_LIGHTNING] = bool(user_input.get(CONF_ENABLE_LIGHTNING, DEFAULT_ENABLE_LIGHTNING))
             self._data[CONF_ENABLE_INDOOR] = bool(user_input.get(CONF_ENABLE_INDOOR, DEFAULT_ENABLE_INDOOR))
             self._data[CONF_ENABLE_SOIL] = bool(user_input.get(CONF_ENABLE_SOIL, DEFAULT_ENABLE_SOIL))
@@ -1071,6 +1104,9 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS
                     ): selector.BooleanSelector(),
+                    vol.Optional(CONF_HDD_BASE_C, default=DEFAULT_HDD_BASE_C): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=10.0, max=24.0, step=0.5, mode="box", unit_of_measurement="°C")
+                    ),
                     vol.Optional(CONF_ENABLE_LIGHTNING, default=DEFAULT_ENABLE_LIGHTNING): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_INDOOR, default=DEFAULT_ENABLE_INDOOR): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_SOIL, default=DEFAULT_ENABLE_SOIL): selector.BooleanSelector(),
@@ -1191,9 +1227,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
-            description_placeholders={
-                "info": "Weather Underground PWS. Leave blank to skip. Credentials will be validated."
-            },
             last_step=False,
         )
 
@@ -1221,9 +1254,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "Air quality data (PM2.5, PM10, NO₂, ozone) from Open-Meteo. Free, no API key required. Uses forecast lat/lon."
-            },
             last_step=False,
         )
 
@@ -1247,13 +1277,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self._show_step(
             step_id="pollen",
             data_schema=vol.Schema({}),
-            description_placeholders={
-                "info": (
-                    "Pollen data is fetched from Open-Meteo Air Quality API "
-                    "(free, no key). Includes alder, birch, grass, mugwort, "
-                    "olive, and ragweed. Updates piggyback on the AQI fetch."
-                )
-            },
             last_step=False,
         )
 
@@ -1303,9 +1326,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "Free solar PV generation forecast from forecast.solar. Uses forecast lat/lon. Azimuth: 0=N, 90=E, 180=S, 270=W."
-            },
             last_step=False,
         )
 
@@ -1425,9 +1445,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "Weathercloud station ID and key from weathercloud.net/dashboard. Leave blank to skip."
-            },
             last_step=False,
         )
 
@@ -1476,9 +1493,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "PWSWeather station ID and API key from pwsweather.com. Leave blank to skip."
-            },
             last_step=False,
         )
 
@@ -1525,9 +1539,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": "WOW site ID and authentication key from wow.metoffice.gov.uk. Leave blank to skip."
-            },
             last_step=False,
         )
 
@@ -1576,7 +1587,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={"info": "AWEKAS username and password from awekas.at. Leave blank to skip."},
             last_step=False,
         )
 
@@ -1623,12 +1633,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": (
-                    "OpenWeatherMap Stations API. Create a station via the OWM API to get a "
-                    "station_id, and use your OWM API key. Leave blank to skip."
-                )
-            },
             last_step=False,
         )
 
@@ -1670,12 +1674,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": (
-                    "Windy.com Stations API key from stations.windy.com. Station ID is optional "
-                    "(defaults to 0 for single-station accounts). Leave the key blank to skip."
-                )
-            },
             last_step=False,
         )
 
@@ -1717,14 +1715,6 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
-            description_placeholders={
-                "info": (
-                    "CWOP (Citizen Weather Observer Program) via APRS. Enter your CWOP/APRS "
-                    "callsign (e.g. CW1234 or a licensed ham callsign). Passcode is -1 for "
-                    "CWOP-issued IDs, or your APRS-IS passcode for ham callsigns. Leave the "
-                    "callsign blank to skip. Forecast lat/lon must be set."
-                )
-            },
             last_step=False,
         )
 
@@ -1763,12 +1753,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             description_placeholders={
-                "info": (
-                    "Sensors will be published as MQTT Discovery payloads under "
-                    f"{DEFAULT_MQTT_DISCOVERY_PREFIX}/sensor/... and state updates under "
-                    f"{DEFAULT_MQTT_STATE_PREFIX}/{{prefix}}/{{sensor}}/state. "
-                    "Requires the HA MQTT integration to be configured."
-                )
+                "discovery_prefix": DEFAULT_MQTT_DISCOVERY_PREFIX,
+                "state_prefix": DEFAULT_MQTT_STATE_PREFIX,
             },
             last_step=False,
         )
@@ -1954,7 +1940,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 if not eid:
                     errors[k] = "required"
                 else:
-                    err = _validate_numeric_sensor(self.hass, eid)
+                    err = _validate_numeric_sensor(self.hass, eid, allow_unknown=k in _ALLOW_UNKNOWN_SOURCE_KEYS)
                     if err:
                         errors[k] = err
                     else:
@@ -1982,7 +1968,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 eid = user_input.get(k)
                 if not eid:
                     continue
-                err = _validate_numeric_sensor(self.hass, eid)
+                err = _validate_numeric_sensor(self.hass, eid, allow_unknown=k in _ALLOW_UNKNOWN_SOURCE_KEYS)
                 if err:
                     errors[k] = err
                 else:
@@ -2044,43 +2030,50 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 vol.Optional(CONF_TEMP_UNIT, default=g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "C", "label": "Celsius (°C)"},
-                            {"value": "F", "label": "Fahrenheit (°F)"},
-                        ],
+                        options=["auto", "C", "F"],
                         mode="list",
+                        translation_key="temp_unit",
                     )
                 ),
                 vol.Optional(CONF_WIND_UNIT, default=g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in WIND_UNIT_OPTIONS], mode="list"
+                        options=list(WIND_UNIT_OPTIONS),
+                        mode="list",
+                        translation_key="wind_unit",
                     )
                 ),
                 vol.Optional(
                     CONF_PRESSURE_UNIT, default=g(CONF_PRESSURE_UNIT, DEFAULT_PRESSURE_UNIT)
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in PRESSURE_UNIT_OPTIONS], mode="list"
+                        options=list(PRESSURE_UNIT_OPTIONS),
+                        mode="list",
+                        translation_key="pressure_unit",
                     )
                 ),
                 vol.Optional(CONF_RAIN_UNIT, default=g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT)): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in RAIN_UNIT_OPTIONS], mode="list"
+                        options=list(RAIN_UNIT_OPTIONS),
+                        mode="list",
+                        translation_key="rain_unit",
                     )
                 ),
                 vol.Optional(
                     CONF_DISTANCE_UNIT, default=g(CONF_DISTANCE_UNIT, DEFAULT_DISTANCE_UNIT)
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in DISTANCE_UNIT_OPTIONS], mode="list"
+                        options=list(DISTANCE_UNIT_OPTIONS),
+                        mode="list",
+                        translation_key="distance_unit",
                     )
                 ),
                 vol.Optional(
                     CONF_ALTITUDE_UNIT, default=g(CONF_ALTITUDE_UNIT, DEFAULT_ALTITUDE_UNIT)
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in ALTITUDE_UNIT_OPTIONS], mode="list"
+                        options=list(ALTITUDE_UNIT_OPTIONS),
+                        mode="list",
+                        translation_key="altitude_unit",
                     )
                 ),
                 vol.Optional(
@@ -2267,6 +2260,11 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_DEGREE_DAYS, default=g(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)
                     ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_HDD_BASE_C, default=g(CONF_HDD_BASE_C, DEFAULT_HDD_BASE_C)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(min=10.0, max=24.0, step=0.5, mode="box", unit_of_measurement="°C")
+                    ),
                     vol.Optional(
                         CONF_ENABLE_LIGHTNING, default=g(CONF_ENABLE_LIGHTNING, DEFAULT_ENABLE_LIGHTNING)
                     ): selector.BooleanSelector(),
@@ -2741,7 +2739,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             ),
             errors=errors,
-            description_placeholders={"info": "Leave API key blank to keep existing key. Will validate."},
             last_step=False,
         )
 
@@ -2761,7 +2758,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             ),
-            description_placeholders={"info": "Open-Meteo Air Quality API. Free, no key required."},
             last_step=False,
         )
 
@@ -2772,9 +2768,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="pollen_opt",
             data_schema=vol.Schema({}),
-            description_placeholders={
-                "info": ("Pollen data via Open-Meteo Air Quality API (free, no key). Piggybacks on AQI fetch.")
-            },
             last_step=False,
         )
 
@@ -2822,7 +2815,6 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                 }
             ),
-            description_placeholders={"info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal."},
             last_step=False,
         )
 
