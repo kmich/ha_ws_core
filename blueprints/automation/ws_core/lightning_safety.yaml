@@ -5,7 +5,7 @@ blueprint:
     is clear (≥30 minutes since last strike). Requires the Lightning Detection
     feature enabled in ws_core and a lightning sensor mapped.
   domain: automation
-  source_url: https://github.com/kmich/ha_ws_core
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/lightning_safety.yaml
   input:
     lightning_proximity_sensor:
       name: WS Lightning Proximity Sensor
@@ -57,7 +57,7 @@ action:
         sequence:
           - service: !input notify_target
             data:
-              title: "⚡ Lightning Nearby!"
+              title: "Lightning Nearby!"
               message: >
                 Lightning detected within proximity threshold.
                 Stay indoors and away from water, tall trees, and metal objects.
@@ -77,7 +77,7 @@ action:
         sequence:
           - service: !input notify_target
             data:
-              title: "✅ Lightning All Clear"
+              title: "Lightning All Clear"
               message: >
                 No lightning detected for {{ states(lightning_clearance_sensor) | int }} minutes.
                 Safe to resume outdoor activities.

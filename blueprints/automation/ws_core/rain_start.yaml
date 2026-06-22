@@ -4,7 +4,7 @@ blueprint:
     Send a notification when rain starts (rain rate exceeds threshold)
     or when rain probability exceeds a configurable level.
   domain: automation
-    source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/rain_start.yaml
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/rain_start.yaml
   input:
     rain_rate_entity:
       name: Rain rate sensor
@@ -68,7 +68,7 @@ action:
         sequence:
           - service: !input notify_target
             data:
-              title: "🌧️ Rain Detected"
+              title: "Rain Detected"
               message: >-
                 Rain rate: {{ states(trigger.entity_id) }} mm/h.
                 Close windows and bring in laundry!
@@ -78,7 +78,7 @@ action:
         sequence:
           - service: !input notify_target
             data:
-              title: "🌧️ Rain Expected"
+              title: "Rain Expected"
               message: >-
                 Rain probability is {{ states(trigger.entity_id) }}%.
                 Consider bringing in laundry or closing skylights.

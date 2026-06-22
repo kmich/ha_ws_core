@@ -1,4 +1,5 @@
 """Unit tests for ws_core meteorological algorithms."""
+
 from __future__ import annotations
 
 import os
@@ -206,23 +207,24 @@ class TestMoon:
 
 class TestET0:
     def test_hargreaves_summer(self):
-        et0 = et0_hargreaves(
-            t_max_c=38.0, t_min_c=24.0, t_mean_c=31.0, lat_deg=38.0, day_of_year=180
-        )
+        et0 = et0_hargreaves(t_max_c=38.0, t_min_c=24.0, t_mean_c=31.0, lat_deg=38.0, day_of_year=180)
         assert 5.0 < et0 < 15.0
 
     def test_hargreaves_freezing(self):
-        et0 = et0_hargreaves(
-            t_max_c=-5.0, t_min_c=-10.0, t_mean_c=-7.5, lat_deg=38.0, day_of_year=15
-        )
+        et0 = et0_hargreaves(t_max_c=-5.0, t_min_c=-10.0, t_mean_c=-7.5, lat_deg=38.0, day_of_year=15)
         # In winter near-freezing conditions, ET₀ is very low (< 1 mm/day)
         assert et0 < 1.0
 
     def test_penman_monteith(self):
         et0 = et0_penman_monteith(
-            temp_mean_c=28.0, temp_max_c=34.0, temp_min_c=22.0,
-            humidity=55.0, wind_speed_ms=3.0,
-            solar_radiation_wm2=600.0, elevation_m=50.0, day_of_year=180,
+            temp_mean_c=28.0,
+            temp_max_c=34.0,
+            temp_min_c=22.0,
+            humidity=55.0,
+            wind_speed_ms=3.0,
+            solar_radiation_wm2=600.0,
+            elevation_m=50.0,
+            day_of_year=180,
         )
         assert 4.0 < et0 < 12.0
 
@@ -371,9 +373,7 @@ class TestDewPointReferenceValues:
         for temp in [-20, -5, 0, 10, 20, 30, 40]:
             for rh in [10, 30, 50, 70, 90, 100]:
                 dp = calculate_dew_point(float(temp), float(rh))
-                assert dp <= temp + 0.05, (
-                    f"Dew point {dp} exceeded temperature {temp} at RH={rh}%"
-                )
+                assert dp <= temp + 0.05, f"Dew point {dp} exceeded temperature {temp} at RH={rh}%"
 
 
 class TestBeaufortAllBoundaries:
@@ -436,9 +436,7 @@ class TestBeaufortAllBoundaries:
         """All 13 Beaufort numbers (0-12) must return a non-empty description."""
         for bf in range(13):
             desc = beaufort_description(bf)
-            assert isinstance(desc, str) and len(desc) > 0, (
-                f"Beaufort {bf} returned empty description"
-            )
+            assert isinstance(desc, str) and len(desc) > 0, f"Beaufort {bf} returned empty description"
 
 
 class TestSeaLevelPressureReferenceValues:
@@ -510,9 +508,7 @@ class TestZambrettiReferenceValues:
         """All 26 Z-number texts in ZAMBRETTI_TEXTS must be non-empty strings."""
         assert len(ZAMBRETTI_TEXTS) == 26
         for i, text in enumerate(ZAMBRETTI_TEXTS):
-            assert isinstance(text, str) and len(text) > 0, (
-                f"Z={i + 1} returned empty text"
-            )
+            assert isinstance(text, str) and len(text) > 0, f"Z={i + 1} returned empty text"
 
     def test_z_number_always_in_valid_range(self):
         """Zambretti Z-number must always be in [1, 26]."""
@@ -554,30 +550,50 @@ class TestCanadianFWIReferenceValues:
     def test_rain_event_resets_ffmc_lower(self):
         """After heavy rain, FFMC should drop significantly."""
         dry = compute_fwi(
-            ffmc_prev=90.0, dmc_prev=30.0, dc_prev=100.0,
-            temp_c=25.0, rh_pct=40.0, wind_kmh=15.0, rain_24h_mm=0.0, month=7,
+            ffmc_prev=90.0,
+            dmc_prev=30.0,
+            dc_prev=100.0,
+            temp_c=25.0,
+            rh_pct=40.0,
+            wind_kmh=15.0,
+            rain_24h_mm=0.0,
+            month=7,
         )
         wet = compute_fwi(
-            ffmc_prev=90.0, dmc_prev=30.0, dc_prev=100.0,
-            temp_c=15.0, rh_pct=80.0, wind_kmh=5.0, rain_24h_mm=20.0, month=7,
+            ffmc_prev=90.0,
+            dmc_prev=30.0,
+            dc_prev=100.0,
+            temp_c=15.0,
+            rh_pct=80.0,
+            wind_kmh=5.0,
+            rain_24h_mm=20.0,
+            month=7,
         )
-        assert wet["ffmc"] < dry["ffmc"], (
-            f"Rain should lower FFMC: wet={wet['ffmc']}, dry={dry['ffmc']}"
-        )
+        assert wet["ffmc"] < dry["ffmc"], f"Rain should lower FFMC: wet={wet['ffmc']}, dry={dry['ffmc']}"
 
     def test_drought_conditions_elevate_fwi(self):
         """High DC (drought) should produce elevated FWI relative to low DC."""
         normal = compute_fwi(
-            ffmc_prev=87.0, dmc_prev=20.0, dc_prev=50.0,
-            temp_c=28.0, rh_pct=35.0, wind_kmh=25.0, rain_24h_mm=0.0, month=8,
+            ffmc_prev=87.0,
+            dmc_prev=20.0,
+            dc_prev=50.0,
+            temp_c=28.0,
+            rh_pct=35.0,
+            wind_kmh=25.0,
+            rain_24h_mm=0.0,
+            month=8,
         )
         drought = compute_fwi(
-            ffmc_prev=87.0, dmc_prev=80.0, dc_prev=600.0,
-            temp_c=28.0, rh_pct=35.0, wind_kmh=25.0, rain_24h_mm=0.0, month=8,
+            ffmc_prev=87.0,
+            dmc_prev=80.0,
+            dc_prev=600.0,
+            temp_c=28.0,
+            rh_pct=35.0,
+            wind_kmh=25.0,
+            rain_24h_mm=0.0,
+            month=8,
         )
-        assert drought["fwi"] > normal["fwi"], (
-            f"Drought FWI={drought['fwi']} should exceed normal FWI={normal['fwi']}"
-        )
+        assert drought["fwi"] > normal["fwi"], f"Drought FWI={drought['fwi']} should exceed normal FWI={normal['fwi']}"
 
     def test_all_fwi_components_present_and_non_negative(self):
         """All 7 FWI output keys must be present and non-negative."""
@@ -622,9 +638,7 @@ class TestRainProbabilityReferenceValues:
         ]
         for mslp, trend, rh, wind in test_cases:
             prob = calculate_rain_probability(mslp, trend, rh, wind)
-            assert 0 <= prob <= 100, (
-                f"Probability {prob} out of [0,100] for {mslp},{trend},{rh},{wind}"
-            )
+            assert 0 <= prob <= 100, f"Probability {prob} out of [0,100] for {mslp},{trend},{rh},{wind}"
 
 
 class TestWetBulbReferenceValues:
@@ -645,9 +659,7 @@ class TestWetBulbReferenceValues:
         for temp in [0, 10, 20, 30, 40]:
             for rh in [20, 40, 60, 80, 99]:
                 tw = calculate_wet_bulb(float(temp), float(rh))
-                assert tw <= temp + 0.5, (
-                    f"Wet-bulb {tw} exceeds temperature {temp} at RH={rh}%"
-                )
+                assert tw <= temp + 0.5, f"Wet-bulb {tw} exceeds temperature {temp} at RH={rh}%"
 
     def test_lower_humidity_gives_lower_wet_bulb(self):
         """For same temperature, lower humidity → lower wet-bulb."""
@@ -672,13 +684,10 @@ class TestUTCIReferenceValues:
 
     def test_elevated_tr_increases_utci(self):
         """Higher mean radiant temperature (tr > ta) must raise UTCI above shade case."""
-        shade = calculate_utci(ta=25.0, tr=25.0, va=1.0, rh=50.0)   # tr == ta (shade)
-        sun = calculate_utci(ta=25.0, tr=45.0, va=1.0, rh=50.0)     # tr >> ta (full sun)
+        shade = calculate_utci(ta=25.0, tr=25.0, va=1.0, rh=50.0)  # tr == ta (shade)
+        sun = calculate_utci(ta=25.0, tr=45.0, va=1.0, rh=50.0)  # tr >> ta (full sun)
         assert shade is not None and sun is not None
-        assert sun > shade, (
-            f"Solar load (tr=45) should raise UTCI above shade (tr=25): "
-            f"sun={sun}, shade={shade}"
-        )
+        assert sun > shade, f"Solar load (tr=45) should raise UTCI above shade (tr=25): sun={sun}, shade={shade}"
 
     def test_out_of_range_returns_none(self):
         """UTCI returns None when ta is outside ±50°C."""
@@ -758,17 +767,13 @@ class TestFogProbability:
 
     def test_saturated_calm_night_high_probability(self):
         """T very close to dew point, calm, night → high fog probability."""
-        prob, label = fog_probability(
-            temp_c=10.0, dew_c=9.5, wind_ms=0.5, rain_rate_mmph=0.0, is_night=True
-        )
+        prob, label = fog_probability(temp_c=10.0, dew_c=9.5, wind_ms=0.5, rain_rate_mmph=0.0, is_night=True)
         assert prob >= 50.0, f"Expected high fog probability, got {prob}"
         assert label in ("probable", "likely")
 
     def test_large_depression_low_probability(self):
         """Large T-Td depression → low fog probability."""
-        prob, label = fog_probability(
-            temp_c=25.0, dew_c=5.0, wind_ms=1.0, rain_rate_mmph=0.0, is_night=False
-        )
+        prob, label = fog_probability(temp_c=25.0, dew_c=5.0, wind_ms=1.0, rain_rate_mmph=0.0, is_night=False)
         assert prob <= 10.0, f"Expected low fog probability, got {prob}"
         assert label == "unlikely"
 

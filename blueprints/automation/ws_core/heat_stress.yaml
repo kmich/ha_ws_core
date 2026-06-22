@@ -2,7 +2,7 @@ blueprint:
   name: "WS Core: Heat Stress Warning"
   description: "Send an alert when the UTCI (Universal Thermal Climate Index) reaches a dangerous level."
   domain: automation
-  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/heat_stress.yaml
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/heat_stress.yaml
   input:
     utci_entity:
       name: UTCI Sensor

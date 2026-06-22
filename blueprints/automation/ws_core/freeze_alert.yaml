@@ -5,7 +5,7 @@ blueprint:
     Uses the Weather Station Core temperature sensor with configurable
     threshold and notification target.
   domain: automation
-    source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/freeze_alert.yaml
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/freeze_alert.yaml
   input:
     temperature_entity:
       name: Temperature sensor
@@ -44,7 +44,7 @@ condition: []
 action:
   - service: !input notify_target
     data:
-      title: "🥶 Frost Warning"
+      title: "Frost Warning"
       message: >-
         Temperature has dropped to {{ states(trigger.entity_id) }}°C.
         Protect sensitive plants and check exposed pipes.

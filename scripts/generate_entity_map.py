@@ -9,6 +9,7 @@ Usage:
     python scripts/generate_entity_map.py
     python scripts/generate_entity_map.py --output path/to/output.html
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,6 +25,7 @@ ROOT = pathlib.Path(__file__).parent.parent
 # ---------------------------------------------------------------------------
 # Source extraction
 # ---------------------------------------------------------------------------
+
 
 def _manifest() -> dict:
     return json.loads((ROOT / "custom_components/ws_core/manifest.json").read_text())
@@ -44,13 +46,13 @@ def _sensor_descriptions() -> list[dict]:
     tm_start = sensor_py.find("_FEATURE_TOGGLE_MAP")
     tm_end = sensor_py.find("\n}", tm_start) + 2
     tm_block = sensor_py[tm_start:tm_end]
-    toggle_map: dict[str, str] = dict(re.findall(r'(KEY_\w+):\s*(CONF_\w+)', tm_block))
+    toggle_map: dict[str, str] = dict(re.findall(r"(KEY_\w+):\s*(CONF_\w+)", tm_block))
 
     # _DISABLED_BY_DEFAULT
     db_start = sensor_py.find("_DISABLED_BY_DEFAULT")
     db_end = sensor_py.find("\n    }", db_start) + 6
     db_block = sensor_py[db_start:db_end]
-    disabled: set[str] = set(re.findall(r'KEY_\w+', db_block))
+    disabled: set[str] = set(re.findall(r"KEY_\w+", db_block))
 
     # Parse WSSensorDescription entries
     sensors_start = sensor_py.find("SENSORS: list[WSSensorDescription] = [")
@@ -58,9 +60,9 @@ def _sensor_descriptions() -> list[dict]:
     sensors_block = sensor_py[sensors_start:sensors_end]
 
     descs = []
-    for m in re.finditer(r'WSSensorDescription\((.+?)\n    \)', sensors_block, re.DOTALL):
+    for m in re.finditer(r"WSSensorDescription\((.+?)\n    \)", sensors_block, re.DOTALL):
         body = m.group(1)
-        key_m = re.search(r'key=(KEY_\w+)', body)
+        key_m = re.search(r"key=(KEY_\w+)", body)
         if not key_m:
             continue
         key = key_m.group(1)
@@ -70,20 +72,22 @@ def _sensor_descriptions() -> list[dict]:
 
         name_m = re.search(r'name="([^"]+)"', body)
         unit_m = re.search(r'native_unit="([^"]+)"', body)
-        cat_m = re.search(r'EntityCategory\.(\w+)', body)
+        cat_m = re.search(r"EntityCategory\.(\w+)", body)
         has_attrs = "attrs_fn" in body
 
-        descs.append({
-            "key": key,
-            "slug": slug,
-            "entity_id": f"sensor.ws_{slug}",
-            "name": name_m.group(1) if name_m else key,
-            "unit": unit_m.group(1) if unit_m else None,
-            "category": cat_m.group(1) if cat_m else None,
-            "has_attrs": has_attrs,
-            "toggle": toggle_map.get(key),
-            "disabled_default": key in disabled,
-        })
+        descs.append(
+            {
+                "key": key,
+                "slug": slug,
+                "entity_id": f"sensor.ws_{slug}",
+                "name": name_m.group(1) if name_m else key,
+                "unit": unit_m.group(1) if unit_m else None,
+                "category": cat_m.group(1) if cat_m else None,
+                "has_attrs": has_attrs,
+                "toggle": toggle_map.get(key),
+                "disabled_default": key in disabled,
+            }
+        )
 
     return descs
 
@@ -91,7 +95,7 @@ def _sensor_descriptions() -> list[dict]:
 def _switch_entities() -> list[dict]:
     switch_py = (ROOT / "custom_components/ws_core/switch.py").read_text()
     const_py = (ROOT / "custom_components/ws_core/const.py").read_text()
-    conf_keys = set(re.findall(r'CONF_ENABLE_\w+', switch_py))
+    conf_keys = set(re.findall(r"CONF_ENABLE_\w+", switch_py))
     switches = []
     for const_name in sorted(conf_keys):
         m = re.search(rf'^{const_name}\s*=\s*"([^"]+)"', const_py, re.MULTILINE)
@@ -106,48 +110,86 @@ def _switch_entities() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 _SECTION_MAP: dict[str, str] = {
-    "KEY_NORM_TEMP_C": "Core Measurements", "KEY_DEW_POINT_C": "Core Measurements",
-    "KEY_NORM_HUMIDITY": "Core Measurements", "KEY_NORM_PRESSURE_HPA": "Core Measurements",
-    "KEY_SEA_LEVEL_PRESSURE_HPA": "Core Measurements", "KEY_NORM_WIND_SPEED_MS": "Core Measurements",
-    "KEY_NORM_WIND_GUST_MS": "Core Measurements", "KEY_NORM_WIND_DIR_DEG": "Core Measurements",
-    "KEY_NORM_RAIN_TOTAL_MM": "Core Measurements", "KEY_RAIN_RATE_RAW": "Core Measurements",
-    "KEY_RAIN_RATE_FILT": "Core Measurements", "KEY_LUX": "Core Measurements",
-    "KEY_UV": "Core Measurements", "KEY_BATTERY_PCT": "Core Measurements",
-    "KEY_DATA_QUALITY": "Diagnostics", "KEY_PACKAGE_STATUS": "Diagnostics",
-    "KEY_SENSOR_QUALITY_FLAGS": "Diagnostics", "KEY_ALERT_STATE": "Diagnostics",
-    "KEY_ALERT_MESSAGE": "Diagnostics", "KEY_FORECAST": "Diagnostics",
-    "KEY_PRESSURE_TREND_HPAH": "Diagnostics", "KEY_PRESSURE_CHANGE_WINDOW_HPA": "Diagnostics",
-    "KEY_WIND_DIR_SMOOTH_DEG": "Diagnostics", "KEY_ZAMBRETTI_NUMBER": "Diagnostics",
-    "KEY_FEELS_LIKE_C": "Advanced Meteorological", "KEY_WET_BULB_C": "Advanced Meteorological",
-    "KEY_FROST_POINT_C": "Advanced Meteorological", "KEY_ZAMBRETTI_FORECAST": "Advanced Meteorological",
-    "KEY_WIND_BEAUFORT": "Advanced Meteorological", "KEY_WIND_QUADRANT": "Advanced Meteorological",
-    "KEY_CURRENT_CONDITION": "Advanced Meteorological", "KEY_RAIN_PROBABILITY": "Advanced Meteorological",
-    "KEY_RAIN_PROBABILITY_COMBINED": "Advanced Meteorological", "KEY_RAIN_DISPLAY": "Advanced Meteorological",
-    "KEY_RAIN_ACCUM_1H": "Advanced Meteorological", "KEY_RAIN_ACCUM_24H": "Advanced Meteorological",
-    "KEY_TIME_SINCE_RAIN": "Advanced Meteorological", "KEY_PRESSURE_TREND_DISPLAY": "Advanced Meteorological",
-    "KEY_HEALTH_DISPLAY": "Advanced Meteorological", "KEY_FORECAST_TILES": "Advanced Meteorological",
-    "KEY_TEMP_HIGH_24H": "24h Statistics", "KEY_TEMP_LOW_24H": "24h Statistics",
-    "KEY_TEMP_AVG_24H": "24h Statistics", "KEY_WIND_GUST_MAX_24H": "24h Statistics",
-    "KEY_HUMIDITY_LEVEL_DISPLAY": "Display Sensors", "KEY_UV_LEVEL_DISPLAY": "Display Sensors",
+    "KEY_NORM_TEMP_C": "Core Measurements",
+    "KEY_DEW_POINT_C": "Core Measurements",
+    "KEY_NORM_HUMIDITY": "Core Measurements",
+    "KEY_NORM_PRESSURE_HPA": "Core Measurements",
+    "KEY_SEA_LEVEL_PRESSURE_HPA": "Core Measurements",
+    "KEY_NORM_WIND_SPEED_MS": "Core Measurements",
+    "KEY_NORM_WIND_GUST_MS": "Core Measurements",
+    "KEY_NORM_WIND_DIR_DEG": "Core Measurements",
+    "KEY_NORM_RAIN_TOTAL_MM": "Core Measurements",
+    "KEY_RAIN_RATE_RAW": "Core Measurements",
+    "KEY_RAIN_RATE_FILT": "Core Measurements",
+    "KEY_LUX": "Core Measurements",
+    "KEY_UV": "Core Measurements",
+    "KEY_BATTERY_PCT": "Core Measurements",
+    "KEY_DATA_QUALITY": "Diagnostics",
+    "KEY_PACKAGE_STATUS": "Diagnostics",
+    "KEY_SENSOR_QUALITY_FLAGS": "Diagnostics",
+    "KEY_ALERT_STATE": "Diagnostics",
+    "KEY_ALERT_MESSAGE": "Diagnostics",
+    "KEY_FORECAST": "Diagnostics",
+    "KEY_PRESSURE_TREND_HPAH": "Diagnostics",
+    "KEY_PRESSURE_CHANGE_WINDOW_HPA": "Diagnostics",
+    "KEY_WIND_DIR_SMOOTH_DEG": "Diagnostics",
+    "KEY_ZAMBRETTI_NUMBER": "Diagnostics",
+    "KEY_FEELS_LIKE_C": "Advanced Meteorological",
+    "KEY_WET_BULB_C": "Advanced Meteorological",
+    "KEY_FROST_POINT_C": "Advanced Meteorological",
+    "KEY_ZAMBRETTI_FORECAST": "Advanced Meteorological",
+    "KEY_WIND_BEAUFORT": "Advanced Meteorological",
+    "KEY_WIND_QUADRANT": "Advanced Meteorological",
+    "KEY_CURRENT_CONDITION": "Advanced Meteorological",
+    "KEY_RAIN_PROBABILITY": "Advanced Meteorological",
+    "KEY_RAIN_PROBABILITY_COMBINED": "Advanced Meteorological",
+    "KEY_RAIN_DISPLAY": "Advanced Meteorological",
+    "KEY_RAIN_ACCUM_1H": "Advanced Meteorological",
+    "KEY_RAIN_ACCUM_24H": "Advanced Meteorological",
+    "KEY_TIME_SINCE_RAIN": "Advanced Meteorological",
+    "KEY_PRESSURE_TREND_DISPLAY": "Advanced Meteorological",
+    "KEY_HEALTH_DISPLAY": "Advanced Meteorological",
+    "KEY_FORECAST_TILES": "Advanced Meteorological",
+    "KEY_TEMP_HIGH_24H": "24h Statistics",
+    "KEY_TEMP_LOW_24H": "24h Statistics",
+    "KEY_TEMP_AVG_24H": "24h Statistics",
+    "KEY_WIND_GUST_MAX_24H": "24h Statistics",
+    "KEY_HUMIDITY_LEVEL_DISPLAY": "Display Sensors",
+    "KEY_UV_LEVEL_DISPLAY": "Display Sensors",
     "KEY_TEMP_DISPLAY": "Display Sensors",
-    "KEY_LAUNDRY_SCORE": "Activity Scores", "KEY_STARGAZE_SCORE": "Activity Scores",
-    "KEY_FIRE_RISK_SCORE": "Activity Scores", "KEY_RUNNING_SCORE": "Activity Scores",
+    "KEY_LAUNDRY_SCORE": "Activity Scores",
+    "KEY_STARGAZE_SCORE": "Activity Scores",
+    "KEY_FIRE_RISK_SCORE": "Activity Scores",
+    "KEY_RUNNING_SCORE": "Activity Scores",
     "KEY_SEA_SURFACE_TEMP": "Sea Temperature",
-    "KEY_HDD_TODAY": "Degree Days & ET₀", "KEY_CDD_TODAY": "Degree Days & ET₀",
-    "KEY_HDD_RATE": "Degree Days & ET₀", "KEY_CDD_RATE": "Degree Days & ET₀",
-    "KEY_ET0_DAILY_MM": "Degree Days & ET₀", "KEY_ET0_HOURLY_MM": "Degree Days & ET₀",
+    "KEY_HDD_TODAY": "Degree Days & ET₀",
+    "KEY_CDD_TODAY": "Degree Days & ET₀",
+    "KEY_HDD_RATE": "Degree Days & ET₀",
+    "KEY_CDD_RATE": "Degree Days & ET₀",
+    "KEY_ET0_DAILY_MM": "Degree Days & ET₀",
+    "KEY_ET0_HOURLY_MM": "Degree Days & ET₀",
     "KEY_ET0_PM_DAILY_MM": "Degree Days & ET₀",
-    "KEY_METAR_VALIDATION": "METAR", "KEY_METAR_TEMP_C": "METAR",
-    "KEY_METAR_PRESSURE_HPA": "METAR", "KEY_METAR_DELTA_TEMP": "METAR",
+    "KEY_METAR_VALIDATION": "METAR",
+    "KEY_METAR_TEMP_C": "METAR",
+    "KEY_METAR_PRESSURE_HPA": "METAR",
+    "KEY_METAR_DELTA_TEMP": "METAR",
     "KEY_METAR_DELTA_PRESSURE": "METAR",
-    "KEY_CWOP_STATUS": "Upload / Export", "KEY_WU_STATUS": "Upload / Export",
+    "KEY_CWOP_STATUS": "Upload / Export",
+    "KEY_WU_STATUS": "Upload / Export",
     "KEY_LAST_EXPORT_TIME": "Upload / Export",
-    "KEY_AQI": "Air Quality", "KEY_AQI_LEVEL": "Air Quality",
-    "KEY_PM2_5": "Air Quality", "KEY_PM10": "Air Quality",
-    "KEY_NO2": "Air Quality", "KEY_OZONE": "Air Quality",
-    "KEY_POLLEN_OVERALL": "Pollen", "KEY_POLLEN_GRASS": "Pollen",
-    "KEY_POLLEN_TREE": "Pollen", "KEY_POLLEN_WEED": "Pollen",
-    "KEY_MOON_DISPLAY": "Moon", "KEY_MOON_PHASE": "Moon", "KEY_MOON_ILLUMINATION_PCT": "Moon",
+    "KEY_AQI": "Air Quality",
+    "KEY_AQI_LEVEL": "Air Quality",
+    "KEY_PM2_5": "Air Quality",
+    "KEY_PM10": "Air Quality",
+    "KEY_NO2": "Air Quality",
+    "KEY_OZONE": "Air Quality",
+    "KEY_POLLEN_OVERALL": "Pollen",
+    "KEY_POLLEN_GRASS": "Pollen",
+    "KEY_POLLEN_TREE": "Pollen",
+    "KEY_POLLEN_WEED": "Pollen",
+    "KEY_MOON_DISPLAY": "Moon",
+    "KEY_MOON_PHASE": "Moon",
+    "KEY_MOON_ILLUMINATION_PCT": "Moon",
     "KEY_SOLAR_FORECAST_TODAY_KWH": "Solar Forecast",
     "KEY_SOLAR_FORECAST_TOMORROW_KWH": "Solar Forecast",
 }
@@ -173,6 +215,7 @@ _SECTIONS = [
 # ---------------------------------------------------------------------------
 # HTML generation
 # ---------------------------------------------------------------------------
+
 
 def _badge(desc: dict) -> str:
     parts = []
@@ -205,8 +248,8 @@ def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> 
             unit = f" <small style='color:#64748b'>· {d['unit']}</small>" if d["unit"] else ""
             rows_html += f"""
         <tr>
-          <td><code>sensor.ws_{d['slug']}</code></td>
-          <td>{d['name']}{unit}</td>
+          <td><code>sensor.ws_{d["slug"]}</code></td>
+          <td>{d["name"]}{unit}</td>
           <td>{_badge(d)}</td>
         </tr>"""
         sections_html += f"""
@@ -225,7 +268,7 @@ def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> 
         rows_html = ""
         for d in ungrouped:
             rows_html += f"""
-        <tr><td><code>sensor.ws_{d['slug']}</code></td><td>{d['name']}</td><td>{_badge(d)}</td></tr>"""
+        <tr><td><code>sensor.ws_{d["slug"]}</code></td><td>{d["name"]}</td><td>{_badge(d)}</td></tr>"""
         sections_html += f"""
   <section>
     <h2>❓ Uncategorised <span class="count">({len(ungrouped)})</span></h2>
@@ -236,7 +279,7 @@ def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> 
     sw_rows = ""
     for sw in switches:
         sw_rows += f"""
-        <tr><td><code>{sw['entity_id']}</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>"""
+        <tr><td><code>{sw["entity_id"]}</code></td><td>Feature toggle</td><td><span class="badge ok">always-on</span></td></tr>"""
     sections_html += f"""
   <section>
     <h2><span class="sec-icon">🔀</span> Feature Switches <span class="count">({len(switches)})</span></h2>

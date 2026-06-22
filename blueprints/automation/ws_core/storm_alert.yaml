@@ -4,7 +4,7 @@ blueprint:
     Fires when barometric pressure is falling rapidly (>1.6 hPa/h) — the
     classic indicator of an approaching storm. Uses the ws_core Pressure Trend sensor.
   domain: automation
-  source_url: https://github.com/kmich/ha_ws_core
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/storm_alert.yaml
   input:
     pressure_trend_sensor:
       name: WS Pressure Trend Rate Sensor
@@ -48,7 +48,7 @@ trigger:
 action:
   - service: !input notify_target
     data:
-      title: "⛈️ Storm Approaching"
+      title: "Storm Approaching"
       message: >
         Pressure falling rapidly at {{ states(trigger.entity_id) | round(2) }} hPa/h.
         Rain probability: {{ states(rain_probability_sensor) }}%.

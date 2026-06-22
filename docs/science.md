@@ -299,7 +299,7 @@ Download diagnostics via **Settings → Devices & Services → Weather Station C
 
 ## Example Automations
 
-Five automation blueprints are provided in `blueprints/automation/ws_core/`:
+Ten automation blueprints are provided in `blueprints/automation/ws_core/`, including:
 
 - **Frost Alert** — Notify when temperature drops below threshold
 - **Storm Alert** — Alert on rapid pressure drop with high wind

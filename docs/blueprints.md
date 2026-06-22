@@ -1,6 +1,6 @@
 # Automation Blueprints
 
-Five automation blueprints are provided in `blueprints/automation/ws_core/`.
+Ten automation blueprints are provided in `blueprints/automation/ws_core/`.
 Each is a single YAML file that imports into HA as a configurable automation template.
 
 ---
@@ -18,7 +18,22 @@ Each is a single YAML file that imports into HA as a configurable automation tem
 
 ## Available blueprints
 
-### Heat Alert (`heat_alert.yaml`)
+| File | Purpose |
+|---|---|
+| `fire_danger_alert.yaml` | Notify when fire danger reaches a configured threshold, with optional precautionary irrigation. |
+| `freeze_alert.yaml` | Notify when temperature drops below a freeze threshold. |
+| `frost_alert.yaml` | Frost/freeze warning with dew point and frost point context. |
+| `heat_stress.yaml` | Notify when UTCI reaches a dangerous heat-stress level. |
+| `high_wind.yaml` | Notify on sustained wind gusts and optionally retract covers or awnings. |
+| `irrigation_rain_skip.yaml` | Skip or cancel irrigation when rain already fell or is likely. |
+| `lightning_safety.yaml` | Alert when lightning is nearby and send an all-clear after the clearance window. |
+| `poor_aqi.yaml` | Notify when AQI crosses a configured threshold, with optional mitigation actions. |
+| `rain_start.yaml` | Notify or run actions when rain starts/stops or rain probability rises. |
+| `storm_alert.yaml` | Notify when rapid pressure drop suggests storm conditions. |
+
+---
+
+### Heat Stress (`heat_stress.yaml`)
 
 Sends a notification when the feels-like temperature (apparent temperature) stays above
 a configurable threshold for a sustained period. Uses the ws_core alert hysteresis, so

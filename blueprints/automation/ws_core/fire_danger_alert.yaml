@@ -5,7 +5,7 @@ blueprint:
     Uses ws_core Fire Risk Score or FFDI (McArthur, Australian standard).
     Optionally activates garden irrigation as a precaution.
   domain: automation
-  source_url: https://github.com/kmich/ha_ws_core
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/fire_danger_alert.yaml
   input:
     fire_sensor:
       name: WS Fire Risk Sensor
@@ -59,7 +59,7 @@ trigger:
 action:
   - service: !input notify_target
     data:
-      title: "🔥 High Fire Danger"
+      title: "High Fire Danger"
       message: >
         Fire danger: {{ states(trigger.entity_id) | round(1) }}.
         Conditions: hot, dry, and/or windy.

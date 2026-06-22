@@ -4,7 +4,7 @@ blueprint:
     Send a notification when the pressure trend indicates a rapid drop
     combined with increasing wind, suggesting an approaching storm front.
   domain: automation
-    source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/high_wind.yaml
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/high_wind.yaml
   input:
     pressure_trend_entity:
       name: Pressure trend sensor
@@ -52,7 +52,7 @@ condition:
 action:
   - service: !input notify_target
     data:
-      title: "⛈️ Storm Warning"
+      title: "High Wind Warning"
       message: >-
         Barometric pressure is falling rapidly with wind gusts
         of {{ states(gust_sensor) }} m/s.

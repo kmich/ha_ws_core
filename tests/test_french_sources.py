@@ -25,6 +25,7 @@ from custom_components.ws_core.const import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_vigilance_cache(phenomena: dict[str, str], dept: str = "13") -> dict:
     """Build a minimal vigilance cache dict like the one stored by the coordinator."""
     return {
@@ -56,6 +57,7 @@ def _apply_vigilance_to_data(vigilance_cache: dict) -> dict:
 # ---------------------------------------------------------------------------
 # 1. Fire danger extraction
 # ---------------------------------------------------------------------------
+
 
 class TestFireDangerExtraction:
     """Verify fire danger is derived correctly from the Vigilance phenomena dict."""
@@ -104,6 +106,7 @@ class TestFireDangerExtraction:
 # ---------------------------------------------------------------------------
 # 2. Vigicrues station code from config bypasses auto-detect
 # ---------------------------------------------------------------------------
+
 
 class TestVigicruesStationInit:
     """Verify that a station code stored in config is respected at coordinator init."""
@@ -168,6 +171,7 @@ class TestVigicruesStationInit:
 # ---------------------------------------------------------------------------
 # 3. _fetch_vigicrues_station_options() with mocked aiohttp
 # ---------------------------------------------------------------------------
+
 
 class TestFetchVigicruesStationOptions:
     """Unit tests for the config-flow helper that fetches nearby stations."""

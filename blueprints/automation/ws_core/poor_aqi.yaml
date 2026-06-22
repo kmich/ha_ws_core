@@ -2,7 +2,7 @@ blueprint:
   name: "WS Core: Poor Air Quality"
   description: "Send an alert when the AQI exceeds healthy levels."
   domain: automation
-  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/kmich/ha_ws_core/poor_aqi.yaml
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/poor_aqi.yaml
   input:
     aqi_entity:
       name: AQI Sensor

@@ -5,7 +5,7 @@ blueprint:
     deficit is below a threshold. Uses ws_core rain_today and irrigation_deficit sensors.
     Compatible with any switch-controlled irrigation zone.
   domain: automation
-  source_url: https://github.com/kmich/ha_ws_core
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/irrigation_rain_skip.yaml
   input:
     rain_today_sensor:
       name: WS Rain Today Sensor
@@ -91,7 +91,7 @@ action:
     then:
       - service: !input notify_target
         data:
-          title: "🌱 Irrigation Complete"
+          title: "Irrigation Complete"
           message: >
             Ran for {{ duration_minutes }} min.
             Rain today: {{ states(rain_today_sensor) | round(1) }}mm.

@@ -58,9 +58,14 @@ def _make_state(state_val: str, unit: str = "", last_updated=None):
 
 
 def _make_coordinator(
-    temp=22.0, humidity=55.0, pressure=1013.0,
-    wind_speed=3.5, wind_gust=6.0, wind_dir=180.0,
-    rain_total=5.2, elevation=50.0,
+    temp=22.0,
+    humidity=55.0,
+    pressure=1013.0,
+    wind_speed=3.5,
+    wind_gust=6.0,
+    wind_dir=180.0,
+    rain_total=5.2,
+    elevation=50.0,
 ):
     """Create a WSStationCoordinator with mocked HA state."""
     from custom_components.ws_core.coordinator import WSStationCoordinator
@@ -151,6 +156,7 @@ def _make_coordinator(
     # v2.0 accumulators / rolling histories (normally set in __init__, which the
     # fixture bypasses).
     from collections import deque
+
     coord._wind_dir_history_24h = deque()
     coord._rain_rate_history_24h = deque()
     coord._wind_run_month_km = 0.0
@@ -212,6 +218,7 @@ def _make_coordinator(
     }
 
     from custom_components.ws_core.coordinator import WSStationRuntime
+
     coord.runtime = WSStationRuntime()
 
     # v2.1 alert hysteresis state
@@ -255,9 +262,7 @@ class TestComputeRawReadings:
         coord = _make_coordinator()
         coord.hass.states.get = lambda eid: None  # all sensors missing
         data = {}
-        tc, rh, p, ws, gs, wd, rain, lux, uv = coord._compute_raw_readings(
-            data, datetime.now(UTC)
-        )
+        tc, rh, p, ws, gs, wd, rain, lux, uv = coord._compute_raw_readings(data, datetime.now(UTC))
         assert tc is None
         assert rh is None
 
@@ -414,26 +419,31 @@ class TestComputeHealth:
 class TestValidateReadings:
     def test_valid_readings_no_flags(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         flags = WSStationCoordinator._validate_readings(20.0, 50.0, 1013.0, 5.0, 8.0, 12.0)
         assert flags == []
 
     def test_extreme_temperature_flagged(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         flags = WSStationCoordinator._validate_readings(70.0, 50.0, 1013.0, 5.0, 8.0, 12.0)
         assert any("temperature" in f for f in flags)
 
     def test_dew_exceeds_temp_flagged(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         flags = WSStationCoordinator._validate_readings(20.0, 50.0, 1013.0, 5.0, 8.0, 25.0)
         assert any("dew point" in f for f in flags)
 
     def test_gust_below_wind_flagged(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         flags = WSStationCoordinator._validate_readings(20.0, 50.0, 1013.0, 10.0, 5.0, 12.0)
         assert any("gust" in f for f in flags)
 
     def test_none_values_no_crash(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         flags = WSStationCoordinator._validate_readings(None, None, None, None, None, None)
         assert flags == []
 
@@ -446,27 +456,33 @@ class TestValidateReadings:
 class TestUnitConversion:
     def test_fahrenheit_to_celsius(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         assert abs(WSStationCoordinator._to_celsius(212.0, "°F") - 100.0) < 0.1
         assert abs(WSStationCoordinator._to_celsius(32.0, "F") - 0.0) < 0.1
 
     def test_kelvin_to_celsius(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         assert abs(WSStationCoordinator._to_celsius(273.15, "K") - 0.0) < 0.1
 
     def test_kmh_to_ms(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         assert abs(WSStationCoordinator._to_ms(36.0, "km/h") - 10.0) < 0.1
 
     def test_mph_to_ms(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         assert abs(WSStationCoordinator._to_ms(10.0, "mph") - 4.47) < 0.1
 
     def test_inhg_to_hpa(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         assert abs(WSStationCoordinator._to_hpa(29.92, "inHg") - 1013.25) < 0.5
 
     def test_inches_to_mm(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         assert abs(WSStationCoordinator._to_mm(1.0, "in") - 25.4) < 0.1
 
 
@@ -478,13 +494,12 @@ class TestUnitConversion:
 class TestRollingWindows:
     def test_append_and_prune(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         history = deque()
         now = datetime.now(UTC)
         # Add values spanning 26 hours
         for i in range(26):
-            WSStationCoordinator._append_and_prune_24h(
-                history, now - timedelta(hours=25 - i), float(i)
-            )
+            WSStationCoordinator._append_and_prune_24h(history, now - timedelta(hours=25 - i), float(i))
         # Should have pruned the oldest entries
         vals = WSStationCoordinator._rolling_values(history)
         assert len(vals) <= 25  # 24h window
@@ -492,6 +507,7 @@ class TestRollingWindows:
 
     def test_rain_accum_handles_reset(self):
         from custom_components.ws_core.coordinator import WSStationCoordinator
+
         history = deque()
         now = datetime.now(UTC)
         # Simulate: 0, 1, 2, 0 (reset), 1

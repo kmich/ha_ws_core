@@ -43,6 +43,7 @@ from custom_components.ws_core.const import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_state(state_val, unit="", last_updated=None):
     mock = MagicMock()
     mock.state = str(state_val)
@@ -121,6 +122,7 @@ def _make_coordinator(**overrides):
 # Config Flow: Structure
 # ===========================================================================
 
+
 class TestConfigFlowStructure:
     """Verify config flow step definitions and translation coverage."""
 
@@ -174,6 +176,7 @@ class TestConfigFlowStructure:
 # Config Flow: Back Button
 # ===========================================================================
 
+
 class TestConfigFlowBackButton:
     """Verify back button infrastructure."""
 
@@ -187,28 +190,27 @@ class TestConfigFlowBackButton:
     def test_back_check_in_all_non_user_steps(self):
         """Every non-user step handler should call _handle_back."""
         import re
+
         with open("custom_components/ws_core/config_flow.py") as f:
             content = f.read()
         # Only check within config flow class
-        config_section = content[:content.find("class WSStationOptionsFlowHandler")]
+        config_section = content[: content.find("class WSStationOptionsFlowHandler")]
         # Count steps with back check
         steps = re.findall(r"async def async_step_(\w+)", config_section)
         non_user = [s for s in steps if s != "user"]
         back_calls = config_section.count("_handle_back")
-        assert back_calls >= len(non_user), (
-            f"Expected >= {len(non_user)} _handle_back calls, found {back_calls}"
-        )
+        assert back_calls >= len(non_user), f"Expected >= {len(non_user)} _handle_back calls, found {back_calls}"
 
 
 # ===========================================================================
 # Alert Accumulation
 # ===========================================================================
 
+
 class TestAlertAccumulation:
     """Verify alerts accumulate instead of overwriting."""
 
-    def _run_alerts(self, coord, gust=5.0, rain=0.0, temp=20.0,
-                    gust_thr=17.0, rain_thr=20.0, freeze_thr=0.0):
+    def _run_alerts(self, coord, gust=5.0, rain=0.0, temp=20.0, gust_thr=17.0, rain_thr=20.0, freeze_thr=0.0):
         data = {
             KEY_NORM_WIND_GUST_MS: gust,
             KEY_RAIN_RATE_FILT: rain,
@@ -291,6 +293,7 @@ class TestAlertAccumulation:
 # API Response Handling
 # ===========================================================================
 
+
 class TestAPIResponseHandling:
     """Verify coordinator handles bad/missing API responses gracefully."""
 
@@ -337,6 +340,7 @@ class TestAPIResponseHandling:
 # Sensor Entity Creation
 # ===========================================================================
 
+
 class TestSensorEntities:
     """Verify sensor descriptors and entity registration."""
 
@@ -370,9 +374,10 @@ class TestSensorEntities:
     def test_all_sensor_keys_have_unique_slugs(self):
         """Every sensor slug override should be unique."""
         import re
+
         with open("custom_components/ws_core/sensor.py", encoding="utf-8") as f:
             content = f.read()
-        block = content[content.find("overrides = {"):content.find("return overrides[key]")]
+        block = content[content.find("overrides = {") : content.find("return overrides[key]")]
         slugs = re.findall(r':\s*"(\w+)"', block)
         assert len(slugs) == len(set(slugs)), f"Duplicate slugs found: {[s for s in slugs if slugs.count(s) > 1]}"
 
@@ -380,6 +385,7 @@ class TestSensorEntities:
         """Zambretti switch should be removed from FEATURE_SWITCHES."""
         try:
             from custom_components.ws_core.switch import FEATURE_SWITCHES
+
             conf_keys = [sw.conf_key for sw in FEATURE_SWITCHES]
             assert CONF_ENABLE_ZAMBRETTI not in conf_keys
         except (ImportError, AttributeError):
@@ -391,6 +397,7 @@ class TestSensorEntities:
 # ===========================================================================
 # Diagnostics
 # ===========================================================================
+
 
 class TestDiagnostics:
     """Verify diagnostics output."""
@@ -463,6 +470,7 @@ class TestDiagnostics:
 # Version Consistency
 # ===========================================================================
 
+
 class TestVersionConsistency:
     def _manifest_version(self):
         with open("custom_components/ws_core/manifest.json", encoding="utf-8") as f:
@@ -505,9 +513,7 @@ class TestOptionsFlowSourceValidation:
         hass.config.longitude = 1.9507
         hass.config.elevation = 100
         hass.states.get = lambda eid: _State(states[eid]) if eid in states else None
-        hass.states.async_all = lambda: [
-            type("S", (), {"entity_id": e, "attributes": {}})() for e in states
-        ]
+        hass.states.async_all = lambda: [type("S", (), {"entity_id": e, "attributes": {}})() for e in states]
 
         entry = MagicMock()
         entry.data = {CONF_SOURCES: dict(sources)}

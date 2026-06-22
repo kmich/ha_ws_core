@@ -12,6 +12,7 @@ Usage:
     python scripts/validate_dashboard_entities.py          # exits 1 on error
     python scripts/validate_dashboard_entities.py --list   # print entity list and exit
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,8 +27,9 @@ ROOT = pathlib.Path(__file__).parent.parent
 # Source-derived entity sets
 # ---------------------------------------------------------------------------
 
+
 def _sensor_entity_ids(prefix: str = "ws") -> set[str]:
-    sensor_py = (ROOT / "custom_components/ws_core/sensor.py").read_text()
+    sensor_py = (ROOT / "custom_components/ws_core/sensor.py").read_text(encoding="utf-8")
     start = sensor_py.find("overrides = {")
     end = sensor_py.find("return overrides[key]", start)
     if start == -1 or end == -1:
@@ -40,9 +42,9 @@ def _sensor_entity_ids(prefix: str = "ws") -> set[str]:
 
 
 def _switch_entity_ids(prefix: str = "ws") -> set[str]:
-    switch_py = (ROOT / "custom_components/ws_core/switch.py").read_text()
-    const_py = (ROOT / "custom_components/ws_core/const.py").read_text()
-    conf_keys = set(re.findall(r'CONF_ENABLE_\w+', switch_py))
+    switch_py = (ROOT / "custom_components/ws_core/switch.py").read_text(encoding="utf-8")
+    const_py = (ROOT / "custom_components/ws_core/const.py").read_text(encoding="utf-8")
+    conf_keys = set(re.findall(r"CONF_ENABLE_\w+", switch_py))
     ids: set[str] = set()
     for const_name in conf_keys:
         m = re.search(rf'^{const_name}\s*=\s*"([^"]+)"', const_py, re.MULTILINE)
@@ -54,7 +56,7 @@ def _switch_entity_ids(prefix: str = "ws") -> set[str]:
 
 def _binary_sensor_entity_ids(prefix: str = "ws") -> set[str]:
     """Read suggested_object_id slugs from binary_sensor.py."""
-    bs_py = (ROOT / "custom_components/ws_core/binary_sensor.py").read_text()
+    bs_py = (ROOT / "custom_components/ws_core/binary_sensor.py").read_text(encoding="utf-8")
     # Pattern: f"{prefix}_package_ok" etc.
     slugs = re.findall(r'f"\{prefix\}_([^"]+)"', bs_py)
     return {f"binary_sensor.{prefix}_{slug}" for slug in slugs}
@@ -99,7 +101,7 @@ _ENTITY_RE = re.compile(
 
 def _dashboard_entity_refs(yaml_path: pathlib.Path) -> dict[str, list[int]]:
     refs: dict[str, list[int]] = {}
-    for lineno, line in enumerate(yaml_path.read_text().splitlines(), 1):
+    for lineno, line in enumerate(yaml_path.read_text(encoding="utf-8").splitlines(), 1):
         for m in _ENTITY_RE.finditer(line):
             eid = m.group(1)
             refs.setdefault(eid, []).append(lineno)
@@ -109,6 +111,7 @@ def _dashboard_entity_refs(yaml_path: pathlib.Path) -> dict[str, list[int]]:
 # ---------------------------------------------------------------------------
 # Validation / list
 # ---------------------------------------------------------------------------
+
 
 def validate(prefix: str = "ws", verbose: bool = False) -> bool:
     known = build_known_entities(prefix)
@@ -127,10 +130,10 @@ def validate(prefix: str = "ws", verbose: bool = False) -> bool:
             for eid, lines in sorted(broken.items()):
                 line_str = ", ".join(str(line_num) for line_num in lines[:5])
                 if len(lines) > 5:
-                    line_str += f" (+{len(lines)-5} more)"
+                    line_str += f" (+{len(lines) - 5} more)"
                 print(f"   BROKEN  {eid}  (lines: {line_str})")
         else:
-            print(f"✓ {dash_path.name}: all {len(refs)} entity refs valid")
+            print(f"OK {dash_path.name}: all {len(refs)} entity refs valid")
             if verbose:
                 for eid in sorted(refs):
                     print(f"   {eid}")

@@ -19,7 +19,7 @@ Turn any weather station into a complete weather intelligence system: local fore
 * **Never Get Caught in the Rain:** Uses your live rain gauge to correct cloud forecasts, giving you a countdown to the minute the rain starts (`sensor.ws_minutes_until_rain`).
 * **Stop the Sprinklers Precisely:** Calculates exact Evapotranspiration (ET0) so your smart irrigation system knows exactly how much water the lawn actually needs.
 * **Offline Zambretti Forecast:** Predicts the next 12 hours based purely on your local barometric pressure trends, even if the internet goes down.
-* **Automate Everything:** Includes 5 ready-to-use blueprints for TTS alerts, freeze warnings, and high-wind awning retraction.
+* **Automate Everything:** Includes 10 ready-to-use blueprints for TTS alerts, freeze warnings, irrigation skips, lightning safety, and high-wind awning retraction.
 
 ---
 

@@ -4,7 +4,7 @@ This page gets you from zero to a working installation in about 5 minutes.
 
 ## Requirements
 
-- Home Assistant 2026.3 or newer
+- Home Assistant 2024.6 or newer
 - A personal weather station already integrated into HA, providing at minimum:
 
 | Measurement | Example entity |

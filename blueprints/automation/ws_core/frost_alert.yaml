@@ -4,7 +4,7 @@ blueprint:
     Sends a notification when temperature drops below a configurable threshold.
     Includes frost point and dew point context. Uses the ws_core Temperature sensor.
   domain: automation
-  source_url: https://github.com/kmich/ha_ws_core
+  source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/frost_alert.yaml
   input:
     temperature_sensor:
       name: WS Temperature Sensor
@@ -61,7 +61,7 @@ condition:
 action:
   - service: !input notify_target
     data:
-      title: "❄️ Frost Alert"
+      title: "Frost Alert"
       message: >
         Temperature has dropped to {{ states(trigger.entity_id) | round(1) }}°C
         (below your {{ threshold }}°C threshold).
