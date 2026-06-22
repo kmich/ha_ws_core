@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Weather Station Core -- Create Station",
+        "title": "Weather Station Core - Create Station",
         "description": "Give your weather station a name. The prefix will be used for all entity IDs (e.g. prefix 'ws' creates sensor.ws_temperature).",
         "data": {
           "name": "Station name",
@@ -34,6 +34,7 @@
           "solar_radiation": "Solar radiation (W/m², for Penman-Monteith ET₀)",
           "lightning_count": "Lightning strike count (cumulative, e.g. from WH57 or AS3935)",
           "lightning_dist": "Lightning nearest distance (km, e.g. from WH57)",
+          "lightning_azimuth": "Lightning strike azimuth (degrees)",
           "indoor_temp": "Indoor temperature sensor",
           "indoor_humidity": "Indoor humidity sensor",
           "indoor_co2": "Indoor CO₂ sensor (ppm)",
@@ -139,6 +140,7 @@
           "enable_advanced_sensors": "Advanced/derived sensors (Zambretti number, ET₀ hourly, smoothed wind direction)",
           "enable_nowcast": "Precipitation nowcast (minutes until rain starts/stops, via Open-Meteo, no API key)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
+          "hdd_base_c": "Degree day base temperature (HDD/CDD reference, °C)",
           "enable_lightning": "Lightning detection (accepts WH57, AS3935, or any lightning count + distance sensor)",
           "enable_indoor": "Indoor sensors (temperature, humidity, CO₂ differential)",
           "enable_soil": "Soil sensors (moisture, temperature, irrigation need)",
@@ -153,7 +155,7 @@
       },
       "weathercloud": {
         "title": "Weathercloud Upload",
-        "description": "{info}",
+        "description": "Weathercloud station ID and key from weathercloud.net/dashboard. Leave blank to skip.",
         "data": {
           "wc_station_id": "Station ID",
           "wc_api_key": "API key",
@@ -163,7 +165,7 @@
       },
       "pwsweather": {
         "title": "PWSWeather Upload",
-        "description": "{info}",
+        "description": "PWSWeather station ID and API key from pwsweather.com. Leave blank to skip.",
         "data": {
           "pws_station_id": "Station ID",
           "pws_api_key": "API key",
@@ -173,7 +175,7 @@
       },
       "wow": {
         "title": "WOW (UK Met Office) Upload",
-        "description": "{info}",
+        "description": "WOW (UK Met Office) site ID and authentication key from wow.metoffice.gov.uk. Leave blank to skip.",
         "data": {
           "wow_site_id": "Site ID",
           "wow_auth_key": "Authentication key",
@@ -183,7 +185,7 @@
       },
       "awekas": {
         "title": "AWEKAS Upload",
-        "description": "{info}",
+        "description": "AWEKAS username and password from awekas.at. Leave blank to skip.",
         "data": {
           "awekas_username": "Username",
           "awekas_password": "Password",
@@ -193,7 +195,7 @@
       },
       "owm_stations": {
         "title": "OpenWeatherMap Stations Upload",
-        "description": "{info}",
+        "description": "OpenWeatherMap Stations API. Create a station via the OWM API to get a station_id, and use your OWM API key. Leave blank to skip.",
         "data": {
           "owm_stations_api_key": "API key",
           "owm_stations_station_id": "Station ID",
@@ -203,7 +205,7 @@
       },
       "windy": {
         "title": "Windy.com Upload",
-        "description": "{info}",
+        "description": "Windy.com Stations API key from stations.windy.com. The station ID is optional (defaults to 0 for single-station accounts). Leave the key blank to skip.",
         "data": {
           "windy_api_key": "API key",
           "windy_station_id": "Station ID (optional)",
@@ -213,7 +215,7 @@
       },
       "mqtt_config": {
         "title": "MQTT Discovery Configuration",
-        "description": "{info}",
+        "description": "Sensors will be published as MQTT Discovery payloads under {discovery_prefix}/sensor/... and state updates under {state_prefix}/{prefix}/{sensor}/state. Requires the HA MQTT integration to be configured.",
         "data": {
           "mqtt_discovery_prefix": "Discovery prefix (default: homeassistant)",
           "mqtt_state_prefix": "State topic prefix (default: ws_core)",
@@ -242,7 +244,7 @@
       },
       "air_quality": {
         "title": "Air Quality",
-        "description": "{info}",
+        "description": "Air quality data (PM2.5, PM10, NO₂, ozone) via Open-Meteo. Free, no API key. Uses the forecast latitude/longitude.",
         "data": {
           "aqi_interval_min": "Refresh interval",
           "_go_back": "← Go back to previous step"
@@ -250,14 +252,14 @@
       },
       "pollen": {
         "title": "Pollen Data",
-        "description": "{info}",
+        "description": "Pollen data is retrieved via the Open-Meteo Air Quality API (free, no key). Includes alder, birch, grass, mugwort, olive, and ragweed. Updates piggyback on the AQI fetch.",
         "data": {
           "_go_back": "← Go back to previous step"
         }
       },
       "solar_forecast": {
         "title": "Solar Forecast",
-        "description": "{info}",
+        "description": "Free solar PV generation forecast via forecast.solar. Uses the forecast latitude/longitude. Azimuth: 0=N, 90=E, 180=S, 270=W.",
         "data": {
           "solar_peak_kw": "Solar system peak power (kWp)",
           "solar_panel_azimuth": "Panel azimuth",
@@ -279,7 +281,7 @@
       },
       "cwop": {
         "title": "CWOP (APRS) Upload",
-        "description": "{info}",
+        "description": "CWOP (Citizen Weather Observer Program) via APRS. Enter your CWOP/APRS callsign (e.g. CW1234 or a licensed amateur radio callsign). The passcode is -1 for credentials issued by CWOP, or your APRS-IS passcode for amateur radio callsigns. Leave the callsign blank to skip. The forecast latitude/longitude must be set.",
         "data": {
           "cwop_callsign": "CWOP / APRS callsign",
           "cwop_passcode": "Passcode (-1 for CWOP IDs)",
@@ -298,9 +300,9 @@
       "elevation_out_of_range": "Elevation must be between -500 m and 9000 m.",
       "wind_gust_too_high": "Wind gust threshold exceeds the physical world record.",
       "temp_out_of_range": "Temperature is outside the physically possible range.",
-      "invalid_api_key": "Invalid API key or credentials rejected",
-      "cannot_connect": "Could not connect to API - check network and try again",
-      "station_not_found": "Weather Underground station ID not found"
+      "invalid_api_key": "Invalid API key or credentials rejected.",
+      "cannot_connect": "Could not connect to API - check network and try again.",
+      "station_not_found": "Weather Underground station ID not found."
     },
     "create_entry": {
       "default": "Setup complete! Your local forecasts and intelligent weather sensors are now generating.\n\n**Next steps:**\n1. Install the Enhanced Dashboard (from the GitHub repository dashboards/ folder)\n2. Set up a Rain Warning Automation (from the blueprints/ folder)"
@@ -444,6 +446,7 @@
           "enable_advanced_sensors": "Advanced/derived sensors",
           "enable_nowcast": "Precipitation nowcast (minutes to rain)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
+          "hdd_base_c": "Degree day base temperature (HDD/CDD reference, °C)",
           "enable_lightning": "Lightning detection sensors",
           "enable_indoor": "Indoor sensors (temperature, humidity, CO₂)",
           "enable_soil": "Soil sensors (moisture, temperature, irrigation need)"
@@ -501,7 +504,7 @@
       },
       "wunderground_opt": {
         "title": "Weather Underground",
-        "description": "{info}",
+        "description": "Leave the API key blank to keep the existing key. It will be validated.",
         "data": {
           "wu_station_id": "Station ID",
           "wu_api_key": "Station key (password)",
@@ -510,19 +513,19 @@
       },
       "air_quality_opt": {
         "title": "Air Quality Settings",
-        "description": "{info}",
+        "description": "Open-Meteo Air Quality API. Free, no key required.",
         "data": {
           "aqi_interval_min": "Refresh interval"
         }
       },
       "pollen_opt": {
         "title": "Pollen Settings",
-        "description": "{info}",
+        "description": "Pollen data via the Open-Meteo Air Quality API (free, no key). Piggybacks on the AQI fetch.",
         "data": {}
       },
       "solar_forecast_opt": {
         "title": "Solar Forecast Settings",
-        "description": "{info}",
+        "description": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal.",
         "data": {
           "solar_peak_kw": "Peak power (kWp)",
           "solar_panel_azimuth": "Panel azimuth",
@@ -615,9 +618,9 @@
       "elevation_out_of_range": "Elevation must be between -500 m and 9000 m.",
       "wind_gust_too_high": "Wind gust threshold exceeds the physical world record.",
       "temp_out_of_range": "Temperature is outside the physically possible range.",
-      "invalid_api_key": "Invalid API key or credentials rejected",
-      "cannot_connect": "Could not connect to API - check network and try again",
-      "station_not_found": "Weather Underground station ID not found"
+      "invalid_api_key": "Invalid API key or credentials rejected.",
+      "cannot_connect": "Could not connect to API - check network and try again.",
+      "station_not_found": "Weather Underground station ID not found."
     }
   },
   "issues": {
@@ -766,7 +769,8 @@
         "name": "Alert Message",
         "state_attributes": {
           "alert_state": {
-            "name": "Alert state"
+            "name": "Alert state",
+            "all clear": "All clear"
           },
           "icon": {
             "name": "Icon"
@@ -2435,6 +2439,30 @@
     }
   },
   "selector": {
+    "temp_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "C": "Celsius (°C)",
+        "F": "Fahrenheit (°F)"
+      }
+    },
+    "wind_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "m/s": "m/s (metres per second)",
+        "km/h": "km/h (kilometres per hour)",
+        "mph": "mph (miles per hour)",
+        "kn": "kn (knots)"
+      }
+    },
+    "pressure_unit": {
+      "options": {
+        "auto": "Auto (follow Home Assistant)",
+        "hPa": "hPa (hectopascals)",
+        "inHg": "inHg (inches of mercury)",
+        "mmHg": "mmHg (millimetres of mercury)"
+      }
+    },
     "units_mode": {
       "options": {
         "auto": "Auto (follow Home Assistant)",
@@ -2476,17 +2504,20 @@
     },
     "hemisphere": {
       "options": {
-        "northern": "Northern",
-        "southern": "Southern"
+        "Northern": "Northern",
+        "Southern": "Southern"
       }
     },
     "climate_region": {
       "options": {
-        "tropical": "Tropical",
-        "dry": "Dry",
-        "temperate": "Temperate",
-        "continental": "Continental",
-        "polar": "Polar"
+        "Atlantic Europe": "Atlantic Europe",
+        "Mediterranean": "Mediterranean",
+        "Continental Europe": "Continental Europe",
+        "Scandinavia": "Scandinavia",
+        "North America East": "North America (East)",
+        "North America West": "North America (West)",
+        "Australia": "Australia",
+        "Custom": "Custom"
       }
     }
   }
