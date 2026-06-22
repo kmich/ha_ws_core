@@ -96,11 +96,3 @@ action:
 ```
 
 Replace `<zone_name>` with your Smart Irrigation zone switch entity ID.
-
----
-
-## Proposed Smart Irrigation documentation PR
-
-A PR proposal for the Smart Irrigation documentation site is saved at
-`docs/promotion/smart_irrigation_docs_pr.md`. This proposes adding ws_core as a
-documented ET₀ source in Smart Irrigation's official docs.

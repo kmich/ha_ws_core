@@ -38,9 +38,6 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
-exclude_docs: |
-  promotion/
-
 plugins:
   - search
 
