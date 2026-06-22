@@ -32,8 +32,9 @@
           "dew_point": "Point de rosée (calculé si absent)",
           "battery": "Niveau de batterie",
           "solar_radiation": "Rayonnement solaire (W/m², pour ET₀ Penman-Monteith)",
-          "lightning_count": "Nombre d'impacts de foudre (cumulé, ex: via Capteur physique ou Blitzortung )",
+          "lightning_count": "Nombre d'impacts de foudre (cumulé, ex: via Capteur physique ou Blitzortung)",
           "lightning_dist": "Distance de l'éclair le plus proche (km, ex: via Capteur physique ou Blitzortung)",
+          "lightning_azimuth": "Azimut de la foudre (degrés, ex: via Capteur physique ou Blitzortung)",
           "indoor_temp": "Capteur de température intérieure",
           "indoor_humidity": "Capteur d'humidité intérieure",
           "indoor_co2": "Capteur de CO₂ intérieur (ppm)",
@@ -90,7 +91,7 @@
         },
         "data_description": {
           "forecast_entity": "Choisissez une entité météo déjà configurée dans Home Assistant (ex. weather.home, weather.forecast_home)"
-                }
+        }
       },
       "forecast_api_key": {
         "title": "Clé API du fournisseur de prévisions météo",
@@ -134,11 +135,12 @@
           "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, déficit de pression de vapeur (DPV), delta-T, course du vent, heures de froid, couverture nuageuse)",
           "enable_vigilance_meteo": "Vigilance Météo (France, sans clé API)",
           "enable_vigicrues": "Surveillance des cours d'eau (Vigicrues) (France, sans clé API)",
-          "enable_diagnostics": "Diagnostics de la station météo(dérive des capteurs, cohérence des données, indicateurs de qualité, fiabilité des prévisions, facteur d'ensoleillement (lux), normales de saison (30 j)",
+          "enable_diagnostics": "Diagnostics de la station météo (dérive des capteurs, cohérence des données, indicateurs de qualité, fiabilité des prévisions, facteur d'ensoleillement (lux), normales de saison (30 j))",
           "enable_fwi_components": "Composantes IFM (FFMC, DMC, DC, ISI, BUI - nécessite le risque d'incendie activé)",
           "enable_advanced_sensors": "Capteurs avancés et calculés (code Zambretti, ET₀ horaire, direction du vent lissée)",
           "enable_nowcast": "Prévision immédiate des précipitations (minutes avant le début/la fin de la pluie, via Open-Meteo, sans clé API)",
           "enable_degree_days": "Calcul des Degrés Jours (Chauffage / Climatisation) et humidité du feuillage",
+          "hdd_base_c": "Température de base pour les degrés jours (référence HDD/CDD, °C)",
           "enable_lightning": "Calcul et détection des impacts de foudre (Capteur physique ou Blitzortung)",
           "enable_indoor": "Capteurs intérieurs (température, humidité, CO₂)",
           "enable_soil": "Capteurs de sol (humidité, température, besoin en irrigation)",
@@ -153,7 +155,7 @@
       },
       "weathercloud": {
         "title": "Envoi vers Weathercloud",
-        "description": "{info}",
+        "description": "ID de station et clé Weathercloud depuis weathercloud.net/dashboard. Laissez vide pour ignorer.",
         "data": {
           "wc_station_id": "ID de la station",
           "wc_api_key": "Clé API",
@@ -163,7 +165,7 @@
       },
       "pwsweather": {
         "title": "Envoi vers PWSWeather",
-        "description": "{info}",
+        "description": "ID de station et clé API PWSWeather depuis pwsweather.com. Laissez vide pour ignorer.",
         "data": {
           "pws_station_id": "ID de la station",
           "pws_api_key": "Clé API",
@@ -173,7 +175,7 @@
       },
       "wow": {
         "title": "Envoi vers WOW (UK Met Office)",
-        "description": "{info}",
+        "description": "ID de site et clé d'authentification WOW depuis wow.metoffice.gov.uk. Laissez vide pour ignorer.",
         "data": {
           "wow_site_id": "ID du site",
           "wow_auth_key": "Clé d'authentification",
@@ -183,7 +185,7 @@
       },
       "awekas": {
         "title": "Envoi vers AWEKAS",
-        "description": "{info}",
+        "description": "Identifiant et mot de passe AWEKAS depuis awekas.at. Laissez vide pour ignorer.",
         "data": {
           "awekas_username": "Nom d'utilisateur AWEKAS",
           "awekas_password": "Mot de passe AWEKAS",
@@ -193,7 +195,7 @@
       },
       "owm_stations": {
         "title": "Envoi vers OpenWeatherMap Stations",
-        "description": "{info}",
+        "description": "OpenWeatherMap Stations API. Créez une station via l'API OWM pour obtenir un station_id, et utilisez votre clé API OWM. Laissez vide pour ignorer.",
         "data": {
           "owm_stations_api_key": "Clé API",
           "owm_stations_station_id": "ID de la station",
@@ -203,7 +205,7 @@
       },
       "windy": {
         "title": "Envoi vers Windy.com",
-        "description": "{info}",
+        "description": "Clé API Windy.com Stations depuis stations.windy.com. L'ID de station est facultatif (0 par défaut pour les comptes mono-station). Laissez la clé vide pour ignorer.",
         "data": {
           "windy_api_key": "Clé API",
           "windy_station_id": "ID de la station (facultatif)",
@@ -213,7 +215,7 @@
       },
       "mqtt_config": {
         "title": "Configuration MQTT",
-        "description": "{info}",
+        "description": "Les capteurs seront publiés sous forme de payloads MQTT Discovery sous {discovery_prefix}/sensor/... et les mises à jour d'état sous {state_prefix}/{prefix}/{sensor}/state. Nécessite que l'intégration MQTT de HA soit configurée.",
         "data": {
           "mqtt_discovery_prefix": "Préfixe de découverte (par défaut : homeassistant)",
           "mqtt_state_prefix": "Préfixe du topic d'état (par défaut : ws_core)",
@@ -232,7 +234,7 @@
       },
       "wunderground": {
         "title": "Envoi vers Weather Underground",
-        "description": "Envoyez vos observations vers votre station Weather Underground personnelle. Vous avez besoin d'un ID de station et d'une clé API de votre compte Weather Underground (wunderground.com/member/devices). Laissez les champs vides pour ignorer et configurer plus tard.",
+        "description": "Téléchargez vos observations vers votre station personnelle Weather Underground. Vous avez besoin d'un identifiant de station et d'une clé de station (mot de passe) depuis votre compte Weather Underground (wunderground.com/member/devices). Laissez les deux champs vides pour ignorer et configurer plus tard.",
         "data": {
           "wu_station_id": "ID de station (ex. IATHEN123) - laisser vide pour ignorer",
           "wu_api_key": "Clé API - laisser vide pour ignorer",
@@ -242,7 +244,7 @@
       },
       "air_quality": {
         "title": "Qualité de l'air",
-        "description": "{info}",
+        "description": "Données de qualité de l'air (PM2.5, PM10, NO₂, ozone) via Open-Meteo. Gratuit, sans clé API. Utilise la latitude/longitude de prévision.",
         "data": {
           "aqi_interval_min": "Intervalle d'actualisation",
           "_go_back": "← Retour à l'étape précédente"
@@ -250,14 +252,14 @@
       },
       "pollen": {
         "title": "Données de pollen",
-        "description": "{info}",
+        "description": "Les données de pollen sont récupérées via l'API Open-Meteo Air Quality (gratuit, sans clé). Inclut aulne, bouleau, graminées, armoise, olivier et ambroisie. Les mises à jour s'appuient sur la récupération AQI.",
         "data": {
           "_go_back": "← Retour à l'étape précédente"
         }
       },
       "solar_forecast": {
         "title": "Prévision solaire",
-        "description": "{info}",
+        "description": "Prévision gratuite de production photovoltaïque via forecast.solar. Utilise la latitude/longitude de prévision. Azimut : 0=N, 90=E, 180=S, 270=O.",
         "data": {
           "solar_peak_kw": "Puissance crête (kWp)",
           "solar_panel_azimuth": "Azimut du panneau",
@@ -279,7 +281,7 @@
       },
       "cwop": {
         "title": "Envoi vers CWOP (APRS)",
-        "description": "{info}",
+        "description": "CWOP (Citizen Weather Observer Program) via APRS. Indiquez votre indicatif CWOP/APRS (ex. CW1234 ou un indicatif radioamateur licencié). Le passcode est -1 pour les identifiants émis par CWOP, ou votre passcode APRS-IS pour les indicatifs radioamateur. Laissez l'indicatif vide pour ignorer. La latitude/longitude de prévision doit être définie.",
         "data": {
           "cwop_callsign": "Identifiant CWOP / APRS (identifiants)",
           "cwop_passcode": "Code d'accès (-1 pour les identifiants CWOP)",
@@ -301,13 +303,16 @@
       "invalid_api_key": "Clé API invalide ou identifiants rejetés.",
       "cannot_connect": "Impossible de se connecter à l'API - vérifiez le réseau et réessayez.",
       "station_not_found": "ID de la station Weather Underground introuvable."
+    },
+    "create_entry": {
+      "default": "Configuration terminée ! Vos prévisions locales et vos capteurs météo intelligents sont maintenant actifs.\n\n**Prochaines étapes :**\n1. Installez le tableau de bord avancé (depuis le dossier dashboards/ du dépôt GitHub)\n2. Configurez une automatisation d'alerte de pluie (depuis le dossier blueprints/)"
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Paramètres généraux",
-        "description": "Identité, unités, prévisions, alertes et calibration.",
+        "description": "Identification, unités, prévisions, alertes et calibration.",
         "data": {
           "prefix": "Préfixe des entités",
           "hemisphere": "Hémisphère",
@@ -324,9 +329,9 @@
           "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
           "forecast_lat": "Latitude des prévisions",
           "forecast_lon": "Longitude des prévisions",
-          "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap, Pirate Weather et Météo France nécessitent une clé API gratuite.",
+          "forecast_provider": "Fournisseur de prévisions",
           "forecast_api_key": "Clé API de prévisions",
-          "forecast_entity": "Entité météo home assistant  (Pour les prévisions)",
+          "forecast_entity": "Entité météo Home Assistant (pour les prévisions)",
           "thresh_wind_gust_ms": "Seuil d'alerte des rafales",
           "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
           "thresh_freeze_c": "Seuil d'alerte de gel",
@@ -337,7 +342,7 @@
           "cal_humidity": "Correction de l'humidité",
           "cal_pressure_hpa": "Correction de la pression atmosphérique",
           "cal_wind_ms": "Correction de la vitesse du vent",
-          "enable_display_sensors": "Capteurs descriptifs (niveaux, tendances, santé)",
+          "enable_display_sensors": "Capteurs avec des attributs textuels",
           "enable_fire_risk_score": "Indice de risque d'incendie",
           "enable_sea_temp": "Température de la mer",
           "sea_temp_lat": "Latitude pour la température",
@@ -348,34 +353,34 @@
           "wu_interval_min": "Intervalle d'envoi WU"
         },
         "data_description": {
-          "prefix": "Préfixe des entités",
-          "hemisphere": "Hémisphère",
-          "climate_region": "Région climatique",
-          "elevation_m": "Altitude de la station",
+          "prefix": "Préfixe utilisé pour générer les identifiants de toutes les entités créées par cette station.",
+          "hemisphere": "Affecte la logique saisonnière (ex. : mois d'été/hiver) utilisée par certains capteurs calculés.",
+          "climate_region": "Utilisée pour pondérer l'influence du vent dans la prévision Zambretti.",
+          "elevation_m": "Altitude de la station au-dessus du niveau de la mer, utilisée pour la réduction de pression.",
           "units_mode": "Définit un système d'unités de base. Les réglages individuels ci-dessous ont priorité.",
           "temp_unit": "Remplace l'unité de température. « Auto » suit les paramètres HA.",
           "wind_unit": "Remplace l'unité de vitesse du vent. « Auto » suit les paramètres HA.",
           "pressure_unit": "Remplace l'unité de pression. « Auto » suit les paramètres HA.",
           "rain_unit": "Remplace l'unité de précipitation. « Auto » suit les paramètres HA.",
-          "distance_unit": "Remplace l'unité de distance (ex. distance foudre). « Auto » suit les paramètres HA.",
+          "distance_unit": "Remplace l'unité de distance (ex. proximité de la foudre). « Auto » suit les paramètres HA.",
           "altitude_unit": "Remplace l'unité d'altitude (ex. base des nuages, niveau de gel). « Auto » suit les paramètres HA.",
-          "forecast_enabled": "Activer les prévisions",
-          "forecast_interval_min": "Intervalle de rafraîchissement des prévisions",
-          "forecast_lat": "Latitude des prévisions",
-          "forecast_lon": "Longitude des prévisions",
+          "forecast_enabled": "Active la récupération des prévisions météo sur 7 jours.",
+          "forecast_interval_min": "Fréquence de rafraîchissement des données de prévision.",
+          "forecast_lat": "Latitude utilisée pour interroger le fournisseur de prévisions.",
+          "forecast_lon": "Longitude utilisée pour interroger le fournisseur de prévisions.",
           "forecast_provider": "Source de données météo. Open-Meteo et Met.no sont gratuits sans clé API. NWS/NOAA est gratuit mais limité aux États-Unis. OpenWeatherMap, Pirate Weather et Météo France nécessitent une clé API gratuite.",
           "forecast_api_key": "Clé API pour le fournisseur sélectionné (requise pour OpenWeatherMap, Pirate Weather et Météo France).",
-          "forecast_entity": "Entité météo home assistant  (Pour les prévisions)",
-          "thresh_wind_gust_ms": "Seuil d'alerte des rafales",
-          "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
-          "thresh_freeze_c": "Seuil d'alerte de gel",
-          "staleness_s": "Délai d'inactivité des capteurs",
-          "rain_filter_alpha": "Lissage du taux de précipitation",
-          "pressure_trend_window_h": "Fenêtre d'analyse de la pression",
-          "cal_temp_c": "Correction de la température",
-          "cal_humidity": "Correction de l'humidité",
-          "cal_pressure_hpa": "Correction de la pression atmosphérique",
-          "cal_wind_ms": "Correction de la vitesse du vent"
+          "forecast_entity": "Entité météo Home Assistant (pour les prévisions)",
+          "thresh_wind_gust_ms": "Vitesse de rafale à partir de laquelle une alerte est déclenchée.",
+          "thresh_rain_rate_mmph": "Intensité de pluie à partir de laquelle une alerte est déclenchée.",
+          "thresh_freeze_c": "Température en dessous de laquelle une alerte de gel est déclenchée.",
+          "staleness_s": "Durée sans mise à jour au-delà de laquelle un capteur est considéré comme inactif.",
+          "rain_filter_alpha": "Coefficient de lissage (filtre de Kalman) appliqué au taux de précipitation.",
+          "pressure_trend_window_h": "Durée de la fenêtre glissante utilisée pour calculer la tendance barométrique.",
+          "cal_temp_c": "Décalage d'étalonnage ajouté à la température mesurée.",
+          "cal_humidity": "Décalage d'étalonnage ajouté à l'humidité mesurée.",
+          "cal_pressure_hpa": "Décalage d'étalonnage ajouté à la pression mesurée.",
+          "cal_wind_ms": "Décalage d'étalonnage ajouté à la vitesse du vent mesurée."
         }
       },
       "forecast_api_key_opt": {
@@ -385,7 +390,7 @@
           "forecast_api_key": "Clé API"
         },
         "data_description": {
-          "forecast_api_key": "Paste your API key here."
+          "forecast_api_key": "Copiez la clé API ici."
         }
       },
       "required_sources_opt": {
@@ -424,7 +429,7 @@
         "title": "Fonctionnalités & services",
         "description": "Activez ou désactivez les capteurs et sources de données externes. Des sous-étapes apparaîtront pour chaque fonctionnalité activée.",
         "data": {
-          "enable_display_sensors": "Capteurs descriptifs",
+          "enable_display_sensors": "Capteurs textuels",
           "enable_fire_risk_score": "Indice de risque d'incendie",
           "enable_sea_temp": "Température de la mer",
           "enable_air_quality": "Indice de qualité de l'air",
@@ -433,7 +438,7 @@
           "enable_solar_forecast": "Prévision de production solaire",
           "enable_fog": "Probabilité de brouillard",
           "enable_thunderstorm_risk": "Risque d'orage (heuristique; nombreux faux positifs)",
-          "enable_thunderstorm": "Risque d'orage",
+          "enable_comfort_indices": "Indices de confort (indice de chaleur, refroidissement éolien, humidex, déficit de pression de vapeur (DPV), delta-T, course du vent, heures de froid, couverture nuageuse)",
           "enable_vigilance_meteo": "Vigilance Météo",
           "enable_vigicrues": "Surveillance des cours d'eau (Vigicrues)",
           "enable_diagnostics": "Diagnostics de la station météo",
@@ -441,12 +446,13 @@
           "enable_advanced_sensors": "Capteurs avancés et calculés",
           "enable_nowcast": "Prévision immédiate des précipitations",
           "enable_degree_days": "Calcul des Degrés-Jours et de l'humidité du feuillage",
+          "hdd_base_c": "Température de base pour les degrés jours (référence HDD/CDD, °C)",
           "enable_lightning": "Capteurs de détection de foudre",
           "enable_indoor": "Prendre en compte les capteurs intérieurs",
           "enable_soil": "Capteurs de sol (humidité, température, besoin en irrigation)"
         },
         "data_description": {
-          "enable_display_sensors": "Capteurs descriptifs",
+          "enable_display_sensors": "Capteurs avec des attributs textuels",
           "enable_fire_risk_score": "Indice de risque d'incendie",
           "enable_sea_temp": "Température de la mer",
           "enable_air_quality": "Indice de qualité de l'air (Open-Meteo)",
@@ -454,7 +460,7 @@
           "enable_moon": "Phase et illumination de la Lune",
           "enable_solar_forecast": "Prévision de production solaire (forecast.solar)",
           "enable_fog": "Active le capteur de probabilité de brouillard (modèle basé sur la dépression du point de rosée)",
-          "enable_thunderstorm": "Active le capteur de risque d'orage (heuristique de surface)",
+          "enable_thunderstorm_risk": "Active le capteur de risque d'orage (heuristique de surface)",
           "enable_comfort_indices": "Active les indices de confort et les capteurs agro-météorologiques",
           "enable_vigilance_meteo": "Active les alertes météo départementales de Météo-France (Vigilance Météo)",
           "enable_vigicrues": "Active le niveau et le débit des cours d'eau les plus proches via Vigicrues (Hub'Eau v2)",
@@ -463,8 +469,8 @@
           "enable_advanced_sensors": "Code Zambretti (format numérique), ET₀ horaire, direction du vent lissée",
           "enable_nowcast": "Prévision immédiate Open-Meteo à 15 minutes : minutes avant le début/la fin de la pluie, cumul pour la prochaine heure, intensité. Sans clé API."
         }
-       }, 
-       "indoor_rooms_opt": {
+      },
+      "indoor_rooms_opt": {
         "title": "Capteurs intérieurs des différentes pièces",
         "description": "Sélectionnez un capteur de température par pièce pour générer un capteur d'écart de température intérieur/extérieur dédié.",
         "data": {
@@ -487,7 +493,7 @@
           "enable_windy": "Windy.com",
           "enable_cwop": "CWOP / APRS",
           "enable_mqtt": "MQTT"
-         }
+        }
       },
       "sea_temp_opt": {
         "title": "Localisation pour la température de la mer",
@@ -498,7 +504,7 @@
       },
       "wunderground_opt": {
         "title": "Envoi vers Weather Underground",
-        "description": "{info}",
+        "description": "Laissez la clé API vide pour conserver la clé existante. Elle sera validée.",
         "data": {
           "wu_station_id": "ID de la station",
           "wu_api_key": "Clé API de la station",
@@ -507,19 +513,19 @@
       },
       "air_quality_opt": {
         "title": "Qualité de l'air",
-        "description": "{info}",
+        "description": "API Open-Meteo Air Quality. Gratuit, sans clé requise.",
         "data": {
           "aqi_interval_min": "Intervalle d'actualisation"
         }
       },
       "pollen_opt": {
         "title": "Niveau de pollen",
-        "description": "{info}",
+        "description": "Données de pollen via l'API Open-Meteo Air Quality (gratuit, sans clé). S'appuie sur la récupération AQI.",
         "data": {}
       },
       "solar_forecast_opt": {
         "title": "Prévision solaire",
-        "description": "{info}",
+        "description": "Azimut : 0=N, 90=E, 180=S, 270=O. Inclinaison : degrés par rapport à l'horizontale.",
         "data": {
           "solar_peak_kw": "Puissance crête (kWp)",
           "solar_panel_azimuth": "Azimut du panneau",
@@ -623,12 +629,12 @@
       "description": "Les entités de capteurs sources suivantes n'ont pas pu être trouvées dans Home Assistant : {entities}. Vérifiez que les entités existent et ne sont pas désactivées."
     },
     "stale_sensors": {
-      "title": "Capteur(s) de la station météo inactif()s",
-      "description": "Les capteurs suivants n'ont pas été mis à jour pendant le délai d'inactivité autorisé : {sensors}. Vérifiez que les capteurs de votre station météo sont en ligne et connecté."
+      "title": "Capteur(s) de la station météo inactif(s)",
+      "description": "Les capteurs suivants n'ont pas été mis à jour pendant le délai d'inactivité autorisé : {sensors}. Vérifiez que les capteurs de votre station météo sont en ligne et connectés."
     },
     "forecast_api_failures": {
-      "title": "Échecs de l'API de prévisions ({provider})",
-      "description": "L'API de prévisions ({provider}) a échoué {failures} fois consécutives. Les données de prévision peuvent être obsolètes. Vérifiez votre connexion Internet. L'intégration réessaiera automatiquement avec un backoff exponentiel."
+      "title": "Échecs de l'API {provider}",
+      "description": "L'API de {provider} a échoué {failures} fois consécutives. Les données de prévision peuvent être obsolètes. Vérifiez votre connexion Internet. L'intégration réessaiera automatiquement avec un backoff exponentiel."
     },
     "stuck_sensors": {
       "title": "Capteur(s) de la station météo bloqué(s)",
@@ -673,7 +679,7 @@
         "name": "Cumul de pluie"
       },
       "rain_rate": {
-        "name": "Intensité de la pluie"
+        "name": "Taux de précipitation"
       },
       "illuminance": {
         "name": "Éclairement"
@@ -696,7 +702,7 @@
         "name": "Fenêtre de variation de pression"
       },
       "data_quality_banner": {
-        "name": "Indicateurs de qualité des capteurs",
+        "name": "Bannière de qualité des données",
         "state_attributes": {
           "package_ok": {
             "name": "Données Ok"
@@ -763,7 +769,8 @@
         "name": "Message d'alerte",
         "state_attributes": {
           "alert_state": {
-            "name": "État de l'alerte"
+            "name": "État de l'alerte",
+            "all clear": "Aucune alerte"
           },
           "icon": {
             "name": "Icône"
@@ -775,7 +782,7 @@
       },
       "forecast_daily": {
         "name": "Prévisions quotidiennes"
-              },
+      },
       "forecast_provider": {
         "name": "Fournisseur de prévisions",
         "state_attributes": {
@@ -862,7 +869,7 @@
           "vert": "Vert (faible)",
           "jaune": "Jaune (modéré)",
           "orange": "Orange (élevé)",
-          "rouge": "Rouge (Dangereux)"
+          "rouge": "Rouge (dangereux)"
         }
       },
       "fire_danger_vigilance": {
@@ -870,7 +877,7 @@
         "state": {
           "vert": "Vert (aucun)",
           "jaune": "Jaune (modéré)",
-          "orange": "Orange (Elevé)",
+          "orange": "Orange (élevé)",
           "rouge": "Rouge (risque d'incendie extrême)"
         },
         "state_attributes": {
@@ -904,7 +911,7 @@
           "light": "Faible",
           "moderate": "Modérée",
           "heavy": "Forte"
-                  }
+        }
       },
       "nowcast_confidence": {
         "name": "Fiabilité de la prévision à court terme",
@@ -923,7 +930,7 @@
           "fine_becoming_less_settled": "Beau, devenant instable",
           "fine_possible_showers": "Beau, averses possibles",
           "fairly_fine_improving": "Assez beau, en amélioration",
-          "fairly_fine_possible_showers_early": "Asverses matinales possibles, puis assez beau",
+          "fairly_fine_possible_showers_early": "Averses matinales possibles, puis assez beau",
           "fairly_fine_showery_later": "Assez beau, averses plus tard",
           "showery_early_improving": "Averses matinales, en amélioration",
           "changeable_mending": "Variable, en amélioration",
@@ -1129,13 +1136,13 @@
             "name": "Variation sur 3h"
           },
           "change_3h": {
-            "name": "Variation sur 3h  [alias]"
+            "name": "Variation sur 3h (alias)"
           },
           "trend_rate_hpah": {
             "name": "Tendance barométrique"
           },
           "mslp_hpa": {
-            "name": "Pression (niveau de la mer) "
+            "name": "Pression (niveau de la mer)"
           },
           "arrow": {
             "name": "Flèche de tendance"
@@ -1325,7 +1332,7 @@
             "name": "Confort de baignade"
           },
           "hourly_forecast": {
-            "name": "Prévisions heure par heure "
+            "name": "Prévisions heure par heure"
           },
           "grid_latitude": {
             "name": "Latitude"
@@ -1464,7 +1471,7 @@
           "days_to_new_moon": {
             "name": "Jours avant la nouvelle lune"
           }
-                  },
+        },
         "state": {
           "new_moon": "Nouvelle lune",
           "waxing_crescent": "Premier croissant",
@@ -1611,7 +1618,7 @@
             "name": "Moyenne (30 j)"
           }
         }
-              },
+      },
       "temp_anomaly_90d": {
         "name": "Écart aux normales (Temp.; 90 j)"
       },
@@ -1667,7 +1674,7 @@
             "name": "Nombre d'échantillons"
           }
         }
-              },
+      },
       "conditions_summary": {
         "name": "Conditions actuelles",
         "state_attributes": {
@@ -2117,7 +2124,7 @@
             "name": "Humidité"
           }
         }
-              },
+      },
       "soil_moisture": {
         "name": "Humidité du sol",
         "state_attributes": {
@@ -2144,12 +2151,12 @@
           "soil_moisture_deficit_pct": {
             "name": "Déficit en eau du sol (%)"
           }
-                  },
+        },
         "state": {
           "none": "Aucun",
           "low": "Faible",
           "moderate": "Modéré",
-          "high": "Elevé",
+          "high": "Élevé",
           "critical": "Critique"
         }
       },
@@ -2187,7 +2194,7 @@
           "all_clear": {
             "name": "Aucune anomalie"
           }
-         }
+        }
       },
       "lightning_azimuth": {
         "name": "Azimut de la foudre"
@@ -2204,7 +2211,7 @@
           "no_risk": "Aucun",
           "unlikely": "Faible",
           "probable": "Probable",
-          "high": "Elevé"
+          "high": "Élevé"
         }
       }
     },
@@ -2253,16 +2260,16 @@
         "name": "Seuil d'alerte de proximité de la foudre"
       },
       "ws_hdd_base": {
-        "name": "Température de base Degrés-Jours"
+        "name": "Degrés-Jours : température de base (Chauffage)"
       },
       "ws_cdd_base": {
-        "name": "Température de base Degrés-Jours"
+        "name": "Degrés-Jours : température de base (Climatisation)"
       },
       "ws_gdd_base": {
-        "name": "Température de base Degrés-Jours"
+        "name": "Degrés-Jours : température de base (Croissance)"
       },
       "ws_gdd_cap": {
-        "name": "Seuil supérieur Degrés-Jours"
+        "name": "Degrés-Jours : seuil supérieur (Croissance)"
       }
     },
     "switch": {
@@ -2270,7 +2277,7 @@
         "name": "Animations (Dashboard)"
       },
       "ws_enable_display_sensors": {
-        "name": "Affichage des capteurs descriptifs"
+        "name": "Affichage des capteurs textuels"
       },
       "ws_enable_fire_risk_score": {
         "name": "Indice de risque d'incendie"
@@ -2331,7 +2338,7 @@
       },
       "ws_enable_indoor": {
         "name": "Capteurs intérieurs"
-              },
+      },
       "ws_enable_soil": {
         "name": "Capteurs de sol"
       },
@@ -2415,7 +2422,7 @@
         "name": "Statut du capteur de pression"
       },
       "ws_temperature_out_of_range": {
-        "name": "Température hors plage calculable"
+        "name": "Statut du calcul de la température"
       },
       "ws_humidity_out_of_range": {
         "name": "Statut du calcul de l'humidité"
@@ -2432,6 +2439,30 @@
     }
   },
   "selector": {
+    "temp_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "C": "Celsius (°C)",
+        "F": "Fahrenheit (°F)"
+      }
+    },
+    "wind_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "m/s": "m/s (mètres par seconde)",
+        "km/h": "km/h (kilomètres par heure)",
+        "mph": "mph (miles par heure)",
+        "kn": "kn (nœuds)"
+      }
+    },
+    "pressure_unit": {
+      "options": {
+        "auto": "Automatique (suit Home Assistant)",
+        "hPa": "hPa (hectopascals)",
+        "inHg": "inHg (pouces de mercure)",
+        "mmHg": "mmHg (millimètres de mercure)"
+      }
+    },
     "units_mode": {
       "options": {
         "auto": "Automatique (suit Home Assistant)",
@@ -2469,21 +2500,24 @@
         "pirate_weather": "Pirate Weather (Clé API requise, offre gratuite)",
         "meteo_france": "Météo France (Clé API requise, offre gratuite)",
         "ha_weather_entity": "Entité météo de Home Assistant"
-              }
+      }
     },
     "hemisphere": {
       "options": {
-        "northern": "Nord",
-        "southern": "Sud"
+        "Northern": "Nord",
+        "Southern": "Sud"
       }
     },
     "climate_region": {
       "options": {
-        "tropical": "Tropical",
-        "dry": "Sec",
-        "temperate": "Tempéré",
-        "continental": "Continental",
-        "polar": "Polaire"
+        "Atlantic Europe": "Europe atlantique",
+        "Mediterranean": "Méditerranée",
+        "Continental Europe": "Europe continentale",
+        "Scandinavia": "Scandinavie",
+        "North America East": "Amérique du Nord (Est)",
+        "North America West": "Amérique du Nord (Ouest)",
+        "Australia": "Australie",
+        "Custom": "Personnalisé"
       }
     }
   }
