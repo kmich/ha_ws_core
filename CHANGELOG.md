@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.4.1] - 2026-06-23
+
+### Fixed
+
+- **Lightning source validation (issue #88):** The config and options flows no longer reject lightning distance/azimuth/count sensors as "entity not found" when they sit at `unknown`/`unavailable`. These sensors are normally idle outside of an active strike, so the validator now tolerates an unknown state for them while still requiring the entity to exist.
+
 ## [2.4.0] - 2026-06-21
 
 ### 🚀 Major Adoption & UX Update (The "Launch" Release)
