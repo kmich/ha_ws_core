@@ -123,12 +123,12 @@ class TestPressureTrend:
 
 class TestZambretti:
     def test_returns_tuple(self):
-        result = zambretti_forecast(1020.0, 0.5, "SW", 60.0, 6, "Northern", "Mediterranean")
+        result = zambretti_forecast(1020.0, 0.5, "SW", 60.0, 6, "northern", "mediterranean")
         assert isinstance(result, tuple)
         assert isinstance(result[0], str)
 
     def test_high_pressure_rising(self):
-        forecast, num = zambretti_forecast(1030.0, 1.5, "SW", 50.0, 6, "Northern", "Mediterranean")
+        forecast, num = zambretti_forecast(1030.0, 1.5, "SW", 50.0, 6, "northern", "mediterranean")
         assert num >= 1
 
 
@@ -481,8 +481,8 @@ class TestZambrettiReferenceValues:
             wind_quadrant="N",
             humidity=45.0,
             month=6,
-            hemisphere="Northern",
-            climate="Mediterranean",
+            hemisphere="northern",
+            climate="mediterranean",
             wind_speed_ms=4.0,
         )
         # Z-number should be in the fine/settled range (1-8)
@@ -497,8 +497,8 @@ class TestZambrettiReferenceValues:
             wind_quadrant="S",
             humidity=90.0,
             month=11,
-            hemisphere="Northern",
-            climate="Mediterranean",
+            hemisphere="northern",
+            climate="mediterranean",
             wind_speed_ms=8.0,
         )
         # Z-number should be in the unsettled/stormy range (17-26)
@@ -613,7 +613,7 @@ class TestRainProbabilityReferenceValues:
             pressure_trend=2.0,
             humidity=40.0,
             wind_quadrant="N",
-            climate_region="Mediterranean",
+            climate_region="mediterranean",
         )
         # Rising high pressure in fine conditions → low rain chance
         assert prob <= 20, f"Expected low probability, got {prob}%"
@@ -625,7 +625,7 @@ class TestRainProbabilityReferenceValues:
             pressure_trend=-2.5,
             humidity=88.0,
             wind_quadrant="S",
-            climate_region="Mediterranean",
+            climate_region="mediterranean",
         )
         assert prob >= 50, f"Expected high probability, got {prob}%"
 

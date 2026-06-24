@@ -112,6 +112,7 @@ from .const import (
     KEY_FORECAST_TILES,
     KEY_FREEZING_LEVEL_M,
     KEY_FROST_POINT_C,
+    KEY_FROST_RISK,
     KEY_FROST_STREAK,
     KEY_FWI,
     KEY_FWI_BUI,
@@ -531,7 +532,7 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_FORECAST,
         translation_key="forecast_daily",
         name="WS Forecast Daily",
-        icon="mdi:calendar-weather",
+        icon="mdi:api",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (d.get(KEY_FORECAST) or {}).get("provider") if d.get(KEY_FORECAST) else None,
         attrs_fn=lambda d: {"forecast": (d.get(KEY_FORECAST) or {}).get("daily", [])},
@@ -1320,7 +1321,7 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_FORECAST_TILES,
         translation_key="forecast_tiles",
         name="WS Forecast Tiles",
-        icon="mdi:calendar-weather",
+        icon="mdi:weather-partly-cloudy",
         value_fn=lambda d: len(d.get(KEY_FORECAST_TILES) or []),
         attrs_fn=lambda d: {
             "tiles": d.get(KEY_FORECAST_TILES) or [],
@@ -1711,7 +1712,7 @@ SENSORS: list[WSSensorDescription] = [
         key=KEY_INDOOR_HUMIDITY,
         translation_key="indoor_humidity",
         name="WS Indoor Humidity",
-        icon="mdi:home-humidity",
+        icon="mdi:water-percent",
         device_class=SensorDeviceClass.HUMIDITY,
         native_unit="%",
         state_class=SensorStateClass.MEASUREMENT,
@@ -2108,6 +2109,15 @@ SENSORS: list[WSSensorDescription] = [
         native_unit=None,
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {"threshold_c": d.get("_frost_streak_threshold_c")},
+    ),
+    # Frost risk category (computed in coordinator._compute_frost_risk; issue #105).
+    WSSensorDescription(
+        key=KEY_FROST_RISK,
+        translation_key="frost_risk",
+        name="WS Frost Risk",
+        icon="mdi:snowflake-alert",
+        native_unit=None,
+        state_class=None,
     ),
     # =========================================================================
     # v1.2.0 - STATION INTELLIGENCE
