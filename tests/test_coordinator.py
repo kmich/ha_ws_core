@@ -83,8 +83,8 @@ def _make_coordinator(
     entry_data = {
         CONF_SOURCES: sources,
         CONF_ELEVATION_M: elevation,
-        CONF_HEMISPHERE: "Northern",
-        CONF_CLIMATE_REGION: "Mediterranean",
+        CONF_HEMISPHERE: "northern",
+        CONF_CLIMATE_REGION: "mediterranean",
         CONF_STALENESS_S: 900,
         CONF_FORECAST_ENABLED: False,
     }
@@ -119,8 +119,8 @@ def _make_coordinator(
     coord.sources = sources
     coord.units_mode = "auto"
     coord.elevation_m = elevation
-    coord.hemisphere = "Northern"
-    coord.climate_region = "Mediterranean"
+    coord.hemisphere = "northern"
+    coord.climate_region = "mediterranean"
     coord.staleness_s = 900
     coord.forecast_enabled = False
     coord.forecast_lat = None

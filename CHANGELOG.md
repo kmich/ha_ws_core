@@ -2,6 +2,27 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.5.0] - 2026-06-23
+
+### Added
+
+- **Frost Risk sensor (issue #105):** `frost_risk` was computed internally but never exposed. It is now a proper sensor (high / probable / unlikely / no risk) with EN/FR translations.
+- **Localized conditions summary & alerts (issue #104):** The `conditions_summary` and `alert_message` sensor states are now localized to the Home Assistant language (English and French, with English fallback) instead of always being English.
+
+### Changed
+
+- **Translatable Hemisphere / Climate region selectors (issue #104):** The hemisphere and climate-region option values are now lowercase slugs (e.g. `Atlantic Europe` -> `atlantic_europe`) so the dropdowns can be translated. Existing config entries are migrated automatically (config schema v2 -> v3). French labels added.
+- **Translated Air Quality / Pollen step descriptions (issue #104):** These config and options-flow steps no longer carry hardcoded English text; descriptions are now in the translation files (EN/FR).
+- **Friendlier Forecast Provider state (issue #104):** The `forecast_provider` sensor now shows human-readable provider names (e.g. "Home Assistant weather entity" instead of `ha_weather_entity`).
+
+### Fixed
+
+- **Nonexistent MDI icons (issue #105):** `WS Forecast Daily`, `WS Forecast Tiles`, and `WS Indoor Humidity` used MDI icons that do not exist and rendered blank. Replaced with `mdi:api`, `mdi:weather-partly-cloudy`, and `mdi:water-percent`.
+
+### Notes
+
+- Unit-selector labels (`°C`/`m/s`/`hPa` etc.) remain in English for now; translating them needs a separate option-value migration and is tracked for a later release.
+
 ## [2.4.1] - 2026-06-23
 
 ### Fixed
