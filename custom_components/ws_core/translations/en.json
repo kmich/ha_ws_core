@@ -1566,6 +1566,15 @@
           }
         }
       },
+      "frost_risk": {
+        "name": "Frost Risk",
+        "state": {
+          "high": "High",
+          "probable": "Probable",
+          "unlikely": "Unlikely",
+          "no_risk": "No risk"
+        }
+      },
       "sensor_drift": {
         "name": "Sensor Drift",
         "state": {

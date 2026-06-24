@@ -1563,6 +1563,15 @@
           }
         }
       },
+      "frost_risk": {
+        "name": "Risque de gel",
+        "state": {
+          "high": "Élevé",
+          "probable": "Probable",
+          "unlikely": "Peu probable",
+          "no_risk": "Aucun risque"
+        }
+      },
       "sensor_drift": {
         "name": "Instabilité des capteurs",
         "state": {
