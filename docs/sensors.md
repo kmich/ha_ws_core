@@ -33,6 +33,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_feels_like` | °C | Apparent temperature (BOM/Steadman 1994) |
 | `sensor.ws_wet_bulb` | °C | Wet-bulb temperature (Stull 2011, ±0.3 °C) |
 | `sensor.ws_frost_point` | °C | Frost point with Buck (1981) ice constants |
+| `sensor.ws_frost_risk` | — | Frost risk category: `high` / `probable` / `unlikely` / `no_risk` (state is localized) |
 | `sensor.ws_zambretti_forecast` | — | Zambretti text forecast (26 phrases) |
 | `sensor.ws_zambretti_number` | — | Z-number 1-26 |
 | `sensor.ws_wind_beaufort` | — | Beaufort scale classification |
@@ -42,7 +43,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_rain_probability_combined` | % | Brier-score blended local + NWP |
 | `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` |
 | `sensor.ws_pressure_trend` | — | WMO No. 306 classification + rate |
-| `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Useful for TTS and Assist. |
+| `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Localized to the HA language (English/French, English fallback). Useful for TTS and Assist. |
 | `sensor.ws_rain_last_1h` | mm | Rolling 1-hour rainfall |
 | `sensor.ws_rain_last_24h` | mm | Rolling 24-hour rainfall |
 | `sensor.ws_rain_today` | mm | Today's accumulated rainfall |

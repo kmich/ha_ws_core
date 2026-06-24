@@ -17,6 +17,8 @@
 | Comfort indices sensors not created | Feature toggle is off | Toggle `switch.ws_enable_comfort_indices` on the device page, or Configure → Features. |
 | FWI values very high on first run | Standard initial values | FWI moisture codes start at Van Wagner (1987) defaults (FFMC=85, DMC=6, DC=15) and self-correct within a few days. |
 | Nowcast always shows unknown | Coordinates not set, or Open-Meteo timeout | Verify forecast coordinates are set in Configure → Forecast. Check internet connectivity. |
+| Lightning sensor rejected as "entity not found" during setup | Older versions rejected sensors sitting at `unknown` | Update to 2.4.1+. Lightning distance/azimuth/count sensors are idle (`unknown`) outside a strike and are now accepted as long as the entity exists. |
+| Hemisphere / climate region shows a raw value like `atlantic_europe` | Translation not loaded for your language | These are localized in English and French (2.5.0+); other languages fall back to English. Restart HA after updating so new translations load. |
 
 ---
 

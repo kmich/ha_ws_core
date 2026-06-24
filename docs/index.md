@@ -23,7 +23,7 @@ wind direction, cumulative rainfall. ws_core does the rest.
 - **Zambretti barometric forecast** — fully local, no network call, no API
 - **Penman-Monteith ET₀** for irrigation scheduling (Smart Irrigation compatible)
 - **8 upload targets** in one integration (WU, Weathercloud, WOW, CWOP, and more)
-- **8 translations** at full entity-name parity
+- **8 translations** at full entity-name parity, including translatable config-flow selectors (hemisphere, climate region) and localized human-readable sensor states (conditions summary, alerts, frost risk)
 
 ### Always-on (core features, no API key required)
 
@@ -31,7 +31,7 @@ wind direction, cumulative rainfall. ws_core does the rest.
 |---|---|
 | Zambretti forecast | From your station's pressure + wind data |
 | 36-condition classifier | From illuminance, rain rate, temperature, wind |
-| Wet-bulb, frost point | Stull (2011), Buck (1981) |
+| Wet-bulb, frost point, frost risk | Stull (2011), Buck (1981) + frost-risk category |
 | Pressure trend | WMO No. 306 least-squares regression |
 | Kalman-filtered rain rate | De-noised tipping-bucket readings |
 | ET₀ (Hargreaves-Samani) | No solar radiation sensor required |

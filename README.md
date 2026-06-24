@@ -87,6 +87,7 @@ Behind the scenes, `ws_core` implements rigorous meteorological and scientific a
 * **Nowcast Ground-Truth Blending:** Combines Open-Meteo 15-minute grids with your live rain gauge data (70% local / 30% NWP) for the best short-term prediction.
 * **Network Uploads:** Syncs to 8 networks simultaneously (WUnderground, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM, Windy).
 * **Adaptive Rain Probability:** Learns over a rolling 90-day window whether the local heuristics or the NWP forecasts have been more accurate.
+* **Localized UI & Sensors:** The setup wizard (including the hemisphere and climate-region pickers) and the human-readable sensors (conditions summary, alert message, frost risk) follow your Home Assistant language, with English and French built in and English as the fallback.
 
 For the math, citations, and formulas behind these features, read the [**Scientific Documentation**](docs/science.md).
 
