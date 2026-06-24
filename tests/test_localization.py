@@ -47,7 +47,13 @@ class TestSelectorSlugging:
 
 class TestFrostRiskSensor:
     def test_frost_risk_has_sensor_description(self):
-        from custom_components.ws_core.sensor import SENSORS
-
-        keys = {s.key for s in SENSORS}
-        assert KEY_FROST_RISK in keys
+        # Parse the source rather than importing sensor.py, which pulls in
+        # HA-version-sensitive device classes unrelated to this test.
+        src = (
+            os.path.join(os.path.dirname(__file__), "..", "custom_components", "ws_core", "sensor.py")
+        )
+        with open(src, encoding="utf-8") as f:
+            text = f.read()
+        assert "key=KEY_FROST_RISK" in text
+        assert 'translation_key="frost_risk"' in text
+        assert KEY_FROST_RISK == "frost_risk"
