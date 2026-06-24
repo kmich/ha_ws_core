@@ -2,6 +2,16 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.5.1] - 2026-06-24
+
+### Fixed
+
+- **Compatibility with HA 2024.6 - 2024.12:** `sensor.py` referenced `SensorDeviceClass.WIND_DIRECTION` and `SensorStateClass.MEASUREMENT_ANGLE` (added in HA 2025.1) unconditionally, while the declared minimum is HA 2024.6.0. On those older cores the sensor platform failed to load with `AttributeError`. Both are now resolved defensively, so older cores fall back to a plain numeric `°` wind-direction sensor instead of crashing.
+
+### Internal
+
+- Added `tests/test_sensor_platform.py` (imports the sensor module so HA-version incompatibilities are caught by CI) and `tests/test_migration.py` (covers the v2 -> v3 hemisphere/climate-region slug migration).
+
 ## [2.5.0] - 2026-06-23
 
 ### Added
