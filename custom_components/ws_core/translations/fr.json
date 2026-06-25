@@ -39,7 +39,7 @@
           "indoor_humidity": "Capteur d'humidité intérieure",
           "indoor_co2": "Capteur de CO₂ intérieur (ppm)",
           "soil_moisture": "Capteur d'humidité du sol",
-          "soil_temperature": "Capteur de température du sol"
+          "soil_temperature": "Capteur de température du sol",
           "_go_back": "← Retour à l'étape précédente"
         }
       },
@@ -2547,4 +2547,5 @@
       }
     }
   }
+}
 }
