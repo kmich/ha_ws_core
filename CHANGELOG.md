@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.5.2] - 2026-06-25
+
+### Fixed
+
+- **French translation metadata:** Updated `fr.json` from PR #108 and repaired JSON syntax so Home Assistant can load the French translation bundle.
+
 ## [2.5.1] - 2026-06-24
 
 ### Fixed
