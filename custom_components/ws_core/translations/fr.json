@@ -502,8 +502,9 @@
           "enable_lightning": "Calcule la distance estimée et la fréquence des impacts de foudre détectés à proximité.",
           "enable_indoor": "Permet de lier vos sondes intérieures pour affiner les calculs de confort thermique global.",
           "enable_soil": "Calcule le besoin en eau des plantes, l'évaporation et suit vos sondes d'humidité du sol."
-       }, 
-       "indoor_rooms_opt": {
+        }
+      },
+      "indoor_rooms_opt": {
         "title": "Capteurs intérieurs des différentes pièces",
         "description": "Sélectionnez un capteur de température par pièce pour générer un capteur d'écart de température intérieur/extérieur dédié.",
         "data": {
@@ -2547,5 +2548,4 @@
       }
     }
   }
-}
 }
