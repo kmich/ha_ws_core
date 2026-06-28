@@ -2082,7 +2082,7 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="thunderstorm_risk",
         name="WS Thunderstorm Risk",
         icon="mdi:weather-lightning",
-        native_unit=None,
+        native_unit="%",
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "risk_level": d.get("_thunderstorm_level"),
