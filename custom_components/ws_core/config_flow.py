@@ -1058,6 +1058,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             if self._data[CONF_ENABLE_VIGICRUES]:
                 return await self.async_step_vigicrues_station()
+            if self._data[CONF_ENABLE_INDOOR]:
+                return await self.async_step_indoor_rooms()
             if self._data[CONF_ENABLE_WEATHERCLOUD]:
                 return await self.async_step_weathercloud()
             if self._data[CONF_ENABLE_PWSWEATHER]:
@@ -1161,6 +1163,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             if self._data.get(CONF_ENABLE_VIGICRUES):
                 return await self.async_step_vigicrues_station()
+            if self._data.get(CONF_ENABLE_INDOOR):
+                return await self.async_step_indoor_rooms()
             return await self._next_v2_step()
 
         default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
@@ -1226,6 +1230,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return await self.async_step_solar_forecast()
                 if self._data.get(CONF_ENABLE_VIGICRUES):
                     return await self.async_step_vigicrues_station()
+                if self._data.get(CONF_ENABLE_INDOOR):
+                    return await self.async_step_indoor_rooms()
                 return await self._next_v2_step()
 
         existing_station = self._data.get(CONF_WU_STATION_ID, "")
@@ -1266,6 +1272,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             if self._data.get(CONF_ENABLE_VIGICRUES):
                 return await self.async_step_vigicrues_station()
+            if self._data.get(CONF_ENABLE_INDOOR):
+                return await self.async_step_indoor_rooms()
             return await self._next_v2_step()
 
         return self._show_step(
@@ -1297,6 +1305,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_solar_forecast()
             if self._data.get(CONF_ENABLE_VIGICRUES):
                 return await self.async_step_vigicrues_station()
+            if self._data.get(CONF_ENABLE_INDOOR):
+                return await self.async_step_indoor_rooms()
             return await self._next_v2_step()
 
         return self._show_step(
@@ -1323,6 +1333,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             if self._data.get(CONF_ENABLE_VIGICRUES):
                 return await self.async_step_vigicrues_station()
+            if self._data.get(CONF_ENABLE_INDOOR):
+                return await self.async_step_indoor_rooms()
             return await self._next_v2_step()
 
         return self._show_step(
@@ -1378,6 +1390,8 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         break
             # Empty list means auto-detect nearest station
             self._data[CONF_VIGICRUES_STATIONS] = stations
+            if self._data.get(CONF_ENABLE_INDOOR):
+                return await self.async_step_indoor_rooms()
             return await self._next_v2_step()
 
         lat = self._data.get(CONF_FORECAST_LAT) or getattr(self.hass.config, "latitude", 0.0) or 0.0
@@ -1405,6 +1419,114 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             multiple=True,
                         )
                     ),
+                }
+            ),
+            last_step=False,
+        )
+
+    # ------------------------------------------------------------------
+    # Named indoor rooms (initial setup) - add / edit / remove hub
+    # Mirrors the Options flow's indoor_rooms_opt hub so rooms can be
+    # configured during the first install, not just from Options afterward.
+    # ------------------------------------------------------------------
+    def _rooms_working_copy(self) -> list[dict]:
+        """Return (initializing if needed) the in-progress room list."""
+        if CONF_INDOOR_ROOMS not in self._data:
+            self._data[CONF_INDOOR_ROOMS] = normalize_indoor_rooms(self._data.get(CONF_INDOOR_ROOMS, []))
+        return self._data[CONF_INDOOR_ROOMS]
+
+    def _room_form_schema(self, src: dict | None) -> vol.Schema:
+        src = src or {}
+        sensor_sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+        schema: dict[Any, Any] = {
+            vol.Required("name", default=src.get("name", "")): selector.TextSelector(),
+        }
+        for field in ("temp", "humidity", "co2"):
+            cur = src.get(field)
+            key = vol.Optional(field, default=cur) if cur else vol.Optional(field)
+            schema[key] = sensor_sel
+        return vol.Schema(schema)
+
+    async def async_step_indoor_rooms(self, user_input: dict[str, Any] | None = None):
+        """Hub menu for managing named indoor rooms."""
+        rooms = self._rooms_working_copy()
+        menu_options = ["room_add"]
+        if rooms:
+            menu_options += ["room_edit", "room_remove"]
+        menu_options.append("room_done")
+        return self.async_show_menu(step_id="indoor_rooms", menu_options=menu_options)
+
+    async def async_step_room_done(self, user_input: dict[str, Any] | None = None):
+        return await self._next_v2_step()
+
+    async def async_step_room_add(self, user_input: dict[str, Any] | None = None):
+        self._edit_rid: str | None = None
+        return await self.async_step_room_form()
+
+    async def async_step_room_edit(self, user_input: dict[str, Any] | None = None):
+        rooms = self._rooms_working_copy()
+        if user_input is not None:
+            self._edit_rid = user_input["room"]
+            return await self.async_step_room_form()
+        options = [{"value": r["id"], "label": r["name"]} for r in rooms]
+        return self.async_show_form(
+            step_id="room_edit",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("room"): selector.SelectSelector(
+                        selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
+                    )
+                }
+            ),
+            last_step=False,
+        )
+
+    async def async_step_room_form(self, user_input: dict[str, Any] | None = None):
+        rooms = self._rooms_working_copy()
+        editing = next((r for r in rooms if r["id"] == self._edit_rid), None) if self._edit_rid else None
+        if user_input is not None:
+            name = (user_input.get("name") or "").strip()
+            if not name:
+                return self.async_show_form(
+                    step_id="room_form",
+                    data_schema=self._room_form_schema({**(editing or {}), **user_input}),
+                    errors={"name": "room_name_required"},
+                    last_step=False,
+                )
+            room = {
+                "id": editing["id"] if editing else uuid.uuid4().hex[:8],
+                "name": name,
+                "temp": user_input.get("temp") or None,
+                "humidity": user_input.get("humidity") or None,
+                "co2": user_input.get("co2") or None,
+            }
+            if editing:
+                self._data[CONF_INDOOR_ROOMS] = [room if r["id"] == editing["id"] else r for r in rooms]
+            else:
+                self._data[CONF_INDOOR_ROOMS] = [*rooms, room]
+            return await self.async_step_indoor_rooms()
+        return self.async_show_form(
+            step_id="room_form",
+            data_schema=self._room_form_schema(editing),
+            last_step=False,
+        )
+
+    async def async_step_room_remove(self, user_input: dict[str, Any] | None = None):
+        rooms = self._rooms_working_copy()
+        if user_input is not None:
+            to_remove = set(user_input.get("rooms") or [])
+            self._data[CONF_INDOOR_ROOMS] = [r for r in rooms if r["id"] not in to_remove]
+            return await self.async_step_indoor_rooms()
+        options = [{"value": r["id"], "label": r["name"]} for r in rooms]
+        return self.async_show_form(
+            step_id="room_remove",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional("rooms", default=[]): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=options, multiple=True, mode=selector.SelectSelectorMode.LIST
+                        )
+                    )
                 }
             ),
             last_step=False,
@@ -2361,7 +2483,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_menu(step_id="indoor_rooms_opt", menu_options=menu_options)
 
     async def async_step_room_done(self, user_input: dict[str, Any] | None = None):
-        return await self.async_step_upload_services_opt()
+        return await self._finish_or_next("indoor_rooms_opt")
 
     async def async_step_room_add(self, user_input: dict[str, Any] | None = None):
         self._edit_rid: str | None = None
@@ -2795,6 +2917,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             (CONF_ENABLE_POLLEN, "pollen_opt"),
             (CONF_ENABLE_SOLAR_FORECAST, "solar_forecast_opt"),
             (CONF_ENABLE_VIGICRUES, "vigicrues_station_opt"),
+            (CONF_ENABLE_INDOOR, "indoor_rooms_opt"),
         ]
         past = False
         for conf_key, step_name in order:
@@ -2972,7 +3095,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                         break
             # Empty list means auto-detect nearest station
             self._opt[CONF_VIGICRUES_STATIONS] = stations
-            return await self.async_step_upload_services_opt()
+            return await self._finish_or_next("vigicrues_station_opt")
 
         lat = (
             self._opt.get(CONF_FORECAST_LAT)
