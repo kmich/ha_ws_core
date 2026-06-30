@@ -70,7 +70,7 @@ Six-view dashboard covering the full range of v2.0 sensors.
 4. **Records** — rain accumulators (today/week/month/year), temperature records,
    streak counters
 5. **Diagnostics** — data quality score, sensor drift flags, upload status sensors
-6. **Indoor** — indoor comfort score, temperature and humidity deltas, per-room sensors
+6. **Indoor** — indoor comfort score, temperature and humidity deltas, plus per-room sensors (temp delta, humidity, CO₂ and comfort) for each named room
 
 **HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
 

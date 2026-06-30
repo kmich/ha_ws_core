@@ -115,5 +115,7 @@ only with indoor temperature and humidity sensors (no outdoor weather station),
 ws_core's outdoor weather mode is not a direct replacement.
 
 ws_core does have an Indoor Sensors group (`enable_indoor`) for monitoring
-indoor comfort alongside outdoor weather, but it still requires a full outdoor
+indoor comfort alongside outdoor weather - including named multi-room support,
+where each room can have its own temperature, humidity and CO₂ sensors with
+per-room delta and comfort sensors - but it still requires a full outdoor
 station for the core integration to function.
