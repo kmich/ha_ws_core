@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- **Thunderstorm risk sensor unit (#113):** `sensor.ws_thunderstorm_risk` returns a 0-100 index but declared no unit, so Home Assistant could not render it as a percentage or build long-term statistics. It now reports `%`. Thanks @Benjamin45590.
+
 ## [2.5.2] - 2026-06-25
 
 ### Fixed
