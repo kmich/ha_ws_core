@@ -6,6 +6,7 @@ All notable changes to Weather Station Core are documented here.
 
 ### Fixed
 
+- **Thunderstorm risk sensor unit (#113):** `sensor.ws_thunderstorm_risk` returns a 0-100 index but declared no unit, so Home Assistant could not render it as a percentage or build long-term statistics. It now reports `%`. Thanks @Benjamin45590.
 - **French notification switch was inverted (issue #114):** the `ws_suppress_notifications` switch read "Bloquer les notifications HA" (Block) in French while every other language and the underlying logic use "Enable HA Notifications" semantics. French users who turned the switch ON to block notifications were actually enabling them, so HA Repairs alerts (e.g. stale-sensor warnings) kept appearing. The French label is now "Activer les notifications HA", consistent with the switch behaviour and all other locales.
 
 ## [2.5.2] - 2026-06-25
