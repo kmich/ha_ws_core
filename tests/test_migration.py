@@ -87,3 +87,50 @@ class TestMigration:
             "australia",
             "custom",
         }
+
+
+class TestIndoorRoomsMigration:
+    """v3 -> v4 (v2.6.0): legacy list[str] indoor rooms -> named-room dicts."""
+
+    def test_legacy_entity_id_list_is_upconverted(self):
+        _, cap = _run_migration(
+            3,
+            {"prefix": "ws"},
+            {"indoor_rooms": ["sensor.bedroom_temp", "sensor.office_temp"]},
+        )
+        assert cap["version"] == CONFIG_VERSION
+        rooms = cap["options"]["indoor_rooms"]
+        assert isinstance(rooms, list) and len(rooms) == 2
+        first = rooms[0]
+        assert first["temp"] == "sensor.bedroom_temp"
+        assert first["humidity"] is None and first["co2"] is None
+        assert first["id"] and first["name"]
+        # Name derived from the entity slug, title-cased.
+        assert first["name"] == "Bedroom Temp"
+
+    def test_already_dict_shape_is_preserved(self):
+        room = {
+            "id": "bedroom",
+            "name": "Bedroom",
+            "temp": "sensor.bt",
+            "humidity": "sensor.bh",
+            "co2": None,
+        }
+        _, cap = _run_migration(3, {"prefix": "ws"}, {"indoor_rooms": [room]})
+        rooms = cap["options"]["indoor_rooms"]
+        assert rooms[0]["id"] == "bedroom"
+        assert rooms[0]["humidity"] == "sensor.bh"
+
+    def test_no_indoor_rooms_key_is_noop(self):
+        _, cap = _run_migration(3, {"prefix": "ws"}, {})
+        assert "indoor_rooms" not in cap["options"]
+        assert cap["version"] == CONFIG_VERSION
+
+    def test_duplicate_ids_are_deduplicated(self):
+        _, cap = _run_migration(
+            3,
+            {"prefix": "ws"},
+            {"indoor_rooms": ["sensor.temp", "sensor.temp"]},
+        )
+        rooms = cap["options"]["indoor_rooms"]
+        assert rooms[0]["id"] != rooms[1]["id"]

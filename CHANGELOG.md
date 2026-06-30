@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.6.0] - 2026-06-30
+
+### Added
+
+- **Multiple indoor rooms with per-room comfort (issue #115):** the indoor monitoring feature now supports any number of named rooms, each with its own temperature, humidity and/or CO2 sensor. Every room gets dedicated sensors - indoor/outdoor temperature delta, humidity (with delta), CO2, and a composite comfort score (0-100) - created only for the metrics you assign. Rooms are managed from a new add/edit/remove screen in the options flow (Configure -> Indoor Rooms). Existing temperature-only rooms from 2.0.5 are migrated automatically (config schema v3 -> v4) and keep their delta sensors. Indoor comfort scoring is shared between the main indoor group and rooms via a single algorithm.
+
 ## [2.5.5] - 2026-06-30
 
 ### Fixed
