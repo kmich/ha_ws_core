@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- **French notification switch was inverted (issue #114):** the `ws_suppress_notifications` switch read "Bloquer les notifications HA" (Block) in French while every other language and the underlying logic use "Enable HA Notifications" semantics. French users who turned the switch ON to block notifications were actually enabling them, so HA Repairs alerts (e.g. stale-sensor warnings) kept appearing. The French label is now "Activer les notifications HA", consistent with the switch behaviour and all other locales.
+
 ## [2.5.2] - 2026-06-25
 
 ### Fixed
