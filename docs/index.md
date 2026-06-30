@@ -47,7 +47,7 @@ wind direction, cumulative rainfall. ws_core does the rest.
 | Precipitation Nowcast | `ws_minutes_until_rain`, `ws_minutes_until_dry`, `ws_rain_next_60min`, `ws_rain_expected_1h` |
 | Fire Risk | FWI, FFDI, FFWI, fire risk score (1-10) |
 | Lightning Detection | Strike count, distance, rate, clearance countdown, proximity state |
-| Indoor Sensors | Indoor temp/humidity/CO₂, deltas, comfort score, per-room deltas |
+| Indoor Sensors | Indoor temp/humidity/CO₂, deltas, comfort score, plus named multi-room monitoring (per-room temp delta, humidity, CO₂ and comfort) |
 | Degree Days | HDD, CDD, GDD, leaf wetness |
 | Air Quality | AQI, NO₂, ozone (Open-Meteo, free) |
 | Network Uploads | WU, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM Stations, Windy |
