@@ -2,6 +2,17 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.6.1] - 2026-07-01
+
+### Added
+
+- **Named indoor rooms during initial setup (PR #120):** the add/edit/remove indoor rooms screen introduced in 2.6.0 for the options flow is now also available during first-time setup (Configure Weather Station -> Features -> Indoor Rooms), so multi-room monitoring can be configured without a follow-up trip to Options. Thanks @Benjamin45590.
+
+### Fixed
+
+- **Indoor Rooms step skipped in Options flow when Vigicrues was also enabled:** finishing the Vigicrues station step used to jump straight to Upload Services, bypassing the Indoor Rooms step entirely whenever both features were enabled. Options-flow navigation now correctly chains through every enabled feature step in order.
+- **Missing English translations for the new indoor-room setup steps:** PR #120 added the new config-flow steps but only PR #121 supplied translations (French only). Added the corresponding `strings.json` / `en.json` entries so the flow renders correctly in English.
+
 ## [2.6.0] - 2026-06-30
 
 ### Added

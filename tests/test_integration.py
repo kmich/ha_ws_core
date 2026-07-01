@@ -123,6 +123,15 @@ def _make_coordinator(**overrides):
 # ===========================================================================
 
 
+# Indoor rooms is a self-contained add/edit/remove mini-wizard (menu + CRUD
+# sub-forms), mirroring the identical, unguarded room_* steps that have
+# always existed in the Options flow's indoor_rooms_opt hub. Menu steps have
+# no data schema to carry a back-button field, and the CRUD sub-forms loop
+# back to their own hub rather than the outer linear step sequence, so the
+# whole mini-wizard is exempt from the back-button convention.
+ROOM_WIZARD_STEPS = {"indoor_rooms", "room_add", "room_edit", "room_form", "room_remove", "room_done"}
+
+
 class TestConfigFlowStructure:
     """Verify config flow step definitions and translation coverage."""
 
@@ -149,6 +158,8 @@ class TestConfigFlowStructure:
         for step_id, step_data in strings["config"]["step"].items():
             if step_id == "user":
                 assert "_go_back" not in step_data.get("data", {}), "user step should NOT have _go_back"
+            elif step_id in ROOM_WIZARD_STEPS:
+                continue
             else:
                 assert "_go_back" in step_data.get("data", {}), f"Step '{step_id}' missing _go_back"
 
@@ -197,7 +208,9 @@ class TestConfigFlowBackButton:
         config_section = content[: content.find("class WSStationOptionsFlowHandler")]
         # Count steps with back check
         steps = re.findall(r"async def async_step_(\w+)", config_section)
-        non_user = [s for s in steps if s != "user"]
+        # See ROOM_WIZARD_STEPS module comment: exempt from the back-button
+        # convention, same as the identical steps in the Options flow.
+        non_user = [s for s in steps if s != "user" and s not in ROOM_WIZARD_STEPS]
         back_calls = config_section.count("_handle_back")
         assert back_calls >= len(non_user), f"Expected >= {len(non_user)} _handle_back calls, found {back_calls}"
 
