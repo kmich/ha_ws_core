@@ -38,12 +38,23 @@ blueprint:
           max: 12
           step: 1
 
+variables:
+  rain_probability_sensor: !input rain_probability_sensor
+  wind_gust_sensor: !input wind_gust_sensor
+  cooldown_hours: !input cooldown_hours
+
 trigger:
   - platform: numeric_state
     entity_id: !input pressure_trend_sensor
     below: -1.6
     for:
       minutes: 10
+
+condition:
+  - condition: template
+    value_template: >
+      {% set last = state_attr(this.entity_id, 'last_triggered') %}
+      {{ last is none or (now() - last).total_seconds() / 3600 > (cooldown_hours | int) }}
 
 action:
   - service: !input notify_target

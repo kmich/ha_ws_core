@@ -64,7 +64,7 @@ See the [Quickstart](quickstart.md) for a 5-minute installation walkthrough.
 
 ## Project status
 
-- **Version:** 2.5.2 (June 2026)
+- **Version:** see [latest release](https://github.com/kmich/ha_ws_core/releases)
 - **License:** MIT
 - **Repository:** [github.com/kmich/ha_ws_core](https://github.com/kmich/ha_ws_core)
 - **Issues:** [GitHub Issues](https://github.com/kmich/ha_ws_core/issues)

@@ -41,6 +41,7 @@ blueprint:
 
 variables:
   threshold: !input freeze_threshold
+  cooldown_hours: !input cooldown_hours
 
 trigger:
   - platform: numeric_state

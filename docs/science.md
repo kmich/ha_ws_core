@@ -54,6 +54,11 @@ T_w = T · atan(0.151977 · (RH + 8.313659)^0.5)
 MSLP = P_station × exp(elevation_m / (T_K × 29.263))
 ```
 
+`T_K` is the **12-hour mean** temperature (in kelvin), as recommended by WMO, rather
+than the instantaneous reading. This avoids a spurious day/night wave in MSLP. Until
+at least an hour of history has accumulated (for example just after setup), the
+instantaneous temperature is used as a fallback.
+
 **Accuracy:** ±0.3 hPa below 500 m, ±1 hPa at 2000 m.
 **Reference:** WMO No. 8 — Guide to Meteorological Instruments and Methods of Observation, Annex 3A.
 
@@ -261,7 +266,9 @@ Six physical-impossibility checks per coordinator update:
 
 ## Sensor Calibration {#calibration}
 
-All offsets are applied after unit conversion, before all derived calculations.
+Each source reading is first converted to canonical metric units (°C, hPa, m/s, mm),
+then the calibration offset is added, and only then are the derived metrics computed.
+So an offset is always expressed in metric units regardless of your display units.
 
 | Offset | Range | Typical use |
 |---|---|---|
@@ -289,11 +296,15 @@ Download diagnostics via **Settings → Devices & Services → Weather Station C
 ## Known Limitations
 
 1. Illuminance-based cloud detection uses raw lux without solar-angle normalization. Accuracy degrades at low sun elevation angles.
-2. Sea-level pressure uses current temperature only, not the WMO-recommended 12h mean.
+2. Sea-level pressure uses the WMO-recommended 12h mean temperature once enough
+   history exists, and falls back to the current temperature during the first hour
+   of operation.
 3. Rain probability is a heuristic index, not a statistically calibrated probability.
 4. FWI moisture codes are initialised at Van Wagner's standard defaults on first run and self-correct within a few days.
 5. Thunderstorm Risk is a surface-based proxy only and cannot detect elevated convection.
-6. 24h statistics are computed from in-memory rolling windows and reset on HA restart.
+6. 24h statistics are computed from rolling windows that are persisted to disk and
+   restored on HA restart, so a normal restart preserves them. Extended downtime
+   still leaves a gap in the window until it refills.
 
 ---
 

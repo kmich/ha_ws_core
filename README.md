@@ -8,7 +8,7 @@
 
 **The Intelligence Layer for your Home Assistant Weather Station.**
 
-Turn any weather station into a complete weather intelligence system: local forecasting, precipitation nowcasting, fire danger, irrigation, lightning detection, and data quality. 150+ sensors. Fully local-capable. No API keys required for core features.
+Turn any weather station into a complete weather intelligence system: local forecasting, precipitation nowcasting, fire danger, irrigation, lightning detection, and data quality. 50+ derived sensors out of the box, 150+ with every optional feature enabled. Fully local-capable. No API keys required for core features.
 
 ![Enhanced dashboard](screenshots/dashboard-advanced.png)
 
@@ -56,7 +56,7 @@ That's it! After the wizard completes, 50+ derived sensors appear automatically.
 
 | Mobile View | Desktop View |
 |---|---|
-| ![Mobile dashboard](screenshots/dashboard-weather.png) | ![Desktop dashboard](screenshots/dashboard-advanced.png) |
+| ![Mobile dashboard](screenshots/mobile_dashboard.png) | ![Desktop dashboard](screenshots/dashboard-advanced.png) |
 
 Check out the `dashboards/` directory for the YAML code. We provide:
 * A `vanilla` dashboard using only native HA cards.
@@ -93,6 +93,29 @@ For the math, citations, and formulas behind these features, read the [**Scienti
 
 ---
 
+## 🔒 Data & Privacy
+
+`ws_core` is local-first. All core derived sensors are computed on your machine from
+your own station data and never leave your network. Every feature that sends data to a
+third party is **opt-in and disabled by default**, so nothing is transmitted until you
+turn it on in **Configure → Features**.
+
+When you enable them, the following optional features contact external services:
+
+| Feature | Destination | Data sent |
+|---|---|---|
+| Forecast (Open-Meteo, Met.no, NWS, OWM, Pirate Weather, Météo France, HA entity) | The selected provider | Your coordinates |
+| Precipitation nowcast, air quality, pollen, sea temperature, solar forecast | Open-Meteo / forecast.solar | Your coordinates |
+| French Vigilance / Vigicrues | Météo-France public APIs | Your department / nearest station |
+| Network uploads (WUnderground, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM, Windy) | Each network you enable | Your live observations and that network's credentials |
+| MQTT republishing | Your own MQTT broker | Derived sensor values |
+
+API keys and passwords you enter are stored in the Home Assistant config entry. The
+diagnostics export **redacts** all credentials and coordinates, so it is safe to attach
+to a bug report.
+
+---
+
 ## ❓ FAQ & Troubleshooting
 
 * **Why are my entities unavailable?**
@@ -103,6 +126,12 @@ For the math, citations, and formulas behind these features, read the [**Scienti
   We have a dedicated [migration guide](docs/migrating_from_thermal_comfort.md) with step-by-step instructions.
 * **Do I need an API Key?**
   No. All core features run completely offline locally. Optional features like Air Quality or Nowcast use free APIs that require no registration.
+* **Which fire-danger number should I trust?**
+  Use the one calibrated for your region: **FFDI** (`sensor.ws_ffdi`) in Australia and New Zealand, **FWI** (`sensor.ws_fwi`, Canadian system) elsewhere, and **FFWI** (`sensor.ws_ffwi`) as a US/global cross-check. `sensor.ws_fire_risk_score` is a simplified 1-10 display value. None of these is an official warning - always defer to your local fire authority.
+* **Which ET0 should I use for irrigation?**
+  If you have mapped a solar-radiation sensor, prefer `sensor.ws_et0_pm_daily` (FAO-56 Penman-Monteith, the reference method). Without solar radiation, use `sensor.ws_et0_daily` (Hargreaves-Samani, ±15-20%).
+* **How do I uninstall?**
+  Go to **Settings → Devices & Services → Weather Station Core → ⋮ → Delete**. This removes the integration, its device, and all derived entities and their history. To remove the code as well, delete the repository from **HACS → Integrations**. Any dashboards or blueprints you imported are independent and can be removed separately.
 
 ---
 
@@ -112,7 +141,7 @@ For the math, citations, and formulas behind these features, read the [**Scienti
 [release-url]: https://github.com/kmich/ha_ws_core/releases
 [license-badge]: https://img.shields.io/github/license/kmich/ha_ws_core?style=for-the-badge
 [license-url]: https://github.com/kmich/ha_ws_core/blob/main/LICENSE
-[validate-badge]: https://img.shields.io/github/actions/workflow/status/kmich/ha_ws_core/validate.yaml?branch=main&label=validate&style=for-the-badge
-[validate-url]: https://github.com/kmich/ha_ws_core/actions/workflows/validate.yaml
+[validate-badge]: https://img.shields.io/github/actions/workflow/status/kmich/ha_ws_core/validate.yml?branch=main&label=validate&style=for-the-badge
+[validate-url]: https://github.com/kmich/ha_ws_core/actions/workflows/validate.yml
 [translation-badge]: https://img.shields.io/badge/Translations-8-blue?style=for-the-badge
 [translation-url]: https://github.com/kmich/ha_ws_core/tree/main/custom_components/ws_core/translations

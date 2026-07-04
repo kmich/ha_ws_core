@@ -2,6 +2,62 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.6.2] - 2026-07-03
+
+### Security
+
+- **Diagnostics no longer leak credentials.** The config-entry diagnostics export
+  previously included the full `entry.data` and `entry.options`, which contain
+  forecast and upload-network API keys, passwords, and passcodes (Weather
+  Underground, Weathercloud, PWSWeather, WOW, AWEKAS, OWM, Windy, CWOP, and the
+  forecast provider). All fields whose name looks like a credential
+  (`key`/`password`/`passcode`/`secret`/`token`/`auth`), plus location
+  coordinates, are now redacted, including inside nested per-network blocks.
+  If you shared a diagnostics export from an earlier version, rotate the exposed
+  keys.
+
+### Fixed
+
+- **User-renamed entities are no longer reverted on restart.** The sensor
+  platform used to force every entity id back to `sensor.{prefix}_{key}` on each
+  startup, silently undoing manual renames and splitting recorder history. Entity
+  ids are now set once at creation (fresh installs still get `sensor.ws_*`) and
+  then left under user control.
+- **Alert blueprints now respect their cooldown.** Several blueprints referenced
+  their inputs inside Jinja templates without mapping them into `variables:`, so
+  the value resolved to nothing. Most visibly, the `cooldown_hours` setting on the
+  frost, storm, and fire-danger alerts did nothing and alerts could repeat on
+  every trigger. All blueprint inputs used in templates are now mapped, and the
+  storm and fire-danger blueprints gained the missing cooldown condition.
+- **Penman-Monteith ET0 now uses your real latitude.** The FAO-56 ET0 calculation
+  hardcoded latitude 37 N for the extraterrestrial-radiation term, biasing the
+  irrigation figure for every site away from that latitude. It now uses the
+  configured location latitude.
+- **Fire Weather Index is correct in the Southern Hemisphere.** The DMC/DC
+  day-length tables were Northern-Hemisphere only, so seasonal drying was
+  six months out of phase south of the equator. `compute_fwi` now shifts the
+  tables based on the configured hemisphere.
+- **Timezone-correct time handling.** The current-condition classifier and the
+  weather-entity forecast alignment used the host clock (`datetime.now()`) instead
+  of the Home Assistant timezone; they now use `dt_util.now()`.
+- **Docs and badge fixes.** The README build badge pointed at `validate.yaml`
+  (the workflow is `validate.yml`); the sensors reference claimed an outdated
+  version; and the science docs incorrectly stated that 24h windows reset on
+  restart (they are persisted and restored).
+
+### Changed
+
+- **Sea-level pressure now uses a 12-hour mean temperature** for the hypsometric
+  reduction, as recommended by WMO, instead of the instantaneous temperature.
+  This removes a spurious diurnal wave from MSLP. Because MSLP feeds the Zambretti
+  forecast, the forecast-agreement sensor, and the local rain-probability index,
+  those values may shift slightly compared with earlier versions, especially at
+  higher-elevation stations. The reduction falls back to the instantaneous
+  temperature until at least an hour of history is available (for example, just
+  after setup).
+- ET0 and FWI values will change for sites affected by the two fixes above; this
+  is a correctness improvement, not a regression.
+
 ## [2.6.1] - 2026-07-01
 
 ### Added

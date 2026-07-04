@@ -39,6 +39,10 @@ blueprint:
           max: 60
           step: 5
 
+variables:
+  pool_switch: !input pool_switch
+  lightning_clearance_sensor: !input lightning_clearance_sensor
+
 trigger:
   - platform: state
     entity_id: !input lightning_proximity_sensor

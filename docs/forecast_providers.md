@@ -84,6 +84,33 @@ attribute on older installations.
 
 ---
 
+## How ws_core combines sources
+
+There is a single active forecast provider at a time (the one you select). ws_core does
+not silently fail over to a different provider, so the source of every forecast value is
+always predictable and shown in `sensor.ws_forecast_provider`. The provider result is
+cached and refreshed on a fixed cadence (about every 15 minutes); if a refresh fails,
+the last good forecast is retained and the forecast sensors stay available rather than
+dropping to `unknown`.
+
+Local station data and the provider forecast are combined in three explicit places, in
+this order of trust for the near term:
+
+1. **Nowcast (0-2 hours):** your live rain gauge is blended with the Open-Meteo
+   15-minute grid (a tapering 70 / 40 / 10 % local weight over the first three hours),
+   because your own gauge is the ground truth for what is happening right now.
+2. **Rain probability:** a local barometric/wind heuristic is blended with the provider
+   precipitation probability. When at least ten verified outcomes exist, the blend weight
+   is learned from each source's rolling 90-day Brier score; otherwise a fixed
+   time-of-day weight is used.
+3. **Forecast agreement:** `sensor.ws_forecast_agreement` compares the local Zambretti
+   outlook against the provider probability and reports `aligned` / `diverging` /
+   `conflict`, so a disagreement is surfaced rather than hidden.
+
+Beyond the first few hours, the selected provider's forecast is used as-is.
+
+---
+
 ## Adding a new provider
 
 See [Contributing](contributing.md) for the provider contribution path.

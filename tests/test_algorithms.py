@@ -225,8 +225,36 @@ class TestET0:
             solar_radiation_wm2=600.0,
             elevation_m=50.0,
             day_of_year=180,
+            latitude_deg=37.0,
         )
         assert 4.0 < et0 < 12.0
+
+    def test_penman_monteith_latitude_sensitivity(self):
+        """ET0 must depend on the supplied latitude (the net-longwave term uses Ra).
+
+        On day-of-year 180 (late June) the sub-tropics receive very different
+        extraterrestrial radiation than high latitudes, so identical weather at
+        10 deg N vs 60 deg N must not yield the same ET0. This guards against the
+        old bug where latitude was hardcoded to 37 N for every site.
+        """
+        # A realistic daily-mean shortwave (200 W/m2) keeps Rs/Rso below the
+        # clear-sky clamp so the latitude-dependent longwave term is active.
+        kwargs = dict(
+            temp_mean_c=28.0,
+            temp_max_c=34.0,
+            temp_min_c=22.0,
+            humidity=55.0,
+            wind_speed_ms=3.0,
+            solar_radiation_wm2=200.0,
+            elevation_m=50.0,
+            day_of_year=180,
+        )
+        et0_low = et0_penman_monteith(latitude_deg=10.0, **kwargs)
+        et0_high = et0_penman_monteith(latitude_deg=60.0, **kwargs)
+        assert et0_low != et0_high
+        # Both must remain physically plausible.
+        assert 3.0 < et0_low < 9.0
+        assert 3.0 < et0_high < 9.0
 
 
 class TestKalman:
@@ -469,6 +497,22 @@ class TestSeaLevelPressureReferenceValues:
         slp_warm = calculate_sea_level_pressure(1000.0, 500.0, 30.0)
         assert slp_cold > slp_warm
 
+    def test_mean_temp_overrides_instantaneous(self):
+        """When mean_temp_c is given it drives the reduction, not temp_c."""
+        # Instantaneous 30 C but a cooler 12h mean of 10 C: result must match
+        # a plain reduction at 10 C, not at 30 C.
+        with_mean = calculate_sea_level_pressure(1000.0, 500.0, 30.0, mean_temp_c=10.0)
+        plain_10 = calculate_sea_level_pressure(1000.0, 500.0, 10.0)
+        plain_30 = calculate_sea_level_pressure(1000.0, 500.0, 30.0)
+        assert with_mean == plain_10
+        assert with_mean != plain_30
+
+    def test_mean_temp_none_falls_back_to_instantaneous(self):
+        """Omitting mean_temp_c preserves the original behaviour."""
+        assert calculate_sea_level_pressure(1000.0, 500.0, 18.0) == calculate_sea_level_pressure(
+            1000.0, 500.0, 18.0, mean_temp_c=None
+        )
+
 
 class TestZambrettiReferenceValues:
     """Zambretti barometric forecaster."""
@@ -601,6 +645,38 @@ class TestCanadianFWIReferenceValues:
         for key in ("ffmc", "dmc", "dc", "isi", "bui", "fwi", "dsr"):
             assert key in result, f"Missing key: {key}"
             assert result[key] >= 0.0, f"{key}={result[key]} is negative"
+
+    def test_hemisphere_shifts_seasonal_drying(self):
+        """Southern Hemisphere must use season-shifted day-length tables.
+
+        In January the Northern tables give a short day-length (low drying),
+        while the Southern Hemisphere is in mid-summer (high drying). The DMC
+        and DC moisture codes must therefore differ between hemispheres for the
+        same January weather. This guards against the old Northern-only tables.
+        """
+        common = dict(
+            ffmc_prev=85.0,
+            dmc_prev=6.0,
+            dc_prev=15.0,
+            temp_c=25.0,
+            rh_pct=40.0,
+            wind_kmh=15.0,
+            rain_24h_mm=0.0,
+            month=1,  # January
+        )
+        north = compute_fwi(**common, hemisphere="northern")
+        south = compute_fwi(**common, hemisphere="southern")
+        assert south["dmc"] != north["dmc"]
+        assert south["dc"] != north["dc"]
+        # Southern-Hemisphere January (summer) must dry faster than Northern
+        # January (winter): higher DMC and DC.
+        assert south["dmc"] > north["dmc"]
+        assert south["dc"] > north["dc"]
+
+    def test_default_hemisphere_is_northern(self):
+        """Omitting hemisphere must match explicit northern (backwards compatible)."""
+        args = (85.0, 6.0, 15.0, 22.0, 45.0, 12.0, 0.0, 3)
+        assert compute_fwi(*args) == compute_fwi(*args, hemisphere="northern")
 
 
 class TestRainProbabilityReferenceValues:

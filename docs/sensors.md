@@ -1,6 +1,6 @@
 # Sensors Reference
 
-Complete list of entities created by Weather Station Core at v2.1.0.
+Complete list of entities created by Weather Station Core.
 
 Entity IDs shown use the default prefix `ws`. If you chose a different prefix during
 setup, replace `ws` with your prefix.

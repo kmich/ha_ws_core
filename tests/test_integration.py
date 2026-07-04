@@ -452,13 +452,60 @@ class TestDiagnostics:
         assert result["data_quality"] == "OK"
 
     def test_diagnostics_redacts_coords(self):
-        from custom_components.ws_core.diagnostics import _redact_coords
+        from custom_components.ws_core.diagnostics import REDACTED, _redact
 
         data = {"forecast_lat": 37.9, "forecast_lon": 23.7, "name": "Test"}
-        redacted = _redact_coords(data)
-        assert "forecast_lat" not in redacted
-        assert "forecast_lon" not in redacted
+        redacted = _redact(dict(data))
+        assert redacted["forecast_lat"] == REDACTED
+        assert redacted["forecast_lon"] == REDACTED
         assert redacted["name"] == "Test"
+
+    def test_diagnostics_redacts_all_credentials(self):
+        """No credential-bearing key may survive in diagnostics output."""
+        from custom_components.ws_core.diagnostics import REDACTED, _redact
+
+        secrets = {
+            "forecast_api_key": "abc123",
+            "wu_api_key": "wu-secret",
+            "wc_api_key": "wc-secret",
+            "pws_api_key": "pws-secret",
+            "wow_auth_key": "wow-secret",
+            "awekas_password": "hunter2",
+            "owm_stations_api_key": "owm-secret",
+            "windy_api_key": "windy-secret",
+            "cwop_passcode": "12345",
+            "tomorrow_io_key": "tio-secret",
+            # nested per-network block must be redacted too
+            "nested": {"pws_api_key": "nested-secret", "prefix": "ws"},
+            # non-secret fields must be preserved
+            "prefix": "ws",
+            "elevation": 120,
+        }
+        redacted = _redact(dict(secrets))
+        for key in (
+            "forecast_api_key",
+            "wu_api_key",
+            "wc_api_key",
+            "pws_api_key",
+            "wow_auth_key",
+            "awekas_password",
+            "owm_stations_api_key",
+            "windy_api_key",
+            "cwop_passcode",
+            "tomorrow_io_key",
+        ):
+            assert redacted[key] == REDACTED, f"{key} leaked"
+        assert redacted["nested"]["pws_api_key"] == REDACTED
+        assert redacted["nested"]["prefix"] == "ws"
+        assert redacted["prefix"] == "ws"
+        assert redacted["elevation"] == 120
+
+        # No original secret VALUE should appear anywhere in the serialized output.
+        import json as _json
+
+        blob = _json.dumps(redacted)
+        for leaked in ("abc123", "wu-secret", "hunter2", "nested-secret", "windy-secret"):
+            assert leaked not in blob
 
     def test_diagnostics_handles_no_coordinator(self):
         import asyncio
@@ -495,11 +542,12 @@ class TestVersionConsistency:
         assert v and len(v.split(".")) == 3, f"Invalid manifest version: {v!r}"
 
     def test_diagnostics_version(self):
-        """diagnostics.py must embed the same version as manifest.json."""
+        """diagnostics must report the same version as manifest.json (read at runtime)."""
         v = self._manifest_version()
-        with open("custom_components/ws_core/diagnostics.py") as f:
-            content = f.read()
-        assert f'"{v}"' in content, f"diagnostics.py does not contain version {v!r}"
+        from custom_components.ws_core.diagnostics import _VERSION, _integration_version
+
+        assert _VERSION == v, f"diagnostics _VERSION {_VERSION!r} != manifest {v!r}"
+        assert _integration_version() == v
 
     def test_pyproject_version(self):
         """pyproject.toml must match manifest.json version."""

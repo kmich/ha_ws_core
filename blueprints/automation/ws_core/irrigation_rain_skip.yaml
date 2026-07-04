@@ -64,6 +64,14 @@ blueprint:
       selector:
         text:
 
+variables:
+  rain_today_sensor: !input rain_today_sensor
+  rain_skip_threshold_mm: !input rain_skip_threshold_mm
+  rain_probability_sensor: !input rain_probability_sensor
+  rain_prob_threshold: !input rain_prob_threshold
+  duration_minutes: !input duration_minutes
+  notify_target: !input notify_target
+
 trigger:
   - platform: time
     at: !input schedule_time

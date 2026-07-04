@@ -49,12 +49,22 @@ blueprint:
           min: 1
           max: 24
 
+variables:
+  garden_switch: !input garden_switch
+  cooldown_hours: !input cooldown_hours
+
 trigger:
   - platform: numeric_state
     entity_id: !input fire_sensor
     above: !input fire_threshold
     for:
       minutes: 15
+
+condition:
+  - condition: template
+    value_template: >
+      {% set last = state_attr(this.entity_id, 'last_triggered') %}
+      {{ last is none or (now() - last).total_seconds() / 3600 > (cooldown_hours | int) }}
 
 action:
   - service: !input notify_target
