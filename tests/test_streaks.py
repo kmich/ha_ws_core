@@ -67,6 +67,54 @@ class TestUpdateDailyStreaks:
 
 
 # ---------------------------------------------------------------------------
+# All-time streak records (issue #127): longest streak ever, never resets
+# ---------------------------------------------------------------------------
+
+
+class TestStreakRecords:
+    def _state(self, **kw) -> LearningState:
+        s = LearningState()
+        for k, v in kw.items():
+            setattr(s, k, v)
+        return s
+
+    def test_record_tracks_new_high(self):
+        s = self._state(dry_streak_days=4, dry_streak_record=4)
+        update_daily_streaks(
+            s, "2026-05-20", t_high=18.0, t_low=9.0, rain_today_mm=0.0, thresh_heat_c=30.0, thresh_freeze_c=0.0
+        )
+        assert s.dry_streak_days == 5
+        assert s.dry_streak_record == 5
+
+    def test_record_survives_streak_reset(self):
+        # A 25-day dry streak, then rain breaks it - the record must stick.
+        s = self._state(dry_streak_days=25, dry_streak_record=25)
+        update_daily_streaks(
+            s, "2026-05-20", t_high=18.0, t_low=9.0, rain_today_mm=12.0, thresh_heat_c=30.0, thresh_freeze_c=0.0
+        )
+        assert s.dry_streak_days == 0
+        assert s.dry_streak_record == 25
+
+    def test_record_not_lowered_by_a_shorter_streak(self):
+        s = self._state(dry_streak_record=10)
+        update_daily_streaks(
+            s, "2026-05-20", t_high=18.0, t_low=9.0, rain_today_mm=0.0, thresh_heat_c=30.0, thresh_freeze_c=0.0
+        )
+        assert s.dry_streak_days == 1
+        assert s.dry_streak_record == 10
+
+    def test_heat_and_frost_records_track_independently(self):
+        s = self._state(heat_streak_days=2, heat_streak_record=2, frost_streak_days=1, frost_streak_record=1)
+        update_daily_streaks(
+            s, "2026-01-15", t_high=35.0, t_low=-5.0, rain_today_mm=0.0, thresh_heat_c=30.0, thresh_freeze_c=0.0
+        )
+        assert s.heat_streak_days == 3
+        assert s.heat_streak_record == 3
+        assert s.frost_streak_days == 2
+        assert s.frost_streak_record == 2
+
+
+# ---------------------------------------------------------------------------
 # Persistence: new guard field round-trips
 # ---------------------------------------------------------------------------
 

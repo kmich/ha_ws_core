@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.6.5] - 2026-07-29
+
+### Added
+
+- **All-time longest streak records (issue #127 follow-up):** `sensor.ws_dry_streak_record`, `sensor.ws_heat_streak_record`, and `sensor.ws_frost_streak_record` track the longest dry/heat/frost streak ever recorded, separate from the existing `sensor.ws_dry_streak_days` / `_heat_streak_days` / `_frost_streak_days`, which reset the moment the current streak breaks. The record sensors never reset, so you can see e.g. the longest frost streak since the station started recording. Thanks to @Benjamin45590 for the follow-up (#127).
+
 ## [2.6.4] - 2026-07-29
 
 ### Added
