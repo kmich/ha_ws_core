@@ -32,12 +32,23 @@ from custom_components.ws_core.const import (
     KEY_PACKAGE_OK,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_TEMP_HIGH_ALL_TIME,
+    KEY_TEMP_HIGH_MONTH,
+    KEY_TEMP_HIGH_WEEK,
     KEY_TEMP_HIGH_YEAR,
     KEY_TEMP_LOW_ALL_TIME,
+    KEY_TEMP_LOW_MONTH,
+    KEY_TEMP_LOW_WEEK,
     KEY_TEMP_LOW_YEAR,
+    KEY_TEMP_MONTH_REF,
+    KEY_TEMP_WEEK_REF,
     KEY_TEMP_YEAR_REF,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
+    KEY_WIND_GUST_MAX_ALL_TIME,
+    KEY_WIND_GUST_MAX_MONTH,
+    KEY_WIND_GUST_MAX_YEAR,
+    KEY_WIND_GUST_MONTH_REF,
+    KEY_WIND_GUST_YEAR_REF,
     KEY_WIND_QUADRANT,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
@@ -182,6 +193,17 @@ def _make_coordinator(
     coord._temp_year_key = ""
     coord._temp_high_all_time = None
     coord._temp_low_all_time = None
+    coord._temp_high_week = None
+    coord._temp_low_week = None
+    coord._temp_week_isoweek = ""
+    coord._temp_high_month = None
+    coord._temp_low_month = None
+    coord._temp_month_key = ""
+    coord._gust_max_month = None
+    coord._gust_month_key = ""
+    coord._gust_max_year = None
+    coord._gust_year_key = ""
+    coord._gust_max_all_time = None
     coord._solar_energy_today_whm2 = 0.0
     coord._solar_energy_date = ""
     coord._solar_energy_last_ts = None
@@ -386,6 +408,130 @@ class TestTempYearAllTime:
         assert data == {}
         assert coord._temp_high_year is None
         assert coord._temp_high_all_time is None
+
+
+# ---------------------------------------------------------------------------
+# Tests: Weekly / Monthly Temperature Extremes (issue #127)
+# ---------------------------------------------------------------------------
+
+
+class TestTempWeekMonth:
+    def test_first_reading_seeds_week_and_month(self):
+        coord = _make_coordinator()
+        data = {}
+        coord._update_temp_week_month(data, 18.0)
+        assert data[KEY_TEMP_HIGH_WEEK] == 18.0
+        assert data[KEY_TEMP_LOW_WEEK] == 18.0
+        assert data[KEY_TEMP_HIGH_MONTH] == 18.0
+        assert data[KEY_TEMP_LOW_MONTH] == 18.0
+        assert data[KEY_TEMP_WEEK_REF] == coord._temp_week_isoweek
+        assert data[KEY_TEMP_MONTH_REF] == coord._temp_month_key
+
+    def test_tracks_new_highs_and_lows(self):
+        coord = _make_coordinator()
+        for temp in (10.0, 25.0, -5.0, 12.0):
+            data = {}
+            coord._update_temp_week_month(data, temp)
+        assert data[KEY_TEMP_HIGH_WEEK] == 25.0
+        assert data[KEY_TEMP_LOW_WEEK] == -5.0
+        assert data[KEY_TEMP_HIGH_MONTH] == 25.0
+        assert data[KEY_TEMP_LOW_MONTH] == -5.0
+
+    def test_week_rollover_resets_week_but_not_month(self):
+        coord = _make_coordinator()
+        coord._temp_high_week = 30.0
+        coord._temp_low_week = -10.0
+        coord._temp_week_isoweek = "2020-W01"
+        coord._temp_high_month = 30.0
+        coord._temp_low_month = -10.0
+        coord._temp_month_key = dt_util.now().strftime("%Y-%m")
+
+        data = {}
+        coord._update_temp_week_month(data, 5.0)
+
+        assert data[KEY_TEMP_HIGH_WEEK] == 5.0
+        assert data[KEY_TEMP_LOW_WEEK] == 5.0
+        # Month key still matches, so month extremes are untouched by the week rollover.
+        assert data[KEY_TEMP_HIGH_MONTH] == 30.0
+        assert data[KEY_TEMP_LOW_MONTH] == -10.0
+
+    def test_month_rollover_resets_month(self):
+        coord = _make_coordinator()
+        coord._temp_high_month = 30.0
+        coord._temp_low_month = -10.0
+        coord._temp_month_key = "2020-01"
+
+        data = {}
+        coord._update_temp_week_month(data, 5.0)
+
+        current_month = dt_util.now().strftime("%Y-%m")
+        assert coord._temp_month_key == current_month
+        assert data[KEY_TEMP_HIGH_MONTH] == 5.0
+        assert data[KEY_TEMP_LOW_MONTH] == 5.0
+
+    def test_handles_none_gracefully(self):
+        coord = _make_coordinator()
+        data = {}
+        coord._update_temp_week_month(data, None)
+        assert data == {}
+        assert coord._temp_high_week is None
+        assert coord._temp_high_month is None
+
+
+# ---------------------------------------------------------------------------
+# Tests: Monthly / Yearly / All-Time Wind Gust Max (issue #127)
+# ---------------------------------------------------------------------------
+
+
+class TestGustMonthYearAllTime:
+    def test_first_reading_seeds_all_periods(self):
+        coord = _make_coordinator()
+        data = {}
+        coord._update_gust_month_year_all_time(data, 8.0)
+        assert data[KEY_WIND_GUST_MAX_MONTH] == 8.0
+        assert data[KEY_WIND_GUST_MAX_YEAR] == 8.0
+        assert data[KEY_WIND_GUST_MAX_ALL_TIME] == 8.0
+        assert data[KEY_WIND_GUST_MONTH_REF] == coord._gust_month_key
+        assert data[KEY_WIND_GUST_YEAR_REF] == coord._gust_year_key
+
+    def test_tracks_new_max(self):
+        coord = _make_coordinator()
+        for gust in (5.0, 12.0, 3.0, 9.0):
+            data = {}
+            coord._update_gust_month_year_all_time(data, gust)
+        assert data[KEY_WIND_GUST_MAX_MONTH] == 12.0
+        assert data[KEY_WIND_GUST_MAX_YEAR] == 12.0
+        assert data[KEY_WIND_GUST_MAX_ALL_TIME] == 12.0
+
+    def test_month_rollover_resets_month_not_year_or_all_time(self):
+        coord = _make_coordinator()
+        coord._gust_max_month = 20.0
+        coord._gust_month_key = "2020-01"
+        coord._gust_max_year = 20.0
+        coord._gust_year_key = dt_util.now().strftime("%Y")
+        coord._gust_max_all_time = 25.0
+
+        data = {}
+        coord._update_gust_month_year_all_time(data, 4.0)
+
+        assert data[KEY_WIND_GUST_MAX_MONTH] == 4.0
+        assert data[KEY_WIND_GUST_MAX_YEAR] == 20.0
+        assert data[KEY_WIND_GUST_MAX_ALL_TIME] == 25.0
+
+    def test_all_time_never_resets(self):
+        coord = _make_coordinator()
+        data = {}
+        coord._update_gust_month_year_all_time(data, 40.0)
+        coord._update_gust_month_year_all_time(data, 2.0)
+        assert data[KEY_WIND_GUST_MAX_ALL_TIME] == 40.0
+
+    def test_handles_none_gracefully(self):
+        coord = _make_coordinator()
+        data = {}
+        coord._update_gust_month_year_all_time(data, None)
+        assert data == {}
+        assert coord._gust_max_month is None
+        assert coord._gust_max_all_time is None
 
 
 # ---------------------------------------------------------------------------

@@ -229,6 +229,22 @@ KEY_TEMP_YEAR_REF = "temp_year_ref"
 KEY_TEMP_HIGH_ALL_TIME = "temp_high_all_time"
 KEY_TEMP_LOW_ALL_TIME = "temp_low_all_time"
 
+# Keys for WEEKLY / MONTHLY TEMPERATURE EXTREMES (issue #127)
+# Weekly resets on the ISO week boundary (Mon), monthly on the 1st.
+KEY_TEMP_HIGH_WEEK = "temp_high_week"
+KEY_TEMP_LOW_WEEK = "temp_low_week"
+KEY_TEMP_WEEK_REF = "temp_week_ref"
+KEY_TEMP_HIGH_MONTH = "temp_high_month"
+KEY_TEMP_LOW_MONTH = "temp_low_month"
+KEY_TEMP_MONTH_REF = "temp_month_ref"
+
+# Keys for MONTHLY / YEARLY / ALL-TIME WIND GUST MAX (issue #127)
+KEY_WIND_GUST_MAX_MONTH = "wind_gust_max_month"
+KEY_WIND_GUST_MONTH_REF = "wind_gust_month_ref"
+KEY_WIND_GUST_MAX_YEAR = "wind_gust_max_year"
+KEY_WIND_GUST_YEAR_REF = "wind_gust_year_ref"
+KEY_WIND_GUST_MAX_ALL_TIME = "wind_gust_max_all_time"
+
 # Keys for DISPLAY/FORMAT SENSORS
 KEY_UV_LEVEL_DISPLAY = "uv_level_display"
 KEY_HUMIDITY_LEVEL_DISPLAY = "humidity_level_display"

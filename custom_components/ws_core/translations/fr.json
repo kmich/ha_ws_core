@@ -1303,6 +1303,39 @@
       "wind_gust_max_24h": {
         "name": "Rafale max (24h)"
       },
+      "temperature_high_year": {
+        "name": "Température max (Année)"
+      },
+      "temperature_low_year": {
+        "name": "Température min (Année)"
+      },
+      "temperature_high_all_time": {
+        "name": "Température max (record)"
+      },
+      "temperature_low_all_time": {
+        "name": "Température min (record)"
+      },
+      "temperature_high_week": {
+        "name": "Température max (semaine)"
+      },
+      "temperature_low_week": {
+        "name": "Température min (semaine)"
+      },
+      "temperature_high_month": {
+        "name": "Température max (mois)"
+      },
+      "temperature_low_month": {
+        "name": "Température min (mois)"
+      },
+      "wind_gust_max_month": {
+        "name": "Rafale max (mois)"
+      },
+      "wind_gust_max_year": {
+        "name": "Rafale max (année)"
+      },
+      "wind_gust_max_all_time": {
+        "name": "Rafale max (record)"
+      },
       "humidity_level": {
         "name": "Niveau d'humidité",
         "state": {
@@ -2242,6 +2275,18 @@
           }
         }
               },
+      "indoor_room_delta": {
+        "name": "Écart de température - {room_name}"
+      },
+      "indoor_room_humidity": {
+        "name": "Humidité - {room_name}"
+      },
+      "indoor_room_co2": {
+        "name": "CO₂ - {room_name}"
+      },
+      "indoor_room_comfort": {
+        "name": "Confort - {room_name}"
+      },
       "soil_moisture": {
         "name": "Humidité du sol",
         "state_attributes": {

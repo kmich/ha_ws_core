@@ -53,6 +53,17 @@ def _coord():
     c._temp_year_key = ""
     c._temp_high_all_time = None
     c._temp_low_all_time = None
+    c._temp_high_week = None
+    c._temp_low_week = None
+    c._temp_week_isoweek = ""
+    c._temp_high_month = None
+    c._temp_low_month = None
+    c._temp_month_key = ""
+    c._gust_max_month = None
+    c._gust_month_key = ""
+    c._gust_max_year = None
+    c._gust_year_key = ""
+    c._gust_max_all_time = None
     c._hdd_today = 0.0
     c._hdd_today_date = ""
     c._hdd_today_samples = 0
@@ -215,3 +226,78 @@ class TestHistoryRoundTrip:
         assert dst._temp_year_key == ""
         assert dst._temp_high_all_time is None
         assert dst._temp_low_all_time is None
+
+    def test_temp_week_month_roundtrip(self):
+        """Weekly/monthly temperature extremes (issue #127) survive a restart when
+        the saved period key still matches the current period."""
+        src = _coord()
+        this_week = dt_util.now().strftime("%G-W%V")
+        this_month = dt_util.now().strftime("%Y-%m")
+        src._temp_high_week = 22.0
+        src._temp_low_week = 5.0
+        src._temp_week_isoweek = this_week
+        src._temp_high_month = 28.0
+        src._temp_low_month = -2.0
+        src._temp_month_key = this_month
+        blob = src._dump_history_state()
+
+        dst = _coord()
+        dst._restore_history_state(blob)
+        assert dst._temp_high_week == 22.0
+        assert dst._temp_low_week == 5.0
+        assert dst._temp_week_isoweek == this_week
+        assert dst._temp_high_month == 28.0
+        assert dst._temp_low_month == -2.0
+        assert dst._temp_month_key == this_month
+
+    def test_temp_week_month_not_restored_when_period_stale(self):
+        src = _coord()
+        src._temp_high_week = 22.0
+        src._temp_week_isoweek = "2020-W01"
+        src._temp_high_month = 28.0
+        src._temp_month_key = "2020-01"
+        blob = src._dump_history_state()
+
+        dst = _coord()
+        dst._restore_history_state(blob)
+        assert dst._temp_high_week is None
+        assert dst._temp_week_isoweek == ""
+        assert dst._temp_high_month is None
+        assert dst._temp_month_key == ""
+
+    def test_gust_month_year_all_time_roundtrip(self):
+        """Monthly/yearly/all-time gust max (issue #127) survive a restart."""
+        src = _coord()
+        this_month = dt_util.now().strftime("%Y-%m")
+        this_year = dt_util.now().strftime("%Y")
+        src._gust_max_month = 18.0
+        src._gust_month_key = this_month
+        src._gust_max_year = 24.0
+        src._gust_year_key = this_year
+        src._gust_max_all_time = 30.0
+        blob = src._dump_history_state()
+
+        dst = _coord()
+        dst._restore_history_state(blob)
+        assert dst._gust_max_month == 18.0
+        assert dst._gust_month_key == this_month
+        assert dst._gust_max_year == 24.0
+        assert dst._gust_year_key == this_year
+        assert dst._gust_max_all_time == 30.0
+
+    def test_gust_month_year_not_restored_when_period_stale_but_all_time_is(self):
+        src = _coord()
+        src._gust_max_month = 18.0
+        src._gust_month_key = "2020-01"
+        src._gust_max_year = 24.0
+        src._gust_year_key = "2020"
+        src._gust_max_all_time = 30.0
+        blob = src._dump_history_state()
+
+        dst = _coord()
+        dst._restore_history_state(blob)
+        assert dst._gust_max_month is None
+        assert dst._gust_month_key == ""
+        assert dst._gust_max_year is None
+        assert dst._gust_year_key == ""
+        assert dst._gust_max_all_time == 30.0

@@ -2,6 +2,18 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.6.4] - 2026-07-29
+
+### Added
+
+- **Weekly and monthly temperature extremes (issue #127):** `sensor.ws_temperature_high_week` / `sensor.ws_temperature_low_week` (reset on the ISO week boundary, Monday, exposing a `week_ref` attribute) and `sensor.ws_temperature_high_month` / `sensor.ws_temperature_low_month` (reset on the 1st, exposing a `month_ref` attribute). Same pipeline, restore behaviour, and restart-persistence as the existing 24h/yearly/all-time temperature extreme sensors.
+- **Monthly, yearly and all-time wind gust max (issue #127):** `sensor.ws_wind_gust_max_month`, `sensor.ws_wind_gust_max_year` (each reset on their period boundary, exposing a `month_ref` / `year_ref` attribute) and `sensor.ws_wind_gust_max_all_time` (never resets). Complements the existing `sensor.ws_wind_gust_max_24h`.
+
+### Fixed
+
+- **French translation for yearly/all-time temperature sensors:** `fr.json` was missing the names added in 2.6.3 for `sensor.ws_temperature_high_year` / `_low_year` / `_high_all_time` / `_low_all_time`, so those four sensors fell back to their English translation key on a French install. Thanks to @Benjamin45590 (#126).
+- **Named indoor room sensors are now translatable (issue #128):** the per-room indoor temperature-delta, humidity, CO₂ and comfort sensors (added in 2.6.0) had their display name hardcoded in English (e.g. `"Humidity - {room}"`), bypassing Home Assistant's translation system entirely. They now use a `{room_name}` translation placeholder so their label follows the configured language, matching every other sensor in the integration.
+
 ## [2.6.3] - 2026-07-27
 
 ### Added
