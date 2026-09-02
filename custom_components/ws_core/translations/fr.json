@@ -817,7 +817,7 @@
         "name": "Indicateurs de qualité des capteurs",
         "state_attributes": {
           "package_ok": {
-            "name": "Données Ok"
+            "name": "Données OK"
           },
           "data_quality": {
             "name": "Qualité des données"
