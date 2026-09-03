@@ -90,6 +90,8 @@ def _coord():
     c._snow_this_month_key = ""
     c._snow_this_year_cm = 0.0
     c._snow_this_year_key = ""
+    c._snowiest_day_cm = 0.0
+    c._snowiest_day_date = ""
     return c
 
 
@@ -343,3 +345,17 @@ class TestHistoryRoundTrip:
         assert dst._gust_max_year is None
         assert dst._gust_year_key == ""
         assert dst._gust_max_all_time == 30.0
+
+    def test_snowiest_day_record_roundtrip(self):
+        """All-time snowiest-day record (issue #144) survives a restart, with
+        its date, and is restored unconditionally like the other all-time
+        extremes."""
+        src = _coord()
+        src._snowiest_day_cm = 42.5
+        src._snowiest_day_date = "2020-12-24"
+        blob = src._dump_history_state()
+
+        dst = _coord()
+        dst._restore_history_state(blob)
+        assert dst._snowiest_day_cm == 42.5
+        assert dst._snowiest_day_date == "2020-12-24"

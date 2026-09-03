@@ -269,6 +269,8 @@ def _make_coordinator(
     coord._snow_this_month_key = ""
     coord._snow_this_year_cm = 0.0
     coord._snow_this_year_key = ""
+    coord._snowiest_day_cm = 0.0
+    coord._snowiest_day_date = ""
 
     return coord
 
@@ -1026,3 +1028,73 @@ class TestComputeSnow:
         assert data[KEY_SNOW_TODAY_CM] == 0.0  # rolled over to a new day
         assert data[KEY_SNOW_THIS_MONTH_CM] == 12.0  # untouched
         assert data[KEY_SNOW_THIS_YEAR_CM] == 40.0  # untouched
+
+    def test_snowiest_day_record_tracks_running_daily_total(self):
+        from custom_components.ws_core.const import KEY_SNOW_RECORD_DAY_CM, KEY_SNOW_TODAY_CM
+
+        coord = _make_coordinator()
+        coord.snow_enabled = True
+        t0 = dt_util.utcnow()
+        coord._compute_snow(self._data(), t0)
+        coord._compute_snow(self._data(), t0 + timedelta(minutes=20))
+        data = self._data()
+        coord._compute_snow(data, t0 + timedelta(minutes=40))
+        # The record mirrors today's accumulating total while it is the wettest day.
+        assert data[KEY_SNOW_RECORD_DAY_CM] == data[KEY_SNOW_TODAY_CM] > 0.0
+        assert data["_snow_record_day_date"] == dt_util.now().strftime("%Y-%m-%d")
+
+    def test_snowiest_day_record_survives_day_rollover_and_dry_days(self):
+        from custom_components.ws_core.const import KEY_SNOW_RECORD_DAY_CM, KEY_SNOW_TODAY_CM
+
+        coord = _make_coordinator()
+        coord.snow_enabled = True
+        coord._snowiest_day_cm = 25.0
+        coord._snowiest_day_date = "2001-02-03"
+        coord._snow_today_date = "2000-01-01"  # force a day rollover this cycle
+        data = self._data(rain_rate=0.0)  # dry day, nothing new
+        coord._compute_snow(data, dt_util.utcnow())
+        assert data[KEY_SNOW_TODAY_CM] == 0.0
+        assert data[KEY_SNOW_RECORD_DAY_CM] == 25.0  # all-time record untouched
+        assert data["_snow_record_day_date"] == "2001-02-03"
+
+
+class TestDiscoverBlitzortung:
+    """_discover_blitzortung scans the whole entity registry; it must tolerate
+    entities whose unique_id is not a string (issue #142)."""
+
+    def _entry(self, entity_id, platform, unique_id):
+        e = MagicMock()
+        e.entity_id = entity_id
+        e.platform = platform
+        e.unique_id = unique_id
+        return e
+
+    def _run(self, entries):
+        coord = _make_coordinator()
+        coord._blitzortung_sources = {}
+        reg = MagicMock()
+        reg.entities.values.return_value = entries
+        with patch("homeassistant.helpers.entity_registry.async_get", return_value=reg):
+            coord._discover_blitzortung()
+        return coord
+
+    def test_non_string_unique_id_does_not_raise(self):
+        # e.g. a nuki lock stores unique_id as a plain int
+        entries = [
+            self._entry("lock.front_door", "nuki", 659980332),
+            self._entry("sensor.some_number", "template", 42),
+        ]
+        coord = self._run(entries)  # must not raise AttributeError
+        assert coord._blitzortung_sources == {}
+
+    def test_blitzortung_entities_still_auto_detected(self):
+        from custom_components.ws_core.const import SRC_LIGHTNING_COUNT, SRC_LIGHTNING_DISTANCE
+
+        entries = [
+            self._entry("lock.front_door", "nuki", 659980332),
+            self._entry("sensor.blitzortung_lightning_counter", "blitzortung", "abc-counter"),
+            self._entry("sensor.blitzortung_lightning_distance", "blitzortung", "abc-distance"),
+        ]
+        coord = self._run(entries)
+        assert coord._blitzortung_sources[SRC_LIGHTNING_COUNT] == "sensor.blitzortung_lightning_counter"
+        assert coord._blitzortung_sources[SRC_LIGHTNING_DISTANCE] == "sensor.blitzortung_lightning_distance"

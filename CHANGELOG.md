@@ -2,6 +2,25 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.7.1] - 2026-09-03
+
+### Added
+
+- **Snowiest Day record sensor (issue #144):** `sensor.ws_snow_record_day` (part of the opt-in Snow group) tracks the highest single-day estimated snow accumulation ever seen for this config entry, with a `date` attribute showing when that record was set. Like the all-time temperature and gust extremes it only ever steps up and never resets, and it survives restarts. Still a heuristic derived from rain rate, not a measurement. Added to the Snow section of the full, vanilla, and detailed dashboards.
+
+### Fixed
+
+- **`AttributeError` in Blitzortung auto-discovery took down the whole integration (issue #142):** `_discover_blitzortung()` scans *every* entity in the registry and called `.lower()` on each entity's `unique_id`. A few integrations (e.g. `nuki`) store `unique_id` as an `int`, so `async_setup_entry` crashed with `AttributeError: 'int' object has no attribute 'lower'` before it ever reached a Blitzortung entity, leaving every `sensor.ws_*` unavailable. The `unique_id` is now coerced to `str` and only inspected after the platform/prefix filter. Pre-existing bug, not new in 2.7.0. Thanks to @denisb88 for the detailed report.
+- **Rain Next 60 min showed ~15 decimal places in inches (issue #141):** the nowcast total is rounded to 2 dp in millimetres, but the sensor had no `device_class` or `suggested_display_precision`, so once converted to inches Home Assistant rendered the raw float (e.g. `0.03937007874015748 in`). It now declares `device_class: precipitation` and 2-decimal display precision, matching the other rain accumulators. Thanks to @doctrdre for the report.
+
+### Translations
+
+- **French:** completed `fr.json` coverage for the v2.7 opt-in features (snow, adaptive calibration, historical climate normals) and their sensors, plus small wording fixes. Thanks to @Benjamin45590 (#143).
+
+### Docs
+
+- Regenerated `docs/entity_map.html` (it had drifted back to v2.6.2) and added the Snowiest Day sensor to `docs/sensors.md`.
+
 ## [2.7.0] - 2026-09-01
 
 ### Added

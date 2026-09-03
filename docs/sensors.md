@@ -336,6 +336,7 @@ estimate.
 | `sensor.ws_snow_today` | cm (or in) | total_increasing | Estimated new snow today, resets at local midnight |
 | `sensor.ws_snow_this_month` | cm (or in) | total_increasing | Resets on the 1st |
 | `sensor.ws_snow_this_year` | cm (or in) | total_increasing | Resets Jan 1st |
+| `sensor.ws_snow_record_day` | cm (or in) | measurement | Snowiest single day ever recorded; `date` attribute shows when. Never resets, survives restarts |
 
 ---
 

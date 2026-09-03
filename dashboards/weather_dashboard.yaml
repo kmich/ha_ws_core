@@ -3903,6 +3903,8 @@ views:
                   name: This Month
                 - entity: sensor.ws_snow_this_year
                   name: This Year
+                - entity: sensor.ws_snow_record_day
+                  name: Snowiest Day
 
           - type: conditional
             conditions:
