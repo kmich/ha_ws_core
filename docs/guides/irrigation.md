@@ -13,7 +13,7 @@ conditions. It is the standard input for computing crop water requirements.
 | Sensor | Formula | When available | Accuracy |
 |---|---|---|---|
 | `sensor.ws_et0_daily` | Hargreaves-Samani (1985) | Always (once coordinates are set) | ±15-20% vs Penman-Monteith |
-| `sensor.ws_et0_pm_daily` | FAO-56 Penman-Monteith | When a solar radiation (W/m²) sensor is mapped | ±5-10% vs lysimeter |
+| `sensor.ws_et0_penman_monteith` | FAO-56 Penman-Monteith | When a solar radiation (W/m²) sensor is mapped | ±5-10% vs lysimeter |
 
 Both sensors update daily. Penman-Monteith is preferred when available; use
 Hargreaves-Samani as a fallback if you do not have a solar radiation sensor.
@@ -98,9 +98,9 @@ When soil moisture or temperature sensors are available, enable the **Soil Senso
 
 | Sensor | Description |
 |---|---|
-| `sensor.ws_soil_moisture` | Volumetric moisture %. Accepts 0–100% or 0–1 (auto-detected) |
-| `sensor.ws_soil_temperature` | Soil temperature in °C |
-| `sensor.ws_soil_moisture_deficit` | Difference between 40% field capacity and current moisture |
+| `sensor.ws_soil_moisture_pct` | Volumetric moisture %. Accepts 0–100% or 0–1 (auto-detected) |
+| `sensor.ws_soil_temp` | Soil temperature in °C |
+| `sensor.ws_soil_moisture_deficit_pct` | Difference between 40% field capacity and current moisture |
 | `sensor.ws_irrigation_need` | Text label: None / Low / Moderate / High / Critical |
 | `sensor.ws_irrigation_need_score` | 0–100 demand score |
 

@@ -75,6 +75,39 @@ def test_fresh_install_entity_id_uses_prefix():
     assert s2.entity_id == "sensor.home_temperature"
 
 
+def test_slug_for_key_only_strips_trailing_unit_suffix():
+    """_slug_for_key must strip a unit suffix only at the END of the key.
+
+    The old implementation used chained str.replace(), which also ate
+    mid-string matches: "nowcast_confidence" -> "nowcastonfidence" (the "_c"
+    inside "_confidence"). It should be left intact.
+    """
+    from custom_components.ws_core.sensor import WSSensor
+
+    slug = WSSensor._slug_for_key
+    # mid-string "_c" must survive
+    assert slug("nowcast_confidence") == "nowcast_confidence"
+    # trailing unit suffixes are still stripped
+    assert slug("soil_temp_c") == "soil_temp"
+    assert slug("wind_speed_ms") == "wind_speed"
+    assert slug("station_pressure_hpa") == "station_pressure"
+    assert slug("rain_rate_mmph") == "rain_rate"
+    # keys with no suffix are untouched
+    assert slug("dry_streak_days") == "dry_streak_days"
+
+
+def test_every_sensor_slug_is_a_valid_object_id():
+    """No SENSORS entry may produce an entity_id slug with a doubled or
+    trailing underscore, or an empty slug."""
+    import re
+
+    from custom_components.ws_core.sensor import SENSORS, WSSensor
+
+    for desc in SENSORS:
+        slug = WSSensor._slug_for_key(desc.key)
+        assert slug and re.fullmatch(r"[a-z0-9]+(?:_[a-z0-9]+)*", slug), f"{desc.key!r} -> bad slug {slug!r}"
+
+
 def test_added_to_hass_does_not_revert_user_rename():
     """A user-renamed entity_id must survive async_added_to_hass (restart)."""
     import asyncio

@@ -3288,8 +3288,13 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         }
         if key in overrides:
             return overrides[key]
-        # Fallback: strip common prefixes/suffixes for a clean slug
-        return key.replace("_mmph", "").replace("_ms", "").replace("_hpa", "").replace("_c", "")
+        # Fallback: strip a trailing unit suffix for a clean slug. Anchored to the
+        # end on purpose - a bare .replace() also ate mid-string matches, turning
+        # e.g. "nowcast_confidence" into "nowcastonfidence".
+        for suffix in ("_mmph", "_ms", "_hpa", "_c"):
+            if key.endswith(suffix):
+                return key[: -len(suffix)]
+        return key
 
     def _apply_unit_conversion(self, val: float) -> float:
         unit = self._attr_native_unit_of_measurement

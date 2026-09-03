@@ -41,7 +41,7 @@ Thermal Comfort entity IDs follow `sensor.<name>_<metric>`. ws_core uses
 | `sensor.ws_delta_t` | Delta-T spray application index |
 | All fire danger sensors | FWI, FFDI, FFWI (see [Fire Danger](guides/fire_danger.md)) |
 | Nowcast sensors | `ws_minutes_until_rain`, etc. |
-| ET₀ sensors | `ws_et0_daily`, `ws_et0_pm_daily` |
+| ET₀ sensors | `ws_et0_daily`, `ws_et0_penman_monteith` |
 | Lightning sensors | Strike count, distance, clearance |
 
 ---

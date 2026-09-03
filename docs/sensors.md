@@ -46,7 +46,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Localized to the HA language (English/French, English fallback). Useful for TTS and Assist. |
 | `sensor.ws_rain_last_1h` | mm | Rolling 1-hour rainfall |
 | `sensor.ws_rain_last_24h` | mm | Rolling 24-hour rainfall |
-| `sensor.ws_rain_today` | mm | Today's accumulated rainfall |
+| `sensor.ws_rain_today_mm` | mm | Today's accumulated rainfall |
 
 ## Always-on: 24h Statistics and Streaks
 
@@ -55,16 +55,16 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_temperature_high_24h` | °C | 24h rolling temperature maximum |
 | `sensor.ws_temperature_low_24h` | °C | 24h rolling temperature minimum |
 | `sensor.ws_wind_gust_max_24h` | m/s | 24h rolling gust maximum |
-| `sensor.ws_dry_streak` | days | Consecutive days without measurable rain |
-| `sensor.ws_heat_streak` | days | Consecutive days above heat threshold |
-| `sensor.ws_frost_streak` | days | Consecutive days below 0 °C |
+| `sensor.ws_dry_streak_days` | days | Consecutive days without measurable rain |
+| `sensor.ws_heat_streak_days` | days | Consecutive days above heat threshold |
+| `sensor.ws_frost_streak_days` | days | Consecutive days below 0 °C |
 
 ## Always-on: ET₀
 
 | Entity ID | Unit | Formula | Description |
 |---|---|---|---|
 | `sensor.ws_et0_daily` | mm | Hargreaves-Samani 1985 | Daily reference ET₀ (±15-20%) |
-| `sensor.ws_et0_pm_daily` | mm | FAO-56 Penman-Monteith | Activates when solar radiation sensor is mapped (±5-10%) |
+| `sensor.ws_et0_penman_monteith` | mm | FAO-56 Penman-Monteith | Activates when solar radiation sensor is mapped (±5-10%) |
 
 ## Always-on: v2.0 additions
 
@@ -296,10 +296,10 @@ Via Open-Meteo Marine API (free, no API key).
 | `sensor.ws_temp_anomaly_90d` | Temperature anomaly (°C) — recent 30d mean vs 90d seasonal baseline (requires ≥60 days of data) |
 | `sensor.ws_rain_anomaly_90d` | Precipitation anomaly (mm/d) — recent 30d mean vs 90d seasonal baseline |
 | `sensor.ws_auto_calibration` | Adaptive calibration status (`learning`/`stable`/`adjusted`) — requires **Feature: Adaptive Sensor Calibration** |
-| `sensor.ws_temperature_high_normal` | Historical normal high for today's calendar date (~10y average) — requires **Feature: Historical Climate Normals** |
-| `sensor.ws_temperature_low_normal` | Historical normal low for today's calendar date |
+| `sensor.ws_temp_high_normal` | Historical normal high for today's calendar date (~10y average) — requires **Feature: Historical Climate Normals** |
+| `sensor.ws_temp_low_normal` | Historical normal low for today's calendar date |
 | `sensor.ws_rain_normal` | Historical normal rainfall for today's calendar date |
-| `sensor.ws_temperature_anomaly_normal` | Today's temperature vs. the historical normal for this specific date — distinct from `_anomaly_30d`/`_90d` (self-referential vs. this station's own recent average) |
+| `sensor.ws_temp_anomaly_normal` | Today's temperature vs. the historical normal for this specific date — distinct from `_anomaly_30d`/`_90d` (self-referential vs. this station's own recent average) |
 | `sensor.ws_rain_anomaly_normal` | Today's rain vs. the historical normal for this specific date |
 
 ---
@@ -310,9 +310,9 @@ Requires: soil moisture or soil temperature source sensors mapped in Configure �
 
 | Entity ID | Unit | State Class | Description |
 |---|---|---|---|
-| `sensor.ws_soil_moisture` | % | measurement | Volumetric soil moisture (auto-normalised from 0–1 or 0–100 input) |
-| `sensor.ws_soil_temperature` | °C | measurement | Soil temperature |
-| `sensor.ws_soil_moisture_deficit` | % | measurement | Deficit from field capacity (40% FC assumed for loam soil) |
+| `sensor.ws_soil_moisture_pct` | % | measurement | Volumetric soil moisture (auto-normalised from 0–1 or 0–100 input) |
+| `sensor.ws_soil_temp` | °C | measurement | Soil temperature |
+| `sensor.ws_soil_moisture_deficit_pct` | % | measurement | Deficit from field capacity (40% FC assumed for loam soil) |
 | `sensor.ws_irrigation_need` | — | — | Text label: None / Low / Moderate / High / Critical |
 | `sensor.ws_irrigation_need_score` | — | measurement | 0–100 irrigation demand score (soil deficit + net ET₀) |
 
@@ -347,8 +347,8 @@ Each upload target is independently enabled. Each produces a status sensor.
 | Upload target | Config key | Status entity |
 |---|---|---|
 | Weather Underground | `enable_wunderground` | `sensor.ws_wu_upload_status` |
-| Weathercloud | `enable_weathercloud` | `sensor.ws_weathercloud_upload_status` |
-| PWSWeather | `enable_pwsweather` | `sensor.ws_pwsweather_upload_status` |
+| Weathercloud | `enable_weathercloud` | `sensor.ws_wc_upload_status` |
+| PWSWeather | `enable_pwsweather` | `sensor.ws_pws_upload_status` |
 | WOW (UK Met Office) | `enable_wow` | `sensor.ws_wow_upload_status` |
 | AWEKAS | `enable_awekas` | `sensor.ws_awekas_upload_status` |
 | CWOP / APRS | `enable_cwop` | `sensor.ws_cwop_upload_status` |

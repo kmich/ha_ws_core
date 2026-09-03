@@ -2,6 +2,13 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.7.2] - 2026-09-03
+
+### Fixed
+
+- **`sensor.ws_nowcast_confidence` was created with a mangled entity ID.** `_slug_for_key()`'s fallback stripped the substring `_c` (and `_ms`/`_hpa`/`_mmph`) *anywhere* in the key rather than only as a trailing unit suffix, so `nowcast_confidence` became `sensor.ws_nowcastonfidence`. It is the only sensor that was affected. The strip is now anchored to the end of the key. New installs get the correct `sensor.ws_nowcast_confidence`; existing installs keep the old ID until you delete and let the entity regenerate (same as issue #134).
+- **Documentation referenced several entity IDs that don't exist.** `docs/sensors.md`, the irrigation/lightning/nowcast guides, `docs/use_cases.md` and `README.md` used names like `sensor.ws_et0_pm_daily`, `sensor.ws_rain_today`, `sensor.ws_dry_streak`, `sensor.ws_temperature_high_normal`, `sensor.ws_pwsweather_upload_status`, `sensor.ws_soil_moisture` and `number.ws_lightning_proximity_threshold`. Corrected to the real IDs (`sensor.ws_et0_penman_monteith`, `sensor.ws_rain_today_mm`, `sensor.ws_dry_streak_days`, `sensor.ws_temp_high_normal`, `sensor.ws_pws_upload_status`, `sensor.ws_soil_moisture_pct`, `number.ws_lightning_proximity`, etc.). Regenerated `docs/entity_map.html`.
+
 ## [2.7.1] - 2026-09-03
 
 ### Added
