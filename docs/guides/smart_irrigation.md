@@ -19,7 +19,7 @@ rainfall. ws_core provides the ET₀ value; Smart Irrigation decides the waterin
 
 ## Which ET₀ sensor to use
 
-Use `sensor.ws_et0_pm_daily` if you have a solar radiation sensor mapped in ws_core.
+Use `sensor.ws_et0_penman_monteith` if you have a solar radiation sensor mapped in ws_core.
 This uses FAO-56 Penman-Monteith with ±5-10% accuracy.
 
 Use `sensor.ws_et0_daily` if you do not have a solar radiation sensor. This uses
@@ -38,7 +38,7 @@ In Smart Irrigation configuration, when prompted for the ET₀ source, choose
 ## Step 2: Map the ET₀ entity
 
 Set the ET₀ entity to:
-- **Preferred:** `sensor.ws_et0_pm_daily`
+- **Preferred:** `sensor.ws_et0_penman_monteith`
 - **Fallback:** `sensor.ws_et0_daily`
 
 Set the unit to `mm` (millimetres per day).
@@ -48,7 +48,7 @@ Set the unit to `mm` (millimetres per day).
 ## Step 3: Map the rainfall entity
 
 Smart Irrigation also needs daily rainfall. Map:
-- `sensor.ws_rain_today` for today's accumulated rainfall
+- `sensor.ws_rain_today_mm` for today's accumulated rainfall
 
 This sensor resets at local midnight and accumulates rain from your physical gauge.
 The unit is `mm`.
@@ -58,8 +58,8 @@ The unit is `mm`.
 ## Step 4: Verify the values
 
 After one full day of operation, check that:
-1. `sensor.ws_et0_pm_daily` (or `ws_et0_daily`) shows a non-zero value
-2. `sensor.ws_rain_today` shows today's rainfall correctly
+1. `sensor.ws_et0_penman_monteith` (or `ws_et0_daily`) shows a non-zero value
+2. `sensor.ws_rain_today_mm` shows today's rainfall correctly
 3. Smart Irrigation shows a sensible irrigation time calculation for your zone
 
 Typical Penman-Monteith ET₀ values:

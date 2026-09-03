@@ -46,7 +46,7 @@ Features → Lightning Detection.
 
 ## Lightning proximity threshold
 
-`number.ws_lightning_proximity_threshold` (on the device page) sets the distance in
+`number.ws_lightning_proximity` (on the device page) sets the distance in
 kilometres that separates "near" from "clear" for `sensor.ws_lightning_proximity`.
 Default is 8 km.
 

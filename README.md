@@ -112,7 +112,7 @@ Behind the scenes, `ws_core` implements rigorous meteorological and scientific a
 * **Network Uploads:** Syncs to 8 networks simultaneously (WUnderground, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM, Windy).
 * **Adaptive Rain Probability:** Learns over a rolling 90-day window whether the local heuristics or the NWP forecasts have been more accurate.
 * **Adaptive Sensor Calibration (opt-in):** Learns a slow bias estimate against the same regional reference point used for QC, and nudges the calibration offsets by a small, bounded amount once confident - so a consistently-off sensor self-corrects without you tracking down a reference station.
-* **Historical Climate Normals (opt-in):** One Open-Meteo archive request builds a ~10-year, day-of-year table of typical highs/lows/rainfall for your location, so `sensor.ws_temperature_anomaly_normal` can tell you today is warmer or colder than *this date normally is here* - not just warmer than your station's own recent average.
+* **Historical Climate Normals (opt-in):** One Open-Meteo archive request builds a ~10-year, day-of-year table of typical highs/lows/rainfall for your location, so `sensor.ws_temp_anomaly_normal` can tell you today is warmer or colder than *this date normally is here* - not just warmer than your station's own recent average.
 * **Snow (opt-in):** No station-agnostic snow gauge exists, so this estimates precipitation phase (rain/sleet/snow) from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio - heuristic, not a measurement, but a genuine gap most PWS integrations leave entirely unaddressed.
 * **Localized UI & Sensors:** The setup wizard (including the hemisphere and climate-region pickers) and the human-readable sensors (conditions summary, alert message, frost risk) follow your Home Assistant language, with English, French, German, Spanish, Italian, Dutch, Polish, and Portuguese built in.
 
@@ -174,7 +174,7 @@ to a bug report.
 * **Which fire-danger number should I trust?**
   Use the one calibrated for your region: **FFDI** (`sensor.ws_ffdi`) in Australia and New Zealand, **FWI** (`sensor.ws_fwi`, Canadian system) elsewhere, and **FFWI** (`sensor.ws_ffwi`) as a US/global cross-check. `sensor.ws_fire_risk_score` is a simplified 1-10 display value. None of these is an official warning - always defer to your local fire authority.
 * **Which ET0 should I use for irrigation?**
-  If you have mapped a solar-radiation sensor, prefer `sensor.ws_et0_pm_daily` (FAO-56 Penman-Monteith, the reference method). Without solar radiation, use `sensor.ws_et0_daily` (Hargreaves-Samani, ±15-20%).
+  If you have mapped a solar-radiation sensor, prefer `sensor.ws_et0_penman_monteith` (FAO-56 Penman-Monteith, the reference method). Without solar radiation, use `sensor.ws_et0_daily` (Hargreaves-Samani, ±15-20%).
 * **How do I uninstall?**
   Go to **Settings → Devices & Services → Weather Station Core → ⋮ → Delete**. This removes the integration, its device, and all derived entities and their history. To remove the code as well, delete the repository from **HACS → Integrations**. Any dashboards or blueprints you imported are independent and can be removed separately.
 

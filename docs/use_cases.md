@@ -52,9 +52,9 @@ For Smart Irrigation, map one of these sensors:
 
 | Need | Entity |
 |---|---|
-| Best ET0 when solar radiation is mapped | `sensor.ws_et0_pm_daily` |
+| Best ET0 when solar radiation is mapped | `sensor.ws_et0_penman_monteith` |
 | ET0 without solar radiation | `sensor.ws_et0_daily` |
-| Today's measured rainfall | `sensor.ws_rain_today` |
+| Today's measured rainfall | `sensor.ws_rain_today_mm` |
 | Soil-aware demand score | `sensor.ws_irrigation_need_score` |
 
 ---
@@ -90,7 +90,7 @@ For a more weather-aware dashboard tile, watch:
 |---|---|
 | `sensor.ws_frost_risk` | Human-readable frost risk category |
 | `sensor.ws_frost_point` | Temperature where frost can form |
-| `sensor.ws_frost_streak` | Consecutive frost days |
+| `sensor.ws_frost_streak_days` | Consecutive frost days |
 
 ---
 
