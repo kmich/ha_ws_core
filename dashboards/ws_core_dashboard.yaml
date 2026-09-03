@@ -314,6 +314,7 @@ views:
           - sensor.ws_snow_today
           - sensor.ws_snow_this_month
           - sensor.ws_snow_this_year
+          - sensor.ws_snow_record_day
 
       - type: entities
         title: Temperature Records
