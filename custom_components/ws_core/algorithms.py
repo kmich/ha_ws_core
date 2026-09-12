@@ -607,6 +607,7 @@ def zambretti_forecast(
         "scandinavia": {"good": ["E", "N"], "bad": ["S", "W"]},
         "north_america_east": {"good": ["N", "W"], "bad": ["S", "E"]},
         "north_america_west": {"good": ["E", "N"], "bad": ["W", "S"]},
+        "south_america_east": {"good": ["S", "W"], "bad": ["N", "E"]},
         "australia": {"good": ["S", "E"], "bad": ["N", "W"]},
         "custom": {"good": ["N", "E"], "bad": ["S", "W"]},
     }
@@ -658,6 +659,7 @@ _RAIN_PRESSURE_PROFILES = {
     "scandinavia": {"low": 1000, "med": 1010, "high": 1018},
     "north_america_east": {"low": 1005, "med": 1013, "high": 1020},
     "north_america_west": {"low": 1008, "med": 1015, "high": 1022},
+    "south_america_east": {"low": 1005, "med": 1013, "high": 1020},
     "australia": {"low": 1005, "med": 1013, "high": 1020},
     "custom": {"low": 1005, "med": 1013, "high": 1020},
 }
@@ -669,6 +671,7 @@ _RAIN_WIND_BIAS = {
     "scandinavia": {"wet": ["S", "W"], "dry": ["N", "E"]},
     "north_america_east": {"wet": ["S", "E"], "dry": ["N", "W"]},
     "north_america_west": {"wet": ["W", "S"], "dry": ["E", "N"]},
+    "south_america_east": {"wet": ["N", "E"], "dry": ["S", "W"]},
     "australia": {"wet": ["N", "W"], "dry": ["S", "E"]},
     "custom": {"wet": ["S", "W"], "dry": ["N", "E"]},
 }

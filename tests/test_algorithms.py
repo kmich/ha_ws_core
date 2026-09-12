@@ -575,6 +575,71 @@ class TestZambrettiReferenceValues:
         assert isinstance(z, int)
 
 
+class TestSouthAmericaEastClimateRegion:
+    """Rio de la Plata wind patterns (Argentina, Uruguay, southern Brazil)."""
+
+    def test_sudestada_is_wet_unlike_australia(self):
+        """An E wind is the sudestada here: wet, where `australia` treats E as dry."""
+        kwargs = {
+            "mslp": 1005.0,
+            "pressure_trend": -1.5,
+            "humidity": 85.0,
+            "wind_quadrant": "E",
+        }
+        sae = calculate_rain_probability(**kwargs, climate_region="south_america_east")
+        aus = calculate_rain_probability(**kwargs, climate_region="australia")
+        assert sae > aus, f"Sudestada should read wetter than under australia ({sae}% vs {aus}%)"
+
+    def test_pampero_is_dry(self):
+        """A SW/S outbreak (pampero) is cold and dry: low rain probability."""
+        prob = calculate_rain_probability(
+            mslp=1022.0,
+            pressure_trend=1.5,
+            humidity=45.0,
+            wind_quadrant="S",
+            climate_region="south_america_east",
+        )
+        assert prob <= 20, f"Expected low probability for pampero, got {prob}%"
+
+    def test_north_wind_is_wet(self):
+        """N brings warm humid subtropical air ahead of storms."""
+        prob = calculate_rain_probability(
+            mslp=1002.0,
+            pressure_trend=-2.5,
+            humidity=88.0,
+            wind_quadrant="N",
+            climate_region="south_america_east",
+        )
+        assert prob >= 50, f"Expected high probability for a humid N wind, got {prob}%"
+
+    def test_west_wind_is_drier_than_under_australia(self):
+        """W is continental and dry here, where `australia` treats W as wet."""
+        kwargs = {
+            "mslp": 1010.0,
+            "pressure_trend": 0.0,
+            "humidity": 60.0,
+            "wind_quadrant": "W",
+        }
+        sae = calculate_rain_probability(**kwargs, climate_region="south_america_east")
+        aus = calculate_rain_probability(**kwargs, climate_region="australia")
+        assert sae < aus, f"W should read drier than under australia ({sae}% vs {aus}%)"
+
+    def test_zambretti_sudestada_is_worse_than_pampero(self):
+        """Same pressure and humidity: an E wind must forecast worse than a S wind."""
+        common = {
+            "mslp": 1008.0,
+            "pressure_trend_3h": -1.0,
+            "humidity": 80.0,
+            "month": 6,
+            "hemisphere": "southern",
+            "climate": "south_america_east",
+            "wind_speed_ms": 6.0,
+        }
+        _, z_east = zambretti_forecast(wind_quadrant="E", **common)
+        _, z_south = zambretti_forecast(wind_quadrant="S", **common)
+        assert z_east > z_south, f"Sudestada Z={z_east} should exceed pampero Z={z_south}"
+
+
 class TestCanadianFWIReferenceValues:
     """Canadian Forest Fire Weather Index system — Van Wagner 1987."""
 
