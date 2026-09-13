@@ -494,8 +494,11 @@ def _guess_climate_region(hass: HomeAssistant) -> str:
     except (TypeError, ValueError):
         return DEFAULT_CLIMATE_REGION
 
-    # Southern hemisphere → Australia (only option currently)
+    # Southern hemisphere
     if lat < 0:
+        # South America east coast (Argentina, Uruguay, southern Brazil)
+        if -75 <= lon <= -34:
+            return "south_america_east"
         return "australia"
     # Scandinavia
     if lat > 55 and 5 <= lon <= 32:

@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **South America (East) climate region (issue #147):** the southern hemisphere previously only offered `australia`, whose wind patterns are half inverted for the east coast of South America. `australia` maps wet to `N`/`W` and dry to `S`/`E`; in the Río de la Plata region north winds are indeed wet (warm humid subtropical air ahead of storms) and southerlies are indeed dry (the *pampero*, a cold dry outbreak that clears the sky), but west winds are continental and dry here, and east/southeast is the *sudestada* — a persistent onshore rain event and the region's signature bad-weather pattern. Under `australia` the Zambretti forecast and the local rain probability both trended toward "improving" exactly when a *sudestada* was setting in. The new `south_america_east` region maps wet to `N`/`E` and dry to `S`/`W`, keeps the generic pressure thresholds (Buenos Aires mean SLP is ~1013 hPa), and is auto-detected for southern-hemisphere longitudes between -75 and -34. Existing installs are unaffected; the region has to be selected in the options flow.
+
 ## [2.7.2] - 2026-09-03
 
 ### Fixed

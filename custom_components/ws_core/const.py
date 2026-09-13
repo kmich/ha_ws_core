@@ -121,6 +121,7 @@ CLIMATE_REGION_OPTIONS = [
     "scandinavia",
     "north_america_east",
     "north_america_west",
+    "south_america_east",
     "australia",
     "custom",
 ]
