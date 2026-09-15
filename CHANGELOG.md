@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.7.4] - 2026-09-15
+
+### Fixed
+
+- **Options flow: source-sensor fields silently reverted on a validation error (issue #149):** the required/optional source-mapping steps - both the initial setup wizard and the post-install Options flow - rebuilt their pre-fill values from the stored config entry on every render, including the re-render after a validation error. So if any field on the page failed validation, every other field silently reverted to its old guessed/stored value, and a field the user had just cleared with the picker's X button reappeared pre-filled with its old value on the very next render. Matches the "Dew Point keeps reappearing and I can't save anything else" behavior reported by @Coolsero. The just-submitted values are now preserved across the re-render. Also added debug logging on the `entity_not_found` validation path to help pin down the remaining, unreproduced part of #149.
+
 ## [2.7.3] - 2026-09-13
 
 ### Added
