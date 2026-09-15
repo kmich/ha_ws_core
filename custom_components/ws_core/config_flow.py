@@ -582,6 +582,11 @@ def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool 
     """
     st = hass.states.get(eid)
     if st is None:
+        # Debug-only: helps diagnose reports like issue #149, where a user
+        # sees "entity not found" for a sensor they can see is available -
+        # confirms exactly what entity_id the flow received and whether HA
+        # simply hadn't registered a state for it yet at that moment.
+        _LOGGER.debug("Source sensor validation: %r not in hass.states (entity_not_found)", eid)
         return "entity_not_found"
     if st.state in ("unknown", "unavailable"):
         return None if allow_unknown else "entity_not_found"
@@ -596,6 +601,28 @@ def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool 
 # an active event (currently: lightning distance/azimuth/count). These are
 # exempted from the strict numeric-state check above (issue #88).
 _ALLOW_UNKNOWN_SOURCE_KEYS = {SRC_LIGHTNING_DISTANCE, SRC_LIGHTNING_AZIMUTH, SRC_LIGHTNING_COUNT}
+
+
+def _merge_submitted_sources(defaults: dict[str, str], user_input: dict[str, Any], keys: list[str]) -> dict[str, str]:
+    """Overlay a rejected form submission onto the pre-fill defaults.
+
+    The required/optional source-mapping steps recompute ``defaults`` from
+    the guessed values or the stored config entry on every render. If *one*
+    field on the page fails validation, the whole form is re-shown - but
+    without this, every *other* field silently reverts to its old
+    guessed/stored value, discarding whatever the user just picked there,
+    and a field the user deliberately cleared reappears pre-filled with its
+    old value (issue #149).
+    """
+    merged = dict(defaults)
+    for k in keys:
+        if k not in user_input:
+            continue
+        if user_input[k]:
+            merged[k] = user_input[k]
+        else:
+            merged.pop(k, None)
+    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -708,6 +735,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 sources = {k: user_input[k] for k in REQUIRED_SOURCES}
                 self._data[CONF_SOURCES] = sources
                 return await self.async_step_optional_sources()
+            defaults = _merge_submitted_sources(defaults, user_input, REQUIRED_SOURCES)
 
         fields = {vol.Required(k, default=defaults.get(k)): _ENTITY_SELECTOR for k in REQUIRED_SOURCES}
         return self._show_step(
@@ -741,6 +769,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 self._data[CONF_SOURCES] = sources
                 return await self.async_step_location()
+            defaults = _merge_submitted_sources(defaults, user_input, OPTIONAL_SOURCES)
 
         # fmt: off
         # Use description={"suggested_value": ...} rather than default=... here.
@@ -2173,6 +2202,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             if not errors:
                 self._opt[CONF_SOURCES] = sources
                 return await self.async_step_optional_sources_opt()
+            defaults = _merge_submitted_sources(defaults, user_input, REQUIRED_SOURCES)
 
         fields = {vol.Required(k, default=defaults.get(k)): _ENTITY_SELECTOR for k in REQUIRED_SOURCES}
         return self.async_show_form(
@@ -2203,6 +2233,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
                     return await self.async_step_forecast_api_key_opt()
                 return await self.async_step_features_opt()
+            defaults = _merge_submitted_sources(defaults, user_input, OPTIONAL_SOURCES)
 
         # See async_step_optional_sources for why suggested_value is used
         # instead of default (issue #135: unclearable, unsaveable fields).

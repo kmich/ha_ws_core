@@ -83,3 +83,49 @@ class TestOptionalSourcesSchemaClearable:
         marker = _schema_marker(schema, guessed_key)
         assert marker.default is vol.UNDEFINED
         assert marker.description == {"suggested_value": "sensor.guessed_humidity"}
+
+
+class TestMergeSubmittedSources:
+    """Regression tests for issue #149.
+
+    When one field on the required/optional source-mapping step fails
+    validation, the whole form is re-shown. Without merging the just-submitted
+    values back into the pre-fill defaults, every *other* field silently
+    reverts to its old guessed/stored value, and a field the user just
+    cleared reappears pre-filled with its old value.
+    """
+
+    def test_valid_submitted_value_overrides_stale_default(self):
+        from custom_components.ws_core.config_flow import _merge_submitted_sources
+
+        defaults = {"humidity": "sensor.old_humidity", "dew_point": "sensor.old_dewpoint"}
+        # User corrected "dew_point" but a different field ("humidity") is
+        # what actually failed validation this submission.
+        user_input = {"humidity": "sensor.bad_humidity", "dew_point": "sensor.new_dewpoint"}
+
+        merged = _merge_submitted_sources(defaults, user_input, ["humidity", "dew_point"])
+
+        assert merged["dew_point"] == "sensor.new_dewpoint"
+        assert merged["humidity"] == "sensor.bad_humidity"
+
+    def test_cleared_field_does_not_revert_to_stale_default(self):
+        from custom_components.ws_core.config_flow import _merge_submitted_sources
+
+        defaults = {"humidity": "sensor.old_humidity", "dew_point": "sensor.old_dewpoint"}
+        # User cleared "dew_point" via the picker's X button (submitted as
+        # empty/None) while "humidity" failed validation.
+        user_input = {"humidity": "sensor.bad_humidity", "dew_point": None}
+
+        merged = _merge_submitted_sources(defaults, user_input, ["humidity", "dew_point"])
+
+        assert "dew_point" not in merged
+
+    def test_field_absent_from_submission_keeps_its_default(self):
+        from custom_components.ws_core.config_flow import _merge_submitted_sources
+
+        defaults = {"humidity": "sensor.old_humidity", "illuminance": "sensor.old_lux"}
+        user_input = {"humidity": "sensor.bad_humidity"}  # illuminance untouched/omitted
+
+        merged = _merge_submitted_sources(defaults, user_input, ["humidity", "illuminance"])
+
+        assert merged["illuminance"] == "sensor.old_lux"
