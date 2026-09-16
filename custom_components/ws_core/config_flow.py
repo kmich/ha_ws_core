@@ -598,6 +598,7 @@ def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool 
         # during integration startup, or for webhook/push-based stations like Ecowitt).
         try:
             from unittest.mock import MagicMock, Mock
+
             from homeassistant.helpers import entity_registry as er
 
             if (isinstance(getattr(hass, "data", None), dict) and er.DATA_REGISTRY in hass.data) or isinstance(

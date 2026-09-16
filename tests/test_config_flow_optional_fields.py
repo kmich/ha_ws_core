@@ -150,6 +150,7 @@ class TestValidateNumericSensor:
 
     def test_numeric_sensor_accepted(self):
         from unittest.mock import MagicMock
+
         from custom_components.ws_core.config_flow import _validate_numeric_sensor
 
         hass = MagicMock()
@@ -161,6 +162,7 @@ class TestValidateNumericSensor:
 
     def test_unavailable_or_unknown_sensor_accepted(self):
         from unittest.mock import MagicMock
+
         from custom_components.ws_core.config_flow import _validate_numeric_sensor
 
         hass = MagicMock()
@@ -172,6 +174,7 @@ class TestValidateNumericSensor:
 
     def test_entity_not_in_states_but_in_registry_accepted(self):
         from unittest.mock import MagicMock, patch
+
         from custom_components.ws_core.config_flow import _validate_numeric_sensor
 
         hass = MagicMock()
@@ -185,6 +188,7 @@ class TestValidateNumericSensor:
 
     def test_missing_sensor_rejected(self):
         from unittest.mock import MagicMock, patch
+
         from custom_components.ws_core.config_flow import _validate_numeric_sensor
 
         hass = MagicMock()
@@ -198,6 +202,7 @@ class TestValidateNumericSensor:
 
     def test_non_numeric_sensor_rejected(self):
         from unittest.mock import MagicMock
+
         from custom_components.ws_core.config_flow import _validate_numeric_sensor
 
         hass = MagicMock()
@@ -209,6 +214,7 @@ class TestValidateNumericSensor:
 
     def test_whitespace_padded_entity_id_handled(self):
         from unittest.mock import MagicMock
+
         from custom_components.ws_core.config_flow import _validate_numeric_sensor
 
         hass = MagicMock()
