@@ -2,6 +2,16 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.7.5] - 2026-09-16
+
+### Fixed
+
+- **Options flow: source sensor validation and field clearing persistence (issue #149):**
+  - **Entity Registry fallback:** `_validate_numeric_sensor` now falls back to checking Home Assistant's Entity Registry if an entity has no state in `hass.states` yet. This resolves false "Entity not found in Home Assistant" errors for registered sensors (e.g. Ecowitt GW3000A) during startup or between push update intervals.
+  - **Tolerate unavailable/unknown states:** Source sensors currently sitting at `unavailable` or `unknown` (common after Home Assistant restarts or during sensor sleep) are now accepted rather than rejected as missing. Genuine validation failures are logged at `WARNING` level so they appear in default Home Assistant logs without custom logger YAML configuration.
+  - **Cleared fields stay cleared:** Fixed `_merge_submitted_sources` so that fields cleared via the entity picker's X button (which Home Assistant frontend omits from the submission payload) are properly removed from pre-fill defaults rather than reverting on re-render.
+  - **Auto-detection self-exclusion:** `_guess_defaults` now excludes Weather Station Core's own derived sensors (`sensor.ws_*`) so they are never suggested as source inputs.
+
 ## [2.7.4] - 2026-09-15
 
 ### Fixed

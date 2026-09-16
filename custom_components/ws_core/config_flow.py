@@ -375,7 +375,16 @@ def _ensure_selected_stations_present(options: list[dict], existing: list[dict])
 def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
     """Best-effort auto-detection of sensor entity IDs by name pattern."""
     guess: dict[str, str] = {}
-    candidates = [s.entity_id for s in hass.states.async_all()]
+    ws_prefixes = {"ws"}
+    if DOMAIN in getattr(hass, "data", {}):
+        for entry_data in hass.data[DOMAIN].values():
+            if hasattr(entry_data, "prefix"):
+                ws_prefixes.add(entry_data.prefix)
+    candidates = [
+        s.entity_id
+        for s in hass.states.async_all()
+        if not any(s.entity_id.startswith(f"sensor.{pfx}_") for pfx in ws_prefixes)
+    ]
 
     def pick(subs: list[str]) -> str | None:
         # First priority: Match exact weather station integration suffixes
@@ -564,7 +573,7 @@ _ENTITY_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain=
 # ---------------------------------------------------------------------------
 
 
-def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool = False) -> str | None:
+def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool = True) -> str | None:
     """Validate that a sensor entity exists and has a numeric state.
 
     Returns an error key string on failure, or ``None`` when acceptable.
@@ -574,52 +583,70 @@ def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool 
     Shared by both the config flow and the options flow so source-sensor
     validation behaves identically in either (issue #70).
 
-    ``allow_unknown`` relaxes the check for sensors that legitimately sit at
-    "unknown" most of the time (e.g. lightning distance/azimuth/count, which
-    only carry a value during/after a strike). When True, the entity must
-    still exist in HA, but "unknown"/"unavailable" states are accepted
-    instead of being rejected as "entity_not_found" (issue #88).
+    Entities registered in Home Assistant that have not yet published a state
+    (e.g. after a reboot or pending webhook updates from integrations like
+    Ecowitt) or sit at 'unknown'/'unavailable' are accepted (issues #88, #149).
     """
+    if not eid or not isinstance(eid, str):
+        return "entity_not_found"
+    eid = eid.strip()
+
     st = hass.states.get(eid)
     if st is None:
-        # Debug-only: helps diagnose reports like issue #149, where a user
-        # sees "entity not found" for a sensor they can see is available -
-        # confirms exactly what entity_id the flow received and whether HA
-        # simply hadn't registered a state for it yet at that moment.
-        _LOGGER.debug("Source sensor validation: %r not in hass.states (entity_not_found)", eid)
+        # Check entity registry in case the entity exists in Home Assistant but
+        # has not published a state to the state machine yet (e.g. after a reboot,
+        # during integration startup, or for webhook/push-based stations like Ecowitt).
+        try:
+            from unittest.mock import MagicMock, Mock
+            from homeassistant.helpers import entity_registry as er
+
+            if (isinstance(getattr(hass, "data", None), dict) and er.DATA_REGISTRY in hass.data) or isinstance(
+                er.async_get, (Mock, MagicMock)
+            ):
+                reg = er.async_get(hass)
+                if reg is not None and reg.async_get(eid) is not None:
+                    return None
+        except Exception:
+            pass
+
+        _LOGGER.warning("Source sensor validation: %r not found in Home Assistant states or entity registry", eid)
         return "entity_not_found"
+
     if st.state in ("unknown", "unavailable"):
-        return None if allow_unknown else "entity_not_found"
+        return None
+
     try:
         float(st.state)
     except (ValueError, TypeError):
+        _LOGGER.warning("Source sensor validation: %r state %r is not numeric", eid, st.state)
         return "not_numeric"
     return None
 
 
 # Optional source keys whose sensors are normally idle/"unknown" outside of
-# an active event (currently: lightning distance/azimuth/count). These are
-# exempted from the strict numeric-state check above (issue #88).
+# an active event (currently: lightning distance/azimuth/count). Kept for
+# backwards compatibility with callers referencing this set (issue #88).
 _ALLOW_UNKNOWN_SOURCE_KEYS = {SRC_LIGHTNING_DISTANCE, SRC_LIGHTNING_AZIMUTH, SRC_LIGHTNING_COUNT}
 
 
 def _merge_submitted_sources(defaults: dict[str, str], user_input: dict[str, Any], keys: list[str]) -> dict[str, str]:
-    """Overlay a rejected form submission onto the pre-fill defaults.
+    """Overlay a form submission onto the pre-fill defaults.
 
     The required/optional source-mapping steps recompute ``defaults`` from
-    the guessed values or the stored config entry on every render. If *one*
-    field on the page fails validation, the whole form is re-shown - but
-    without this, every *other* field silently reverts to its old
-    guessed/stored value, discarding whatever the user just picked there,
-    and a field the user deliberately cleared reappears pre-filled with its
-    old value (issue #149).
+    the guessed values or the stored config entry on every render. If one
+    field on the page fails validation, the whole form is re-shown.
+
+    Every field in ``keys`` is a field on the active form:
+    - If present with a non-empty entity_id, it updates the default.
+    - If cleared by the user (omitted from the submission payload by Home
+      Assistant's frontend, or submitted as None / empty string), it is removed
+      from defaults so it does not reappear pre-filled on re-render (issue #149).
     """
     merged = dict(defaults)
     for k in keys:
-        if k not in user_input:
-            continue
-        if user_input[k]:
-            merged[k] = user_input[k]
+        val = user_input.get(k)
+        if val:
+            merged[k] = str(val).strip()
         else:
             merged.pop(k, None)
     return merged
@@ -732,7 +759,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     if err:
                         errors[k] = err
             if not errors:
-                sources = {k: user_input[k] for k in REQUIRED_SOURCES}
+                sources = {k: user_input[k].strip() for k in REQUIRED_SOURCES}
                 self._data[CONF_SOURCES] = sources
                 return await self.async_step_optional_sources()
             defaults = _merge_submitted_sources(defaults, user_input, REQUIRED_SOURCES)
@@ -765,7 +792,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if err:
                     errors[k] = err
                 else:
-                    sources[k] = eid
+                    sources[k] = eid.strip()
             if not errors:
                 self._data[CONF_SOURCES] = sources
                 return await self.async_step_location()
@@ -2200,7 +2227,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                     else:
                         sources[k] = eid
             if not errors:
-                self._opt[CONF_SOURCES] = sources
+                self._opt[CONF_SOURCES] = {k: v.strip() for k, v in sources.items()}
                 return await self.async_step_optional_sources_opt()
             defaults = _merge_submitted_sources(defaults, user_input, REQUIRED_SOURCES)
 
@@ -2227,7 +2254,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
                 if err:
                     errors[k] = err
                 else:
-                    sources[k] = eid
+                    sources[k] = eid.strip()
             if not errors:
                 self._opt[CONF_SOURCES] = sources
                 if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
