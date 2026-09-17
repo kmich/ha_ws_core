@@ -383,7 +383,8 @@ def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
     candidates = [
         s.entity_id
         for s in hass.states.async_all()
-        if not any(s.entity_id.startswith(f"sensor.{pfx}_") for pfx in ws_prefixes)
+        if s.entity_id.startswith("sensor.")
+        and not any(s.entity_id.startswith(f"sensor.{pfx}_") for pfx in ws_prefixes)
     ]
 
     def pick(subs: list[str]) -> str | None:
@@ -2206,10 +2207,26 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     def _current_sources_for_options(self) -> dict[str, str]:
-        defaults = _guess_defaults(self.hass)
-        current = dict(self.config_entry.data.get(CONF_SOURCES, {}))
-        current.update(self.config_entry.options.get(CONF_SOURCES, {}) or {})
-        return {**defaults, **{k: v for k, v in current.items() if v}}
+        if CONF_SOURCES in self.config_entry.options:
+            current = dict(self.config_entry.options[CONF_SOURCES] or {})
+        else:
+            current = dict(self.config_entry.data.get(CONF_SOURCES, {}))
+
+        guessed = _guess_defaults(self.hass)
+        defaults: dict[str, str] = {}
+        for k in REQUIRED_SOURCES:
+            val = current.get(k) or guessed.get(k)
+            if val:
+                defaults[k] = val
+
+        # For optional sources, only use what is currently configured.
+        # Do not auto-guess unconfigured or cleared optional sources in the Options flow (issue #149).
+        for k in OPTIONAL_SOURCES:
+            val = current.get(k)
+            if val:
+                defaults[k] = val
+
+        return defaults
 
     async def async_step_required_sources_opt(self, user_input: dict[str, Any] | None = None):
         defaults = self._current_sources_for_options()

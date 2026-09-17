@@ -72,9 +72,7 @@ class TestOptionalSourcesSchemaClearable:
         # async_step_optional_sources / async_step_optional_sources_opt.
         fields = {
             (
-                vol.Optional(k, description={"suggested_value": defaults[k]})
-                if k in defaults
-                else vol.Optional(k)
+                vol.Optional(k, description={"suggested_value": defaults[k]}) if k in defaults else vol.Optional(k)
             ): object()
             for k in OPTIONAL_SOURCES
         }
@@ -223,3 +221,181 @@ class TestValidateNumericSensor:
         hass.states.get.side_effect = lambda eid: state if eid == "sensor.temp" else None
 
         assert _validate_numeric_sensor(hass, "  sensor.temp  ") is None
+
+
+class TestGuessDefaults:
+    """Tests for _guess_defaults auto-detection (issues #135, #149)."""
+
+    def test_ignores_non_sensor_domains(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import _guess_defaults
+
+        hass = MagicMock()
+        hass.data = {}
+        s_binary = MagicMock()
+        s_binary.entity_id = "binary_sensor.gw3000a_wh65_battery"
+        s_switch = MagicMock()
+        s_switch.entity_id = "switch.station_power"
+        s_temp = MagicMock()
+        s_temp.entity_id = "sensor.gw3000a_outdoor_temperature"
+
+        hass.states.async_all.return_value = [s_binary, s_switch, s_temp]
+
+        guessed = _guess_defaults(hass)
+        assert "battery" not in guessed
+        assert guessed.get("temperature") == "sensor.gw3000a_outdoor_temperature"
+
+    def test_excludes_ws_core_derived_sensors(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import _guess_defaults
+
+        hass = MagicMock()
+        hass.data = {}
+        s_ws = MagicMock()
+        s_ws.entity_id = "sensor.ws_dew_point"
+        hass.states.async_all.return_value = [s_ws]
+
+        guessed = _guess_defaults(hass)
+        assert "dew_point" not in guessed
+
+    def test_matches_valid_sensor_battery(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import _guess_defaults
+
+        hass = MagicMock()
+        hass.data = {}
+        s_bat = MagicMock()
+        s_bat.entity_id = "sensor.gw3000a_station_battery"
+        hass.states.async_all.return_value = [s_bat]
+
+        guessed = _guess_defaults(hass)
+        assert guessed.get("battery") == "sensor.gw3000a_station_battery"
+
+
+class TestCurrentSourcesForOptions:
+    """Tests for _current_sources_for_options in options flow (issues #135, #149)."""
+
+    def test_cleared_optional_source_not_resurrected_from_data(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import WSStationOptionsFlowHandler
+        from custom_components.ws_core.const import CONF_SOURCES
+
+        entry = MagicMock()
+        entry.data = {
+            CONF_SOURCES: {
+                "temperature": "sensor.t",
+                "battery": "sensor.old_bat",
+            }
+        }
+        # User saved options without battery (cleared)
+        entry.options = {
+            CONF_SOURCES: {
+                "temperature": "sensor.t",
+            }
+        }
+
+        hass = MagicMock()
+        hass.data = {}
+        hass.states.async_all.return_value = []
+
+        flow = type(
+            "_TestFlow",
+            (WSStationOptionsFlowHandler,),
+            {"config_entry": property(lambda self: entry)},
+        )()
+        flow.hass = hass
+
+        defaults = flow._current_sources_for_options()
+        assert "battery" not in defaults
+        assert defaults["temperature"] == "sensor.t"
+
+    def test_unconfigured_optional_source_not_auto_guessed(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import WSStationOptionsFlowHandler
+        from custom_components.ws_core.const import CONF_SOURCES
+
+        entry = MagicMock()
+        entry.data = {CONF_SOURCES: {"temperature": "sensor.t"}}
+        entry.options = {}
+
+        # HA has an available battery sensor that matches patterns
+        s_bat = MagicMock()
+        s_bat.entity_id = "sensor.gw3000a_station_battery"
+
+        hass = MagicMock()
+        hass.data = {}
+        hass.states.async_all.return_value = [s_bat]
+
+        flow = type(
+            "_TestFlow",
+            (WSStationOptionsFlowHandler,),
+            {"config_entry": property(lambda self: entry)},
+        )()
+        flow.hass = hass
+
+        defaults = flow._current_sources_for_options()
+        # In Options flow, unconfigured optional sources must NOT be guessed
+        assert "battery" not in defaults
+        assert defaults["temperature"] == "sensor.t"
+
+    def test_configured_optional_source_preserved(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import WSStationOptionsFlowHandler
+        from custom_components.ws_core.const import CONF_SOURCES
+
+        entry = MagicMock()
+        entry.data = {
+            CONF_SOURCES: {
+                "temperature": "sensor.t",
+                "dew_point": "sensor.dp",
+            }
+        }
+        entry.options = {}
+
+        hass = MagicMock()
+        hass.data = {}
+        hass.states.async_all.return_value = []
+
+        flow = type(
+            "_TestFlow",
+            (WSStationOptionsFlowHandler,),
+            {"config_entry": property(lambda self: entry)},
+        )()
+        flow.hass = hass
+
+        defaults = flow._current_sources_for_options()
+        assert defaults["dew_point"] == "sensor.dp"
+
+    def test_missing_required_source_falls_back_to_guess(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import WSStationOptionsFlowHandler
+        from custom_components.ws_core.const import CONF_SOURCES
+
+        entry = MagicMock()
+        entry.data = {CONF_SOURCES: {"temperature": "sensor.t"}}
+        entry.options = {}
+
+        s_hum = MagicMock()
+        s_hum.entity_id = "sensor.gw3000a_outdoor_humidity"
+
+        hass = MagicMock()
+        hass.data = {}
+        hass.states.async_all.return_value = [s_hum]
+
+        flow = type(
+            "_TestFlow",
+            (WSStationOptionsFlowHandler,),
+            {"config_entry": property(lambda self: entry)},
+        )()
+        flow.hass = hass
+
+        defaults = flow._current_sources_for_options()
+        # Required sources (humidity) fall back to guess if missing
+        assert defaults["humidity"] == "sensor.gw3000a_outdoor_humidity"

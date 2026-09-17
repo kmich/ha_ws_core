@@ -2,6 +2,14 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.7.6] - 2026-09-17
+
+### Fixed
+
+- **Options flow: restrict auto-detection to sensor domain and keep cleared optional sources clear (issue #149):**
+  - **Restrict auto-detection to sensor domain:** `_guess_defaults` now filters candidate entities strictly to the `sensor.` domain (`s.entity_id.startswith("sensor.")`), excluding entities from other domains such as `binary_sensor.*_battery` (e.g. Ecowitt WH65 battery status) or switches. This eliminates the `"Entity binary_sensor... belongs to domain binary_sensor, expected 'sensor'"` schema validation error.
+  - **Preserve cleared optional sources on reopening Options:** `_current_sources_for_options` now reads configuration directly from `config_entry.options` (preventing keys deleted in options from being revived from `config_entry.data`). Furthermore, optional sources are no longer auto-guessed in the Options flow, ensuring optional fields deliberately cleared or not configured remain empty when reopening the options dialog.
+
 ## [2.7.5] - 2026-09-16
 
 ### Fixed
