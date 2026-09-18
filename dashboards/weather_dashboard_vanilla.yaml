@@ -264,7 +264,7 @@ views:
       # - type: custom:windrose-card
       #   title: Wind Rose (24h)
       #   data_period:
-      #     hours_to_show: 24
+      #     period_back: -24h
       #   wind_direction_entity:
       #     entity: sensor.ws_wind_direction
       #   windspeed_entities:
