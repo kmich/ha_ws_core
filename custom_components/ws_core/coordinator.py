@@ -4522,9 +4522,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rh = data.get(KEY_NORM_HUMIDITY)
             ws = data.get(KEY_NORM_WIND_SPEED_MS)
             solar_daily_mean_wm2 = (
-                self._solar_energy_previous_whm2 / 24.0
-                if self._solar_energy_previous_whm2 > 0.0
-                else None
+                self._solar_energy_previous_whm2 / 24.0 if self._solar_energy_previous_whm2 > 0.0 else None
             )
             if tc is not None and rh is not None and ws is not None and solar_daily_mean_wm2 is not None:
                 high = data.get(KEY_TEMP_HIGH_24H) or tc
