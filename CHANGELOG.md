@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- **Penman-Monteith ET₀ used instantaneous solar radiation as a 24-hour daily mean (issue #152):** the mapped solar sensor reports instantaneous W/m², but FAO-56 converts its radiation input as a daily mean. At solar noon this could inflate `sensor.ws_et0_penman_monteith` several-fold and make it follow the daytime solar curve. The coordinator now snapshots the completed day's accumulated solar irradiation, persists it across restarts, divides that Wh/m² total by 24 hours, and uses the resulting true daily-mean W/m² on the following day. Until one complete day of measured solar energy is available, the Penman-Monteith sensor remains unavailable rather than publishing a knowingly invalid estimate.
+
 ## [2.7.6] - 2026-09-17
 
 ### Fixed
