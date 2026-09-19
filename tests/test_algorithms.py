@@ -225,12 +225,13 @@ class TestET0:
             temp_min_c=22.0,
             humidity=55.0,
             wind_speed_ms=3.0,
-            solar_radiation_wm2=600.0,
+            # FAO-56 expects a 24-hour mean, not an instantaneous noon value.
+            solar_radiation_wm2=200.0,
             elevation_m=50.0,
             day_of_year=180,
             latitude_deg=37.0,
         )
-        assert 4.0 < et0 < 12.0
+        assert 3.0 < et0 < 9.0
 
     def test_penman_monteith_latitude_sensitivity(self):
         """ET0 must depend on the supplied latitude (the net-longwave term uses Ra).

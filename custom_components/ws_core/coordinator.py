@@ -1004,9 +1004,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._wind_run_date: str = ""
         self._wind_run_last_ts: Any = None
 
-        # v2.0 Solar energy accumulation (Wh/m²) - resets at midnight
+        # v2.0 Solar energy accumulation (Wh/m²) - resets at midnight.
+        # Keep the last completed day's irradiation separately so daily
+        # Penman-Monteith never treats an instantaneous W/m² reading as a
+        # 24-hour mean (issue #152).
         self._solar_energy_today_whm2: float = 0.0
         self._solar_energy_date: str = ""
+        self._solar_energy_previous_whm2: float = 0.0
+        self._solar_energy_previous_date: str = ""
         self._solar_energy_last_ts: Any = None
 
         # v2.0 Wind direction history for dominant direction + variability (24h)
@@ -2505,6 +2510,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             now_local = dt_util.now()
             solar_date = now_local.strftime("%Y-%m-%d")
             if solar_date != self._solar_energy_date:
+                # Snapshot only a genuinely completed previous calendar day.
+                # If HA was down for longer, do not mislabel stale partial
+                # irradiation as "yesterday".
+                yesterday = (now_local - timedelta(days=1)).strftime("%Y-%m-%d")
+                if self._solar_energy_date == yesterday:
+                    self._solar_energy_previous_whm2 = self._solar_energy_today_whm2
+                    self._solar_energy_previous_date = self._solar_energy_date
+                elif self._solar_energy_previous_date != yesterday:
+                    self._solar_energy_previous_whm2 = 0.0
+                    self._solar_energy_previous_date = ""
                 self._solar_energy_today_whm2 = 0.0
                 self._solar_energy_date = solar_date
                 self._solar_energy_last_ts = None
@@ -3920,6 +3935,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # v2.0 solar energy accumulation (Wh/m², resets at midnight)
             "solar_energy_today_whm2": self._solar_energy_today_whm2,
             "solar_energy_date": self._solar_energy_date,
+            # Last completed day, used as the FAO-56 daily mean radiation input.
+            "solar_energy_previous_whm2": self._solar_energy_previous_whm2,
+            "solar_energy_previous_date": self._solar_energy_previous_date,
             # v2.7 - snow accumulation (opt-in)
             "snow_today_cm": self._snow_today_cm,
             "snow_today_date": self._snow_today_date,
@@ -4095,10 +4113,21 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._gdd_season = float(data.get("gdd_season") or 0.0)
         self._gdd_season_key = data.get("gdd_season_key") or ""
 
-        # v2.0 solar energy: continue only if still the same calendar day.
+        # v2.0 solar energy: continue today's accumulator when possible and
+        # preserve the most recent completed day for Penman-Monteith (issue #152).
+        yesterday = (dt_util.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         if data.get("solar_energy_date") == today:
             self._solar_energy_today_whm2 = float(data.get("solar_energy_today_whm2") or 0.0)
             self._solar_energy_date = today
+
+        if data.get("solar_energy_previous_date") == yesterday:
+            self._solar_energy_previous_whm2 = float(data.get("solar_energy_previous_whm2") or 0.0)
+            self._solar_energy_previous_date = yesterday
+        elif data.get("solar_energy_date") == yesterday:
+            # A restart after midnight may encounter a store written before the
+            # old day rolled over in memory. Promote that completed accumulation.
+            self._solar_energy_previous_whm2 = float(data.get("solar_energy_today_whm2") or 0.0)
+            self._solar_energy_previous_date = yesterday
 
         # v2.7 - snow accumulation: restore only within the same period,
         # mirroring the rain day/month/year restore above.
@@ -4483,15 +4512,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_FORECAST_TOMORROW_KWH] = sol.get("tomorrow_kwh")
             data[KEY_SOLAR_FORECAST_STATUS] = sol.get("status", "OK")
 
-        # Penman-Monteith ET₀ - uses solar radiation sensor if configured
-        # v0.3.0: ungated from removed degree_days_enabled flag; runs whenever
-        # forecast_lat is configured and the required inputs are available.
+        # Penman-Monteith ET₀ requires *daily mean* shortwave radiation.
+        # The mapped solar sensor is instantaneous W/m², so feeding it directly
+        # into FAO-56 makes ET₀ track the solar curve and can overestimate by
+        # several times at noon. Use the last completed day's measured
+        # irradiation (Wh/m²) / 24 h instead (issue #152).
         if self.forecast_lat is not None:
             tc = data.get(KEY_NORM_TEMP_C)
             rh = data.get(KEY_NORM_HUMIDITY)
             ws = data.get(KEY_NORM_WIND_SPEED_MS)
-            sol_rad = self._get_solar_radiation()
-            if tc is not None and rh is not None and ws is not None and sol_rad is not None:
+            solar_daily_mean_wm2 = (
+                self._solar_energy_previous_whm2 / 24.0 if self._solar_energy_previous_whm2 > 0.0 else None
+            )
+            if tc is not None and rh is not None and ws is not None and solar_daily_mean_wm2 is not None:
                 high = data.get(KEY_TEMP_HIGH_24H) or tc
                 low = data.get(KEY_TEMP_LOW_24H) or tc
                 doy = dt_util.now().timetuple().tm_yday
@@ -4501,7 +4534,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     temp_min_c=float(low),
                     humidity=float(rh),
                     wind_speed_ms=float(ws),
-                    solar_radiation_wm2=float(sol_rad),
+                    solar_radiation_wm2=float(solar_daily_mean_wm2),
                     elevation_m=self.elevation_m,
                     day_of_year=doy,
                     latitude_deg=float(self.forecast_lat),

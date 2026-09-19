@@ -81,6 +81,8 @@ def _coord():
     c._gdd_season_key = ""
     c._solar_energy_today_whm2 = 0.0
     c._solar_energy_date = ""
+    c._solar_energy_previous_whm2 = 0.0
+    c._solar_energy_previous_date = ""
     # v2.0 max rain rate over rolling 24h window (issue #139)
     c._rain_rate_history_24h = deque()
     # v2.7 snow accumulation (opt-in)
@@ -154,14 +156,22 @@ class TestHistoryRoundTrip:
         src._rain_today_date = yesterday
         src._wind_run_km = 50.0
         src._wind_run_date = yesterday
+        # Solar is special: yesterday's completed irradiation must be promoted
+        # into the previous-day slot for daily Penman-Monteith.
+        src._solar_energy_today_whm2 = 4800.0
+        src._solar_energy_date = yesterday
         blob = src._dump_history_state()
 
         dst = _coord()
         dst._restore_history_state(blob)
-        # New day -> daily accumulators must NOT carry over yesterday's totals.
+        # New day -> ordinary daily accumulators do not carry over.
         assert dst._rain_today_mm == 0.0
         assert dst._rain_today_date == ""
         assert dst._wind_run_km == 0.0
+        # But completed solar irradiation is retained explicitly as yesterday.
+        assert dst._solar_energy_today_whm2 == 0.0
+        assert dst._solar_energy_previous_whm2 == 4800.0
+        assert dst._solar_energy_previous_date == yesterday
 
     def test_empty_blob_is_safe(self):
         dst = _coord()
