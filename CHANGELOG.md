@@ -10,8 +10,11 @@ All notable changes to Weather Station Core are documented here.
 
 - **CI consolidated into `validate.yml`.** `ci.yml` and `hacs.yml` ran the same hassfest, HACS, lint and test jobs a second time on every push and PR; they are removed. `validate.yml` (the workflow behind the README badge) keeps all seven jobs and can now also be run manually.
 
+- **Coordinators are stored on `entry.runtime_data`** instead of `hass.data[DOMAIN]`, the pattern Home Assistant recommends since 2024.4. The services now target only loaded entries.
+
 ### Fixed
 
+- **Setup could offer a station's own sensors as sources.** Auto-detection only skipped `sensor.ws_*`; a station set up with a different prefix could have its own derived sensors suggested as source sensors when adding another station. Every configured prefix is now excluded.
 - **Sensor drift detection flagged ordinary weather.** Its buffers held 288 recomputes (minutes, not the documented 72 h), and a slope was judged after only 20 samples, so a steady morning warm-up could be reported as temperature drift. The window is now 72 h of one-per-minute samples, no slope is judged on less than 24 h of data, and the regression runs once per tick.
 
 ## [2.8.0] - 2026-09-25

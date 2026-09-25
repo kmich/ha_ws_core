@@ -374,11 +374,12 @@ def _ensure_selected_stations_present(options: list[dict], existing: list[dict])
 def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
     """Best-effort auto-detection of sensor entity IDs by name pattern."""
     guess: dict[str, str] = {}
-    ws_prefixes = {"ws"}
-    if DOMAIN in getattr(hass, "data", {}):
-        for entry_data in hass.data[DOMAIN].values():
-            if hasattr(entry_data, "prefix"):
-                ws_prefixes.add(entry_data.prefix)
+    # Never offer this integration's own derived sensors as sources.
+    ws_prefixes = {DEFAULT_PREFIX}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        prefix = entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX)
+        if prefix:
+            ws_prefixes.add(prefix)
     candidates = [
         s.entity_id
         for s in hass.states.async_all()

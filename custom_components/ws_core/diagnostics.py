@@ -12,7 +12,6 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_SOURCES,
-    DOMAIN,
     KEY_DATA_QUALITY,
     KEY_SENSOR_QUALITY_FLAGS,
 )
@@ -62,7 +61,7 @@ def _redact(value: Any, key: str | None = None) -> Any:
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """Return diagnostics for a config entry (secrets and coordinates redacted)."""
-    coord = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    coord = getattr(entry, "runtime_data", None)
     data = coord.data if coord else None
 
     # Count sensor availability
