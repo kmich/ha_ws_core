@@ -32,7 +32,7 @@ Created for every installation, regardless of optional features.
 |---|---|---|
 | `sensor.ws_feels_like` | °C | Apparent temperature (BOM/Steadman 1994) |
 | `sensor.ws_wet_bulb` | °C | Wet-bulb temperature (Stull 2011, ±0.3 °C) |
-| `sensor.ws_frost_point` | °C | Frost point with Buck (1981) ice constants |
+| `sensor.ws_frost_point` | °C | Frost point with Buck (1981) ice constants below 0 °C; equals the dew point above 0 °C |
 | `sensor.ws_frost_risk` | — | Frost risk category: `high` / `probable` / `unlikely` / `no_risk` (state is localized) |
 | `sensor.ws_zambretti_forecast` | — | Zambretti text forecast (26 phrases) |
 | `sensor.ws_zambretti_number` | — | Z-number 1-26 |
@@ -199,6 +199,10 @@ Indoor rooms are configured under **Configure → Indoor Rooms**, where each roo
 | `sensor.ws_gdd_season` | °C·day | Season-to-date GDD |
 | `sensor.ws_leaf_wetness` | — | `wet` / `dry` |
 
+Seasons run 1 January - 31 December. Each completed day's total is added to its
+season at local midnight (including a day that ended while Home Assistant was stopped),
+and all three season totals reset on 1 January.
+
 ---
 
 ## Optional: Air Quality (`enable_air_quality`)
@@ -207,7 +211,7 @@ Free via Open-Meteo. No API key required.
 
 | Entity ID | Unit | Description |
 |---|---|---|
-| `sensor.ws_air_quality_index` | AQI | US EPA AQI (PM2.5-based) |
+| `sensor.ws_air_quality_index` | AQI | US EPA AQI, higher of the PM2.5 and PM10 sub-indices (2024 PM2.5 breakpoints) |
 | `sensor.ws_no2` | µg/m³ | Nitrogen dioxide |
 | `sensor.ws_ozone` | µg/m³ | Ozone |
 
@@ -273,7 +277,7 @@ Via Open-Meteo Marine API (free, no API key).
 |---|---|
 | `sensor.ws_vigilance` | Météo-France Vigilance — `vert` / `jaune` / `orange` / `rouge` |
 | `sensor.ws_river_level` | Vigicrues water height at nearest station (m) |
-| `sensor.ws_river_flow` | Vigicrues water flow at nearest station (m³/s) |
+| `sensor.ws_river_flow` | Vigicrues water flow at nearest station (m³/s, converted from Hub'Eau's L/s) |
 
 ---
 

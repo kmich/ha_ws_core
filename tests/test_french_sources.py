@@ -191,8 +191,8 @@ class TestFetchVigicruesStationOptions:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            options = await _fetch_vigicrues_station_options(43.3, 5.4)
+        with patch("custom_components.ws_core.config_flow.async_get_clientsession", return_value=mock_session):
+            options = await _fetch_vigicrues_station_options(MagicMock(), 43.3, 5.4)
 
         assert len(options) == 1
         assert options[0]["value"] == ""
@@ -230,8 +230,8 @@ class TestFetchVigicruesStationOptions:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            options = await _fetch_vigicrues_station_options(43.3, 5.4)
+        with patch("custom_components.ws_core.config_flow.async_get_clientsession", return_value=mock_session):
+            options = await _fetch_vigicrues_station_options(MagicMock(), 43.3, 5.4)
 
         assert len(options) == 2  # auto + 1 station, not auto-only
         codes = [o["value"] for o in options[1:]]
@@ -245,11 +245,10 @@ class TestFetchVigicruesStationOptions:
         from custom_components.ws_core.config_flow import _fetch_vigicrues_station_options
 
         mock_session = MagicMock()
-        mock_session.__aenter__ = AsyncMock(side_effect=aiohttp.ClientError("timeout"))
-        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_session.get.side_effect = aiohttp.ClientError("timeout")
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            options = await _fetch_vigicrues_station_options(43.3, 5.4)
+        with patch("custom_components.ws_core.config_flow.async_get_clientsession", return_value=mock_session):
+            options = await _fetch_vigicrues_station_options(MagicMock(), 43.3, 5.4)
 
         assert options == [{"value": "", "label": "Auto (nearest station)", "_name": "", "_river": ""}]
 
@@ -284,8 +283,8 @@ class TestFetchVigicruesStationOptions:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            options = await _fetch_vigicrues_station_options(43.5, 5.5)
+        with patch("custom_components.ws_core.config_flow.async_get_clientsession", return_value=mock_session):
+            options = await _fetch_vigicrues_station_options(MagicMock(), 43.5, 5.5)
 
         assert len(options) == 3  # auto + 2 stations
         assert options[0]["value"] == ""  # auto is always first
@@ -324,8 +323,8 @@ class TestFetchVigicruesStationOptions:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            options = await _fetch_vigicrues_station_options(43.5, 5.5)
+        with patch("custom_components.ws_core.config_flow.async_get_clientsession", return_value=mock_session):
+            options = await _fetch_vigicrues_station_options(MagicMock(), 43.5, 5.5)
 
         assert len(options) == 2  # auto + 1 valid
         assert options[1]["value"] == "W9900001"
@@ -352,8 +351,8 @@ class TestFetchVigicruesStationOptions:
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            options = await _fetch_vigicrues_station_options(43.5, 5.5)
+        with patch("custom_components.ws_core.config_flow.async_get_clientsession", return_value=mock_session):
+            options = await _fetch_vigicrues_station_options(MagicMock(), 43.5, 5.5)
 
         opt = next(o for o in options if o["value"] == "W1234567")
         assert opt["label"] == "Station Orpheline"

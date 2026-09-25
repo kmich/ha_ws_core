@@ -23,6 +23,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     ALTITUDE_UNIT_OPTIONS,
@@ -257,7 +258,7 @@ _LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-async def _validate_wu_credentials(station_id: str, api_key: str) -> tuple[bool, str]:
+async def _validate_wu_credentials(hass: HomeAssistant, station_id: str, api_key: str) -> tuple[bool, str]:
     """Validate Weather Underground station ID + station key using the upload endpoint.
 
     The field stored as ``wu_api_key`` is the station key (PASSWORD) used by the PWS
@@ -273,8 +274,6 @@ async def _validate_wu_credentials(station_id: str, api_key: str) -> tuple[bool,
     Returns ``(valid, error_key)``.
     """
     try:
-        import aiohttp
-
         url = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
         params = {
             "ID": station_id,
@@ -282,18 +281,18 @@ async def _validate_wu_credentials(station_id: str, api_key: str) -> tuple[bool,
             "action": "updateraw",
             "dateutc": "now",
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                body = (await resp.text()).lower().strip()
-                if resp.status == 200 and "success" in body:
-                    return True, ""
-                # 401 = bad PASSWORD (station key); 403 = station exists but rejected
-                if resp.status in (401, 403):
-                    return False, "invalid_api_key"
-                # station ID not recognised
-                if resp.status == 404:
-                    return False, "station_not_found"
-                return False, "cannot_connect"
+        session = async_get_clientsession(hass)
+        async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            body = (await resp.text()).lower().strip()
+            if resp.status == 200 and "success" in body:
+                return True, ""
+            # 401 = bad PASSWORD (station key); 403 = station exists but rejected
+            if resp.status in (401, 403):
+                return False, "invalid_api_key"
+            # station ID not recognised
+            if resp.status == 404:
+                return False, "station_not_found"
+            return False, "cannot_connect"
     except Exception:
         return False, "cannot_connect"
 
@@ -313,7 +312,7 @@ _VIGICRUES_AUTO_OPTION = {
 }
 
 
-async def _fetch_vigicrues_station_options(lat: float, lon: float) -> list[dict]:
+async def _fetch_vigicrues_station_options(hass: HomeAssistant, lat: float, lon: float) -> list[dict]:
     """Return a list of nearby Vigicrues stations as SelectSelector option dicts."""
     options = [_VIGICRUES_AUTO_OPTION]
     try:
@@ -323,15 +322,15 @@ async def _fetch_vigicrues_station_options(lat: float, lon: float) -> list[dict]
             "&en_service=true&size=20"
             "&fields=code_station,libelle_station,libelle_cours_eau"
         )
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                # Hub'Eau's referentiel/stations endpoint returns HTTP 206
-                # (Partial Content) whenever the result set doesn't include
-                # every matching station -- routine, not an error. Treat it
-                # the same as 200 (see issue #133).
-                if resp.status not in (200, 206):
-                    return options
-                data = await resp.json()
+        session = async_get_clientsession(hass)
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            # Hub'Eau's referentiel/stations endpoint returns HTTP 206
+            # (Partial Content) whenever the result set doesn't include
+            # every matching station -- routine, not an error. Treat it
+            # the same as 200 (see issue #133).
+            if resp.status not in (200, 206):
+                return options
+            data = await resp.json()
     except (aiohttp.ClientError, TimeoutError, ValueError):
         return options
 
@@ -1307,7 +1306,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_WU_API_KEY] = ""
             else:
                 # Validate credentials
-                valid, err = await _validate_wu_credentials(station_id, api_key)
+                valid, err = await _validate_wu_credentials(self.hass, station_id, api_key)
                 if not valid:
                     errors[CONF_WU_API_KEY] = err or "invalid_api_key"
                 else:
@@ -1491,7 +1490,7 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         lat = self._data.get(CONF_FORECAST_LAT) or getattr(self.hass.config, "latitude", 0.0) or 0.0
         lon = self._data.get(CONF_FORECAST_LON) or getattr(self.hass.config, "longitude", 0.0) or 0.0
-        options = await _fetch_vigicrues_station_options(lat, lon)
+        options = await _fetch_vigicrues_station_options(self.hass, lat, lon)
 
         # Pre-select previously chosen stations (migrate legacy single-code if needed)
         existing: list[dict] = self._data.get(CONF_VIGICRUES_STATIONS) or []
@@ -3101,7 +3100,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             if not api_key:
                 api_key = g(CONF_WU_API_KEY, "")  # keep existing key if not re-entered
             if station_id and api_key:
-                valid, err = await _validate_wu_credentials(station_id, api_key)
+                valid, err = await _validate_wu_credentials(self.hass, station_id, api_key)
                 if not valid:
                     errors[CONF_WU_API_KEY] = err or "invalid_api_key"
                 else:
@@ -3243,7 +3242,7 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             or getattr(self.hass.config, "longitude", 0.0)
             or 0.0
         )
-        options = await _fetch_vigicrues_station_options(lat, lon)
+        options = await _fetch_vigicrues_station_options(self.hass, lat, lon)
 
         # Pre-select previously chosen stations (migrate legacy single-code if needed)
         existing: list[dict] = self._opt.get(CONF_VIGICRUES_STATIONS) or g(CONF_VIGICRUES_STATIONS, []) or []

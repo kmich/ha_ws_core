@@ -87,9 +87,7 @@ class TestComputeClimateNormals:
 
     def test_year_boundary_wraps_circularly(self):
         # Dec 31 and Jan 1 are calendar-adjacent across the year boundary.
-        records = [{"date": "2019-12-31", "t_max": 5.0, "t_min": 1.0, "precip": 0.0}] + _years_of_jan1(
-            15.0, 5.0, 0.0
-        )
+        records = [{"date": "2019-12-31", "t_max": 5.0, "t_min": 1.0, "precip": 0.0}] + _years_of_jan1(15.0, 5.0, 0.0)
         normals = compute_climate_normals(records, window_days=1)
         # Day 365 (Dec 31) is within 1 of day 1 (Jan 1) via circular distance.
         assert normals["1"]["t_high"] == round((5.0 + 15.0 * 10) / 11, 1)
