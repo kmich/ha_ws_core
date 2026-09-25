@@ -235,9 +235,21 @@ Computed from Julian Date using simplified lunar orbital equations without exter
 
 ---
 
+### Update Cadence {#cadence}
+
+Derived values are recomputed whenever a source sensor updates, so dashboards stay
+current. State that accumulates *per sample* advances only on a fixed 60-second tick:
+the 24h rolling histories, the rain-rate Kalman filter, wind-direction smoothing, the
+daily degree-day means, spike and drift buffers, alert debounce counters and solar-factor
+learning. Between ticks those values are shown including the latest reading but are not
+stored, so their behaviour does not depend on how often your station reports.
+
+---
+
 ### Rain Rate — 1D Kalman Filter
 
 Optimal recursive smoothing eliminates tipping-bucket spike-and-drop artefacts.
+The filter takes one measurement per 60-second tick.
 Configurable measurement noise (`number.ws_rain_filter_alpha`).
 
 ---
@@ -252,8 +264,11 @@ from the station's own history. Temperature and rain anomaly sensors are meaning
 
 ### Sensor Drift Detection — Linear Regression (72h)
 
-OLS regression over 72h flagging monotonic drift (slope magnitude + R² ≥ 0.85) in
-temperature, humidity, pressure, and rain rate.
+OLS regression over the last 72h (one sample per minute) flagging monotonic drift
+(slope magnitude + R² ≥ 0.85) in temperature, humidity and pressure, plus a stuck
+rain-rate check over 4h. No slope is judged on less than 24h of data, so the diurnal
+temperature and humidity cycle cannot pass for drift. The buffers are in memory, so the
+24h warm-up restarts after a Home Assistant restart.
 
 ---
 

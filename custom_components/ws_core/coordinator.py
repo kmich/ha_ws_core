@@ -299,6 +299,7 @@ from .const import (
     DEFAULT_WINDY_INTERVAL_MIN,
     DEFAULT_WOW_INTERVAL_MIN,
     DEFAULT_WU_INTERVAL_MIN,
+    DRIFT_MIN_SAMPLES,
     DRIFT_R_SQ_THRESH,
     DRIFT_SLOPE_HUMIDITY_PCT_H,
     DRIFT_SLOPE_PRESSURE_HPA_H,
@@ -306,6 +307,7 @@ from .const import (
     DRIFT_STUCK_BUCKET_MIN_RATE,
     DRIFT_STUCK_BUCKET_SAMPLES,
     DRIFT_STUCK_RATE_RANGE_MAX,
+    DRIFT_WINDOW_SAMPLES,
     FORECAST_AGREEMENT_ALIGNED_PP,
     FORECAST_AGREEMENT_CONFLICT_PP,
     FORECAST_MAX_RETRY_S,
@@ -1063,11 +1065,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # (streak_last_counted_date); the old in-memory guard was lost on
         # restart, causing repeated increments within one day (issue #15).
 
-        # v1.2.0 Drift detection buffers (timestamp, value) - 72-h in-memory
-        self._drift_temp: deque = deque(maxlen=288)
-        self._drift_humidity: deque = deque(maxlen=288)
-        self._drift_pressure: deque = deque(maxlen=288)
-        self._drift_rain_rate: deque = deque(maxlen=288)
+        # v1.2.0 Drift detection buffers (timestamp, value) - 72-h in-memory,
+        # one sample per tick
+        self._drift_temp: deque = deque(maxlen=DRIFT_WINDOW_SAMPLES)
+        self._drift_humidity: deque = deque(maxlen=DRIFT_WINDOW_SAMPLES)
+        self._drift_pressure: deque = deque(maxlen=DRIFT_WINDOW_SAMPLES)
+        self._drift_rain_rate: deque = deque(maxlen=DRIFT_WINDOW_SAMPLES)
+        self._drift_result: tuple[str, list[dict]] = ("ok", [])
 
         # v1.2.0 Forecast skill 6-h outcome window
         self._skill_window_start: Any = None
@@ -1094,7 +1098,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             logger=_LOGGER,
             name="WS Station",
-            update_interval=timedelta(seconds=60),
+            # No built-in polling: _handle_tick is the single 60 s sampling
+            # clock; refreshes are requested explicitly by fetches.
+            update_interval=None,
         )
         self._unsubs: list = []
 
@@ -1282,8 +1288,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._start_periodic(self._async_mqtt_publish, self._mqtt_interval_min * 60, "ws_core_mqtt_publish")
             self._start_once(self._async_mqtt_discovery, 15, "ws_core_mqtt_discovery")
 
-        # Defer first refresh by 5s so config entry creation completes before any network calls.
-        self._start_once(self.async_refresh, 5, "ws_core_first_refresh")
+        # Defer the first sample by 5s so config entry creation completes before any network calls.
+        self._start_once(self._async_first_sample, 5, "ws_core_first_refresh")
+
+    async def _async_first_sample(self) -> None:
+        self.async_set_updated_data(self._compute(sample=True))
 
     def _issue_id(self, name: str) -> str:
         """Repairs issue ID scoped to this config entry (translation_key stays ``name``)."""
@@ -1353,14 +1362,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @callback
     def _handle_source_change(self, event) -> None:
-        self.async_set_updated_data(self._compute())
+        self.async_set_updated_data(self._compute(sample=False))
 
     @callback
     def _handle_tick(self, _now) -> None:
-        self.async_set_updated_data(self._compute())
+        self.async_set_updated_data(self._compute(sample=True))
 
     async def _async_update_data(self) -> dict[str, Any]:
-        return self._compute()
+        return self._compute(sample=False)
 
     # ------------------------------------------------------------------
     # Rolling window helpers (24h timestamp-based)
@@ -1372,6 +1381,20 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         cutoff = now - timedelta(hours=24)
         while history and history[0][0] < cutoff:
             history.popleft()
+
+    def _history_view(self, history: deque, now: Any, value: float | None, sample: bool) -> Any:
+        """Rolling window including the current reading.
+
+        On a sample tick the reading is stored (and the window pruned);
+        otherwise a temporary view with the reading appended is returned so
+        intermediate recomputes stay current without advancing stored state.
+        """
+        if value is None:
+            return history
+        if sample:
+            self._append_and_prune_24h(history, now, float(value))
+            return history
+        return [*history, (now, float(value))]
 
     @staticmethod
     def _rolling_values(history: deque) -> list[float]:
@@ -1641,7 +1664,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return tc, rh, pressure_hpa, wind_ms, gust_ms, wind_dir, rain_total_mm, lux, uv
 
     def _compute_derived_temperature(
-        self, data: dict, now: Any, tc: float | None, rh: float | None, wind_ms: float | None
+        self, data: dict, now: Any, tc: float | None, rh: float | None, wind_ms: float | None, sample: bool = True
     ) -> float | None:
         """Dew point, frost point, wet-bulb, feels-like, 24h stats. Returns dew_c."""
         rt = self.runtime
@@ -1682,10 +1705,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._update_temp_week_month(data, tc)
 
         # 24h rolling stats
-        if tc is not None:
-            self._append_and_prune_24h(rt.temp_history_24h, now, float(tc))
-        if rt.temp_history_24h:
-            temps = self._rolling_values(rt.temp_history_24h)
+        temp_hist = self._history_view(rt.temp_history_24h, now, tc, sample)
+        if temp_hist:
+            temps = self._rolling_values(temp_hist)
             data[KEY_TEMP_HIGH_24H] = round(max(temps), 1)
             data[KEY_TEMP_LOW_24H] = round(min(temps), 1)
             data[KEY_TEMP_AVG_24H] = round(sum(temps) / len(temps), 1)
@@ -1911,19 +1933,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return trend_3h, (mslp or 0.0)
 
     def _compute_derived_wind(
-        self, data: dict, now: Any, wind_ms: float | None, gust_ms: float | None, wind_dir: float | None
+        self,
+        data: dict,
+        now: Any,
+        wind_ms: float | None,
+        gust_ms: float | None,
+        wind_dir: float | None,
+        sample: bool = True,
     ) -> None:
         """Beaufort, quadrant, smoothed direction, 24h gust max."""
         rt = self.runtime
 
         if wind_dir is not None:
             if rt.smoothed_wind_dir is None:
-                rt.smoothed_wind_dir = float(wind_dir)
+                smoothed = float(wind_dir)
             else:
-                rt.smoothed_wind_dir = smooth_wind_direction(
-                    float(wind_dir), rt.smoothed_wind_dir, alpha=WIND_SMOOTH_ALPHA
-                )
-            data[KEY_WIND_DIR_SMOOTH_DEG] = rt.smoothed_wind_dir
+                smoothed = smooth_wind_direction(float(wind_dir), rt.smoothed_wind_dir, alpha=WIND_SMOOTH_ALPHA)
+            if sample:
+                rt.smoothed_wind_dir = smoothed
+            data[KEY_WIND_DIR_SMOOTH_DEG] = smoothed
 
         smooth_dir = data.get(KEY_WIND_DIR_SMOOTH_DEG, wind_dir)
         if smooth_dir is not None:
@@ -1934,10 +1962,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_WIND_BEAUFORT] = bft
             data[KEY_WIND_BEAUFORT_DESC] = beaufort_description(bft)
 
-        if gust_ms is not None:
-            self._append_and_prune_24h(rt.gust_history_24h, now, float(gust_ms))
-        if rt.gust_history_24h:
-            gust_vals = self._rolling_values(rt.gust_history_24h)
+        gust_hist = self._history_view(rt.gust_history_24h, now, gust_ms, sample)
+        if gust_hist:
+            gust_vals = self._rolling_values(gust_hist)
             if gust_vals:
                 data[KEY_WIND_GUST_MAX_24H] = round(max(gust_vals), 1)
 
@@ -1951,10 +1978,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 data[KEY_WIND_GUST_FACTOR] = gf
 
         # v2.0 dominant wind direction + variability (24h circular stats)
-        if wind_dir is not None:
-            self._append_and_prune_24h(self._wind_dir_history_24h, now, float(wind_dir))
-        if self._wind_dir_history_24h:
-            dir_vals = [v for _, v in self._wind_dir_history_24h]
+        dir_hist = self._history_view(self._wind_dir_history_24h, now, wind_dir, sample)
+        if dir_hist:
+            dir_vals = [v for _, v in dir_hist]
             dom = calculate_dominant_wind_direction(dir_vals)
             if dom is not None:
                 data[KEY_DOMINANT_WIND_DIR] = dom
@@ -1996,32 +2022,36 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._gust_max_all_time = gust
         data[KEY_WIND_GUST_MAX_ALL_TIME] = round(self._gust_max_all_time, 1)
 
-    def _compute_derived_precipitation(self, data: dict, now: Any, rain_total_mm: float | None) -> float:
+    def _compute_derived_precipitation(
+        self, data: dict, now: Any, rain_total_mm: float | None, sample: bool = True
+    ) -> float:
         """Rain rate (Kalman-filtered), rain display. Returns rain_rate (filtered)."""
         rt = self.runtime
 
+        rain_hist = self._history_view(rt.rain_total_history_24h, now, rain_total_mm, sample)
         if rain_total_mm is not None:
-            self._append_and_prune_24h(rt.rain_total_history_24h, now, float(rain_total_mm))
-
             if rt.last_rain_total_mm is None or rt.last_rain_ts is None:
-                rt.last_rain_total_mm = float(rain_total_mm)
-                rt.last_rain_ts = now
+                if sample:
+                    rt.last_rain_total_mm = float(rain_total_mm)
+                    rt.last_rain_ts = now
                 data[KEY_RAIN_RATE_FILT] = 0.0
-            else:
-                raw = self._rain_rate_from_totals_window(rt.rain_total_history_24h, now, RAIN_RATE_WINDOW_H)
+            elif sample:
+                raw = self._rain_rate_from_totals_window(rain_hist, now, RAIN_RATE_WINDOW_H)
                 raw = max(0.0, min(raw, RAIN_RATE_PHYSICAL_CAP_MMPH))
-                filtered = rt.kalman.update(raw)
+                data[KEY_RAIN_RATE_FILT] = rt.kalman.update(raw)
                 rt.last_rain_total_mm = float(rain_total_mm)
                 rt.last_rain_ts = now
-                data[KEY_RAIN_RATE_FILT] = filtered
+            else:
+                # The Kalman filter advances once per tick; show its estimate.
+                data[KEY_RAIN_RATE_FILT] = max(0.0, round(rt.kalman.estimate, 1))
 
         rain_rate: float = data.get(KEY_RAIN_RATE_FILT, 0.0)
         data[KEY_RAIN_DISPLAY] = format_rain_display(float(rain_rate))
 
         # Rain accumulations (1h / 24h)
-        if rt.rain_total_history_24h:
-            data[KEY_RAIN_ACCUM_1H] = round(self._rain_accum_window_from_totals(rt.rain_total_history_24h, now, 1.0), 1)
-            data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rt.rain_total_history_24h), 1)
+        if rain_hist:
+            data[KEY_RAIN_ACCUM_1H] = round(self._rain_accum_window_from_totals(rain_hist, now, 1.0), 1)
+            data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rain_hist), 1)
 
         # Rain today - resets at local midnight (use local time, not UTC)
         rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
@@ -2099,9 +2129,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_RAIN_THIS_YEAR_MM] = round(self._rain_this_year_mm, 1)
 
         # v2.0 — Max rain rate in rolling 24h window
-        self._append_and_prune_24h(self._rain_rate_history_24h, now, float(rain_rate))
-        if self._rain_rate_history_24h:
-            data[KEY_RAIN_RATE_MAX_24H] = round(max(v for _, v in self._rain_rate_history_24h), 1)
+        rate_hist = self._history_view(self._rain_rate_history_24h, now, rain_rate, sample)
+        if rate_hist:
+            data[KEY_RAIN_RATE_MAX_24H] = round(max(v for _, v in rate_hist), 1)
 
         return rain_rate
 
@@ -2236,7 +2266,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_forecast_agreement_delta"] = round(delta)
 
     def _compute_degree_days(
-        self, data: dict, now: Any, tc: float | None, dew_c: float | None, rh: float | None
+        self, data: dict, now: Any, tc: float | None, dew_c: float | None, rh: float | None, sample: bool = True
     ) -> None:
         """Heating / Cooling / Growing Degree Days and leaf wetness.  (v2.0)
 
@@ -2288,15 +2318,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._gdd_season = 0.0
             self._gdd_season_key = year_key
 
-        # --- HDD / CDD today (running mean of per-sample contributions) ---
-        self._hdd_today_samples += 1
-        hdd_contrib = calculate_hdd_contribution(float(tc), self._hdd_base_c)
-        self._hdd_today += (hdd_contrib - self._hdd_today) / self._hdd_today_samples
+        # --- HDD / CDD today: running mean of one contribution per tick, so
+        # the mean is time-weighted rather than weighted by update frequency ---
+        if sample:
+            self._hdd_today_samples += 1
+            hdd_contrib = calculate_hdd_contribution(float(tc), self._hdd_base_c)
+            self._hdd_today += (hdd_contrib - self._hdd_today) / self._hdd_today_samples
+            self._cdd_today_samples += 1
+            cdd_contrib = calculate_cdd_contribution(float(tc), self._cdd_base_c)
+            self._cdd_today += (cdd_contrib - self._cdd_today) / self._cdd_today_samples
         data[KEY_HDD_TODAY_MM] = round(self._hdd_today, 2)
-
-        self._cdd_today_samples += 1
-        cdd_contrib = calculate_cdd_contribution(float(tc), self._cdd_base_c)
-        self._cdd_today += (cdd_contrib - self._cdd_today) / self._cdd_today_samples
         data[KEY_CDD_TODAY_MM] = round(self._cdd_today, 2)
 
         # --- GDD today (from 24h rolling max/min; only meaningful after warmup) ---
@@ -2927,7 +2958,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if rain_today_mm is not None and rain_normal is not None:
             data[KEY_RAIN_ANOMALY_NORMAL] = round(float(rain_today_mm) - float(rain_normal), 1)
 
-    def _compute_data_quality_score(self, data: dict, now: Any) -> None:
+    def _compute_data_quality_score(self, data: dict, now: Any, sample: bool = True) -> None:
         """Compute overall data quality score (0-100) and stuck-sensor flags.  (v2.0)"""
         stuck_flags: list[str] = []
 
@@ -2975,7 +3006,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             f"{label}: {float(curr):.1f} is {abs(float(curr) - mean) / sigma:.1f}σ from mean {mean:.1f}"
                         )
                 # Append after the test so the current spike doesn't poison the window
-                hist.append(float(curr))
+                if sample:
+                    hist.append(float(curr))
         data[KEY_SENSOR_SPIKE] = spike_flags
 
         # Per-sensor stuck flags for binary sensors
@@ -3092,7 +3124,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             elapsed_min = (now - self._lightning_last_strike_ts).total_seconds() / 60.0
             data[KEY_LIGHTNING_CLEARANCE_MIN] = round(elapsed_min, 0)
 
-    def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list) -> None:
+    def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list, sample: bool = True) -> None:
         """Staleness, package status, data quality, configurable alerts."""
         stale = []
         for k, eid in self.sources.items():
@@ -3191,7 +3223,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Apply hysteresis: alert fires after ALERT_DEBOUNCE_ON_TICKS consecutive
         # ticks above threshold and clears after ALERT_DEBOUNCE_OFF_TICKS consecutive
         # ticks below threshold.  This prevents chatty automations from sensor noise.
-        for alert_type in ("wind", "rain", "freeze"):
+        for alert_type in ("wind", "rain", "freeze") if sample else ():
             if alert_type in raw_triggers:
                 self._alert_debounce_raw[alert_type] = self._alert_debounce_raw.get(alert_type, 0) + 1
                 self._alert_debounce_clear[alert_type] = 0
@@ -3532,14 +3564,21 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # v1.2.0 - Sensor drift detection (C1)
     # ------------------------------------------------------------------
 
-    def _compute_drift_detection(self, data: dict, now: Any) -> None:
-        """Detect slow monotonic sensor trends that indicate hardware faults."""
+    def _compute_drift_detection(self, data: dict, now: Any, sample: bool = True) -> None:
+        """Detect slow monotonic sensor trends that indicate hardware faults.
+
+        Buffers and the regression advance only on sample ticks; other cycles
+        republish the last result.
+        """
+        if not sample:
+            data[KEY_SENSOR_DRIFT_FLAGS], data["_drift_details"] = self._drift_result
+            return
         tc = data.get(KEY_NORM_TEMP_C)
         rh = data.get(KEY_NORM_HUMIDITY)
         pres = data.get(KEY_NORM_PRESSURE_HPA)
         rain_r = data.get(KEY_RAIN_RATE_FILT, 0.0)
 
-        # Append to drift buffers (one sample per compute call, ~1 min intervals)
+        # Append to drift buffers (one sample per 60 s tick)
         if tc is not None:
             self._drift_temp.append((now, float(tc)))
         if rh is not None:
@@ -3552,7 +3591,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         flags: list[dict] = []
 
         def _check_slope(buf, max_slope_abs: float, r_sq_thresh: float, sensor_name: str, unit: str) -> None:
-            if len(buf) < 20:
+            if len(buf) < DRIFT_MIN_SAMPLES:
                 return
             first_ts = buf[0][0]
             vals = [v for _, v in buf]
@@ -3591,6 +3630,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
 
         status = "warning" if flags else "ok"
+        self._drift_result = (status, flags)
         data[KEY_SENSOR_DRIFT_FLAGS] = status
         data["_drift_details"] = flags
 
@@ -4106,7 +4146,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # Main orchestrator
     # ------------------------------------------------------------------
 
-    def _compute(self) -> dict[str, Any]:
+    def _compute(self, sample: bool = True) -> dict[str, Any]:
+        """Recompute every derived value.
+
+        ``sample=True`` (the 60 s tick) also advances per-sample state: rolling
+        histories, the rain Kalman filter, wind-direction smoothing, degree-day
+        means, spike/drift buffers, alert debounce and solar-factor learning.
+        Recomputes triggered by source updates or fetches pass ``sample=False``
+        and leave that state untouched, so its cadence never depends on how
+        often sensors report.
+        """
         import time
 
         t0 = time.monotonic()
@@ -4119,9 +4168,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ]
 
         tc, rh, pressure_hpa, wind_ms, gust_ms, wind_dir, rain_total_mm, lux, uv = self._compute_raw_readings(data, now)
-        self._compute_derived_wind(data, now, wind_ms, gust_ms, wind_dir)
-        rain_rate = self._compute_derived_precipitation(data, now, rain_total_mm)
-        dew_c = self._compute_derived_temperature(data, now, tc, rh, wind_ms)
+        self._compute_derived_wind(data, now, wind_ms, gust_ms, wind_dir, sample)
+        rain_rate = self._compute_derived_precipitation(data, now, rain_total_mm, sample)
+        dew_c = self._compute_derived_temperature(data, now, tc, rh, wind_ms, sample)
         trend_3h, mslp = self._compute_derived_pressure(data, now, tc, pressure_hpa, rh)
         self._compute_rain_probability(data, mslp, trend_3h, rh)
         self._compute_forecast_agreement(data)
@@ -4134,14 +4183,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # v0.3.0: removed _compute_degree_days (HDD/CDD)
         self._compute_fire_weather(data, tc, rh, wind_ms)
         self._compute_et0(data, now)
-        self._compute_degree_days(data, now, tc, dew_c, rh)
+        self._compute_degree_days(data, now, tc, dew_c, rh, sample)
         self._compute_lightning(data, now)
         self._compute_indoor(data)
         self._compute_soil(data)
         self._compute_snow(data, now)
         self._compute_neighbor_qc(data)
-        self._compute_data_quality_score(data, now)
-        self._compute_health(data, now, missing, missing_entities)
+        self._compute_data_quality_score(data, now, sample)
+        self._compute_health(data, now, missing, missing_entities, sample)
 
         # v0.3.0: renamed _compute_fog_precip_type -> _compute_fog_and_thunderstorm
         # (precipitation_type was redundant with rain_rate + temperature)
@@ -4152,13 +4201,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_streaks(data, now)
         self._compute_climatology(data)
         self._compute_climate_normal_anomaly(data, tc, data.get("_rain_today_mm"))
-        self._compute_drift_detection(data, now)
+        self._compute_drift_detection(data, now, sample)
         self._compute_consistency_checks(data, now)
         self._compute_learning_sensors(data)
         self._compute_conditions_summary(data)
 
         # Solar lux factor learning (A4): update on clear days near solar noon
-        if lux is not None and self._learning_state.solar_lux_factor:
+        if sample and lux is not None and self._learning_state.solar_lux_factor:
             sun_state = self.hass.states.get("sun.sun")
             if sun_state:
                 try:
@@ -4188,8 +4237,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._update_forecast_skill_window(data, now)
 
         # Periodic save of learning state (async, fire-and-forget)
-        with contextlib.suppress(RuntimeError):
-            self.hass.async_create_task(self._async_maybe_save_learning())
+        if sample:
+            with contextlib.suppress(RuntimeError):
+                self.hass.async_create_task(self._async_maybe_save_learning())
 
         provider = get_provider(self.forecast_provider)
         data[KEY_FORECAST_PROVIDER] = self.forecast_provider
@@ -4554,7 +4604,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         self.runtime.last_forecast_fetch = dt_util.utcnow()
         rt.forecast_consecutive_failures = 0
-        self.async_set_updated_data(self._compute())
+        self.async_set_updated_data(self._compute(sample=False))
         rt.forecast_inflight = False
 
     async def _async_fetch_sea_temp(self) -> None:
@@ -4631,7 +4681,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ),
             }
             rt.last_sea_temp_fetch = dt_util.utcnow()
-            self.async_set_updated_data(self._compute())
+            self.async_set_updated_data(self._compute(sample=False))
 
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("Open-Meteo Marine fetch failed: %s", exc)
@@ -4686,7 +4736,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             nc["_raw_times"] = list(times)
             nc["_raw_precip"] = [float(p) if p is not None else 0.0 for p in precip]
             self._nowcast_cache = nc
-            self.async_set_updated_data(self._compute())
+            self.async_set_updated_data(self._compute(sample=False))
 
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             _LOGGER.warning("Open-Meteo nowcast fetch failed: %s", exc)

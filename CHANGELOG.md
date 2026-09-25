@@ -2,6 +2,16 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- **Per-sample state advances on a fixed 60-second tick.** Derived values were recomputed on every source-sensor update, and each recompute also advanced the 24h rolling histories, the rain-rate Kalman filter, wind-direction smoothing, degree-day means, spike/drift buffers, alert debounce counters and solar-factor learning. How fast those evolved therefore depended on how often the station reported: a station pushing a dozen entities every 16 s stepped the rain filter many times a minute, alerts debounced in seconds instead of two minutes, and the heating/cooling degree-day mean was weighted towards whenever sensors were busiest. That state now advances only on the 60-second tick. Updates between ticks still refresh every sensor, including the latest reading, but store nothing. The coordinator's redundant built-in 60-second poll was removed, so the tick is the single sampling clock.
+
+### Fixed
+
+- **Sensor drift detection flagged ordinary weather.** Its buffers held 288 recomputes (minutes, not the documented 72 h), and a slope was judged after only 20 samples, so a steady morning warm-up could be reported as temperature drift. The window is now 72 h of one-per-minute samples, no slope is judged on less than 24 h of data, and the regression runs once per tick.
+
 ## [2.8.0] - 2026-09-25
 
 A correctness release from a full code review. Several derived values change meaning

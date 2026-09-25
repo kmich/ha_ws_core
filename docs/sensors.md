@@ -285,7 +285,7 @@ Via Open-Meteo Marine API (free, no API key).
 
 | Entity ID | Description |
 |---|---|
-| `sensor.ws_sensor_drift` | Monotonic drift flags from 72h OLS regression |
+| `sensor.ws_sensor_drift` | Monotonic drift flags from 72h OLS regression (needs 24h of data) |
 | `sensor.ws_sensor_consistency` | Cross-sensor physical impossibility flags |
 | `sensor.ws_sensor_quality_flags` | Aggregate sensor validation flags |
 | `sensor.ws_forecast_skill` | Learned forecast skill score |
