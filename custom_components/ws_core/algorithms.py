@@ -58,20 +58,27 @@ def calculate_dew_point(temp_c: float, humidity: float) -> float:
 
 
 def calculate_frost_point(temp_c: float, humidity: float) -> float:
-    """Frost point using Magnus formula with ice constants (Buck 1981).
+    """Frost point: temperature at which the air saturates with respect to ice.
 
-    The frost point is the temperature at which air becomes saturated
-    with respect to ice. Uses ice constants at all temperatures:
-      a=22.587, b=273.86
+    Relative humidity is reported with respect to liquid water, so the actual
+    vapour pressure is taken from the water Magnus curve (Alduchov & Eskridge
+    1996) and then inverted on the ice Magnus curve (Buck 1981:
+    a=22.587, b=273.86). Using ice constants on both sides, as earlier
+    versions did, is off by roughly 1 °C at -10 °C.
 
-    The frost point is always numerically higher (warmer) than the dew
-    point at the same conditions, because ice requires less vapour
-    pressure to saturate than liquid water does.
+    Frost point is only meaningful below 0 °C; when the dew point is at or
+    above freezing the dew point is returned. Below freezing the frost point
+    is always slightly warmer than the dew point.
     """
-    a, b = 22.587, 273.86
     rh_clamped = max(1.0, min(100.0, humidity))
-    gamma = (a * temp_c) / (b + temp_c) + math.log(rh_clamped / 100.0)
-    return round((b * gamma) / (a - gamma), 2)
+    gamma_w = (17.625 * temp_c) / (243.04 + temp_c) + math.log(rh_clamped / 100.0)
+    dew_c = (243.04 * gamma_w) / (17.625 - gamma_w)
+    if dew_c >= 0.0:
+        return round(dew_c, 2)
+    # ln(e / 6.1115 hPa) with e = 6.1094 * exp(gamma_w)
+    gamma_i = gamma_w + math.log(6.1094 / 6.1115)
+    a, b = 22.587, 273.86
+    return round((b * gamma_i) / (a - gamma_i), 2)
 
 
 def calculate_wet_bulb(temp_c: float, humidity: float) -> float:
@@ -1240,39 +1247,44 @@ def compute_fwi(
     dc = D0 + 0.5 * V
     dc = max(0.0, dc)
 
-    # -----------------------------------------------------------------------
+    return {
+        "ffmc": round(ffmc, 1),
+        "dmc": round(dmc, 1),
+        "dc": round(dc, 1),
+        **fwi_indices(ffmc, dmc, dc, W),
+    }
+
+
+def fwi_indices(ffmc: float, dmc: float, dc: float, wind_kmh: float) -> dict:
+    """ISI, BUI, FWI and DSR from the three moisture codes (Van Wagner 1987).
+
+    Pure function of the codes and wind: it never advances the moisture
+    codes, so it can be re-evaluated through the day with the current wind
+    without applying extra drying.
+    """
+    W = max(0.0, float(wind_kmh))
+
     # ISI - Initial Spread Index
-    # -----------------------------------------------------------------------
     fm = 147.2 * (101.0 - ffmc) / (59.5 + ffmc)
     ff = 91.9 * math.exp(-0.1386 * fm) * (1.0 + fm**5.31 / 49300000.0)
     isi = 0.208 * ff * math.exp(0.05039 * W)
 
-    # -----------------------------------------------------------------------
     # BUI - Buildup Index
-    # -----------------------------------------------------------------------
     if dmc <= 0.4 * dc:
         bui = 0.8 * dmc * dc / (dmc + 0.4 * dc) if (dmc + 0.4 * dc) > 0 else 0.0
     else:
         bui = dmc - (1.0 - 0.8 * dc / (dmc + 0.4 * dc)) * (0.92 + (0.0114 * dmc) ** 1.7)
     bui = max(0.0, bui)
 
-    # -----------------------------------------------------------------------
     # FWI - Fire Weather Index
-    # -----------------------------------------------------------------------
     fD = 0.626 * bui**0.809 + 2.0 if bui <= 80.0 else 1000.0 / (25.0 + 108.64 * math.exp(-0.023 * bui))
     B = 0.1 * isi * fD
-    S = math.exp(2.72 * (0.434 * math.log(B)) ** 0.647) if B > 1.0 else B
-    fwi = S
+    fwi = math.exp(2.72 * (0.434 * math.log(B)) ** 0.647) if B > 1.0 else B
 
-    # -----------------------------------------------------------------------
     # DSR - Daily Severity Rating
-    # -----------------------------------------------------------------------
     dsr = 0.0272 * fwi**1.77
 
     return {
-        "ffmc": round(ffmc, 1),
-        "dmc": round(dmc, 1),
-        "dc": round(dc, 1),
         "isi": round(isi, 1),
         "bui": round(bui, 1),
         "fwi": round(fwi, 1),
@@ -1423,21 +1435,21 @@ def et0_hargreaves(
         return 0.0
 
 
-def et0_hourly_estimate(et0_daily_mm: float, hour_utc: int) -> float:
-    """Distribute daily ET₀ across hours using a sinusoidal solar curve.
+def et0_hourly_estimate(et0_daily_mm: float, solar_hour: float) -> float:
+    """Distribute daily ET₀ over daylight with a sine curve peaking at solar noon.
 
-    Assumes ~80 % of daily ET₀ occurs during daylight hours 6-18 UTC.
-    Returns mm for the current hour.
+    ``solar_hour`` is local solar time (0-24). The curve spans 06:00-18:00
+    solar time and is normalised so the hourly values sum to the daily total.
+    Returns mm for the hour starting at ``solar_hour``.
     """
     if et0_daily_mm <= 0:
         return 0.0
-    if 6 <= hour_utc <= 18:
-        daytime_hours = 13
-        # Sine curve peaked at noon (hour 12)
-        angle = math.pi * (hour_utc - 6) / daytime_hours
-        weight = math.sin(angle)
-        return round(et0_daily_mm * 0.80 * weight / 6.37, 3)
-    return 0.0
+    h = float(solar_hour) % 24.0
+    if not 6.0 <= h < 18.0:
+        return 0.0
+    # Integral of sin(pi*(h-6)/12) over 6..18 is 24/pi.
+    weight = math.sin(math.pi * (h + 0.5 - 6.0) / 12.0)
+    return round(max(0.0, et0_daily_mm * weight * math.pi / 24.0), 3)
 
 
 # =============================================================================
@@ -1450,14 +1462,15 @@ def et0_hourly_estimate(et0_daily_mm: float, hour_utc: int) -> float:
 # ===========================================================================
 
 # US EPA AQI breakpoints: (C_low, C_high, AQI_low, AQI_high)
+# PM2.5 breakpoints per the EPA's 2024 revision (89 FR 16202, effective
+# May 2024): "Good" tightened to 0-9.0 µg/m³ and the upper bands rescaled.
 _PM25_BREAKPOINTS = [
-    (0.0, 12.0, 0, 50),
-    (12.1, 35.4, 51, 100),
+    (0.0, 9.0, 0, 50),
+    (9.1, 35.4, 51, 100),
     (35.5, 55.4, 101, 150),
-    (55.5, 150.4, 151, 200),
-    (150.5, 250.4, 201, 300),
-    (250.5, 350.4, 301, 400),
-    (350.5, 500.4, 401, 500),
+    (55.5, 125.4, 151, 200),
+    (125.5, 225.4, 201, 300),
+    (225.5, 325.4, 301, 500),
 ]
 
 _PM10_BREAKPOINTS = [
@@ -1482,16 +1495,18 @@ def _aqi_from_breakpoints(c: float, breakpoints: list) -> int | None:
 def calculate_us_aqi(pm2_5: float | None, pm10: float | None) -> int | None:
     """US EPA AQI - highest of PM2.5 and PM10 sub-indices.
 
-    Returns None when both inputs are None.
-    Reference: EPA AQI Technical Assistance Document, 2018.
+    Returns None when both inputs are None. Concentrations are truncated as
+    the EPA specifies (PM2.5 to 0.1 µg/m³, PM10 to 1 µg/m³) so values never
+    fall into the gaps between breakpoint bands.
+    Reference: EPA AQI Technical Assistance Document (2024 PM2.5 revision).
     """
     sub = []
     if pm2_5 is not None:
-        v = _aqi_from_breakpoints(float(pm2_5), _PM25_BREAKPOINTS)
+        v = _aqi_from_breakpoints(math.floor(float(pm2_5) * 10) / 10, _PM25_BREAKPOINTS)
         if v is not None:
             sub.append(v)
     if pm10 is not None:
-        v = _aqi_from_breakpoints(float(pm10), _PM10_BREAKPOINTS)
+        v = _aqi_from_breakpoints(float(math.floor(float(pm10))), _PM10_BREAKPOINTS)
         if v is not None:
             sub.append(v)
     return max(sub) if sub else None

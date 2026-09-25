@@ -546,7 +546,7 @@ class TestVersionConsistency:
         v = self._manifest_version()
         from custom_components.ws_core.diagnostics import _VERSION, _integration_version
 
-        assert _VERSION == v, f"diagnostics _VERSION {_VERSION!r} != manifest {v!r}"
+        assert v == _VERSION, f"diagnostics _VERSION {_VERSION!r} != manifest {v!r}"
         assert _integration_version() == v
 
     def test_pyproject_version(self):

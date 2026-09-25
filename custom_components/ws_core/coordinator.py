@@ -100,6 +100,7 @@ from .algorithms import (
     ffdi_danger_level,
     fog_probability,
     format_rain_display,
+    fwi_indices,
     get_condition_severity,
     humidity_level,
     indoor_comfort_score,
@@ -310,6 +311,7 @@ from .const import (
     FORECAST_MAX_RETRY_S,
     FORECAST_MIN_RETRY_S,
     FORECAST_PROVIDER_HA_ENTITY,
+    FWI_OBSERVATION_HOUR,
     # v1.5.0
     KEY_ABSOLUTE_HUMIDITY,
     KEY_AIR_DENSITY,
@@ -562,6 +564,9 @@ from .const import (
     SRC_WIND,
     SRC_WIND_DIR,
     STALENESS_CHECK_SOURCES,
+    STUCK_DURATION_S,
+    STUCK_HUMIDITY_RAIL_PCT,
+    STUCK_TOLERANCE,
     VALID_HUMIDITY_MAX,
     VALID_HUMIDITY_MIN,
     VALID_PRESSURE_MAX_HPA,
@@ -569,6 +574,7 @@ from .const import (
     VALID_TEMP_MAX_C,
     VALID_TEMP_MIN_C,
     WIND_SMOOTH_ALPHA,
+    issue_id_for_entry,
     normalize_indoor_rooms,
 )
 from .models import WsData
@@ -591,6 +597,19 @@ _LOGGER = logging.getLogger(__name__)
 # manifest is tiny and fast, but we still use executor so the call is explicit.
 # The value is cached in a module-level variable after the first read.
 _INTEGRATION_VERSION: str = "unknown"
+
+
+def _redact_secrets(text: Any, *secrets: str | None) -> str:
+    """Return ``str(text)`` with every non-empty secret replaced.
+
+    aiohttp exception messages can embed the request URL, and several
+    services carry their API key in the URL path or query string.
+    """
+    out = str(text)
+    for secret in secrets:
+        if secret:
+            out = out.replace(secret, "**REDACTED**")
+    return out
 
 
 def _load_integration_version() -> str:
@@ -765,6 +784,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "humidity": deque(maxlen=48),
             "pressure": deque(maxlen=48),
         }
+        # Event entities registered by event.py (class name -> entity)
+        self.event_entities: dict[str, Any] = {}
+        # Stuck-value detection reference: label -> (value, since_utc)
+        self._stuck_ref: dict[str, tuple[float, datetime]] = {}
 
         # v2.0: CWOP upload
         self.cwop_enabled = bool(_get(CONF_ENABLE_CWOP, DEFAULT_ENABLE_CWOP))
@@ -1204,281 +1227,103 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # v0.3.0: pollen no longer has its own scheduler - it piggybacks on
         # the Open-Meteo Air Quality fetch (same API, same call).
 
-        # Weather Underground periodic upload (kept disabled-by-default for v0.6 roadmap)
+        has_location = self.forecast_lat is not None and self.forecast_lon is not None
+
+        # Upload targets
         if self.wu_enabled and self.wu_station_id and self.wu_api_key:
-
-            async def _wu_upload_loop() -> None:
-                await asyncio.sleep(self.wu_interval_min * 60)
-                while True:
-                    await self._async_upload_wunderground()
-                    await asyncio.sleep(self.wu_interval_min * 60)
-
-            _wu_task = self.hass.async_create_background_task(_wu_upload_loop(), "ws_core_wu_upload")
-            self._unsubs.append(_wu_task.cancel)
-
-        # v2.0: Weathercloud upload
+            self._start_periodic(self._async_upload_wunderground, self.wu_interval_min * 60, "ws_core_wu_upload")
         if self.weathercloud_enabled and self.wc_station_id and self.wc_api_key:
-
-            async def _wc_upload_loop() -> None:
-                await asyncio.sleep(self.wc_interval_min * 60)
-                while True:
-                    await self._async_upload_weathercloud()
-                    await asyncio.sleep(self.wc_interval_min * 60)
-
-            _wc_task = self.hass.async_create_background_task(_wc_upload_loop(), "ws_core_wc_upload")
-            self._unsubs.append(_wc_task.cancel)
-
-        # v2.0: PWSWeather upload
+            self._start_periodic(self._async_upload_weathercloud, self.wc_interval_min * 60, "ws_core_wc_upload")
         if self.pwsweather_enabled and self.pws_station_id and self.pws_api_key:
-
-            async def _pws_upload_loop() -> None:
-                await asyncio.sleep(self.pws_interval_min * 60)
-                while True:
-                    await self._async_upload_pwsweather()
-                    await asyncio.sleep(self.pws_interval_min * 60)
-
-            _pws_task = self.hass.async_create_background_task(_pws_upload_loop(), "ws_core_pws_upload")
-            self._unsubs.append(_pws_task.cancel)
-
-        # v2.0: WOW (UK Met Office) upload
+            self._start_periodic(self._async_upload_pwsweather, self.pws_interval_min * 60, "ws_core_pws_upload")
         if self.wow_enabled and self.wow_site_id and self.wow_auth_key:
-
-            async def _wow_upload_loop() -> None:
-                await asyncio.sleep(self.wow_interval_min * 60)
-                while True:
-                    await self._async_upload_wow()
-                    await asyncio.sleep(self.wow_interval_min * 60)
-
-            _wow_task = self.hass.async_create_background_task(_wow_upload_loop(), "ws_core_wow_upload")
-            self._unsubs.append(_wow_task.cancel)
-
-        # v2.0: AWEKAS upload
+            self._start_periodic(self._async_upload_wow, self.wow_interval_min * 60, "ws_core_wow_upload")
         if self.awekas_enabled and self.awekas_username and self.awekas_password:
-
-            async def _awekas_upload_loop() -> None:
-                await asyncio.sleep(self.awekas_interval_min * 60)
-                while True:
-                    await self._async_upload_awekas()
-                    await asyncio.sleep(self.awekas_interval_min * 60)
-
-            _awekas_task = self.hass.async_create_background_task(_awekas_upload_loop(), "ws_core_awekas_upload")
-            self._unsubs.append(_awekas_task.cancel)
-
-        # v2.0: OpenWeatherMap Stations API upload
+            self._start_periodic(self._async_upload_awekas, self.awekas_interval_min * 60, "ws_core_awekas_upload")
         if self.owm_stations_enabled and self.owm_stations_api_key and self.owm_stations_station_id:
-
-            async def _owm_upload_loop() -> None:
-                await asyncio.sleep(self.owm_stations_interval_min * 60)
-                while True:
-                    await self._async_upload_owm_stations()
-                    await asyncio.sleep(self.owm_stations_interval_min * 60)
-
-            _owm_task = self.hass.async_create_background_task(_owm_upload_loop(), "ws_core_owm_upload")
-            self._unsubs.append(_owm_task.cancel)
-
-        # v2.0: Windy.com upload
+            self._start_periodic(
+                self._async_upload_owm_stations, self.owm_stations_interval_min * 60, "ws_core_owm_upload"
+            )
         if self.windy_enabled and self.windy_api_key:
+            self._start_periodic(self._async_upload_windy, self.windy_interval_min * 60, "ws_core_windy_upload")
+        if self.cwop_enabled and self.cwop_callsign:
+            self._start_periodic(self._async_upload_cwop, self.cwop_interval_min * 60, "ws_core_cwop_upload")
 
-            async def _windy_upload_loop() -> None:
-                await asyncio.sleep(self.windy_interval_min * 60)
-                while True:
-                    await self._async_upload_windy()
-                    await asyncio.sleep(self.windy_interval_min * 60)
-
-            _windy_task = self.hass.async_create_background_task(_windy_upload_loop(), "ws_core_windy_upload")
-            self._unsubs.append(_windy_task.cancel)
-
-        # Air quality + pollen periodic fetch (Open-Meteo Air Quality API, single call)
-        if (
-            (self.aqi_enabled or self.pollen_enabled)
-            and self.forecast_lat is not None
-            and self.forecast_lon is not None
-        ):
-
-            async def _aqi_fetch_loop() -> None:
-                await asyncio.sleep(self.aqi_interval_min * 60)
-                while True:
-                    await self._async_fetch_aqi()
-                    await asyncio.sleep(self.aqi_interval_min * 60)
-
-            _aqi_task = self.hass.async_create_background_task(_aqi_fetch_loop(), "ws_core_aqi_fetch")
-            self._unsubs.append(_aqi_task.cancel)
-
-            async def _deferred_aqi():
-                await asyncio.sleep(10)
-                try:
-                    await self._async_fetch_aqi()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning("ws_core: deferred AQI fetch failed (will retry): %s", err)
-
-            self.hass.async_create_task(_deferred_aqi())
-
-        # Solar forecast periodic fetch
-        if self.solar_forecast_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
-
-            async def _solar_fetch_loop() -> None:
-                await asyncio.sleep(self.solar_interval_min * 60)
-                while True:
-                    await self._async_fetch_solar_forecast()
-                    await asyncio.sleep(self.solar_interval_min * 60)
-
-            _solar_task = self.hass.async_create_background_task(_solar_fetch_loop(), "ws_core_solar_fetch")
-            self._unsubs.append(_solar_task.cancel)
-
-            async def _deferred_solar():
-                await asyncio.sleep(30)
-                try:
-                    await self._async_fetch_solar_forecast()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning("ws_core: deferred solar forecast fetch failed (will retry): %s", err)
-
-            self.hass.async_create_task(_deferred_solar())
-
-        # Météo Vigilance periodic fetch (every 30 min; alerts rarely change faster)
-        if self.vigilance_meteo_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
-
-            async def _vigilance_fetch_loop() -> None:
-                await asyncio.sleep(30 * 60)
-                while True:
-                    await self._async_fetch_vigilance()
-                    await asyncio.sleep(30 * 60)
-
-            _vigilance_task = self.hass.async_create_background_task(_vigilance_fetch_loop(), "ws_core_vigilance_fetch")
-            self._unsubs.append(_vigilance_task.cancel)
-
-            async def _deferred_vigilance():
-                await asyncio.sleep(45)
-                try:
-                    await self._async_fetch_vigilance()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning("ws_core: deferred vigilance fetch failed (will retry): %s", err)
-
-            self.hass.async_create_task(_deferred_vigilance())
-
-        # Vigicrues periodic fetch (every 15 min; river levels update frequently)
-        if self.vigicrues_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
-
-            async def _vigicrues_fetch_loop() -> None:
-                await asyncio.sleep(15 * 60)
-                while True:
-                    await self._async_fetch_vigicrues()
-                    await asyncio.sleep(15 * 60)
-
-            _vigicrues_task = self.hass.async_create_background_task(_vigicrues_fetch_loop(), "ws_core_vigicrues_fetch")
-            self._unsubs.append(_vigicrues_task.cancel)
-
-            async def _deferred_vigicrues():
-                await asyncio.sleep(60)
-                try:
-                    await self._async_fetch_vigicrues()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning("ws_core: deferred Vigicrues fetch failed (will retry): %s", err)
-
-            self.hass.async_create_task(_deferred_vigicrues())
-
-        # v1.7.0 Precipitation nowcast (Open-Meteo minutely_15; refresh often)
-        if self.nowcast_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
-
-            async def _nowcast_fetch_loop() -> None:
-                await asyncio.sleep(self.nowcast_interval_min * 60)
-                while True:
-                    await self._async_fetch_nowcast()
-                    await asyncio.sleep(self.nowcast_interval_min * 60)
-
-            _nowcast_task = self.hass.async_create_background_task(_nowcast_fetch_loop(), "ws_core_nowcast_fetch")
-            self._unsubs.append(_nowcast_task.cancel)
-
-            async def _deferred_nowcast():
-                await asyncio.sleep(20)
-                try:
-                    await self._async_fetch_nowcast()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning("ws_core: deferred nowcast fetch failed (will retry): %s", err)
-
-            self.hass.async_create_task(_deferred_nowcast())
-
+        # Location-based fetches. first_run_s staggers the initial fetches so
+        # entry setup finishes before any network calls.
+        if (self.aqi_enabled or self.pollen_enabled) and has_location:
+            self._start_periodic(self._async_fetch_aqi, self.aqi_interval_min * 60, "ws_core_aqi_fetch", 10)
+        if self.solar_forecast_enabled and has_location:
+            self._start_periodic(
+                self._async_fetch_solar_forecast, self.solar_interval_min * 60, "ws_core_solar_fetch", 30
+            )
+        # Météo Vigilance: alerts rarely change faster than 30 min
+        if self.vigilance_meteo_enabled and has_location:
+            self._start_periodic(self._async_fetch_vigilance, 30 * 60, "ws_core_vigilance_fetch", 45)
+        # Vigicrues: river levels update frequently
+        if self.vigicrues_enabled and has_location:
+            self._start_periodic(self._async_fetch_vigicrues, 15 * 60, "ws_core_vigicrues_fetch", 60)
+        # v1.7.0 Precipitation nowcast (Open-Meteo minutely_15)
+        if self.nowcast_enabled and has_location:
+            self._start_periodic(self._async_fetch_nowcast, self.nowcast_interval_min * 60, "ws_core_nowcast_fetch", 20)
         # v2.0: spatial neighbor QC (hourly fetch from Open-Meteo)
         self._neighbor_qc_cache: dict | None = None
-        if self.forecast_lat is not None and self.forecast_lon is not None:
-
-            async def _neighbor_qc_fetch_loop() -> None:
-                await asyncio.sleep(60 * 60)
-                while True:
-                    await self._async_fetch_neighbor_qc()
-                    await asyncio.sleep(60 * 60)
-
-            _neighbor_qc_task = self.hass.async_create_background_task(
-                _neighbor_qc_fetch_loop(), "ws_core_neighbor_qc_fetch"
+        if has_location:
+            self._start_periodic(self._async_fetch_neighbor_qc, 60 * 60, "ws_core_neighbor_qc_fetch", 60)
+        # v2.7 - Climate normals: check daily whether the cached table is stale
+        # (CLIMATE_NORMALS_REFRESH_DAYS) rather than re-fetching on a fixed cadence.
+        if self.climate_normals_enabled and has_location:
+            self._start_periodic(
+                self._async_maybe_refresh_climate_normals, 24 * 60 * 60, "ws_core_climate_normals_fetch", 120
             )
-            self._unsubs.append(_neighbor_qc_task.cancel)
 
-            async def _deferred_neighbor_qc():
-                await asyncio.sleep(60)
-                try:
-                    await self._async_fetch_neighbor_qc()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.debug("ws_core: neighbor QC fetch failed: %s", err)
-
-            self.hass.async_create_task(_deferred_neighbor_qc())
-
-        # v2.7 - Climate normals: fetch/refresh once, then check daily whether
-        # it's stale (CLIMATE_NORMALS_REFRESH_DAYS) rather than a fixed-interval
-        # re-fetch - normals barely change, so there's no value in polling hourly.
-        if self.climate_normals_enabled and self.forecast_lat is not None and self.forecast_lon is not None:
-
-            async def _climate_normals_loop() -> None:
-                await asyncio.sleep(120)  # let the first regular update land first
-                while True:
-                    await self._async_maybe_refresh_climate_normals()
-                    await asyncio.sleep(24 * 60 * 60)
-
-            _climate_normals_task = self.hass.async_create_background_task(
-                _climate_normals_loop(), "ws_core_climate_normals_fetch"
-            )
-            self._unsubs.append(_climate_normals_task.cancel)
-
-        # v2.0: CWOP upload
-        if self.cwop_enabled and self.cwop_callsign:
-
-            async def _cwop_upload_loop() -> None:
-                await asyncio.sleep(self.cwop_interval_min * 60)
-                while True:
-                    await self._async_upload_cwop()
-                    await asyncio.sleep(self.cwop_interval_min * 60)
-
-            _cwop_task = self.hass.async_create_background_task(_cwop_upload_loop(), "ws_core_cwop_upload")
-            self._unsubs.append(_cwop_task.cancel)
-
-        # v2.0: MQTT Discovery periodic state publishing
+        # v2.0: MQTT Discovery + periodic state publishing
         if self.mqtt_enabled:
-
-            async def _mqtt_publish_loop() -> None:
-                await asyncio.sleep(self._mqtt_interval_min * 60)
-                while True:
-                    await self._async_mqtt_publish()
-                    await asyncio.sleep(self._mqtt_interval_min * 60)
-
-            _mqtt_task = self.hass.async_create_background_task(_mqtt_publish_loop(), "ws_core_mqtt_publish")
-            self._unsubs.append(_mqtt_task.cancel)
-
-            async def _deferred_mqtt_discovery():
-                await asyncio.sleep(15)
-                try:
-                    await self._async_mqtt_discovery()
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.warning("ws_core: MQTT discovery publish failed: %s", err)
-
-            self.hass.async_create_task(_deferred_mqtt_discovery())
+            self._start_periodic(self._async_mqtt_publish, self._mqtt_interval_min * 60, "ws_core_mqtt_publish")
+            self._start_once(self._async_mqtt_discovery, 15, "ws_core_mqtt_discovery")
 
         # Defer first refresh by 5s so config entry creation completes before any network calls.
-        async def _deferred_refresh():
-            await asyncio.sleep(5)
-            try:
-                await self.async_refresh()
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("ws_core: deferred first refresh failed (will retry on next tick): %s", err)
+        self._start_once(self.async_refresh, 5, "ws_core_first_refresh")
 
-        self.hass.async_create_task(_deferred_refresh())
+    def _issue_id(self, name: str) -> str:
+        """Repairs issue ID scoped to this config entry (translation_key stays ``name``)."""
+        return issue_id_for_entry(name, self.entry_data.get("entry_id", ""))
+
+    def _spawn(self, coro: Any, name: str) -> None:
+        """Start a background task that is cancelled when the entry unloads."""
+        task = self.hass.async_create_background_task(coro, name)
+        self._unsubs.append(task.cancel)
+
+    def _start_once(self, fn: Any, delay_s: float, name: str) -> None:
+        """Run ``fn`` once after ``delay_s``; failures are logged, never raised."""
+
+        async def _once() -> None:
+            await asyncio.sleep(delay_s)
+            try:
+                await fn()
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning("ws_core: %s failed (will retry): %s", name, err)
+
+        self._spawn(_once(), name)
+
+    def _start_periodic(self, fn: Any, interval_s: float, name: str, first_run_s: float | None = None) -> None:
+        """Run ``fn`` every ``interval_s`` seconds (first run after ``first_run_s``, if given).
+
+        A failing run is logged and retried on the next interval rather than
+        ending the loop.
+        """
+
+        async def _loop() -> None:
+            delay = interval_s if first_run_s is None else first_run_s
+            while True:
+                await asyncio.sleep(delay)
+                delay = interval_s
+                try:
+                    await fn()
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("ws_core: %s failed (will retry): %s", name, err)
+
+        self._spawn(_loop(), name)
 
     async def async_stop(self) -> None:
         for u in self._unsubs:
@@ -1652,6 +1497,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return v * 0.44704
         if u in ("kn", "knot", "knots"):
             return v * 0.514444
+        if u == "ft/s":
+            return v * 0.3048
         return v
 
     @staticmethod
@@ -1659,6 +1506,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         u = unit.lower().replace(" ", "")
         if u == "pa":
             return v / 100.0
+        if u == "kpa":
+            return v * 10.0
+        if u == "psi":
+            return v * 68.9476
         if u == "inhg":
             return v * 33.8638866667
         if u in ("mmhg", "torr"):
@@ -1739,6 +1590,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         wg_raw = num(SRC_GUST)
         gust_ms = round(self._to_ms(wg_raw, uom(SRC_GUST)), 2) if wg_raw is not None else None
         if gust_ms is not None:
+            # Same anemometer as wind speed, so it gets the same offset;
+            # otherwise a positive offset can trip "gust below wind speed".
+            gust_ms = round(max(0.0, gust_ms + float(self.entry_options.get("cal_wind_ms", 0.0))), 2)
             data[KEY_NORM_WIND_GUST_MS] = gust_ms
 
         wd_raw = num(SRC_WIND_DIR)
@@ -2190,6 +2044,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif rain_total_mm is not None and self._rain_today_last_total is None:
             self._rain_today_last_total = float(rain_total_mm)
         data["_rain_today_mm"] = round(self._rain_today_mm, 1)
+        data[KEY_RAIN_TODAY_MM] = self._rain_today_mm
 
         # Track last rain event timestamp (used by streak counters)
         if float(rain_rate) > 0.0:
@@ -2282,7 +2137,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             wind_gust_ms=float(gust_ms or 0),
             rain_rate_mmph=float(rain_rate),
             dew_point_c=float(dew_c or 0),
-            illuminance_lx=float(lux or 50000),
+            # 0 lx is a real reading (dusk, covered sensor), not a missing one
+            illuminance_lx=float(lux) if lux is not None else 50000.0,
             uv_index=float(uv or 0),
             zambretti=str(data.get(KEY_ZAMBRETTI_FORECAST, "")),
             pressure_trend=float(data.get(KEY_PRESSURE_TREND_HPAH, 0)),
@@ -2391,27 +2247,55 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not self.degree_days_enabled or tc is None:
             return
 
-        date_str = dt_util.now().strftime("%Y-%m-%d")
         now_local = dt_util.now()
+        date_str = now_local.strftime("%Y-%m-%d")
+        year_key = date_str[:4]
 
-        # --- HDD today (rolling mean of per-sample contributions) ---
-        hdd_contrib = calculate_hdd_contribution(float(tc), self._hdd_base_c)
+        # Day rollover: fold each completed day into its calendar-year season
+        # *before* resetting the daily value, so the season receives the
+        # finished day's total rather than the new day's first sample.
         if date_str != self._hdd_today_date:
+            if self._hdd_today_date and self._hdd_today_samples > 0:
+                self._hdd_season, self._hdd_season_key = self._fold_into_season(
+                    self._hdd_season, self._hdd_season_key, self._hdd_today_date, self._hdd_today
+                )
             self._hdd_today = 0.0
             self._hdd_today_date = date_str
             self._hdd_today_samples = 0
-        self._hdd_today_samples += 1
-        # Welford-style running mean to avoid overflow
-        self._hdd_today += (hdd_contrib - self._hdd_today) / self._hdd_today_samples
-        data[KEY_HDD_TODAY_MM] = round(self._hdd_today, 2)
-
-        # --- CDD today ---
-        cdd_contrib = calculate_cdd_contribution(float(tc), self._cdd_base_c)
         if date_str != self._cdd_today_date:
+            if self._cdd_today_date and self._cdd_today_samples > 0:
+                self._cdd_season, self._cdd_season_key = self._fold_into_season(
+                    self._cdd_season, self._cdd_season_key, self._cdd_today_date, self._cdd_today
+                )
             self._cdd_today = 0.0
             self._cdd_today_date = date_str
             self._cdd_today_samples = 0
+        if date_str != self._gdd_today_date and self._gdd_today_date:
+            self._gdd_season, self._gdd_season_key = self._fold_into_season(
+                self._gdd_season, self._gdd_season_key, self._gdd_today_date, self._gdd_today
+            )
+            self._gdd_today = 0.0
+            self._gdd_today_date = ""
+
+        # Seasons reset on Jan 1 (after the Dec 31 fold above).
+        if year_key != self._hdd_season_key:
+            self._hdd_season = 0.0
+            self._hdd_season_key = year_key
+        if year_key != self._cdd_season_key:
+            self._cdd_season = 0.0
+            self._cdd_season_key = year_key
+        if year_key != self._gdd_season_key:
+            self._gdd_season = 0.0
+            self._gdd_season_key = year_key
+
+        # --- HDD / CDD today (running mean of per-sample contributions) ---
+        self._hdd_today_samples += 1
+        hdd_contrib = calculate_hdd_contribution(float(tc), self._hdd_base_c)
+        self._hdd_today += (hdd_contrib - self._hdd_today) / self._hdd_today_samples
+        data[KEY_HDD_TODAY_MM] = round(self._hdd_today, 2)
+
         self._cdd_today_samples += 1
+        cdd_contrib = calculate_cdd_contribution(float(tc), self._cdd_base_c)
         self._cdd_today += (cdd_contrib - self._cdd_today) / self._cdd_today_samples
         data[KEY_CDD_TODAY_MM] = round(self._cdd_today, 2)
 
@@ -2419,39 +2303,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         t_max = data.get(KEY_TEMP_HIGH_24H)
         t_min = data.get(KEY_TEMP_LOW_24H)
         if t_max is not None and t_min is not None:
-            gdd = calculate_gdd_contribution(float(t_max), float(t_min), self._gdd_base_c, self._gdd_cap_c)
-            if date_str != self._gdd_today_date:
-                self._gdd_today = gdd
-                self._gdd_today_date = date_str
-            else:
-                self._gdd_today = gdd  # refresh with latest 24h window
+            self._gdd_today = calculate_gdd_contribution(float(t_max), float(t_min), self._gdd_base_c, self._gdd_cap_c)
+            self._gdd_today_date = date_str
             data[KEY_GDD_TODAY_V2] = round(self._gdd_today, 2)
 
-        # --- HDD / CDD season accumulators (reset Jan 1) ---
-        year_key = now_local.strftime("%Y")
-        if year_key != self._hdd_season_key:
-            self._hdd_season = 0.0
-            self._hdd_season_key = year_key
-        # Accumulate once per day (use today's completed HDD/CDD when day ticks over)
-        if hasattr(self, "_hdd_prev_date") and self._hdd_prev_date != date_str:
-            self._hdd_season += self._hdd_today
-            self._cdd_season += self._cdd_today
-        self._hdd_prev_date = date_str  # type: ignore[attr-defined]
         data[KEY_HDD_SEASON] = round(self._hdd_season, 1)
         data[KEY_CDD_SEASON] = round(self._cdd_season, 1)
-
-        # --- GDD season ---
-        gdd_season_key = now_local.strftime("%Y")
-        if gdd_season_key != self._gdd_season_key:
-            self._gdd_season = 0.0
-            self._gdd_season_key = gdd_season_key
-        if (
-            hasattr(self, "_gdd_prev_date")
-            and self._gdd_prev_date != date_str
-            and data.get(KEY_GDD_TODAY_V2) is not None
-        ):
-            self._gdd_season += data[KEY_GDD_TODAY_V2]
-        self._gdd_prev_date = date_str  # type: ignore[attr-defined]
         data[KEY_GDD_SEASON_V2] = round(self._gdd_season, 1)
 
         # --- Leaf wetness (boolean → text) ---
@@ -2459,6 +2316,109 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rain_rate = data.get(KEY_RAIN_RATE_FILT, 0.0) or 0.0
             wet = calculate_leaf_wetness(float(tc), float(dew_c), float(rh)) or float(rain_rate) > 0.0
             data[KEY_LEAF_WETNESS] = "wet" if wet else "dry"
+
+    @staticmethod
+    def _fold_into_season(season: float, season_key: str, day: str, value: float) -> tuple[float, str]:
+        """Add a completed day's value to the season of that day's year."""
+        day_year = day[:4]
+        if day_year != season_key:
+            return value, day_year
+        return season + value, season_key
+
+    def _local_solar_hour(self, now_utc: Any) -> float:
+        """Approximate local solar time (hours) from UTC and station longitude.
+
+        Falls back to the local clock hour when no longitude is configured.
+        """
+        try:
+            lon = float(self.forecast_lon)
+        except (TypeError, ValueError):
+            return float(dt_util.as_local(now_utc).hour)
+        utc_h = now_utc.hour + now_utc.minute / 60.0
+        return (utc_h + lon / 15.0) % 24.0
+
+    def _compute_fire_weather(self, data: dict, tc: float | None, rh: float | None, wind_ms: float | None) -> None:
+        """Canadian FWI system (Van Wagner 1987), FFDI and FFWI."""
+        if not self.fire_risk_enabled or tc is None or rh is None:
+            return
+        rain_24h = float(data.get(KEY_RAIN_ACCUM_24H, 0.0) or 0.0)
+        data["_fire_rain_24h_mm"] = rain_24h
+        wind_kmh = float(wind_ms or 0) * 3.6
+
+        # FWI moisture codes advance once per calendar day, on the first
+        # reading at or after local noon: the system is defined on noon
+        # observations, and at noon the rolling 24h rain total is exactly
+        # the standard noon-to-noon rainfall. Every other cycle evaluates
+        # ISI/BUI/FWI/DSR from the stored codes with the current wind,
+        # without advancing (re-drying) the codes.
+        local_now = dt_util.now()
+        fwi_date_str = local_now.strftime("%Y-%m-%d")
+        fwi_month = local_now.month
+
+        if fwi_date_str != self._learning_state.fwi_last_date and local_now.hour >= FWI_OBSERVATION_HOUR:
+            fwi_result = compute_fwi(
+                ffmc_prev=self._learning_state.fwi_ffmc,
+                dmc_prev=self._learning_state.fwi_dmc,
+                dc_prev=self._learning_state.fwi_dc,
+                temp_c=float(tc),
+                rh_pct=float(rh),
+                wind_kmh=wind_kmh,
+                rain_24h_mm=rain_24h,
+                month=fwi_month,
+                hemisphere=self.hemisphere,
+            )
+            self._learning_state.fwi_ffmc = fwi_result["ffmc"]
+            self._learning_state.fwi_dmc = fwi_result["dmc"]
+            self._learning_state.fwi_dc = fwi_result["dc"]
+            self._learning_state.fwi_last_date = fwi_date_str
+        else:
+            ls = self._learning_state
+            fwi_result = {
+                "ffmc": ls.fwi_ffmc,
+                "dmc": ls.fwi_dmc,
+                "dc": ls.fwi_dc,
+                **fwi_indices(ls.fwi_ffmc, ls.fwi_dmc, ls.fwi_dc, wind_kmh),
+            }
+
+        data[KEY_FWI_FFMC] = fwi_result["ffmc"]
+        data[KEY_FWI_DMC] = fwi_result["dmc"]
+        data[KEY_FWI_DC] = fwi_result["dc"]
+        data[KEY_FWI_ISI] = fwi_result["isi"]
+        data[KEY_FWI_BUI] = fwi_result["bui"]
+        data[KEY_FWI] = fwi_result["fwi"]
+        data[KEY_FWI_DSR] = fwi_result["dsr"]
+
+        # Map FWI to 1-10 fire_risk_score for backward sensor compatibility
+        fwi_val = fwi_result["fwi"]
+        if fwi_val < 5.0:
+            f_score = 1
+            danger = "Very Low"
+        elif fwi_val < 12.0:
+            f_score = 2
+            danger = "Low"
+        elif fwi_val < 22.0:
+            f_score = round(3 + (fwi_val - 12.0) / 10.0)
+            danger = "Moderate"
+        elif fwi_val < 33.0:
+            f_score = round(5 + (fwi_val - 22.0) / 11.0)
+            danger = "High"
+        elif fwi_val < 50.0:
+            f_score = round(7 + (fwi_val - 33.0) / 17.0)
+            danger = "Very High"
+        else:
+            f_score = 10
+            danger = "Extreme"
+        f_score = max(1, min(10, f_score))
+
+        data[KEY_FIRE_RISK_SCORE] = f_score
+        data["_fire_danger_level"] = danger
+
+        # v2.0 FFDI (McArthur - Australian) + FFWI (Fosberg - US/global)
+        if tc is not None and rh is not None and wind_ms is not None:
+            ffdi_val = calculate_ffdi(float(tc), float(rh), float(wind_ms) * 3.6)
+            data[KEY_FFDI] = ffdi_val
+            data["_ffdi_danger"] = ffdi_danger_level(ffdi_val)
+            data[KEY_FFWI] = calculate_ffwi(float(tc), float(rh), float(wind_ms))
 
     def _compute_et0(self, data: dict, now: Any) -> None:
         """Calculate ET₀ (reference evapotranspiration) via Hargreaves-Samani.  (v0.6.0)
@@ -2476,13 +2436,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         t_max = data.get(KEY_TEMP_HIGH_24H)
         t_min = data.get(KEY_TEMP_LOW_24H)
-        t_mean = data.get(KEY_NORM_TEMP_C)
-
-        # Hargreaves needs valid t_max, t_min, t_mean
-        if None in (t_max, t_min, t_mean):
+        if None in (t_max, t_min):
             return
         if t_max <= t_min:  # pathological - sensor noise
             return
+        # FAO-56 daily mean; the instantaneous reading made ET0 swing with
+        # the diurnal temperature curve.
+        t_mean = (float(t_max) + float(t_min)) / 2.0
 
         doy = now.timetuple().tm_yday
         et0_daily = et0_hargreaves(
@@ -2493,7 +2453,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             day_of_year=doy,
         )
         data[KEY_ET0_DAILY_MM] = et0_daily
-        data[KEY_ET0_HOURLY_MM] = et0_hourly_estimate(et0_daily, now.hour)
+        data[KEY_ET0_HOURLY_MM] = et0_hourly_estimate(et0_daily, self._local_solar_hour(now))
 
         # v2.0 Max theoretical (clear-sky) solar radiation
         doy = now.timetuple().tm_yday
@@ -2967,33 +2927,32 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if rain_today_mm is not None and rain_normal is not None:
             data[KEY_RAIN_ANOMALY_NORMAL] = round(float(rain_today_mm) - float(rain_normal), 1)
 
-    def _compute_data_quality_score(self, data: dict) -> None:
+    def _compute_data_quality_score(self, data: dict, now: Any) -> None:
         """Compute overall data quality score (0-100) and stuck-sensor flags.  (v2.0)"""
         stuck_flags: list[str] = []
 
-        # Stuck-at detection: check if key sensors have the same value as the last cycle.
-        # We compare against saved '_prev' values in data (set each cycle).
-        for src_key, data_key, threshold in [
-            (SRC_TEMP, KEY_NORM_TEMP_C, 0.01),
-            (SRC_HUM, KEY_NORM_HUMIDITY, 0.1),
-            (SRC_PRESS, KEY_NORM_PRESSURE_HPA, 0.01),
-        ]:
+        # Stuck-at detection: a reading is stuck when it has not moved beyond
+        # a small tolerance for STUCK_DURATION_S. State lives on the
+        # coordinator because `data` is rebuilt from scratch every cycle.
+        for label, src_key, data_key in (
+            ("temp", SRC_TEMP, KEY_NORM_TEMP_C),
+            ("humidity", SRC_HUM, KEY_NORM_HUMIDITY),
+            ("pressure", SRC_PRESS, KEY_NORM_PRESSURE_HPA),
+        ):
             curr = data.get(data_key)
-            prev_key = f"_prev_{data_key}"
-            prev = data.get(prev_key)
-            if curr is not None and prev is not None:
-                if abs(float(curr) - float(prev)) < threshold:
-                    # Also require that the sensor has been "stuck" for at least one prior cycle
-                    stuck_count_key = f"_stuck_count_{data_key}"
-                    stuck_count = data.get(stuck_count_key, 0) + 1
-                    data[stuck_count_key] = stuck_count
-                    if stuck_count >= 3:  # ≥3 consecutive identical readings
-                        stuck_flags.append(src_key)
-                else:
-                    data[f"_stuck_count_{data_key}"] = 0
-            # Always record current as next cycle's prev
-            if curr is not None:
-                data[f"_prev_{data_key}"] = curr
+            if curr is None:
+                self._stuck_ref.pop(label, None)
+                continue
+            curr = float(curr)
+            if label == "humidity" and (curr >= 100.0 - STUCK_HUMIDITY_RAIL_PCT or curr <= STUCK_HUMIDITY_RAIL_PCT):
+                self._stuck_ref.pop(label, None)
+                continue
+            ref = self._stuck_ref.get(label)
+            if ref is None or abs(curr - ref[0]) > STUCK_TOLERANCE[label]:
+                self._stuck_ref[label] = (curr, now)
+                continue
+            if (now - ref[1]).total_seconds() >= STUCK_DURATION_S[label]:
+                stuck_flags.append(src_key)
 
         data[KEY_SENSOR_STUCK] = stuck_flags
 
@@ -3020,9 +2979,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_SENSOR_SPIKE] = spike_flags
 
         # Per-sensor stuck flags for binary sensors
-        data["_temp_stuck"] = (
-            KEY_NORM_TEMP_C.replace("norm_temperature_c", "temperature") in stuck_flags or SRC_TEMP in stuck_flags
-        )
+        data["_temp_stuck"] = SRC_TEMP in stuck_flags
         data["_humidity_stuck"] = SRC_HUM in stuck_flags
         data["_pressure_stuck"] = SRC_PRESS in stuck_flags
 
@@ -3275,44 +3232,44 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             if self.suppress_notifications:
                 # User has disabled notifications - clear any existing issues immediately
-                ir.async_delete_issue(self.hass, DOMAIN, "missing_source_entities")
-                ir.async_delete_issue(self.hass, DOMAIN, "stale_sensors")
-                ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
-                ir.async_delete_issue(self.hass, DOMAIN, "stuck_sensors")
-                ir.async_delete_issue(self.hass, DOMAIN, "sensor_drift_detected")
+                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("missing_source_entities"))
+                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stale_sensors"))
+                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("forecast_api_failures"))
+                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stuck_sensors"))
+                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("sensor_drift_detected"))
             else:
                 if missing_entities:
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,
-                        "missing_source_entities",
+                        self._issue_id("missing_source_entities"),
                         is_fixable=False,
                         severity=ir.IssueSeverity.ERROR,
                         translation_key="missing_source_entities",
                         translation_placeholders={"entities": ", ".join(missing_entities)},
                     )
                 else:
-                    ir.async_delete_issue(self.hass, DOMAIN, "missing_source_entities")
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("missing_source_entities"))
 
                 if stale:
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,
-                        "stale_sensors",
+                        self._issue_id("stale_sensors"),
                         is_fixable=False,
                         severity=ir.IssueSeverity.WARNING,
                         translation_key="stale_sensors",
                         translation_placeholders={"sensors": ", ".join(stale)},
                     )
                 else:
-                    ir.async_delete_issue(self.hass, DOMAIN, "stale_sensors")
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stale_sensors"))
 
                 if self.runtime.forecast_consecutive_failures >= 3:
                     provider = get_provider(self.forecast_provider)
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,
-                        "forecast_api_failures",
+                        self._issue_id("forecast_api_failures"),
                         is_fixable=False,
                         severity=ir.IssueSeverity.WARNING,
                         translation_key="forecast_api_failures",
@@ -3322,7 +3279,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         },
                     )
                 else:
-                    ir.async_delete_issue(self.hass, DOMAIN, "forecast_api_failures")
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("forecast_api_failures"))
 
                 # Stuck sensors (data quality; gated on CONF_ENABLE_DIAGNOSTICS not
                 # required — hardware failures affect all users)
@@ -3331,14 +3288,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,
-                        "stuck_sensors",
+                        self._issue_id("stuck_sensors"),
                         is_fixable=False,
                         severity=ir.IssueSeverity.WARNING,
                         translation_key="stuck_sensors",
                         translation_placeholders={"sensors": ", ".join(str(s) for s in stuck_flags)},
                     )
                 else:
-                    ir.async_delete_issue(self.hass, DOMAIN, "stuck_sensors")
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stuck_sensors"))
 
                 # Drifting sensors
                 drift_status = data.get(KEY_SENSOR_DRIFT_FLAGS)
@@ -3347,14 +3304,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,
-                        "sensor_drift_detected",
+                        self._issue_id("sensor_drift_detected"),
                         is_fixable=False,
                         severity=ir.IssueSeverity.WARNING,
                         translation_key="sensor_drift_detected",
                         translation_placeholders={"sensors": ", ".join(str(s) for s in drift_details)},
                     )
                 else:
-                    ir.async_delete_issue(self.hass, DOMAIN, "sensor_drift_detected")
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("sensor_drift_detected"))
 
     # ------------------------------------------------------------------
     # v1.2.0 - Fog, precipitation type, thunderstorm index
@@ -3985,7 +3942,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # rate happened to be), which looks like a reset to zero.
         self._rain_rate_history_24h = _load_dq("rain_rate_history_24h")
 
-        ph: deque = deque(maxlen=PRESSURE_HISTORY_SAMPLES)
+        # Keep the capacity derived from the configured trend window; a fixed
+        # PRESSURE_HISTORY_SAMPLES here silently shrank longer windows to 3h.
+        ph: deque = deque(maxlen=getattr(self, "_pressure_history_samples", PRESSURE_HISTORY_SAMPLES))
         for v in data.get("pressure_history") or []:
             try:
                 ph.append(float(v))
@@ -4091,21 +4050,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ga = data.get("gust_max_all_time")
         self._gust_max_all_time = float(ga) if ga is not None else None
 
-        # v2.0 degree days: 'today' values continue only within the same day;
-        # 'season' totals are restored unconditionally (their own reset logic,
-        # keyed by year, handles the seasonal rollover) so a restart never wipes
-        # an accumulated growing/heating/cooling season.
-        if data.get("hdd_today_date") == today:
-            self._hdd_today = float(data.get("hdd_today") or 0.0)
-            self._hdd_today_date = today
-            self._hdd_today_samples = int(data.get("hdd_today_samples") or 0)
-        if data.get("cdd_today_date") == today:
-            self._cdd_today = float(data.get("cdd_today") or 0.0)
-            self._cdd_today_date = today
-            self._cdd_today_samples = int(data.get("cdd_today_samples") or 0)
-        if data.get("gdd_today_date") == today:
-            self._gdd_today = float(data.get("gdd_today") or 0.0)
-            self._gdd_today_date = today
+        # v2.0 degree days: 'today' values are restored together with their
+        # date even when that date is in the past, so the first compute after
+        # a restart across midnight folds the completed day into its season
+        # instead of dropping it. 'season' totals are restored unconditionally
+        # (their own reset logic, keyed by year, handles the seasonal rollover).
+        self._hdd_today = float(data.get("hdd_today") or 0.0)
+        self._hdd_today_date = data.get("hdd_today_date") or ""
+        self._hdd_today_samples = int(data.get("hdd_today_samples") or 0)
+        self._cdd_today = float(data.get("cdd_today") or 0.0)
+        self._cdd_today_date = data.get("cdd_today_date") or ""
+        self._cdd_today_samples = int(data.get("cdd_today_samples") or 0)
+        self._gdd_today = float(data.get("gdd_today") or 0.0)
+        self._gdd_today_date = data.get("gdd_today_date") or ""
         self._hdd_season = float(data.get("hdd_season") or 0.0)
         self._hdd_season_key = data.get("hdd_season_key") or ""
         self._cdd_season = float(data.get("cdd_season") or 0.0)
@@ -4175,88 +4132,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_condition(data, tc, rh, wind_ms, gust_ms, rain_rate, dew_c, lux, uv)
         # v0.3.0: removed _compute_activity_scores (laundry, running, stargazing)
         # v0.3.0: removed _compute_degree_days (HDD/CDD)
-        # Fire risk: full Canadian FWI system (Van Wagner 1987).
-        if self.fire_risk_enabled and tc is not None and rh is not None:
-            rain_24h = float(data.get(KEY_RAIN_ACCUM_24H, 0.0) or 0.0)
-            data["_fire_rain_24h_mm"] = rain_24h
-            wind_kmh = float(wind_ms or 0) * 3.6
-
-            # FWI daily update - once per calendar day
-            local_now = dt_util.now()
-            fwi_date_str = local_now.strftime("%Y-%m-%d")
-            fwi_month = local_now.month
-
-            if fwi_date_str != self._learning_state.fwi_last_date:
-                fwi_result = compute_fwi(
-                    ffmc_prev=self._learning_state.fwi_ffmc,
-                    dmc_prev=self._learning_state.fwi_dmc,
-                    dc_prev=self._learning_state.fwi_dc,
-                    temp_c=float(tc),
-                    rh_pct=float(rh),
-                    wind_kmh=wind_kmh,
-                    rain_24h_mm=rain_24h,
-                    month=fwi_month,
-                    hemisphere=self.hemisphere,
-                )
-                self._learning_state.fwi_ffmc = fwi_result["ffmc"]
-                self._learning_state.fwi_dmc = fwi_result["dmc"]
-                self._learning_state.fwi_dc = fwi_result["dc"]
-                self._learning_state.fwi_last_date = fwi_date_str
-            else:
-                # Re-compute ISI/BUI/FWI/DSR with current wind/conditions but
-                # use the already-updated moisture codes for today.
-                fwi_result = compute_fwi(
-                    ffmc_prev=self._learning_state.fwi_ffmc,
-                    dmc_prev=self._learning_state.fwi_dmc,
-                    dc_prev=self._learning_state.fwi_dc,
-                    temp_c=float(tc),
-                    rh_pct=float(rh),
-                    wind_kmh=wind_kmh,
-                    rain_24h_mm=0.0,  # rain already applied today
-                    month=fwi_month,
-                    hemisphere=self.hemisphere,
-                )
-
-            data[KEY_FWI_FFMC] = fwi_result["ffmc"]
-            data[KEY_FWI_DMC] = fwi_result["dmc"]
-            data[KEY_FWI_DC] = fwi_result["dc"]
-            data[KEY_FWI_ISI] = fwi_result["isi"]
-            data[KEY_FWI_BUI] = fwi_result["bui"]
-            data[KEY_FWI] = fwi_result["fwi"]
-            data[KEY_FWI_DSR] = fwi_result["dsr"]
-
-            # Map FWI to 1-10 fire_risk_score for backward sensor compatibility
-            fwi_val = fwi_result["fwi"]
-            if fwi_val < 5.0:
-                f_score = 1
-                danger = "Very Low"
-            elif fwi_val < 12.0:
-                f_score = 2
-                danger = "Low"
-            elif fwi_val < 22.0:
-                f_score = round(3 + (fwi_val - 12.0) / 10.0)
-                danger = "Moderate"
-            elif fwi_val < 33.0:
-                f_score = round(5 + (fwi_val - 22.0) / 11.0)
-                danger = "High"
-            elif fwi_val < 50.0:
-                f_score = round(7 + (fwi_val - 33.0) / 17.0)
-                danger = "Very High"
-            else:
-                f_score = 10
-                danger = "Extreme"
-            f_score = max(1, min(10, f_score))
-
-            data[KEY_FIRE_RISK_SCORE] = f_score
-            data["_fire_danger_level"] = danger
-
-            # v2.0 FFDI (McArthur - Australian) + FFWI (Fosberg - US/global)
-            if tc is not None and rh is not None and wind_ms is not None:
-                ffdi_val = calculate_ffdi(float(tc), float(rh), float(wind_ms) * 3.6)
-                data[KEY_FFDI] = ffdi_val
-                data["_ffdi_danger"] = ffdi_danger_level(ffdi_val)
-                data[KEY_FFWI] = calculate_ffwi(float(tc), float(rh), float(wind_ms))
-
+        self._compute_fire_weather(data, tc, rh, wind_ms)
         self._compute_et0(data, now)
         self._compute_degree_days(data, now, tc, dew_c, rh)
         self._compute_lightning(data, now)
@@ -4264,7 +4140,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_soil(data)
         self._compute_snow(data, now)
         self._compute_neighbor_qc(data)
-        self._compute_data_quality_score(data)
+        self._compute_data_quality_score(data, now)
         self._compute_health(data, now, missing, missing_entities)
 
         # v0.3.0: renamed _compute_fog_precip_type -> _compute_fog_and_thunderstorm
@@ -4325,12 +4201,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             data[KEY_FORECAST] = None
 
-        # Apply nowcast correction to first 3 hourly slots
+        # Raw provider forecast; the weather entity blends local readings into
+        # the upcoming hours itself (time-aware), so it is not blended here.
         fc = getattr(self, "_forecast_cache", None)
         if fc:
-            corrected_hourly = self._apply_nowcast_correction(fc.get("hourly", []), data)
-            if corrected_hourly is not fc.get("hourly"):
-                fc = {**fc, "hourly": corrected_hourly}
             data[KEY_FORECAST] = fc
 
         # Sea temperature: independent fetch schedule (every forecast interval)
@@ -4343,8 +4217,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Frost risk
         self._compute_frost_risk(data, tc)
-        # Rain today (resets at local midnight)
-        data[KEY_RAIN_TODAY_MM] = self._rain_today_mm
 
         # Sea surface temperature
         if self.sea_temp_enabled and self._sea_temp_cache:
@@ -4525,11 +4397,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._solar_energy_previous_whm2 / 24.0 if self._solar_energy_previous_whm2 > 0.0 else None
             )
             if tc is not None and rh is not None and ws is not None and solar_daily_mean_wm2 is not None:
-                high = data.get(KEY_TEMP_HIGH_24H) or tc
-                low = data.get(KEY_TEMP_LOW_24H) or tc
+                high = data.get(KEY_TEMP_HIGH_24H)
+                high = tc if high is None else high
+                low = data.get(KEY_TEMP_LOW_24H)
+                low = tc if low is None else low
                 doy = dt_util.now().timetuple().tm_yday
                 et0_pm = et0_penman_monteith(
-                    temp_mean_c=float(tc),
+                    temp_mean_c=(float(high) + float(low)) / 2.0,
                     temp_max_c=float(high),
                     temp_min_c=float(low),
                     humidity=float(rh),
@@ -4556,13 +4430,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _fire_ws_events(self, data: dict) -> None:
         """Notify event entities of transitions detected in this compute cycle."""
-        from .const import DOMAIN
-
-        try:
-            entry_id = self.config_entry.entry_id
-        except Exception:  # noqa: BLE001
-            return
-        events = self.hass.data.get(DOMAIN, {}).get(f"{entry_id}_events", {})
+        events = self.event_entities
         if not events:
             return
         freeze_thresh = float(self.entry_options.get("thresh_freeze_c", 0.0))
@@ -4663,12 +4531,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             result = await provider.async_fetch(session, lat, lon, api_key=api_key)
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
-            _LOGGER.warning("Forecast fetch failed (%s): %s", provider.PROVIDER_NAME, exc)
+            _LOGGER.warning(
+                "Forecast fetch failed (%s): %s", provider.PROVIDER_NAME, _redact_secrets(exc, self.forecast_api_key)
+            )
             rt.forecast_consecutive_failures += 1
             rt.forecast_inflight = False
             return
         except Exception as exc:
-            _LOGGER.error("Forecast fetch unexpected error (%s): %s", provider.PROVIDER_NAME, exc, exc_info=True)
+            _LOGGER.error(
+                "Forecast fetch unexpected error (%s): %s",
+                provider.PROVIDER_NAME,
+                _redact_secrets(exc, self.forecast_api_key),
+            )
             rt.forecast_consecutive_failures += 1
             rt.forecast_inflight = False
             return
@@ -4682,45 +4556,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         rt.forecast_consecutive_failures = 0
         self.async_set_updated_data(self._compute())
         rt.forecast_inflight = False
-
-    def _apply_nowcast_correction(self, hourly: list[dict], data: dict) -> list[dict]:
-        """Blend current local readings into the first 0-3 hourly forecast slots.
-
-        Tapering weights: 70 % local at hour 0, 40 % at hour 1, 10 % at hour 2,
-        pure NWP from hour 3 onwards. Only numeric fields that both sides supply
-        are blended; missing values are left unchanged.
-        """
-        if not hourly:
-            return hourly
-
-        local_temp = data.get(KEY_NORM_TEMP_C)
-        local_hum = data.get(KEY_NORM_HUMIDITY)
-        local_wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
-        local_dew = data.get(KEY_DEW_POINT_C)
-
-        # Nothing to blend if all local readings are missing
-        if all(v is None for v in [local_temp, local_hum, local_wind_ms, local_dew]):
-            return hourly
-
-        local_wind_kmh = local_wind_ms * 3.6 if local_wind_ms is not None else None
-        weights = [0.70, 0.40, 0.10]
-
-        result = []
-        for i, slot in enumerate(hourly):
-            if i < 3:
-                w_local = weights[i]
-                w_nwp = 1.0 - w_local
-                slot = dict(slot)  # copy before mutating
-                if local_temp is not None and slot.get("temp_c") is not None:
-                    slot["temp_c"] = round(w_local * local_temp + w_nwp * slot["temp_c"], 1)
-                if local_hum is not None and slot.get("humidity") is not None:
-                    slot["humidity"] = round(w_local * local_hum + w_nwp * slot["humidity"], 1)
-                if local_wind_kmh is not None and slot.get("wind_kmh") is not None:
-                    slot["wind_kmh"] = round(w_local * local_wind_kmh + w_nwp * slot["wind_kmh"], 1)
-                if local_dew is not None and slot.get("dewpoint_c") is not None:
-                    slot["dewpoint_c"] = round(w_local * local_dew + w_nwp * slot["dewpoint_c"], 1)
-            result.append(slot)
-        return result
 
     async def _async_fetch_sea_temp(self) -> None:
         """Fetch sea surface temperature from Open-Meteo Marine API."""
@@ -4887,7 +4722,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
         gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
         rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
+        rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
 
         def _c_to_f(c: float) -> float:
             return round(c * 9 / 5 + 32, 1)
@@ -4909,7 +4744,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "windspeedmph": _ms_to_mph(wind_ms),
             "windgustmph": _ms_to_mph(gust_ms),
             "rainin": _mm_to_in(rain_1h),
-            "dailyrainin": _mm_to_in(rain_24h),
+            # WU protocol: rain since local midnight, not a rolling 24h total
+            "dailyrainin": _mm_to_in(rain_today),
             "action": "updateraw",
             "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
         }
@@ -4936,10 +4772,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("WUnderground upload failed HTTP %d: %s", resp.status, body[:120])
         except (aiohttp.ClientError, TimeoutError) as exc:
             self._wu_status = "error_network"
-            _LOGGER.warning("WUnderground upload error: %s", exc)
+            _LOGGER.warning("WUnderground upload error: %s", _redact_secrets(exc, self.wu_api_key))
         except Exception as exc:
             self._wu_status = "error"
-            _LOGGER.error("WUnderground upload unexpected error: %s", exc, exc_info=True)
+            _LOGGER.error("WUnderground upload unexpected error: %s", _redact_secrets(exc, self.wu_api_key))
 
     # ------------------------------------------------------------------
     # v2.0 - CWOP (Citizen Weather Observer Program) upload via APRS TCP
@@ -4977,6 +4813,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
         rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
         rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
+        rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
 
         # APRS uses hundredths of degrees, N/S E/W format
         lat_f = float(lat)
@@ -5006,12 +4843,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         temp_s = f"t{_c_to_f(float(temp_c)):03d}" if temp_c is not None else "t..."
         rain1h_s = f"r{_mm_to_hundredths_in(float(rain_1h)):03d}"
         rain24h_s = f"p{_mm_to_hundredths_in(float(rain_24h)):03d}"
-        hum_s = f"h{int(float(humidity)):02d}" if humidity is not None else ""
+        rain_midnight_s = f"P{_mm_to_hundredths_in(float(rain_today)):03d}"
+        # APRS encodes 100 % humidity as "h00" (the field is two digits)
+        hum_s = f"h{round(float(humidity)) % 100:02d}" if humidity is not None else ""
         baro_s = f"b{round(float(press) * 10):05d}" if press is not None else ""
 
         weather_body = (
             f"_{wind_dir_s}/{wind_spd_s}{gust_s}{temp_s}"
-            f"{rain1h_s}{rain24h_s}{hum_s}{baro_s}"
+            f"{rain1h_s}{rain24h_s}{rain_midnight_s}{hum_s}{baro_s}"
             f" ws_core/{_INTEGRATION_VERSION}"
         )
 
@@ -5148,10 +4987,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("Weathercloud upload HTTP %d: %s", resp.status, body[:120])
         except (aiohttp.ClientError, TimeoutError) as exc:
             self._wc_status = "error_network"
-            _LOGGER.warning("Weathercloud upload error: %s", exc)
+            _LOGGER.warning("Weathercloud upload error: %s", _redact_secrets(exc, self.wc_api_key))
         except Exception as exc:  # noqa: BLE001
             self._wc_status = "error"
-            _LOGGER.error("Weathercloud upload unexpected error: %s", exc)
+            _LOGGER.error("Weathercloud upload unexpected error: %s", _redact_secrets(exc, self.wc_api_key))
 
     # ------------------------------------------------------------------
     # v2.0 - PWSWeather upload
@@ -5173,7 +5012,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
         gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
         rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
+        rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
 
         def _c_to_f(c: float) -> float:
             return round(float(c) * 9 / 5 + 32, 1)
@@ -5195,7 +5034,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "windspeedmph": _ms_to_mph(wind_ms),
             "windgustmph": _ms_to_mph(gust_ms),
             "rainin": _mm_to_in(rain_1h),
-            "dailyrainin": _mm_to_in(rain_24h),
+            # WU protocol: rain since local midnight, not a rolling 24h total
+            "dailyrainin": _mm_to_in(rain_today),
             "action": "updateraw",
             "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
         }
@@ -5221,10 +5061,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("PWSWeather upload HTTP %d: %s", resp.status, body[:120])
         except (aiohttp.ClientError, TimeoutError) as exc:
             self._pws_status = "error_network"
-            _LOGGER.warning("PWSWeather upload error: %s", exc)
+            _LOGGER.warning("PWSWeather upload error: %s", _redact_secrets(exc, self.pws_api_key))
         except Exception as exc:  # noqa: BLE001
             self._pws_status = "error"
-            _LOGGER.error("PWSWeather upload unexpected error: %s", exc)
+            _LOGGER.error("PWSWeather upload unexpected error: %s", _redact_secrets(exc, self.pws_api_key))
 
     # ------------------------------------------------------------------
     # v2.0 - WOW (UK Met Office Weather Observations Website) upload
@@ -5281,10 +5121,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("WOW upload HTTP %d", resp.status)
         except (aiohttp.ClientError, TimeoutError) as exc:
             self._wow_status = "error_network"
-            _LOGGER.warning("WOW upload error: %s", exc)
+            _LOGGER.warning("WOW upload error: %s", _redact_secrets(exc, self.wow_auth_key))
         except Exception as exc:  # noqa: BLE001
             self._wow_status = "error"
-            _LOGGER.error("WOW upload unexpected error: %s", exc)
+            _LOGGER.error("WOW upload unexpected error: %s", _redact_secrets(exc, self.wow_auth_key))
 
     # ------------------------------------------------------------------
     # v2.0 - AWEKAS upload
@@ -5403,10 +5243,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("OWM Stations upload HTTP %d", resp.status)
         except (aiohttp.ClientError, TimeoutError) as exc:
             self._owm_stations_status = "error_network"
-            _LOGGER.warning("OWM Stations upload error: %s", exc)
+            _LOGGER.warning("OWM Stations upload error: %s", _redact_secrets(exc, self.owm_stations_api_key))
         except Exception as exc:  # noqa: BLE001
             self._owm_stations_status = "error"
-            _LOGGER.error("OWM Stations upload unexpected error: %s", exc)
+            _LOGGER.error("OWM Stations upload unexpected error: %s", _redact_secrets(exc, self.owm_stations_api_key))
 
     # ------------------------------------------------------------------
     # v2.0 - Windy.com upload (stations.windy.com)
@@ -5465,10 +5305,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     _LOGGER.warning("Windy upload HTTP %d", resp.status)
         except (aiohttp.ClientError, TimeoutError) as exc:
             self._windy_status = "error_network"
-            _LOGGER.warning("Windy upload error: %s", exc)
+            _LOGGER.warning("Windy upload error: %s", _redact_secrets(exc, self.windy_api_key))
         except Exception as exc:  # noqa: BLE001
             self._windy_status = "error"
-            _LOGGER.error("Windy upload unexpected error: %s", exc)
+            _LOGGER.error("Windy upload unexpected error: %s", _redact_secrets(exc, self.windy_api_key))
 
     # ------------------------------------------------------------------
     # CSV / JSON export  (v0.6.0)
@@ -5602,12 +5442,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "&timezone=auto"
         )
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status != 200:
-                        _LOGGER.warning("ws_core AQI/pollen fetch failed: HTTP %s", resp.status)
-                        return
-                    raw = await resp.json()
+            session = async_get_clientsession(self.hass)
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status != 200:
+                    _LOGGER.warning("ws_core AQI/pollen fetch failed: HTTP %s", resp.status)
+                    return
+                raw = await resp.json()
             cur = raw.get("current", {})
 
             # AQI side
@@ -5709,15 +5549,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         url = f"https://api.forecast.solar/estimate/{lat}/{lon}/{declination}/{azimuth}/{kwp}"
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status == 429:
-                        _LOGGER.warning("ws_core solar forecast: forecast.solar rate limit hit")
-                        return
-                    if resp.status != 200:
-                        _LOGGER.warning("ws_core solar forecast fetch failed: HTTP %s", resp.status)
-                        return
-                    raw = await resp.json()
+            session = async_get_clientsession(self.hass)
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status == 429:
+                    _LOGGER.warning("ws_core solar forecast: forecast.solar rate limit hit")
+                    return
+                if resp.status != 200:
+                    _LOGGER.warning("ws_core solar forecast fetch failed: HTTP %s", resp.status)
+                    return
+                raw = await resp.json()
 
             result = raw.get("result", {})
             # watt_hours_day: {"YYYY-MM-DD": wh, ...}
@@ -5776,12 +5616,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Step 1: reverse-geocode to French department code via BAN API
         ban_url = f"https://api-adresse.data.gouv.fr/reverse/?lon={lon}&lat={lat}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(ban_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status != 200:
-                        _LOGGER.debug("ws_core vigilance: BAN geocode failed HTTP %s", resp.status)
-                        return
-                    geo = await resp.json()
+            session = async_get_clientsession(self.hass)
+            async with session.get(ban_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    _LOGGER.debug("ws_core vigilance: BAN geocode failed HTTP %s", resp.status)
+                    return
+                geo = await resp.json()
         except (aiohttp.ClientError, TimeoutError) as exc:
             _LOGGER.debug("ws_core vigilance: BAN geocode error: %s", exc)
             return
@@ -5806,12 +5646,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "&limit=20&select=phenomenon_id,phenomenon,color_id,color"
         )
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(ods_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status != 200:
-                        _LOGGER.warning("ws_core vigilance: ODS fetch failed HTTP %s", resp.status)
-                        return
-                    raw = await resp.json()
+            session = async_get_clientsession(self.hass)
+            async with session.get(ods_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status != 200:
+                    _LOGGER.warning("ws_core vigilance: ODS fetch failed HTTP %s", resp.status)
+                    return
+                raw = await resp.json()
         except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
             _LOGGER.warning("ws_core vigilance: ODS fetch error: %s", exc)
             return
@@ -5868,116 +5708,117 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         need_refresh = False
 
         try:
-            async with aiohttp.ClientSession() as session:
-                # Auto-detect mode: no stations configured → find nearest
-                if not stations:
-                    if not self._vigicrues_auto_code:
-                        lat, lon = self.forecast_lat, self.forecast_lon
-                        url = (
-                            "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations"
-                            f"?format=json&longitude={lon}&latitude={lat}&distance=50"
-                            "&en_service=true&size=1"
-                            "&fields=code_station,libelle_station,libelle_cours_eau"
-                        )
-                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                            # Hub'Eau's referentiel/stations endpoint returns
-                            # HTTP 206 (Partial Content) whenever the result set
-                            # doesn't include every matching station -- routine,
-                            # not an error. Treat it the same as 200, matching
-                            # the observations_tr fetch below (see issue #133).
-                            if resp.status not in (200, 206):
-                                _LOGGER.warning("ws_core Vigicrues: auto-detect HTTP %s", resp.status)
-                                return
-                            sdata = await resp.json()
-                        found = sdata.get("data", [])
-                        if not found:
-                            _LOGGER.debug("ws_core Vigicrues: no station within 50 km (outside France?)")
-                            return
-                        st = found[0]
-                        self._vigicrues_auto_code = st.get("code_station", "")
-                        self._vigicrues_auto_name = st.get("libelle_station") or self._vigicrues_auto_code
-                        self._vigicrues_auto_river = st.get("libelle_cours_eau") or ""
-                        _LOGGER.debug(
-                            "ws_core Vigicrues auto-detected: %s (%s) on %s",
-                            self._vigicrues_auto_code,
-                            self._vigicrues_auto_name,
-                            self._vigicrues_auto_river,
-                        )
-                    stations = [
-                        {
-                            "code": self._vigicrues_auto_code or "",
-                            "name": self._vigicrues_auto_name or "",
-                            "river": self._vigicrues_auto_river or "",
-                        }
-                    ]
-
-                for st_info in stations:
-                    code = st_info.get("code", "").strip()
-                    if not code:
-                        continue
-                    obs_url = (
-                        "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr"
-                        f"?format=json&code_entite={code}"
-                        "&grandeur_hydro=H&size=1"
-                        "&fields=code_station,date_obs,resultat_obs"
+            session = async_get_clientsession(self.hass)
+            # Auto-detect mode: no stations configured → find nearest
+            if not stations:
+                if not self._vigicrues_auto_code:
+                    lat, lon = self.forecast_lat, self.forecast_lon
+                    url = (
+                        "https://hubeau.eaufrance.fr/api/v2/hydrometrie/referentiel/stations"
+                        f"?format=json&longitude={lon}&latitude={lat}&distance=50"
+                        "&en_service=true&size=1"
+                        "&fields=code_station,libelle_station,libelle_cours_eau"
                     )
-                    async with session.get(obs_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                        # Hub'Eau's referentiel/stations endpoint returns
+                        # HTTP 206 (Partial Content) whenever the result set
+                        # doesn't include every matching station -- routine,
+                        # not an error. Treat it the same as 200, matching
+                        # the observations_tr fetch below (see issue #133).
                         if resp.status not in (200, 206):
-                            _LOGGER.warning("ws_core Vigicrues: observations HTTP %s for %s", resp.status, code)
-                            continue
-                        odata = await resp.json()
-
-                    observations = odata.get("data", [])
-                    if not observations:
-                        _LOGGER.debug("ws_core Vigicrues: no observations for station %s", code)
-                        continue
-
-                    obs = observations[0]
-                    raw_mm = obs.get("resultat_obs")
-                    level_m = round(float(raw_mm) / 1000.0, 3) if raw_mm is not None else None
-
-                    self._vigicrues_caches[code] = {
-                        "level_m": level_m,
-                        "station_code": code,
-                        "station_name": st_info.get("name", code),
-                        "river_name": st_info.get("river", ""),
-                        "obs_time": obs.get("date_obs"),
-                        "fetched_at": dt_util.utcnow().isoformat(),
-                    }
+                            _LOGGER.warning("ws_core Vigicrues: auto-detect HTTP %s", resp.status)
+                            return
+                        sdata = await resp.json()
+                    found = sdata.get("data", [])
+                    if not found:
+                        _LOGGER.debug("ws_core Vigicrues: no station within 50 km (outside France?)")
+                        return
+                    st = found[0]
+                    self._vigicrues_auto_code = st.get("code_station", "")
+                    self._vigicrues_auto_name = st.get("libelle_station") or self._vigicrues_auto_code
+                    self._vigicrues_auto_river = st.get("libelle_cours_eau") or ""
                     _LOGGER.debug(
-                        "ws_core Vigicrues: %s (%s) level=%.3f m at %s",
-                        st_info.get("name", code),
-                        code,
-                        level_m or 0,
-                        obs.get("date_obs"),
+                        "ws_core Vigicrues auto-detected: %s (%s) on %s",
+                        self._vigicrues_auto_code,
+                        self._vigicrues_auto_name,
+                        self._vigicrues_auto_river,
                     )
+                stations = [
+                    {
+                        "code": self._vigicrues_auto_code or "",
+                        "name": self._vigicrues_auto_name or "",
+                        "river": self._vigicrues_auto_river or "",
+                    }
+                ]
 
-                    # Try to fetch flow data (Q) — not all stations provide it
-                    flow_url = (
-                        "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr"
-                        f"?format=json&code_entite={code}"
-                        "&grandeur_hydro=Q&size=1"
-                        "&fields=code_station,date_obs,resultat_obs"
-                    )
-                    try:
-                        async with session.get(flow_url, timeout=aiohttp.ClientTimeout(total=15)) as fresp:
-                            if fresp.status in (200, 206):
-                                fdata = await fresp.json()
-                                fobs = fdata.get("data", [])
-                                if fobs:
-                                    raw_q = fobs[0].get("resultat_obs")
-                                    flow_m3s = round(float(raw_q), 3) if raw_q is not None else None
-                                    self._vigicrues_caches[code]["flow_m3s"] = flow_m3s
-                                    self._vigicrues_caches[code]["flow_obs_time"] = fobs[0].get("date_obs")
-                                    _LOGGER.debug(
-                                        "ws_core Vigicrues: %s flow=%.3f m³/s",
-                                        code,
-                                        flow_m3s or 0,
-                                    )
-                    except (aiohttp.ClientError, TimeoutError, ValueError):
-                        pass  # Flow data is optional; level data still reported
+            for st_info in stations:
+                code = st_info.get("code", "").strip()
+                if not code:
+                    continue
+                obs_url = (
+                    "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr"
+                    f"?format=json&code_entite={code}"
+                    "&grandeur_hydro=H&size=1"
+                    "&fields=code_station,date_obs,resultat_obs"
+                )
+                async with session.get(obs_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status not in (200, 206):
+                        _LOGGER.warning("ws_core Vigicrues: observations HTTP %s for %s", resp.status, code)
+                        continue
+                    odata = await resp.json()
 
-                    need_refresh = True
+                observations = odata.get("data", [])
+                if not observations:
+                    _LOGGER.debug("ws_core Vigicrues: no observations for station %s", code)
+                    continue
+
+                obs = observations[0]
+                raw_mm = obs.get("resultat_obs")
+                level_m = round(float(raw_mm) / 1000.0, 3) if raw_mm is not None else None
+
+                self._vigicrues_caches[code] = {
+                    "level_m": level_m,
+                    "station_code": code,
+                    "station_name": st_info.get("name", code),
+                    "river_name": st_info.get("river", ""),
+                    "obs_time": obs.get("date_obs"),
+                    "fetched_at": dt_util.utcnow().isoformat(),
+                }
+                _LOGGER.debug(
+                    "ws_core Vigicrues: %s (%s) level=%.3f m at %s",
+                    st_info.get("name", code),
+                    code,
+                    level_m or 0,
+                    obs.get("date_obs"),
+                )
+
+                # Try to fetch flow data (Q) — not all stations provide it
+                flow_url = (
+                    "https://hubeau.eaufrance.fr/api/v2/hydrometrie/observations_tr"
+                    f"?format=json&code_entite={code}"
+                    "&grandeur_hydro=Q&size=1"
+                    "&fields=code_station,date_obs,resultat_obs"
+                )
+                try:
+                    async with session.get(flow_url, timeout=aiohttp.ClientTimeout(total=15)) as fresp:
+                        if fresp.status in (200, 206):
+                            fdata = await fresp.json()
+                            fobs = fdata.get("data", [])
+                            if fobs:
+                                raw_q = fobs[0].get("resultat_obs")
+                                # Hub'Eau reports discharge (Q) in L/s
+                                flow_m3s = round(float(raw_q) / 1000.0, 3) if raw_q is not None else None
+                                self._vigicrues_caches[code]["flow_m3s"] = flow_m3s
+                                self._vigicrues_caches[code]["flow_obs_time"] = fobs[0].get("date_obs")
+                                _LOGGER.debug(
+                                    "ws_core Vigicrues: %s flow=%.3f m³/s",
+                                    code,
+                                    flow_m3s or 0,
+                                )
+                except (aiohttp.ClientError, TimeoutError, ValueError):
+                    pass  # Flow data is optional; level data still reported
+
+                need_refresh = True
 
         except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
             _LOGGER.warning("ws_core Vigicrues fetch error: %r", exc)

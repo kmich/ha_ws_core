@@ -56,10 +56,9 @@ async def async_setup_entry(
     ]
     async_add_entities(entities)
 
-    # Store references so coordinator can call trigger_event()
-    hass.data[DOMAIN].setdefault(f"{entry.entry_id}_events", {})
-    for ent in entities:
-        hass.data[DOMAIN][f"{entry.entry_id}_events"][ent.__class__.__name__] = ent
+    # Kept on the coordinator (not in hass.data[DOMAIN], which must only hold
+    # coordinators) so the coordinator can call check_and_fire().
+    coordinator.event_entities = {ent.__class__.__name__: ent for ent in entities}
 
 
 if _HAS_EVENT:

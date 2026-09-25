@@ -29,7 +29,9 @@ from .const import (
     DEPRECATED_CONF_KEYS_V030,
     DEPRECATED_KEYS_V030,
     DOMAIN,
+    ENTRY_REPAIR_ISSUES,
     PLATFORMS,
+    issue_id_for_entry,
     normalize_indoor_rooms,
 )
 
@@ -173,6 +175,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WSStationCoordinator
+
+    # Pre-2.8 releases used domain-wide issue IDs shared by every entry;
+    # issues are now per entry, so drop any leftovers from the old scheme.
+    for name in ENTRY_REPAIR_ISSUES:
+        ir.async_delete_issue(hass, DOMAIN, name)
 
     coordinator = WSStationCoordinator(hass, {**entry.data, "entry_id": entry.entry_id}, entry.options)
     coordinator._entry = entry
@@ -358,7 +365,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 ir.async_create_issue(
                     hass,
                     DOMAIN,
-                    "large_calibration_offset",
+                    issue_id_for_entry("large_calibration_offset", entry.entry_id),
                     is_fixable=False,
                     severity=ir.IssueSeverity.WARNING,
                     translation_key="large_calibration_offset",
@@ -368,7 +375,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     },
                 )
             else:
-                ir.async_delete_issue(hass, DOMAIN, "large_calibration_offset")
+                ir.async_delete_issue(hass, DOMAIN, issue_id_for_entry("large_calibration_offset", entry.entry_id))
 
     if not hass.services.has_service(DOMAIN, SERVICE_APPLY_CALIBRATION):
         hass.services.async_register(
@@ -389,3 +396,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator is not None:
         await coordinator.async_stop()
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Clean up this entry's Repairs issues when it is deleted."""
+    for name in ENTRY_REPAIR_ISSUES:
+        ir.async_delete_issue(hass, DOMAIN, issue_id_for_entry(name, entry.entry_id))

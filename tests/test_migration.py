@@ -48,9 +48,7 @@ def _run_migration(version, data, options=None):
 
 class TestMigration:
     def test_v2_slugs_display_values_in_data(self):
-        ok, cap = _run_migration(
-            2, {"hemisphere": "Northern", "climate_region": "Atlantic Europe", "prefix": "ws"}
-        )
+        ok, cap = _run_migration(2, {"hemisphere": "Northern", "climate_region": "Atlantic Europe", "prefix": "ws"})
         assert ok is True
         assert cap["version"] == CONFIG_VERSION
         assert cap["data"]["hemisphere"] == "northern"
@@ -67,9 +65,7 @@ class TestMigration:
 
     def test_already_slugged_values_are_left_unchanged(self):
         # An unknown / already-slug value must pass through untouched (idempotent).
-        _, cap = _run_migration(
-            2, {"hemisphere": "northern", "climate_region": "mediterranean", "prefix": "ws"}
-        )
+        _, cap = _run_migration(2, {"hemisphere": "northern", "climate_region": "mediterranean", "prefix": "ws"})
         assert cap["data"]["hemisphere"] == "northern"
         assert cap["data"]["climate_region"] == "mediterranean"
 

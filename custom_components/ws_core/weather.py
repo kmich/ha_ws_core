@@ -18,7 +18,7 @@ from homeassistant.const import (
     UnitOfSpeed,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -110,6 +110,16 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
     @property
     def device_info(self):
         return {"identifiers": {(DOMAIN, self._entry.entry_id)}}
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Write state and push fresh forecasts to subscribed frontend cards.
+
+        Forecast subscriptions are not refreshed by a state write alone;
+        without this, open forecast cards kept stale data until resubscribed.
+        """
+        super()._handle_coordinator_update()
+        self._entry.async_create_task(self.hass, self.async_update_listeners(None))
 
     @property
     def available(self) -> bool:
