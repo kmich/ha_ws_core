@@ -73,12 +73,13 @@ pytest tests/ -v --tb=short
 
 Run linting:
 ```bash
-ruff check custom_components/
-ruff format --check custom_components/
+ruff check custom_components/ tests/ scripts/
+ruff format --check custom_components/ tests/ scripts/
 ```
 
-CI runs automatically on PRs to `main`. All six jobs must pass: hassfest, HACS
-validation, lint, tests, no-bytecode, and version consistency.
+CI (`.github/workflows/validate.yml`) runs automatically on PRs to `main`. All seven
+jobs must pass: hassfest, HACS validation, lint, tests, no-bytecode, version
+consistency, and the dashboard entity validator.
 
 ---
 

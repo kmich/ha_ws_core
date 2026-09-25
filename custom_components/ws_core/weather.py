@@ -83,7 +83,7 @@ def _weathercode_to_condition(code: int | None) -> str | None:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
     async_add_entities([WSStationWeather(coordinator, entry, prefix)])
 

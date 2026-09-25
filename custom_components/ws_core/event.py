@@ -46,7 +46,7 @@ async def async_setup_entry(
         _LOGGER.debug("ws_core: event platform not available (HA < 2023.8); skipping")
         return
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
 
     entities: list[EventEntity] = [
@@ -56,8 +56,7 @@ async def async_setup_entry(
     ]
     async_add_entities(entities)
 
-    # Kept on the coordinator (not in hass.data[DOMAIN], which must only hold
-    # coordinators) so the coordinator can call check_and_fire().
+    # Kept on the coordinator so it can call check_and_fire().
     coordinator.event_entities = {ent.__class__.__name__: ent for ent in entities}
 
 

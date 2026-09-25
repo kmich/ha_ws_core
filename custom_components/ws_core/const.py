@@ -390,6 +390,10 @@ DRIFT_R_SQ_THRESH: float = 0.85  # minimum R² to flag as drift
 
 # Stuck rain-bucket detection (samples at ~1 min intervals)
 DRIFT_STUCK_BUCKET_SAMPLES: int = 240  # 4-hour rolling window
+# Drift buffers take one sample per 60 s tick: 72 h window, and no slope is
+# judged on less than 24 h so the diurnal cycle can't pass for drift.
+DRIFT_WINDOW_SAMPLES: int = 72 * 60
+DRIFT_MIN_SAMPLES: int = 24 * 60
 DRIFT_STUCK_BUCKET_MIN_RATE: float = 0.1  # mm/h minimum to count as non-zero
 DRIFT_STUCK_RATE_RANGE_MAX: float = 0.1  # mm/h max spread to flag as stuck
 

@@ -22,7 +22,6 @@ from custom_components.ws_core.const import (
     CONF_HEMISPHERE,
     CONF_SOURCES,
     CONF_STALENESS_S,
-    DOMAIN,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     KEY_DATA_QUALITY,
@@ -433,7 +432,7 @@ class TestDiagnostics:
         coord.data = {KEY_DATA_QUALITY: "OK", KEY_SENSOR_QUALITY_FLAGS: []}
         coord.runtime = WSStationRuntime()
 
-        hass.data = {DOMAIN: {"test_entry_123": coord}}
+        entry.runtime_data = coord
         hass.states.get = lambda eid: _make_state("22.0", "degC")
 
         result = asyncio.run(async_get_config_entry_diagnostics(hass, entry))
@@ -518,7 +517,7 @@ class TestDiagnostics:
         entry.data = {CONF_SOURCES: {}}
         entry.options = {}
         entry.entry_id = "missing"
-        hass.data = {DOMAIN: {}}
+        entry.runtime_data = None
         hass.states.get = lambda eid: None
 
         result = asyncio.run(async_get_config_entry_diagnostics(hass, entry))

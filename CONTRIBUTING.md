@@ -11,8 +11,8 @@ the approach.
 ```bash
 pip install -r requirements_dev.txt
 python -m pytest          # run the test suite
-ruff check custom_components/
-ruff format --check custom_components/
+ruff check custom_components/ tests/ scripts/
+ruff format --check custom_components/ tests/ scripts/
 python scripts/validate_dashboard_entities.py
 ```
 

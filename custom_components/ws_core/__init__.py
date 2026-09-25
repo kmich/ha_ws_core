@@ -8,7 +8,7 @@ import pathlib
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
@@ -168,9 +168,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
     return True
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    hass.data.setdefault(DOMAIN, {})
-    return True
+def _loaded_coordinators(hass: HomeAssistant, entry_id: str | None = None) -> list[WSStationCoordinator]:
+    """Coordinators of loaded Weather Station Core entries (all, or just ``entry_id``)."""
+    return [
+        entry.runtime_data
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.state is ConfigEntryState.LOADED and entry_id in (None, entry.entry_id)
+    ]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -182,8 +186,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ir.async_delete_issue(hass, DOMAIN, name)
 
     coordinator = WSStationCoordinator(hass, {**entry.data, "entry_id": entry.entry_id}, entry.options)
-    coordinator._entry = entry
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     try:
         await coordinator.async_start()
@@ -215,16 +218,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # ── Service: reset_rain_baseline ──────────────────────────────────────
     async def _reset_rain(call: ServiceCall) -> None:
-        entry_id = call.data.get(ATTR_ENTRY_ID)
-        targets = []
-        if entry_id:
-            coord = hass.data[DOMAIN].get(entry_id)
-            if coord:
-                targets = [coord]
-        else:
-            targets = list(hass.data[DOMAIN].values())
-
-        for coord in targets:
+        for coord in _loaded_coordinators(hass, call.data.get(ATTR_ENTRY_ID)):
             coord.runtime.last_rain_total_mm = None
             coord.runtime.last_rain_ts = None
             coord.runtime.last_rain_rate_filt = 0.0
@@ -245,11 +239,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 
     def _get_targets(call: ServiceCall) -> list:
-        entry_id = call.data.get(ATTR_ENTRY_ID)
-        if entry_id:
-            coord = hass.data[DOMAIN].get(entry_id)
-            return [coord] if coord else []
-        return list(hass.data[DOMAIN].values())
+        return _loaded_coordinators(hass, call.data.get(ATTR_ENTRY_ID))
 
     async def _reset_learning(call: ServiceCall) -> None:
         from .learning_state import async_save_learning
@@ -392,9 +382,7 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    coordinator: WSStationCoordinator | None = hass.data[DOMAIN].pop(entry.entry_id, None)
-    if coordinator is not None:
-        await coordinator.async_stop()
+    await entry.runtime_data.async_stop()
     return unload_ok
 
 

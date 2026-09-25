@@ -16,7 +16,6 @@ from custom_components.ws_core.algorithms import (
 )
 from custom_components.ws_core.const import (
     CONF_ENABLE_SOIL,
-    DOMAIN,
     KEY_ET0_DAILY_MM,
     KEY_FWI_DC,
     KEY_FWI_DMC,
@@ -166,24 +165,25 @@ def test_irrigation_score_sees_rain_today():
 
 
 # ---------------------------------------------------------------------------
-# Event platform must not put non-coordinators into hass.data[DOMAIN]
+# Event entities are kept on the coordinator
 # ---------------------------------------------------------------------------
 
 
-async def test_event_platform_keeps_hass_data_coordinator_only():
+async def test_event_platform_registers_entities_on_coordinator():
     from custom_components.ws_core import event as ev
 
     coord = MagicMock()
     hass = MagicMock()
-    hass.data = {DOMAIN: {"e1": coord}}
+    hass.data = {}
     entry = MagicMock()
     entry.entry_id = "e1"
     entry.options = {}
     entry.data = {}
+    entry.runtime_data = coord
     added: list = []
     await ev.async_setup_entry(hass, entry, added.extend)
 
-    assert list(hass.data[DOMAIN]) == ["e1"]
+    assert hass.data == {}
     assert set(coord.event_entities) == {"WSRainEvent", "WSFrostEvent", "WSLightningEvent"}
 
 
