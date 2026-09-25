@@ -12,8 +12,11 @@ All notable changes to Weather Station Core are documented here.
 
 - **Coordinators are stored on `entry.runtime_data`** instead of `hass.data[DOMAIN]`, the pattern Home Assistant recommends since 2024.4. The services now target only loaded entries.
 
+- **Config and options flows share one implementation of the upload-credential and indoor-room steps** (new `flow_steps.py`), replacing two hand-maintained copies. Step IDs and translations are unchanged. The options flow now cleans input the same way setup does: values are trimmed, a CWOP callsign is upper-cased, blank MQTT prefixes fall back to the defaults, and leaving a service's required credentials blank switches that service off instead of keeping it enabled with no credentials.
+
 ### Fixed
 
+- **Setup skipped upload services after Weathercloud.** Each setup step hard-coded its own "what comes next" list, and the lists disagreed: after the Weathercloud credentials step the flow jumped to PWSWeather, WOW, AWEKAS or MQTT and never asked for OWM Stations, Windy or CWOP credentials, so those uploads were enabled but silently never ran. All upload steps now follow one ordered list.
 - **Setup could offer a station's own sensors as sources.** Auto-detection only skipped `sensor.ws_*`; a station set up with a different prefix could have its own derived sensors suggested as source sensors when adding another station. Every configured prefix is now excluded.
 - **Sensor drift detection flagged ordinary weather.** Its buffers held 288 recomputes (minutes, not the documented 72 h), and a slope was judged after only 20 samples, so a steady morning warm-up could be reported as temperature drift. The window is now 72 h of one-per-minute samples, no slope is judged on less than 24 h of data, and the regression runs once per tick.
 

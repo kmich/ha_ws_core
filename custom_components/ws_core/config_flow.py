@@ -15,7 +15,6 @@ The Options flow (Configure button) exposes all settings for post-install change
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Any
 
 import aiohttp
@@ -30,19 +29,11 @@ from .const import (
     CLIMATE_REGION_OPTIONS,
     CONF_ALTITUDE_UNIT,
     CONF_AQI_INTERVAL_MIN,
-    CONF_AWEKAS_INTERVAL_MIN,
-    CONF_AWEKAS_PASSWORD,
-    CONF_AWEKAS_USERNAME,
     CONF_CAL_HUMIDITY,
     CONF_CAL_PRESSURE_HPA,
     CONF_CAL_TEMP_C,
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
-    CONF_CWOP_CALLSIGN,
-    CONF_CWOP_INTERVAL_MIN,
-    CONF_CWOP_PASSCODE,
-    CONF_CWOP_PORT,
-    CONF_CWOP_SERVER,
     CONF_DISTANCE_UNIT,
     CONF_ELEVATION_M,
     CONF_ENABLE_ADVANCED_SENSORS,
@@ -87,20 +78,10 @@ from .const import (
     CONF_FORECAST_LON,
     CONF_FORECAST_PROVIDER,
     CONF_HEMISPHERE,
-    CONF_INDOOR_ROOMS,
-    CONF_MQTT_DISCOVERY_PREFIX,
-    CONF_MQTT_INTERVAL_MIN,
-    CONF_MQTT_STATE_PREFIX,
     CONF_NAME,
-    CONF_OWM_STATIONS_API_KEY,
-    CONF_OWM_STATIONS_INTERVAL_MIN,
-    CONF_OWM_STATIONS_STATION_ID,
     CONF_PREFIX,
     CONF_PRESSURE_TREND_WINDOW_H,
     CONF_PRESSURE_UNIT,
-    CONF_PWS_API_KEY,
-    CONF_PWS_INTERVAL_MIN,
-    CONF_PWS_STATION_ID,
     CONF_RAIN_FILTER_ALPHA,
     CONF_RAIN_PENALTY_HEAVY_MMPH,
     CONF_RAIN_PENALTY_LIGHT_MMPH,
@@ -120,31 +101,18 @@ from .const import (
     CONF_UNITS_MODE,
     CONF_VIGICRUES_STATION_CODE,
     CONF_VIGICRUES_STATIONS,
-    CONF_WC_API_KEY,
-    CONF_WC_INTERVAL_MIN,
-    CONF_WC_STATION_ID,
     CONF_WIND_UNIT,
-    CONF_WINDY_API_KEY,
-    CONF_WINDY_INTERVAL_MIN,
-    CONF_WINDY_STATION_ID,
-    CONF_WOW_AUTH_KEY,
-    CONF_WOW_INTERVAL_MIN,
-    CONF_WOW_SITE_ID,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
     CONF_WU_STATION_ID,
     CONFIG_VERSION,
     DEFAULT_ALTITUDE_UNIT,
     DEFAULT_AQI_INTERVAL_MIN,
-    DEFAULT_AWEKAS_INTERVAL_MIN,
     DEFAULT_CAL_HUMIDITY,
     DEFAULT_CAL_PRESSURE_HPA,
     DEFAULT_CAL_TEMP_C,
     DEFAULT_CAL_WIND_MS,
     DEFAULT_CLIMATE_REGION,
-    DEFAULT_CWOP_INTERVAL_MIN,
-    DEFAULT_CWOP_PORT,
-    DEFAULT_CWOP_SERVER,
     DEFAULT_DISTANCE_UNIT,
     DEFAULT_ELEVATION_M,
     DEFAULT_ENABLE_ADVANCED_SENSORS,
@@ -183,15 +151,10 @@ from .const import (
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_FORECAST_PROVIDER,
     DEFAULT_HEMISPHERE,
-    DEFAULT_MQTT_DISCOVERY_PREFIX,
-    DEFAULT_MQTT_INTERVAL_MIN,
-    DEFAULT_MQTT_STATE_PREFIX,
     DEFAULT_NAME,
-    DEFAULT_OWM_STATIONS_INTERVAL_MIN,
     DEFAULT_PREFIX,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_PRESSURE_UNIT,
-    DEFAULT_PWS_INTERVAL_MIN,
     DEFAULT_RAIN_FILTER_ALPHA,
     DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
     DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
@@ -206,10 +169,7 @@ from .const import (
     DEFAULT_THRESH_RAIN_RATE_MMPH,
     DEFAULT_THRESH_WIND_GUST_MS,
     DEFAULT_UNITS_MODE,
-    DEFAULT_WC_INTERVAL_MIN,
     DEFAULT_WIND_UNIT,
-    DEFAULT_WINDY_INTERVAL_MIN,
-    DEFAULT_WOW_INTERVAL_MIN,
     DEFAULT_WU_INTERVAL_MIN,
     DISTANCE_UNIT_OPTIONS,
     DOMAIN,
@@ -248,8 +208,8 @@ from .const import (
     VALID_TEMP_MIN_C,
     VALID_WIND_GUST_MAX_MS,
     WIND_UNIT_OPTIONS,
-    normalize_indoor_rooms,
 )
+from .flow_steps import SharedFlowSteps
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -659,7 +619,7 @@ def _merge_submitted_sources(defaults: dict[str, str], user_input: dict[str, Any
 # ---------------------------------------------------------------------------
 
 
-class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = CONFIG_VERSION
 
     @classmethod
@@ -1519,528 +1479,33 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             last_step=False,
         )
 
-    # ------------------------------------------------------------------
-    # Named indoor rooms (initial setup) - add / edit / remove hub
-    # Mirrors the Options flow's indoor_rooms_opt hub so rooms can be
-    # configured during the first install, not just from Options afterward.
-    # ------------------------------------------------------------------
-    def _rooms_working_copy(self) -> list[dict]:
-        """Return (initializing if needed) the in-progress room list."""
-        if CONF_INDOOR_ROOMS not in self._data:
-            self._data[CONF_INDOOR_ROOMS] = normalize_indoor_rooms(self._data.get(CONF_INDOOR_ROOMS, []))
-        return self._data[CONF_INDOOR_ROOMS]
-
-    def _room_form_schema(self, src: dict | None) -> vol.Schema:
-        src = src or {}
-        sensor_sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
-        schema: dict[Any, Any] = {
-            vol.Required("name", default=src.get("name", "")): selector.TextSelector(),
-        }
-        for field in ("temp", "humidity", "co2"):
-            cur = src.get(field)
-            # suggested_value (not default) keeps the field clearable when
-            # editing a room to remove a previously-assigned sensor -- see
-            # issue #135.
-            key = vol.Optional(field, description={"suggested_value": cur}) if cur else vol.Optional(field)
-            schema[key] = sensor_sel
-        return vol.Schema(schema)
-
     async def async_step_indoor_rooms(self, user_input: dict[str, Any] | None = None):
         """Hub menu for managing named indoor rooms."""
-        rooms = self._rooms_working_copy()
-        menu_options = ["room_add"]
-        if rooms:
-            menu_options += ["room_edit", "room_remove"]
-        menu_options.append("room_done")
-        return self.async_show_menu(step_id="indoor_rooms", menu_options=menu_options)
+        return await self._rooms_menu()
 
-    async def async_step_room_done(self, user_input: dict[str, Any] | None = None):
-        return await self._next_v2_step()
-
-    async def async_step_room_add(self, user_input: dict[str, Any] | None = None):
-        self._edit_rid: str | None = None
-        return await self.async_step_room_form()
-
-    async def async_step_room_edit(self, user_input: dict[str, Any] | None = None):
-        rooms = self._rooms_working_copy()
-        if user_input is not None:
-            self._edit_rid = user_input["room"]
-            return await self.async_step_room_form()
-        options = [{"value": r["id"], "label": r["name"]} for r in rooms]
-        return self.async_show_form(
-            step_id="room_edit",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("room"): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
-                    )
-                }
-            ),
-            last_step=False,
-        )
-
-    async def async_step_room_form(self, user_input: dict[str, Any] | None = None):
-        rooms = self._rooms_working_copy()
-        editing = next((r for r in rooms if r["id"] == self._edit_rid), None) if self._edit_rid else None
-        if user_input is not None:
-            name = (user_input.get("name") or "").strip()
-            if not name:
-                return self.async_show_form(
-                    step_id="room_form",
-                    data_schema=self._room_form_schema({**(editing or {}), **user_input}),
-                    errors={"name": "room_name_required"},
-                    last_step=False,
-                )
-            room = {
-                "id": editing["id"] if editing else uuid.uuid4().hex[:8],
-                "name": name,
-                "temp": user_input.get("temp") or None,
-                "humidity": user_input.get("humidity") or None,
-                "co2": user_input.get("co2") or None,
-            }
-            if editing:
-                self._data[CONF_INDOOR_ROOMS] = [room if r["id"] == editing["id"] else r for r in rooms]
-            else:
-                self._data[CONF_INDOOR_ROOMS] = [*rooms, room]
-            return await self.async_step_indoor_rooms()
-        return self.async_show_form(
-            step_id="room_form",
-            data_schema=self._room_form_schema(editing),
-            last_step=False,
-        )
-
-    async def async_step_room_remove(self, user_input: dict[str, Any] | None = None):
-        rooms = self._rooms_working_copy()
-        if user_input is not None:
-            to_remove = set(user_input.get("rooms") or [])
-            self._data[CONF_INDOOR_ROOMS] = [r for r in rooms if r["id"] not in to_remove]
-            return await self.async_step_indoor_rooms()
-        options = [{"value": r["id"], "label": r["name"]} for r in rooms]
-        return self.async_show_form(
-            step_id="room_remove",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional("rooms", default=[]): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=options, multiple=True, mode=selector.SelectSelectorMode.LIST
-                        )
-                    )
-                }
-            ),
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 helper — navigate to the next enabled v2.0 upload sub-step, or
-    # fall through to async_step_alerts if none are enabled.
-    # ------------------------------------------------------------------
     async def _next_v2_step(self):
-        if self._data.get(CONF_ENABLE_WEATHERCLOUD):
-            return await self.async_step_weathercloud()
-        if self._data.get(CONF_ENABLE_PWSWEATHER):
-            return await self.async_step_pwsweather()
-        if self._data.get(CONF_ENABLE_WOW):
-            return await self.async_step_wow()
-        if self._data.get(CONF_ENABLE_AWEKAS):
-            return await self.async_step_awekas()
-        if self._data.get(CONF_ENABLE_OWM_STATIONS):
-            return await self.async_step_owm_stations()
-        if self._data.get(CONF_ENABLE_WINDY):
-            return await self.async_step_windy()
-        if self._data.get(CONF_ENABLE_CWOP):
-            return await self.async_step_cwop()
-        if self._data.get(CONF_ENABLE_MQTT):
-            return await self.async_step_mqtt_config()
+        """Go to the next enabled upload-credential step, or on to alerts."""
+        return await self._next_upload_step()
+
+    # -- SharedFlowSteps hooks ------------------------------------------
+
+    def _flow_store(self) -> dict[str, Any]:
+        return self._data
+
+    def _flow_default(self, key: str, default: Any) -> Any:
+        return self._data.get(key, default)
+
+    async def _flow_back(self, user_input: dict[str, Any]):
+        return await self._handle_back(user_input)
+
+    def _flow_show(self, step_id: str, schema: vol.Schema, placeholders: dict[str, str]):
+        return self._show_step(step_id=step_id, data_schema=schema, description_placeholders=placeholders)
+
+    async def _uploads_done(self):
         return await self.async_step_alerts()
 
-    # ------------------------------------------------------------------
-    # v2.0 - Weathercloud upload credentials
-    # ------------------------------------------------------------------
-    async def async_step_weathercloud(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            station_id = str(user_input.get(CONF_WC_STATION_ID, "")).strip()
-            api_key = str(user_input.get(CONF_WC_API_KEY, "")).strip()
-            if not station_id or not api_key:
-                self._data[CONF_ENABLE_WEATHERCLOUD] = False
-            else:
-                self._data[CONF_WC_STATION_ID] = station_id
-                self._data[CONF_WC_API_KEY] = api_key
-                self._data[CONF_WC_INTERVAL_MIN] = int(user_input.get(CONF_WC_INTERVAL_MIN, DEFAULT_WC_INTERVAL_MIN))
-            if self._data.get(CONF_ENABLE_PWSWEATHER):
-                return await self.async_step_pwsweather()
-            if self._data.get(CONF_ENABLE_WOW):
-                return await self.async_step_wow()
-            if self._data.get(CONF_ENABLE_AWEKAS):
-                return await self.async_step_awekas()
-            if self._data.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="weathercloud",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_WC_STATION_ID, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Optional(CONF_WC_API_KEY, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(CONF_WC_INTERVAL_MIN, default=DEFAULT_WC_INTERVAL_MIN): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={
-                "info": "Weathercloud station ID and key from weathercloud.net/dashboard. Leave blank to skip."
-            },
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 - PWSWeather upload credentials
-    # ------------------------------------------------------------------
-    async def async_step_pwsweather(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            station_id = str(user_input.get(CONF_PWS_STATION_ID, "")).strip()
-            api_key = str(user_input.get(CONF_PWS_API_KEY, "")).strip()
-            if not station_id or not api_key:
-                self._data[CONF_ENABLE_PWSWEATHER] = False
-            else:
-                self._data[CONF_PWS_STATION_ID] = station_id
-                self._data[CONF_PWS_API_KEY] = api_key
-                self._data[CONF_PWS_INTERVAL_MIN] = int(user_input.get(CONF_PWS_INTERVAL_MIN, DEFAULT_PWS_INTERVAL_MIN))
-            if self._data.get(CONF_ENABLE_WOW):
-                return await self.async_step_wow()
-            if self._data.get(CONF_ENABLE_AWEKAS):
-                return await self.async_step_awekas()
-            if self._data.get(CONF_ENABLE_OWM_STATIONS):
-                return await self.async_step_owm_stations()
-            if self._data.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy()
-            if self._data.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop()
-            if self._data.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="pwsweather",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_PWS_STATION_ID, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Optional(CONF_PWS_API_KEY, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(CONF_PWS_INTERVAL_MIN, default=DEFAULT_PWS_INTERVAL_MIN): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={
-                "info": "PWSWeather station ID and API key from pwsweather.com. Leave blank to skip."
-            },
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 - WOW (UK Met Office) upload credentials
-    # ------------------------------------------------------------------
-    async def async_step_wow(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            site_id = str(user_input.get(CONF_WOW_SITE_ID, "")).strip()
-            auth_key = str(user_input.get(CONF_WOW_AUTH_KEY, "")).strip()
-            if not site_id or not auth_key:
-                self._data[CONF_ENABLE_WOW] = False
-            else:
-                self._data[CONF_WOW_SITE_ID] = site_id
-                self._data[CONF_WOW_AUTH_KEY] = auth_key
-                self._data[CONF_WOW_INTERVAL_MIN] = int(user_input.get(CONF_WOW_INTERVAL_MIN, DEFAULT_WOW_INTERVAL_MIN))
-            if self._data.get(CONF_ENABLE_AWEKAS):
-                return await self.async_step_awekas()
-            if self._data.get(CONF_ENABLE_OWM_STATIONS):
-                return await self.async_step_owm_stations()
-            if self._data.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy()
-            if self._data.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop()
-            if self._data.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="wow",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_WOW_SITE_ID, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Optional(CONF_WOW_AUTH_KEY, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(CONF_WOW_INTERVAL_MIN, default=DEFAULT_WOW_INTERVAL_MIN): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={
-                "info": "WOW site ID and authentication key from wow.metoffice.gov.uk. Leave blank to skip."
-            },
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 - AWEKAS upload credentials
-    # ------------------------------------------------------------------
-    async def async_step_awekas(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            username = str(user_input.get(CONF_AWEKAS_USERNAME, "")).strip()
-            password = str(user_input.get(CONF_AWEKAS_PASSWORD, "")).strip()
-            if not username or not password:
-                self._data[CONF_ENABLE_AWEKAS] = False
-            else:
-                self._data[CONF_AWEKAS_USERNAME] = username
-                self._data[CONF_AWEKAS_PASSWORD] = password
-                self._data[CONF_AWEKAS_INTERVAL_MIN] = int(
-                    user_input.get(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN)
-                )
-            if self._data.get(CONF_ENABLE_OWM_STATIONS):
-                return await self.async_step_owm_stations()
-            if self._data.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy()
-            if self._data.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop()
-            if self._data.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="awekas",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_AWEKAS_USERNAME, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Optional(CONF_AWEKAS_PASSWORD, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(
-                        CONF_AWEKAS_INTERVAL_MIN, default=DEFAULT_AWEKAS_INTERVAL_MIN
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={"info": "AWEKAS username and password from awekas.at. Leave blank to skip."},
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 - OpenWeatherMap Stations API credentials
-    # ------------------------------------------------------------------
-    async def async_step_owm_stations(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            api_key = str(user_input.get(CONF_OWM_STATIONS_API_KEY, "")).strip()
-            station_id = str(user_input.get(CONF_OWM_STATIONS_STATION_ID, "")).strip()
-            if not api_key or not station_id:
-                self._data[CONF_ENABLE_OWM_STATIONS] = False
-            else:
-                self._data[CONF_OWM_STATIONS_API_KEY] = api_key
-                self._data[CONF_OWM_STATIONS_STATION_ID] = station_id
-                self._data[CONF_OWM_STATIONS_INTERVAL_MIN] = int(
-                    user_input.get(CONF_OWM_STATIONS_INTERVAL_MIN, DEFAULT_OWM_STATIONS_INTERVAL_MIN)
-                )
-            if self._data.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy()
-            if self._data.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop()
-            if self._data.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="owm_stations",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_OWM_STATIONS_API_KEY, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(CONF_OWM_STATIONS_STATION_ID, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Optional(
-                        CONF_OWM_STATIONS_INTERVAL_MIN, default=DEFAULT_OWM_STATIONS_INTERVAL_MIN
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={
-                "info": (
-                    "OpenWeatherMap Stations API. Create a station via the OWM API to get a "
-                    "station_id, and use your OWM API key. Leave blank to skip."
-                )
-            },
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 - Windy.com upload credentials
-    # ------------------------------------------------------------------
-    async def async_step_windy(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            api_key = str(user_input.get(CONF_WINDY_API_KEY, "")).strip()
-            if not api_key:
-                self._data[CONF_ENABLE_WINDY] = False
-            else:
-                self._data[CONF_WINDY_API_KEY] = api_key
-                self._data[CONF_WINDY_STATION_ID] = str(user_input.get(CONF_WINDY_STATION_ID, "")).strip()
-                self._data[CONF_WINDY_INTERVAL_MIN] = int(
-                    user_input.get(CONF_WINDY_INTERVAL_MIN, DEFAULT_WINDY_INTERVAL_MIN)
-                )
-            if self._data.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop()
-            if self._data.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="windy",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_WINDY_API_KEY, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(CONF_WINDY_STATION_ID, default=""): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Optional(CONF_WINDY_INTERVAL_MIN, default=DEFAULT_WINDY_INTERVAL_MIN): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={
-                "info": (
-                    "Windy.com Stations API key from stations.windy.com. Station ID is optional "
-                    "(defaults to 0 for single-station accounts). Leave the key blank to skip."
-                )
-            },
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 - CWOP (APRS) credentials
-    # ------------------------------------------------------------------
-    async def async_step_cwop(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            callsign = str(user_input.get(CONF_CWOP_CALLSIGN, "")).strip().upper()
-            if not callsign:
-                self._data[CONF_ENABLE_CWOP] = False
-            else:
-                self._data[CONF_CWOP_CALLSIGN] = callsign
-                self._data[CONF_CWOP_PASSCODE] = str(user_input.get(CONF_CWOP_PASSCODE, "-1")).strip() or "-1"
-                self._data[CONF_CWOP_SERVER] = str(user_input.get(CONF_CWOP_SERVER, DEFAULT_CWOP_SERVER)).strip()
-                self._data[CONF_CWOP_PORT] = int(user_input.get(CONF_CWOP_PORT, DEFAULT_CWOP_PORT))
-                self._data[CONF_CWOP_INTERVAL_MIN] = int(
-                    user_input.get(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN)
-                )
-            if self._data.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="cwop",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_CWOP_CALLSIGN, default=""): selector.TextSelector(),
-                    vol.Optional(CONF_CWOP_PASSCODE, default="-1"): selector.TextSelector(),
-                    vol.Optional(CONF_CWOP_SERVER, default=DEFAULT_CWOP_SERVER): selector.TextSelector(),
-                    vol.Optional(CONF_CWOP_PORT, default=DEFAULT_CWOP_PORT): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=65535, step=1, mode="box")
-                    ),
-                    vol.Optional(CONF_CWOP_INTERVAL_MIN, default=DEFAULT_CWOP_INTERVAL_MIN): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=5, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={
-                "info": (
-                    "CWOP (Citizen Weather Observer Program) via APRS. Enter your CWOP/APRS "
-                    "callsign (e.g. CW1234 or a licensed ham callsign). Passcode is -1 for "
-                    "CWOP-issued IDs, or your APRS-IS passcode for ham callsigns. Leave the "
-                    "callsign blank to skip. Forecast lat/lon must be set."
-                )
-            },
-            last_step=False,
-        )
-
-    # ------------------------------------------------------------------
-    # v2.0 - MQTT Discovery configuration
-    # ------------------------------------------------------------------
-    async def async_step_mqtt_config(self, user_input: dict[str, Any] | None = None):
-        if user_input is not None:
-            back = await self._handle_back(user_input)
-            if back:
-                return back
-            self._data[CONF_MQTT_DISCOVERY_PREFIX] = (
-                str(user_input.get(CONF_MQTT_DISCOVERY_PREFIX, DEFAULT_MQTT_DISCOVERY_PREFIX)).strip()
-                or DEFAULT_MQTT_DISCOVERY_PREFIX
-            )
-            self._data[CONF_MQTT_STATE_PREFIX] = (
-                str(user_input.get(CONF_MQTT_STATE_PREFIX, DEFAULT_MQTT_STATE_PREFIX)).strip()
-                or DEFAULT_MQTT_STATE_PREFIX
-            )
-            self._data[CONF_MQTT_INTERVAL_MIN] = int(user_input.get(CONF_MQTT_INTERVAL_MIN, DEFAULT_MQTT_INTERVAL_MIN))
-            return await self.async_step_alerts()
-
-        return self._show_step(
-            step_id="mqtt_config",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_MQTT_DISCOVERY_PREFIX, default=DEFAULT_MQTT_DISCOVERY_PREFIX
-                    ): selector.TextSelector(selector.TextSelectorConfig(type="text")),
-                    vol.Optional(CONF_MQTT_STATE_PREFIX, default=DEFAULT_MQTT_STATE_PREFIX): selector.TextSelector(
-                        selector.TextSelectorConfig(type="text")
-                    ),
-                    vol.Optional(CONF_MQTT_INTERVAL_MIN, default=DEFAULT_MQTT_INTERVAL_MIN): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            description_placeholders={
-                "info": (
-                    "Sensors will be published as MQTT Discovery payloads under "
-                    f"{DEFAULT_MQTT_DISCOVERY_PREFIX}/sensor/... and state updates under "
-                    f"{DEFAULT_MQTT_STATE_PREFIX}/{{prefix}}/{{sensor}}/state. "
-                    "Requires the HA MQTT integration to be configured."
-                )
-            },
-            last_step=False,
-        )
+    async def _rooms_done(self):
+        return await self._next_upload_step()
 
     # ------------------------------------------------------------------
     async def async_step_alerts(self, user_input: dict[str, Any] | None = None):
@@ -2145,8 +1610,11 @@ class WSStationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 # ---------------------------------------------------------------------------
 
 
-class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
+class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
     """Multi-step options flow - mirrors the config flow so every setting is accessible post-install."""
+
+    _step_suffix = "_opt"
+    _rooms_hub_step = "indoor_rooms_opt"
 
     def _get(self, key: str, default: Any) -> Any:
         return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
@@ -2583,114 +2051,9 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
             last_step=False,
         )
 
-    # ------------------------------------------------------------------
-    # Named indoor rooms (v2.6.0; issue #115) - add / edit / remove hub
-    # ------------------------------------------------------------------
-    def _rooms_working_copy(self) -> list[dict]:
-        """Return (initializing if needed) the in-progress room list."""
-        if CONF_INDOOR_ROOMS not in self._opt:
-            self._opt[CONF_INDOOR_ROOMS] = normalize_indoor_rooms(self._get(CONF_INDOOR_ROOMS, []))
-        return self._opt[CONF_INDOOR_ROOMS]
-
-    def _room_form_schema(self, src: dict | None) -> vol.Schema:
-        src = src or {}
-        sensor_sel = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
-        schema: dict[Any, Any] = {
-            vol.Required("name", default=src.get("name", "")): selector.TextSelector(),
-        }
-        for field in ("temp", "humidity", "co2"):
-            cur = src.get(field)
-            # suggested_value (not default) keeps the field clearable when
-            # editing a room to remove a previously-assigned sensor -- see
-            # issue #135.
-            key = vol.Optional(field, description={"suggested_value": cur}) if cur else vol.Optional(field)
-            schema[key] = sensor_sel
-        return vol.Schema(schema)
-
     async def async_step_indoor_rooms_opt(self, user_input: dict[str, Any] | None = None):
         """Hub menu for managing named indoor rooms."""
-        rooms = self._rooms_working_copy()
-        menu_options = ["room_add"]
-        if rooms:
-            menu_options += ["room_edit", "room_remove"]
-        menu_options.append("room_done")
-        return self.async_show_menu(step_id="indoor_rooms_opt", menu_options=menu_options)
-
-    async def async_step_room_done(self, user_input: dict[str, Any] | None = None):
-        return await self._finish_or_next("indoor_rooms_opt")
-
-    async def async_step_room_add(self, user_input: dict[str, Any] | None = None):
-        self._edit_rid: str | None = None
-        return await self.async_step_room_form()
-
-    async def async_step_room_edit(self, user_input: dict[str, Any] | None = None):
-        rooms = self._rooms_working_copy()
-        if user_input is not None:
-            self._edit_rid = user_input["room"]
-            return await self.async_step_room_form()
-        options = [{"value": r["id"], "label": r["name"]} for r in rooms]
-        return self.async_show_form(
-            step_id="room_edit",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("room"): selector.SelectSelector(
-                        selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
-                    )
-                }
-            ),
-            last_step=False,
-        )
-
-    async def async_step_room_form(self, user_input: dict[str, Any] | None = None):
-        rooms = self._rooms_working_copy()
-        editing = next((r for r in rooms if r["id"] == self._edit_rid), None) if self._edit_rid else None
-        if user_input is not None:
-            name = (user_input.get("name") or "").strip()
-            if not name:
-                return self.async_show_form(
-                    step_id="room_form",
-                    data_schema=self._room_form_schema({**(editing or {}), **user_input}),
-                    errors={"name": "room_name_required"},
-                    last_step=False,
-                )
-            room = {
-                "id": editing["id"] if editing else uuid.uuid4().hex[:8],
-                "name": name,
-                "temp": user_input.get("temp") or None,
-                "humidity": user_input.get("humidity") or None,
-                "co2": user_input.get("co2") or None,
-            }
-            if editing:
-                self._opt[CONF_INDOOR_ROOMS] = [room if r["id"] == editing["id"] else r for r in rooms]
-            else:
-                self._opt[CONF_INDOOR_ROOMS] = [*rooms, room]
-            return await self.async_step_indoor_rooms_opt()
-        return self.async_show_form(
-            step_id="room_form",
-            data_schema=self._room_form_schema(editing),
-            last_step=False,
-        )
-
-    async def async_step_room_remove(self, user_input: dict[str, Any] | None = None):
-        rooms = self._rooms_working_copy()
-        if user_input is not None:
-            to_remove = set(user_input.get("rooms") or [])
-            self._opt[CONF_INDOOR_ROOMS] = [r for r in rooms if r["id"] not in to_remove]
-            return await self.async_step_indoor_rooms_opt()
-        options = [{"value": r["id"], "label": r["name"]} for r in rooms]
-        return self.async_show_form(
-            step_id="room_remove",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional("rooms", default=[]): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=options, multiple=True, mode=selector.SelectSelectorMode.LIST
-                        )
-                    )
-                }
-            ),
-            last_step=False,
-        )
+        return await self._rooms_menu()
 
     async def async_step_upload_services_opt(self, user_input: dict[str, Any] | None = None):
         g = self._get
@@ -2737,275 +2100,56 @@ class WSStationOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     # ------------------------------------------------------------------
-    # v2.0 options-flow chain: upload credentials + MQTT (reconfigure parity)
+    # Upload credentials + MQTT (shared with the config flow)
     # ------------------------------------------------------------------
     async def _next_v2_opt_step(self):
-        if self._opt.get(CONF_ENABLE_WEATHERCLOUD):
-            return await self.async_step_weathercloud_opt()
-        if self._opt.get(CONF_ENABLE_PWSWEATHER):
-            return await self.async_step_pwsweather_opt()
-        if self._opt.get(CONF_ENABLE_WOW):
-            return await self.async_step_wow_opt()
-        if self._opt.get(CONF_ENABLE_AWEKAS):
-            return await self.async_step_awekas_opt()
-        if self._opt.get(CONF_ENABLE_OWM_STATIONS):
-            return await self.async_step_owm_stations_opt()
-        if self._opt.get(CONF_ENABLE_WINDY):
-            return await self.async_step_windy_opt()
-        if self._opt.get(CONF_ENABLE_CWOP):
-            return await self.async_step_cwop_opt()
-        if self._opt.get(CONF_ENABLE_MQTT):
-            return await self.async_step_mqtt_config_opt()
-        return self.async_create_entry(title="", data=self._opt)
+        return await self._next_upload_step()
 
     async def async_step_weathercloud_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_ENABLE_PWSWEATHER):
-                return await self.async_step_pwsweather_opt()
-            if self._opt.get(CONF_ENABLE_WOW):
-                return await self.async_step_wow_opt()
-            if self._opt.get(CONF_ENABLE_AWEKAS):
-                return await self.async_step_awekas_opt()
-            if self._opt.get(CONF_ENABLE_OWM_STATIONS):
-                return await self.async_step_owm_stations_opt()
-            if self._opt.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy_opt()
-            if self._opt.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop_opt()
-            if self._opt.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config_opt()
-            return self.async_create_entry(title="", data=self._opt)
-        return self.async_show_form(
-            step_id="weathercloud_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_WC_STATION_ID, default=g(CONF_WC_STATION_ID, "")): selector.TextSelector(),
-                    vol.Optional(CONF_WC_API_KEY, default=g(CONF_WC_API_KEY, "")): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(
-                        CONF_WC_INTERVAL_MIN, default=g(CONF_WC_INTERVAL_MIN, DEFAULT_WC_INTERVAL_MIN)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
-        )
+        return await self._upload_step("weathercloud", user_input)
 
     async def async_step_pwsweather_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_ENABLE_WOW):
-                return await self.async_step_wow_opt()
-            if self._opt.get(CONF_ENABLE_AWEKAS):
-                return await self.async_step_awekas_opt()
-            if self._opt.get(CONF_ENABLE_OWM_STATIONS):
-                return await self.async_step_owm_stations_opt()
-            if self._opt.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy_opt()
-            if self._opt.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop_opt()
-            if self._opt.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config_opt()
-            return self.async_create_entry(title="", data=self._opt)
-        return self.async_show_form(
-            step_id="pwsweather_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_PWS_STATION_ID, default=g(CONF_PWS_STATION_ID, "")): selector.TextSelector(),
-                    vol.Optional(CONF_PWS_API_KEY, default=g(CONF_PWS_API_KEY, "")): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(
-                        CONF_PWS_INTERVAL_MIN, default=g(CONF_PWS_INTERVAL_MIN, DEFAULT_PWS_INTERVAL_MIN)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
-        )
+        return await self._upload_step("pwsweather", user_input)
 
     async def async_step_wow_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_ENABLE_AWEKAS):
-                return await self.async_step_awekas_opt()
-            if self._opt.get(CONF_ENABLE_OWM_STATIONS):
-                return await self.async_step_owm_stations_opt()
-            if self._opt.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy_opt()
-            if self._opt.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop_opt()
-            if self._opt.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config_opt()
-            return self.async_create_entry(title="", data=self._opt)
-        return self.async_show_form(
-            step_id="wow_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_WOW_SITE_ID, default=g(CONF_WOW_SITE_ID, "")): selector.TextSelector(),
-                    vol.Optional(CONF_WOW_AUTH_KEY, default=g(CONF_WOW_AUTH_KEY, "")): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(
-                        CONF_WOW_INTERVAL_MIN, default=g(CONF_WOW_INTERVAL_MIN, DEFAULT_WOW_INTERVAL_MIN)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
-        )
+        return await self._upload_step("wow", user_input)
 
     async def async_step_awekas_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_ENABLE_OWM_STATIONS):
-                return await self.async_step_owm_stations_opt()
-            if self._opt.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy_opt()
-            if self._opt.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop_opt()
-            if self._opt.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config_opt()
-            return self.async_create_entry(title="", data=self._opt)
-        return self.async_show_form(
-            step_id="awekas_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_AWEKAS_USERNAME, default=g(CONF_AWEKAS_USERNAME, "")): selector.TextSelector(),
-                    vol.Optional(CONF_AWEKAS_PASSWORD, default=g(CONF_AWEKAS_PASSWORD, "")): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(
-                        CONF_AWEKAS_INTERVAL_MIN, default=g(CONF_AWEKAS_INTERVAL_MIN, DEFAULT_AWEKAS_INTERVAL_MIN)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
-        )
+        return await self._upload_step("awekas", user_input)
 
     async def async_step_owm_stations_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_ENABLE_WINDY):
-                return await self.async_step_windy_opt()
-            if self._opt.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop_opt()
-            if self._opt.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config_opt()
-            return self.async_create_entry(title="", data=self._opt)
-        return self.async_show_form(
-            step_id="owm_stations_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_OWM_STATIONS_API_KEY, default=g(CONF_OWM_STATIONS_API_KEY, "")
-                    ): selector.TextSelector(selector.TextSelectorConfig(type="password")),
-                    vol.Optional(
-                        CONF_OWM_STATIONS_STATION_ID, default=g(CONF_OWM_STATIONS_STATION_ID, "")
-                    ): selector.TextSelector(),
-                    vol.Optional(
-                        CONF_OWM_STATIONS_INTERVAL_MIN,
-                        default=g(CONF_OWM_STATIONS_INTERVAL_MIN, DEFAULT_OWM_STATIONS_INTERVAL_MIN),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
-        )
+        return await self._upload_step("owm_stations", user_input)
 
     async def async_step_windy_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_ENABLE_CWOP):
-                return await self.async_step_cwop_opt()
-            if self._opt.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config_opt()
-            return self.async_create_entry(title="", data=self._opt)
-        return self.async_show_form(
-            step_id="windy_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_WINDY_API_KEY, default=g(CONF_WINDY_API_KEY, "")): selector.TextSelector(
-                        selector.TextSelectorConfig(type="password")
-                    ),
-                    vol.Optional(CONF_WINDY_STATION_ID, default=g(CONF_WINDY_STATION_ID, "")): selector.TextSelector(),
-                    vol.Optional(
-                        CONF_WINDY_INTERVAL_MIN, default=g(CONF_WINDY_INTERVAL_MIN, DEFAULT_WINDY_INTERVAL_MIN)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
-        )
+        return await self._upload_step("windy", user_input)
 
     async def async_step_cwop_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_ENABLE_MQTT):
-                return await self.async_step_mqtt_config_opt()
-            return self.async_create_entry(title="", data=self._opt)
-        return self.async_show_form(
-            step_id="cwop_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_CWOP_CALLSIGN, default=g(CONF_CWOP_CALLSIGN, "")): selector.TextSelector(),
-                    vol.Optional(CONF_CWOP_PASSCODE, default=g(CONF_CWOP_PASSCODE, "-1")): selector.TextSelector(),
-                    vol.Optional(
-                        CONF_CWOP_SERVER, default=g(CONF_CWOP_SERVER, DEFAULT_CWOP_SERVER)
-                    ): selector.TextSelector(),
-                    vol.Optional(CONF_CWOP_PORT, default=g(CONF_CWOP_PORT, DEFAULT_CWOP_PORT)): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=65535, step=1, mode="box")
-                    ),
-                    vol.Optional(
-                        CONF_CWOP_INTERVAL_MIN, default=g(CONF_CWOP_INTERVAL_MIN, DEFAULT_CWOP_INTERVAL_MIN)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=5, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
-        )
+        return await self._upload_step("cwop", user_input)
 
     async def async_step_mqtt_config_opt(self, user_input: dict[str, Any] | None = None):
-        g = self._get
-        if user_input is not None:
-            self._opt.update(user_input)
-            return self.async_create_entry(title="", data=self._opt)
+        return await self._upload_step("mqtt_config", user_input)
+
+    # -- SharedFlowSteps hooks ------------------------------------------
+
+    def _flow_store(self) -> dict[str, Any]:
+        return self._opt
+
+    def _flow_default(self, key: str, default: Any) -> Any:
+        return self._opt.get(key, self._get(key, default))
+
+    async def _flow_back(self, user_input: dict[str, Any]):
+        return None
+
+    def _flow_show(self, step_id: str, schema: vol.Schema, placeholders: dict[str, str]):
         return self.async_show_form(
-            step_id="mqtt_config_opt",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_MQTT_DISCOVERY_PREFIX, default=g(CONF_MQTT_DISCOVERY_PREFIX, DEFAULT_MQTT_DISCOVERY_PREFIX)
-                    ): selector.TextSelector(),
-                    vol.Optional(
-                        CONF_MQTT_STATE_PREFIX, default=g(CONF_MQTT_STATE_PREFIX, DEFAULT_MQTT_STATE_PREFIX)
-                    ): selector.TextSelector(),
-                    vol.Optional(
-                        CONF_MQTT_INTERVAL_MIN, default=g(CONF_MQTT_INTERVAL_MIN, DEFAULT_MQTT_INTERVAL_MIN)
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(min=1, max=60, step=1, mode="box", unit_of_measurement="min")
-                    ),
-                }
-            ),
-            last_step=False,
+            step_id=step_id, data_schema=schema, description_placeholders=placeholders, last_step=False
         )
+
+    async def _uploads_done(self):
+        return self.async_create_entry(title="", data=self._opt)
+
+    async def _rooms_done(self):
+        return await self._finish_or_next("indoor_rooms_opt")
 
     async def async_step_forecast_api_key_opt(self, user_input: dict[str, Any] | None = None):
         """Options step: API key for providers that require one."""
