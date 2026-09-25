@@ -53,7 +53,9 @@ class PirateWeatherProvider(ForecastProvider):
             if resp.status == 429:
                 raise ValueError("Pirate Weather: API rate limit exceeded")
             if resp.status != 200:
-                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
+                # Not ClientResponseError: its message embeds the request URL,
+                # which carries the API key, and would leak it into the logs.
+                raise ValueError(f"Pirate Weather: HTTP {resp.status}")
             js = await resp.json(content_type=None)
 
         # Daily

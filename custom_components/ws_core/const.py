@@ -938,8 +938,21 @@ KEY_NEIGHBOR_QC = "neighbor_qc_flags"  # list of neighbor-comparison flags
 KEY_SENSOR_SPIKE = "sensor_spike_flags"  # list of σ-based step-change flags
 
 # Spike detection thresholds (sigma multiplier + minimum samples)
+# FWI moisture codes are defined on local-noon observations (Van Wagner 1987)
+FWI_OBSERVATION_HOUR = 12
+
 SPIKE_SIGMA_THRESHOLD = 3.0  # flag a reading > 3σ from rolling mean
 SPIKE_MIN_SAMPLES = 12  # need at least this many samples to compute σ
+
+# Stuck-value detection: a reading is "stuck" when it has not moved by more
+# than the tolerance for the whole duration. Time-based rather than
+# sample-based because compute cycles run on every source update, and a
+# healthy 0.1-resolution sensor can legitimately hold one value for a while.
+STUCK_TOLERANCE = {"temp": 0.05, "humidity": 0.5, "pressure": 0.05}
+STUCK_DURATION_S = {"temp": 4 * 3600, "humidity": 6 * 3600, "pressure": 6 * 3600}
+# Saturated / bone-dry humidity can legitimately sit at the rail for hours
+# (fog, desert afternoons), so it is excluded from stuck detection.
+STUCK_HUMIDITY_RAIL_PCT = 2.0
 
 # ---------------------------------------------------------------------------
 # v2.7 - Adaptive (auto-apply) sensor calibration
@@ -1080,3 +1093,21 @@ DEPRECATED_CONF_KEYS_V030 = (
     "rain_penalty_light_mmph",
     "rain_penalty_heavy_mmph",
 )
+
+
+# Repairs issues raised per config entry. The issue ID carries the entry ID so
+# two stations never overwrite or clear each other's issues; the
+# translation_key is the bare name.
+ENTRY_REPAIR_ISSUES = (
+    "missing_source_entities",
+    "stale_sensors",
+    "forecast_api_failures",
+    "stuck_sensors",
+    "sensor_drift_detected",
+    "large_calibration_offset",
+)
+
+
+def issue_id_for_entry(name: str, entry_id: str) -> str:
+    """Repairs issue ID for ``name`` scoped to one config entry."""
+    return f"{name}_{entry_id}"

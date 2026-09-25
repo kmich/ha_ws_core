@@ -2,6 +2,45 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.8.0] - 2026-09-25
+
+A correctness release from a full code review. Several derived values change meaning
+slightly (noted below), so check automations that compare them against fixed thresholds.
+
+### Fixed
+
+- **Stuck-sensor detection never fired.** `sensor.ws_sensor_stuck`, the temperature/humidity/pressure *stuck* binary sensors and the "stuck sensors" Repairs issue compared each reading with a value stored on the per-cycle data dict, which is rebuilt from scratch every cycle, so nothing was ever flagged. Detection is now time-based: temperature is flagged after 4 h without moving more than 0.05 °C, humidity after 6 h within 0.5 % (never at 0-2 % or 98-100 %, e.g. fog), pressure after 6 h within 0.05 hPa. A count of identical consecutive cycles would have raised false alarms, because cycles run on every source update.
+- **Degree-day season totals were wrong.** At midnight the day's running mean was reset *before* it was added to the season, so `sensor.ws_hdd_season` / `sensor.ws_cdd_season` accumulated the new day's first reading instead of the completed day (a 10 °C·day day added about 3). The completed day is now folded in first, `sensor.ws_cdd_season` now resets on 1 January like the others, and a day that ends while Home Assistant is stopped is still counted after the restart. GDD season uses the same logic. Existing season totals are not recomputed.
+- **`reset_rain_baseline`, `reset_learning_state` and `export_learning_state` raised `AttributeError` when called without `entry_id`.** The event platform stored a plain dict alongside the coordinators in `hass.data[DOMAIN]`, and these services iterate every value there. Event entities are now kept on their coordinator.
+- **FWI moisture codes were dried twice a day and observed at midnight.** After the daily update, every later cycle fed the already-updated codes back in as "yesterday", so the displayed FFMC/DMC/DC (and ISI/BUI/FWI/DSR from them) included an extra day of drying. The daily update also ran on the first reading after local midnight, but the FWI system is defined on noon observations, and the cool, humid night air biased fire danger low. The codes now advance once, on the first reading at or after 12:00 local time (the rolling 24 h rain at noon is exactly the standard noon-to-noon rainfall), and ISI/BUI/FWI/DSR are recomputed from the stored codes with the current wind the rest of the day. Expect higher daytime FWI values than before.
+- **The configured pressure-trend window reverted to 3 h after a restart.** Restoring the pressure history rebuilt it with a fixed 12-sample capacity instead of the one derived from `number.ws_pressure_trend_window`.
+- **The irrigation need score ignored today's rain.** It read `rain_today_mm` before that cycle had set it, so rain never offset ET₀ in `sensor.ws_irrigation_need_score`.
+- **Weather Underground and PWSWeather received the rolling 24 h rain as `dailyrainin`.** The protocol defines it as rain since local midnight, which is what is now sent.
+- **Hourly forecast blended local readings twice.** The coordinator blended the first three hourly forecast slots by list position, and the weather entity blended them again, so the current hour was about 91 % local instead of 70 %. The coordinator no longer blends; the weather entity's time-aware 70/40/20 % blend, applied from the current hour, is the only one.
+- **`sensor.ws_et0_hourly` assumed daylight was 06:00-18:00 UTC.** It now follows local solar time from the station longitude (it peaked around 04:00 local time on the US west coast) and its hourly values sum to the daily total. Both `sensor.ws_et0_daily` (Hargreaves) and `sensor.ws_et0_penman_monteith` now use the FAO-56 daily mean temperature (T_max + T_min) / 2 instead of the current reading, so they no longer swing with the time of day.
+- **`sensor.ws_river_flow` was 1000× too high.** Hub'Eau reports discharge in L/s; it is now converted to the sensor's m³/s.
+- **Background loops died on the first unexpected error, and deferred start-up tasks outlived the entry.** All periodic uploads/fetches now log a failed run and retry on the next interval, and every background task (including the first fetches after start-up) is cancelled when the entry unloads, so a quick reload can no longer re-publish MQTT discovery after it was removed.
+- **Forecast cards could keep showing stale forecasts.** The weather entity now pushes forecast updates to subscribed frontend cards whenever its data changes.
+- **Repairs issues were shared across entries.** With two stations, one entry could overwrite or clear the other's issue (or clear it via *suppress notifications*). Issue IDs now include the config entry, and an entry's issues are removed when the entry is deleted. Leftover issues from the old shared IDs are cleared on start-up.
+
+### Security
+
+- **API keys could appear in the Home Assistant log.** OpenWeatherMap and Pirate Weather carry the key in the request URL, and on an HTTP error other than an auth or rate-limit response the logged aiohttp exception included that URL. They now raise a plain `HTTP <status>` error, and forecast and upload error messages are scrubbed of the configured keys.
+- Air quality, solar forecast, Météo Vigilance, Vigicrues and the config-flow checks now use Home Assistant's shared HTTP session instead of opening their own.
+
+### Changed (accuracy)
+
+- **Frost point** used Buck's ice constants for both the humidity reference and the inversion, but relative humidity is measured against liquid water; it was about 1 °C too cold at -10 °C. It now takes vapour pressure from the water curve and inverts on the ice curve, and returns the dew point when the dew point is at or above 0 °C.
+- **US AQI** uses the EPA's 2024 PM2.5 breakpoints (Good = 0-9.0 µg/m³) and truncates concentrations as the EPA specifies, so values between bands (e.g. 9.05 µg/m³) no longer drop the PM2.5 sub-index. Readings that were "Good" at 9-12 µg/m³ are now "Moderate".
+- **Wind gust** now receives the wind-speed calibration offset (same anemometer); a positive offset could previously raise a false "gust below wind speed" flag.
+- **Source units:** pressure sources in kPa or psi and wind sources in ft/s are now converted (kPa was previously read as hPa).
+- **Current condition:** an illuminance reading of exactly 0 lx is now used as-is instead of being treated as missing (daylight).
+- **CWOP:** 100 % humidity is sent as `h00` as APRS requires (was `h100`), and the packet now includes rain since local midnight (`P`).
+
+### Internal
+
+- `tests/` and `scripts/` are now linted and format-checked in CI; 27 regression tests cover the fixes above.
+
 ## [2.7.7] - 2026-09-19
 
 ### Fixed

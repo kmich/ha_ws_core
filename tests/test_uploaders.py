@@ -37,6 +37,7 @@ from custom_components.ws_core.const import (
     KEY_NORM_WIND_SPEED_MS,
     KEY_RAIN_ACCUM_1H,
     KEY_RAIN_ACCUM_24H,
+    KEY_RAIN_TODAY_MM,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_UV,
 )
@@ -105,6 +106,7 @@ def _data() -> dict:
         KEY_NORM_WIND_GUST_MS: 8.0,
         KEY_RAIN_ACCUM_1H: 2.54,  # = 0.1 in
         KEY_RAIN_ACCUM_24H: 25.4,  # = 1.0 in
+        KEY_RAIN_TODAY_MM: 12.7,  # = 0.5 in (since local midnight)
         KEY_UV: 4.0,
     }
 
@@ -199,7 +201,8 @@ class TestWUnderground:
         assert p["humidity"] == 55
         assert p["windspeedmph"] == pytest.approx(11.2, abs=0.1)  # 5 m/s
         assert p["rainin"] == pytest.approx(0.1, abs=0.001)  # 2.54 mm
-        assert p["dailyrainin"] == pytest.approx(1.0, abs=0.001)  # 25.4 mm
+        # dailyrainin is rain since local midnight, not the rolling 24h total
+        assert p["dailyrainin"] == pytest.approx(0.5, abs=0.001)  # 12.7 mm
         assert p["baromin"] == pytest.approx(29.92, abs=0.02)  # 1013 hPa
 
     async def test_http_500_is_error_http(self):
@@ -485,6 +488,23 @@ class TestCWOP:
         assert "FW1234>APRS" in sent
         assert "_180/" in sent  # wind dir 180
         assert "t068" in sent  # 20°C -> 68°F
+        assert "p100" in sent  # rolling 24h: 25.4 mm = 1.00 in
+        assert "P050" in sent  # since midnight: 12.7 mm = 0.50 in
+        assert "h55" in sent
+
+    async def test_saturated_humidity_encodes_as_h00(self):
+        writer = _FakeWriter()
+
+        async def fake_open(host, port):
+            return _FakeReader(), writer
+
+        coord = _coord()
+        coord.data = {**coord.data, KEY_NORM_HUMIDITY: 100.0}
+        with patch.object(asyncio, "open_connection", fake_open):
+            await coord._async_upload_cwop()
+        sent = b"".join(writer.written).decode("ascii")
+        assert "h00" in sent
+        assert "h100" not in sent
 
     async def test_connection_refused(self):
         async def fake_open(host, port):

@@ -96,9 +96,14 @@ dropping to `unknown`.
 Local station data and the provider forecast are combined in three explicit places, in
 this order of trust for the near term:
 
-1. **Nowcast (0-2 hours):** your live rain gauge is blended with the Open-Meteo
-   15-minute grid (a tapering 70 / 40 / 10 % local weight over the first three hours),
-   because your own gauge is the ground truth for what is happening right now.
+1. **Nowcast (0-2 hours):** the weather entity's hourly forecast blends your live
+   readings (temperature, humidity, dew point, wind, gust and rain rate) into the
+   current hour and the next two, with a tapering 70 / 40 / 20 % local weight, and uses
+   the locally detected condition for the current hour, because your own station is the
+   ground truth for what is happening right now. The blend is applied once, by the
+   weather entity, to the hours starting from the current hour. Separately, the
+   precipitation nowcast sensors blend your rain gauge into the first two Open-Meteo
+   15-minute buckets (see [Nowcast](guides/nowcast.md)).
 2. **Rain probability:** a local barometric/wind heuristic is blended with the provider
    precipitation probability. When at least ten verified outcomes exist, the blend weight
    is learned from each source's rolling 90-day Brier score; otherwise a fixed

@@ -39,8 +39,11 @@ fuel moisture at three depths and derives an index of fire intensity.
 | `sensor.ws_fwi_dmc` | Loosely compacted duff, 5-10 cm depth | ~12 days |
 | `sensor.ws_fwi_dc` | Deep compact organic layer, > 10 cm | ~52 days |
 
-Moisture codes are updated once per calendar day and persist across HA restarts.
-They self-correct within a few days from the Van Wagner (1987) standard start values.
+Moisture codes advance once per calendar day, on the first reading at or after 12:00
+local time (the FWI system is defined on noon observations), and persist across HA
+restarts. For the rest of the day ISI, BUI, FWI and DSR follow the current wind while the
+moisture codes stay fixed. Before the first noon after installation the sensors show the
+Van Wagner (1987) standard start values, and they self-correct within a few days.
 
 ### Derived indices
 

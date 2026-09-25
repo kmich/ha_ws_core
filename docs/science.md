@@ -25,9 +25,11 @@ Over ice  (T < 0 °C):  a = 22.587, b = 273.86 °C   [Buck 1981]
 
 ### Frost Point — Magnus Formula with Ice Constants (Buck 1981)
 
-The frost point is the temperature at which ice saturation occurs. Uses Buck's (1981)
-ice-phase saturation constants (a = 22.587, b = 273.86). Returns dew point above 0 °C,
-frost point below 0 °C.
+The frost point is the temperature at which ice saturation occurs. Relative humidity is
+reported with respect to liquid water, so the actual vapour pressure is first taken from
+the water Magnus curve (the dew-point constants above) and then inverted on Buck's (1981)
+ice-phase curve (a = 22.587, b = 273.86). Returns the dew point when the dew point is at or
+above 0 °C, and the frost point (always slightly warmer than the dew point) below 0 °C.
 
 **Reference:** Buck, A.L. (1981). *J. Appl. Meteor.*, 20, 1527-1532.
 
@@ -180,6 +182,13 @@ WMO synoptic code Table 4680.
 Complete Van Wagner (1987) implementation: FFMC, DMC, DC moisture codes with persistent
 daily carry-over across HA restarts, ISI, BUI, FWI, DSR.
 
+The system is defined on local-noon observations. The moisture codes advance once per
+calendar day, on the first reading at or after 12:00 local time, using that reading's
+temperature, humidity and wind plus the rolling 24h rain total (which at noon is exactly
+the standard noon-to-noon rainfall). Between those daily steps ISI, BUI, FWI and DSR are
+re-evaluated from the stored codes with the current wind; the codes themselves do not
+change until the next day's noon reading.
+
 **Disclaimer:** Not suitable for operational fire weather decisions. Consult official
 fire services and national fire weather products.
 
@@ -194,7 +203,12 @@ Fire Weather Index System.* Forestry Technical Report 35. Canadian Forestry Serv
 
 ```
 ET₀ = 0.0023 · Ra · (T_mean + 17.8) · (T_max − T_min)^0.5
+T_mean = (T_max + T_min) / 2        (FAO-56 daily mean, from the rolling 24h high/low)
 ```
+
+`sensor.ws_et0_hourly` spreads the daily total over daylight with a sine curve between
+06:00 and 18:00 **local solar time** (derived from the station longitude), peaking at solar
+noon and summing to the daily value.
 
 **Accuracy:** ±15-20% vs Penman-Monteith.
 **Reference:** Hargreaves, G.H. & Samani, Z.A. (1985). *Appl. Eng. Agric.*, 1, 96-99.
@@ -204,6 +218,9 @@ ET₀ = 0.0023 · Ra · (T_mean + 17.8) · (T_max − T_min)^0.5
 ```
 ET₀ = [0.408·Δ·(Rn − G) + γ·(900/(T+273))·u₂·(eₛ − eₐ)] / [Δ + γ·(1 + 0.34·u₂)]
 ```
+
+The mean temperature term uses the FAO-56 daily mean (T_max + T_min) / 2, and the radiation
+term uses the previous complete day's measured irradiation divided by 24 h.
 
 **Accuracy:** ±5-10% vs lysimeter under standard conditions.
 **Reference:** Allen, R.G. et al. (1998). *FAO Irrigation and Drainage Paper 56.* FAO, Rome.
@@ -255,12 +272,46 @@ Six physical-impossibility checks per coordinator update:
 
 ---
 
+### Stuck-Value Detection
+
+`sensor.ws_sensor_stuck` and the per-sensor *stuck* binary sensors flag a reading that has
+not moved beyond a small tolerance for a sustained period:
+
+| Sensor | Tolerance | Flagged after |
+|---|---|---|
+| Temperature | 0.05 °C | 4 h unchanged |
+| Humidity | 0.5 % | 6 h unchanged (ignored within 2 % of 0 % or 100 %, e.g. fog) |
+| Pressure | 0.05 hPa | 6 h unchanged |
+
+The check is time-based rather than sample-based because derived values are recomputed on
+every source update, and a healthy sensor with 0.1 resolution can legitimately hold one
+value for several minutes.
+
+---
+
+### US Air Quality Index
+
+`sensor.ws_air_quality_index` is the higher of the PM2.5 and PM10 sub-indices, computed
+from Open-Meteo's current concentrations with the US EPA breakpoints, including the
+2024 PM2.5 revision (Good = 0-9.0 µg/m³). Concentrations are truncated as the EPA
+specifies (PM2.5 to 0.1 µg/m³, PM10 to 1 µg/m³) before lookup. The EPA index is defined
+on 24h averages; ws_core applies it to current values, so treat it as an indicator.
+
+**Reference:** US EPA (2024). *Technical Assistance Document for the Reporting of Daily Air
+Quality — the Air Quality Index (AQI).*
+
+---
+
 ## Services {#services}
 
 | Service | Description |
 |---|---|
 | `ws_core.reset_rain_baseline` | Reset the internal rain total baseline (useful after station rain counter resets) |
+| `ws_core.reset_learning_state` | Reset learned solar factor, forecast skill and/or streak counters |
+| `ws_core.export_learning_state` | Write the learning state to the Home Assistant log |
 | `ws_core.apply_calibration` | Write sensor calibration offsets from an automation or Developer Tools |
+
+Omit `entry_id` to target every Weather Station Core entry.
 
 ---
 
@@ -275,7 +326,10 @@ So an offset is always expressed in metric units regardless of your display unit
 | Temperature | ±10 °C | Correct for sensor placement or radiation shield quality |
 | Humidity | ±20% | Compensate for sensor aging |
 | Pressure | ±10 hPa | Correct for altitude error |
-| Wind speed | ±5 m/s | Adjust for sheltered mounting |
+| Wind speed | ±5 m/s | Adjust for sheltered mounting (applied to wind gust too) |
+
+Source sensors may report pressure in hPa, mbar, Pa, kPa, inHg, mmHg or psi, and wind in
+m/s, km/h, mph, knots or ft/s; they are converted before the offset is added.
 
 ---
 

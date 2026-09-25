@@ -83,7 +83,9 @@ class OpenWeatherMapProvider(ForecastProvider):
             if resp.status == 429:
                 raise ValueError("OpenWeatherMap: API rate limit exceeded")
             if resp.status != 200:
-                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
+                # Not ClientResponseError: its message embeds the request URL,
+                # which carries the API key, and would leak it into the logs.
+                raise ValueError(f"OpenWeatherMap: HTTP {resp.status}")
             js = await resp.json()
 
         # Daily forecast (up to 8 days, take 7)

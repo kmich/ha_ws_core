@@ -245,6 +245,8 @@ def _make_coordinator(
     coord.windy_enabled = False
     coord.mqtt_enabled = False
     coord._neighbor_qc_cache = None
+    coord._stuck_ref = {}
+    coord.event_entities = {}
     coord._spike_history = {
         "temp": deque(maxlen=48),
         "humidity": deque(maxlen=48),

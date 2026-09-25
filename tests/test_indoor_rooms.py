@@ -49,8 +49,15 @@ class TestIndoorRooms:
             "sensor.bed_h": _state(45.0, "%"),
             "sensor.bed_c": _state(800, "ppm"),
         }
-        rooms = [{"id": "bedroom", "name": "Bedroom", "temp": "sensor.bed_t",
-                  "humidity": "sensor.bed_h", "co2": "sensor.bed_c"}]
+        rooms = [
+            {
+                "id": "bedroom",
+                "name": "Bedroom",
+                "temp": "sensor.bed_t",
+                "humidity": "sensor.bed_h",
+                "co2": "sensor.bed_c",
+            }
+        ]
         coord = _build_coord(states, rooms)
 
         data = {KEY_NORM_TEMP_C: 10.0, KEY_NORM_HUMIDITY: 60.0}
@@ -67,8 +74,7 @@ class TestIndoorRooms:
 
     def test_co2_penalty_lowers_comfort(self):
         states = {"sensor.t": _state(21.0, "°C"), "sensor.c": _state(1800, "ppm")}
-        rooms = [{"id": "office", "name": "Office", "temp": "sensor.t",
-                  "humidity": None, "co2": "sensor.c"}]
+        rooms = [{"id": "office", "name": "Office", "temp": "sensor.t", "humidity": None, "co2": "sensor.c"}]
         coord = _build_coord(states, rooms)
         data = {KEY_NORM_TEMP_C: 18.0}
         coord._compute_indoor(data)
@@ -79,8 +85,7 @@ class TestIndoorRooms:
 
     def test_temperature_only_room_has_no_co2_or_humidity_fields(self):
         states = {"sensor.t": _state(19.5, "°C")}
-        rooms = [{"id": "loft", "name": "Loft", "temp": "sensor.t",
-                  "humidity": None, "co2": None}]
+        rooms = [{"id": "loft", "name": "Loft", "temp": "sensor.t", "humidity": None, "co2": None}]
         coord = _build_coord(states, rooms)
         data = {KEY_NORM_TEMP_C: 5.0}
         coord._compute_indoor(data)
@@ -92,8 +97,7 @@ class TestIndoorRooms:
 
     def test_unavailable_sensor_is_skipped(self):
         states = {"sensor.t": _state("unavailable", "°C")}
-        rooms = [{"id": "garage", "name": "Garage", "temp": "sensor.t",
-                  "humidity": None, "co2": None}]
+        rooms = [{"id": "garage", "name": "Garage", "temp": "sensor.t", "humidity": None, "co2": None}]
         coord = _build_coord(states, rooms)
         data = {KEY_NORM_TEMP_C: 5.0}
         coord._compute_indoor(data)
