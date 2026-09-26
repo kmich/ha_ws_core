@@ -85,6 +85,63 @@ class TestMigration:
         }
 
 
+class TestOrphanedForecasterCleanup:
+    """switch.ws_enable_local_forecaster / number.ws_forecaster_learning_rate are
+    leftovers from the unreleased v2.0 AI/local-forecaster work and show up as
+    restored/unavailable on some instances. Cleanup runs on every setup (not
+    tied to a config version bump, since affected instances are already current).
+    """
+
+    def _entity(self, entity_id, unique_id, config_entry_id):
+        ent = MagicMock()
+        ent.entity_id = entity_id
+        ent.unique_id = unique_id
+        ent.config_entry_id = config_entry_id
+        return ent
+
+    def test_removes_only_matching_uids_for_this_entry(self):
+        from custom_components.ws_core import _async_remove_orphaned_forecaster_entities
+
+        entry = MagicMock()
+        entry.entry_id = "entry1"
+
+        dead_switch = self._entity("switch.ws_enable_local_forecaster", "entry1_enable_local_forecaster", "entry1")
+        dead_number = self._entity("number.ws_forecaster_learning_rate", "entry1_forecaster_learning_rate", "entry1")
+        legit_sensor = self._entity("sensor.ws_temperature", "entry1_temperature", "entry1")
+        # Same unique_id suffix but a *different* config entry - must be left alone.
+        other_entry_dead = self._entity(
+            "switch.ws2_enable_local_forecaster", "entry2_enable_local_forecaster", "entry2"
+        )
+        # A legitimately user-disabled restored switch - must not be touched.
+        user_disabled = self._entity("switch.ws_enable_lightning", "entry1_enable_lightning", "entry1")
+
+        fake_registry = MagicMock()
+        fake_registry.entities = {
+            e.entity_id: e for e in (dead_switch, dead_number, legit_sensor, other_entry_dead, user_disabled)
+        }
+
+        hass = MagicMock()
+        with patch("custom_components.ws_core.er.async_get", return_value=fake_registry):
+            _async_remove_orphaned_forecaster_entities(hass, entry)
+
+        removed = {c.args[0] for c in fake_registry.async_remove.call_args_list}
+        assert removed == {"switch.ws_enable_local_forecaster", "number.ws_forecaster_learning_rate"}
+
+    def test_no_op_once_already_removed(self):
+        from custom_components.ws_core import _async_remove_orphaned_forecaster_entities
+
+        entry = MagicMock()
+        entry.entry_id = "entry1"
+        fake_registry = MagicMock()
+        fake_registry.entities = {}
+
+        hass = MagicMock()
+        with patch("custom_components.ws_core.er.async_get", return_value=fake_registry):
+            _async_remove_orphaned_forecaster_entities(hass, entry)
+
+        fake_registry.async_remove.assert_not_called()
+
+
 class TestIndoorRoomsMigration:
     """v3 -> v4 (v2.6.0): legacy list[str] indoor rooms -> named-room dicts."""
 

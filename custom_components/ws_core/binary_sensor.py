@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -18,8 +20,11 @@ from .const import (
     DEFAULT_ENABLE_SNOW,
     DEFAULT_PREFIX,
     DOMAIN,
+    KEY_NOWCAST_FETCHED_AT,
+    KEY_NOWCAST_STALE,
     KEY_PACKAGE_OK,
     KEY_RAIN_EXPECTED_1H,
+    KEY_RAIN_EXPECTED_SOURCE,
     KEY_SNOW_FALLING,
 )
 
@@ -86,10 +91,16 @@ class WSPackageOK(CoordinatorEntity, BinarySensorEntity):
 
 
 class WSRainExpected1h(CoordinatorEntity, BinarySensorEntity):
-    """True when measurable rain is expected within the next 60 minutes."""
+    """True when measurable rain is expected within the next 60 minutes.
+
+    No BinarySensorDeviceClass fits a forecast flag: MOISTURE is reserved for
+    a wetness/leak sensor reporting a *current* physical condition, which this
+    is not - it's a nowcast prediction. Left without a device_class so HA
+    doesn't imply a leak-detection semantic that isn't there (see issue about
+    device_class MOISTURE misuse).
+    """
 
     _attr_has_entity_name = True
-    _attr_device_class = BinarySensorDeviceClass.MOISTURE
 
     def __init__(self, coordinator, entry: ConfigEntry, prefix: str):
         super().__init__(coordinator)
@@ -104,12 +115,31 @@ class WSRainExpected1h(CoordinatorEntity, BinarySensorEntity):
         return {"identifiers": {(DOMAIN, self._entry.entry_id)}}
 
     @property
+    def available(self) -> bool:
+        # Explicitly unavailable once the Open-Meteo nowcast is stale/failed
+        # and the local Zambretti fallback couldn't produce a value either,
+        # rather than silently holding the last (possibly hours-old) reading.
+        if not super().available:
+            return False
+        d = self.coordinator.data or {}
+        return d.get(KEY_RAIN_EXPECTED_1H) is not None
+
+    @property
     def is_on(self) -> bool | None:
         d = self.coordinator.data or {}
         v = d.get(KEY_RAIN_EXPECTED_1H)
         if v is None:
             return None
         return bool(v)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self.coordinator.data or {}
+        return {
+            "source": d.get(KEY_RAIN_EXPECTED_SOURCE),
+            "nowcast_fetched_at": d.get(KEY_NOWCAST_FETCHED_AT),
+            "nowcast_stale": d.get(KEY_NOWCAST_STALE),
+        }
 
 
 class WSSnowFalling(CoordinatorEntity, BinarySensorEntity):

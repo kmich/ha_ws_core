@@ -725,6 +725,10 @@
     "large_calibration_offset": {
       "title": "Large calibration offset applied",
       "description": "A calibration offset of {value} was applied to {field}. Large offsets may indicate sensor hardware failure rather than calibration drift. Consider replacing the sensor."
+    },
+    "et0_pm_unavailable": {
+      "title": "PM ET₀ unavailable: no solar_radiation source configured",
+      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
     }
   },
   "entity": {

@@ -2,6 +2,20 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Illuminance-based fallback for ET₀ Penman-Monteith.** When no `solar_radiation` source is mapped, an optional "illuminance fallback" (Solar Forecast step of the config/options flow) derives an approximate solar radiation from a mapped illuminance (lux) sensor using a ~0.0079 W/m² per lux daylight conversion factor. `sensor.ws_et0_penman_monteith` reports the value's `radiation_source` attribute (`sensor` or `illuminance_estimate`) so automations can tell a real pyranometer reading from an estimate (accurate to roughly ±25%, since luminous efficacy varies with sky conditions and sun elevation).
+- **Repair issue for a silently-missing PM ET₀ sensor.** `sensor.ws_et0_penman_monteith` never appeared when Solar Forecast was enabled but no `solar_radiation` source (and no illuminance fallback) was configured, with no indication why. A Repairs issue now explains it.
+- **Nowcast staleness is now visible.** `binary_sensor.ws_rain_expected_1h` exposes `nowcast_fetched_at` and `nowcast_stale` attributes, and a `source` attribute (`nowcast` or `local_fallback`).
+- **Local-only nowcast fallback.** When the Open-Meteo nowcast fetch has failed or its cache is older than 2x the fetch interval, `binary_sensor.ws_rain_expected_1h` now falls back to a coarser rain-expected signal derived from the local pressure-trend/Zambretti forecast instead of silently holding a stale value. The entity goes explicitly `unavailable` only if neither a fresh nowcast nor a Zambretti reading exists.
+
+### Fixed
+
+- **Two orphaned entities from an unreleased feature.** `switch.ws_enable_local_forecaster` and `number.ws_forecaster_learning_rate` are leftovers of the v2.0 AI/local-forecaster work that never shipped (v1.8.0 stripped its user-facing surfaces before release), but a handful of instances that briefly ran a pre-release build still carry them as `restored`/`unavailable`. They are now removed from the entity registry on every setup. Other restored/unavailable entities a user has legitimately disabled are untouched.
+- **`binary_sensor.ws_rain_expected_1h` used `device_class: moisture`,** which Home Assistant reserves for a *current* wetness/leak reading, not a forecast flag. The device_class has been removed.
+
 ## [2.8.1] - 2026-09-25
 
 ### Changed

@@ -109,6 +109,7 @@ from .const import (
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
     KEY_ET0_PM_DAILY_MM,
+    KEY_ET0_PM_RADIATION_SOURCE,
     KEY_FEELS_LIKE_C,
     KEY_FFDI,
     KEY_FFWI,
@@ -2243,6 +2244,7 @@ SENSORS: list[WSSensorDescription] = [
         unit_group="rain",
         attrs_fn=lambda d: {
             "hargreaves_et0": d.get(KEY_ET0_DAILY_MM),
+            "radiation_source": d.get(KEY_ET0_PM_RADIATION_SOURCE),
         },
     ),
     # v2.0 — Irrigation water deficit (ET₀ − rain today)
