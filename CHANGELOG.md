@@ -2,7 +2,7 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [Unreleased]
+## [2.9.0] - 2026-09-26
 
 ### Added
 
