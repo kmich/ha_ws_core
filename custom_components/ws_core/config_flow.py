@@ -70,6 +70,7 @@ from .const import (
     CONF_ENABLE_WOW,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ENABLE_ZAMBRETTI,
+    CONF_ET0_ILLUMINANCE_FALLBACK,
     CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_ENTITY,
@@ -147,6 +148,7 @@ from .const import (
     DEFAULT_ENABLE_WINDY,
     DEFAULT_ENABLE_WOW,
     DEFAULT_ENABLE_WUNDERGROUND,
+    DEFAULT_ET0_ILLUMINANCE_FALLBACK,
     DEFAULT_FORECAST_ENABLED,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_FORECAST_PROVIDER,
@@ -1386,6 +1388,9 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             self._data[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
+            self._data[CONF_ET0_ILLUMINANCE_FALLBACK] = bool(
+                user_input.get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK)
+            )
             if self._data.get(CONF_ENABLE_VIGICRUES):
                 return await self.async_step_vigicrues_station()
             if self._data.get(CONF_ENABLE_INDOOR):
@@ -1416,10 +1421,16 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
                     vol.Optional(CONF_SOLAR_INTERVAL_MIN, default=DEFAULT_SOLAR_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
+                    vol.Optional(
+                        CONF_ET0_ILLUMINANCE_FALLBACK, default=DEFAULT_ET0_ILLUMINANCE_FALLBACK
+                    ): selector.BooleanSelector(),
                 }
             ),
             description_placeholders={
-                "info": "Free solar PV generation forecast from forecast.solar. Uses forecast lat/lon. Azimuth: 0=N, 90=E, 180=S, 270=W."
+                "info": "Free solar PV generation forecast from forecast.solar. Uses forecast lat/lon. Azimuth: 0=N, 90=E, 180=S, 270=W. "
+                "The illuminance fallback derives an approximate solar radiation from a lux sensor for the ET₀ "
+                "Penman-Monteith sensor when no solar_radiation source is mapped - lower confidence than a real "
+                "pyranometer reading, and only used if an illuminance sensor is also mapped in Sources."
             },
             last_step=False,
         )
@@ -2320,6 +2331,9 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             self._opt[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
+            self._opt[CONF_ET0_ILLUMINANCE_FALLBACK] = bool(
+                user_input.get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK)
+            )
             return await self._finish_or_next("solar_forecast_opt")
         return self.async_show_form(
             step_id="solar_forecast_opt",
@@ -2351,9 +2365,18 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
+                    vol.Optional(
+                        CONF_ET0_ILLUMINANCE_FALLBACK,
+                        default=g(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK),
+                    ): selector.BooleanSelector(),
                 }
             ),
-            description_placeholders={"info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal."},
+            description_placeholders={
+                "info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal. "
+                "The illuminance fallback derives an approximate solar radiation from a lux sensor for the ET₀ "
+                "Penman-Monteith sensor when no solar_radiation source is mapped - lower confidence than a real "
+                "pyranometer reading, and only used if an illuminance sensor is also mapped in Sources."
+            },
             last_step=False,
         )
 

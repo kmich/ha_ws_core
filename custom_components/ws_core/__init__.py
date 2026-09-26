@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_CLIMATE_REGION,
     DEFAULT_HEMISPHERE,
     DEPRECATED_CONF_KEYS_V030,
+    DEPRECATED_KEYS_FORECASTER,
     DEPRECATED_KEYS_V030,
     DOMAIN,
     ENTRY_REPAIR_ISSUES,
@@ -177,6 +178,26 @@ def _loaded_coordinators(hass: HomeAssistant, entry_id: str | None = None) -> li
     ]
 
 
+def _async_remove_orphaned_forecaster_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove registry entries left over from the unreleased local-forecaster feature.
+
+    switch.<prefix>_enable_local_forecaster and number.<prefix>_forecaster_learning_rate
+    were never part of a public release (see DEPRECATED_KEYS_FORECASTER), but a handful
+    of instances that briefly ran a pre-release build still show them as
+    restored/unavailable. Unlike the v0.3.0 cleanup this isn't tied to a config version
+    bump, since affected instances are already on the latest schema - so it runs on
+    every setup and is a no-op once the entities are gone.
+    """
+    registry = er.async_get(hass)
+    deprecated_uids = {f"{entry.entry_id}_{key}" for key in DEPRECATED_KEYS_FORECASTER}
+    for ent in list(registry.entities.values()):
+        if ent.config_entry_id != entry.entry_id:
+            continue
+        if ent.unique_id in deprecated_uids:
+            _LOGGER.info("Removing orphaned local-forecaster entity %s (unique_id=%s)", ent.entity_id, ent.unique_id)
+            registry.async_remove(ent.entity_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WSStationCoordinator
 
@@ -184,6 +205,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # issues are now per entry, so drop any leftovers from the old scheme.
     for name in ENTRY_REPAIR_ISSUES:
         ir.async_delete_issue(hass, DOMAIN, name)
+
+    _async_remove_orphaned_forecaster_entities(hass, entry)
 
     coordinator = WSStationCoordinator(hass, {**entry.data, "entry_id": entry.entry_id}, entry.options)
     entry.runtime_data = coordinator

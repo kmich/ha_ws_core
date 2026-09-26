@@ -114,6 +114,13 @@ def _make_coordinator(**overrides):
     coord._alert_debounce_raw: dict = {}
     coord._alert_debounce_clear: dict = {}
     coord._alert_active: dict = {}
+    coord.solar_forecast_enabled = False
+    coord.et0_illuminance_fallback = False
+    coord._solar_radiation_source = None
+    coord._solar_energy_previous_whm2 = 0.0
+    coord.nowcast_enabled = False
+    coord.nowcast_interval_min = 15
+    coord._nowcast_cache = None
     return coord, hass, states
 
 

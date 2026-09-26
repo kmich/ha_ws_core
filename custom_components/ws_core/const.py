@@ -438,6 +438,18 @@ DEFAULT_SOLAR_PANEL_AZIMUTH = 180  # south-facing
 DEFAULT_SOLAR_PANEL_TILT = 30  # degrees from horizontal
 DEFAULT_SOLAR_INTERVAL_MIN = 60
 
+# Penman-Monteith ET₀ - optional lux-derived solar radiation fallback.
+# Used when no solar_radiation source is mapped but an illuminance sensor is.
+# 0.0079 W/m² per lux is a widely-cited rule-of-thumb luminous efficacy for
+# daylight (~126 lm/W); actual efficacy varies roughly +/-25% with sky
+# conditions (clear vs overcast) and spectrum (sun elevation), so ET₀ derived
+# this way is an estimate, not a pyranometer-grade measurement.
+CONF_ET0_ILLUMINANCE_FALLBACK = "et0_illuminance_fallback"
+DEFAULT_ET0_ILLUMINANCE_FALLBACK = False
+LUX_TO_WM2_FACTOR = 0.0079
+ET0_RADIATION_SOURCE_SENSOR = "sensor"
+ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE = "illuminance_estimate"
+
 # ---------------------------------------------------------------------------
 # Data keys - v0.7.0 Air Quality
 # ---------------------------------------------------------------------------
@@ -468,6 +480,7 @@ KEY_SOLAR_FORECAST_TODAY_KWH = "solar_forecast_today_kwh"
 KEY_SOLAR_FORECAST_TOMORROW_KWH = "solar_forecast_tomorrow_kwh"
 KEY_SOLAR_FORECAST_STATUS = "solar_forecast_status"
 KEY_ET0_PM_DAILY_MM = "et0_pm_daily_mm"  # Penman-Monteith (when solar available)
+KEY_ET0_PM_RADIATION_SOURCE = "et0_pm_radiation_source"  # "sensor" or "illuminance_estimate"
 
 # ---------------------------------------------------------------------------
 # v1.2.0 - Self-learning, new met sensors, station intelligence, climatology
@@ -675,6 +688,11 @@ CONF_NOWCAST_INTERVAL_MIN = "nowcast_interval_min"
 DEFAULT_ENABLE_NOWCAST = False
 DEFAULT_NOWCAST_INTERVAL_MIN = 15
 
+# The Open-Meteo minutely_15 nowcast is considered stale (and the rain-expected
+# entity falls back to the local Zambretti forecast, or unavailable) once its
+# cache is older than this many fetch intervals.
+NOWCAST_STALE_MULTIPLIER = 2
+
 # Suppress HA Repairs notifications (issue #20)
 CONF_SUPPRESS_NOTIFICATIONS = "suppress_notifications"
 DEFAULT_SUPPRESS_NOTIFICATIONS = False
@@ -686,6 +704,14 @@ KEY_MINUTES_UNTIL_DRY = "minutes_until_dry"
 KEY_NOWCAST_INTENSITY = "nowcast_intensity"
 KEY_NOWCAST_CONFIDENCE = "nowcast_confidence"  # "high", "medium", "low"
 KEY_RAIN_EXPECTED_1H = "rain_expected_1h"
+KEY_NOWCAST_FETCHED_AT = "_nowcast_fetched_at"
+KEY_NOWCAST_STALE = "nowcast_stale"
+KEY_RAIN_EXPECTED_SOURCE = "rain_expected_source"  # "nowcast" or "local_fallback"
+RAIN_EXPECTED_SOURCE_NOWCAST = "nowcast"
+RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK = "local_fallback"
+# Z-number implied rain probability (%) at/above which the Zambretti-derived
+# local fallback reports rain expected. Coarser than the 15-min NWP nowcast.
+ZAMBRETTI_FALLBACK_RAIN_THRESHOLD_PCT = 50
 
 # ---------------------------------------------------------------------------
 # v2.0 - Degree days + leaf wetness (new agrometeorological group)
@@ -1073,6 +1099,17 @@ DEPRECATED_KEYS_V030 = (
     "rain_rate_mmph_raw",
     "precipitation_type",
     "time_since_rain",
+)
+
+# ---------------------------------------------------------------------------
+# Orphaned entities left behind by the v2.0 AI/local-forecaster work that was
+# stripped from the public release before it shipped (see v1.8.0 changelog).
+# Some instances that briefly ran a pre-release build still carry these in
+# their entity registry as restored/unavailable. Removed on every setup.
+# ---------------------------------------------------------------------------
+DEPRECATED_KEYS_FORECASTER = (
+    "enable_local_forecaster",
+    "forecaster_learning_rate",
 )
 
 DEPRECATED_CONF_KEYS_V030 = (

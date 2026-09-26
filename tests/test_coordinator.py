@@ -22,6 +22,8 @@ from custom_components.ws_core.const import (
     CONF_HEMISPHERE,
     CONF_SOURCES,
     CONF_STALENESS_S,
+    ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE,
+    ET0_RADIATION_SOURCE_SENSOR,
     KEY_ALERT_STATE,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
@@ -29,7 +31,10 @@ from custom_components.ws_core.const import (
     KEY_FROST_POINT_C,
     KEY_HEALTH_DISPLAY,
     KEY_NORM_WIND_GUST_MS,
+    KEY_NOWCAST_STALE,
     KEY_PACKAGE_OK,
+    KEY_RAIN_EXPECTED_1H,
+    KEY_RAIN_EXPECTED_SOURCE,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_TEMP_HIGH_ALL_TIME,
     KEY_TEMP_HIGH_MONTH,
@@ -52,10 +57,14 @@ from custom_components.ws_core.const import (
     KEY_WIND_QUADRANT,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
+    RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK,
+    RAIN_EXPECTED_SOURCE_NOWCAST,
     SRC_GUST,
     SRC_HUM,
+    SRC_LUX,
     SRC_PRESS,
     SRC_RAIN_TOTAL,
+    SRC_SOLAR_RADIATION,
     SRC_TEMP,
     SRC_WIND,
     SRC_WIND_DIR,
@@ -273,6 +282,15 @@ def _make_coordinator(
     coord._snow_this_year_key = ""
     coord._snowiest_day_cm = 0.0
     coord._snowiest_day_date = ""
+
+    # v2.9 solar forecast / ET0 illuminance fallback + nowcast staleness
+    coord.solar_forecast_enabled = False
+    coord.et0_illuminance_fallback = False
+    coord._solar_radiation_source = None
+    coord._solar_energy_previous_whm2 = 0.0
+    coord.nowcast_enabled = False
+    coord.nowcast_interval_min = 15
+    coord._nowcast_cache = None
 
     return coord
 
@@ -1100,3 +1118,154 @@ class TestDiscoverBlitzortung:
         coord = self._run(entries)
         assert coord._blitzortung_sources[SRC_LIGHTNING_COUNT] == "sensor.blitzortung_lightning_counter"
         assert coord._blitzortung_sources[SRC_LIGHTNING_DISTANCE] == "sensor.blitzortung_lightning_distance"
+
+
+# ---------------------------------------------------------------------------
+# Tests: Nowcast staleness + local Zambretti fallback
+# ---------------------------------------------------------------------------
+
+
+class TestComputeNowcast:
+    def _coord_with_zambretti(self, z_number):
+        coord = _make_coordinator()
+        coord.nowcast_enabled = True
+        return coord, {KEY_ZAMBRETTI_NUMBER: z_number}
+
+    def test_fresh_cache_uses_nowcast_source(self):
+        coord, data = self._coord_with_zambretti(10)
+        now_iso = dt_util.now().isoformat()
+        coord._nowcast_cache = {
+            "fetched_at": now_iso,
+            "next_60min_mm": 0.0,
+            "minutes_until_rain": None,
+            "minutes_until_dry": None,
+            "intensity": "none",
+            "rain_expected_1h": False,
+            "peak_rate_mmph": 0.0,
+            "raining_now": False,
+        }
+        coord._compute_nowcast(data)
+        assert data[KEY_NOWCAST_STALE] is False
+        assert data[KEY_RAIN_EXPECTED_SOURCE] == RAIN_EXPECTED_SOURCE_NOWCAST
+        assert data[KEY_RAIN_EXPECTED_1H] is False
+
+    def test_stale_cache_falls_back_to_zambretti_high_rain_pct(self):
+        # Z-number 26 ("Very Unsettled, Rain") sits at the high-rain-probability
+        # end of ZAMBRETTI_RAIN_PCT.
+        coord, data = self._coord_with_zambretti(26)
+        old_iso = (dt_util.now() - timedelta(hours=2)).isoformat()
+        coord._nowcast_cache = {"fetched_at": old_iso, "next_60min_mm": 0.0, "rain_expected_1h": False}
+        coord._compute_nowcast(data)
+        assert data[KEY_NOWCAST_STALE] is True
+        assert data[KEY_RAIN_EXPECTED_SOURCE] == RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK
+        assert data[KEY_RAIN_EXPECTED_1H] is True
+
+    def test_never_fetched_falls_back_to_zambretti_low_rain_pct(self):
+        # Z-number 1 ("Settled Fine") sits at the low-rain-probability end.
+        coord, data = self._coord_with_zambretti(1)
+        coord._nowcast_cache = None
+        coord._compute_nowcast(data)
+        assert data[KEY_NOWCAST_STALE] is True
+        assert data[KEY_RAIN_EXPECTED_SOURCE] == RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK
+        assert data[KEY_RAIN_EXPECTED_1H] is False
+
+    def test_no_nowcast_and_no_zambretti_is_unavailable(self):
+        coord, data = self._coord_with_zambretti(None)
+        coord._nowcast_cache = None
+        coord._compute_nowcast(data)
+        assert data[KEY_RAIN_EXPECTED_1H] is None
+        assert data[KEY_RAIN_EXPECTED_SOURCE] is None
+
+
+# ---------------------------------------------------------------------------
+# Tests: PM ET0 illuminance fallback for solar radiation
+# ---------------------------------------------------------------------------
+
+
+class TestSolarRadiationForEt0:
+    def test_prefers_real_solar_sensor(self):
+        coord = _make_coordinator()
+        coord.sources = {SRC_SOLAR_RADIATION: "sensor.solar", SRC_LUX: "sensor.lux"}
+        coord.et0_illuminance_fallback = True
+        coord.hass.states.get = lambda eid: {
+            "sensor.solar": _make_state("500.0"),
+            "sensor.lux": _make_state("40000"),
+        }.get(eid)
+        val = coord._get_solar_radiation_for_et0()
+        assert val == 500.0
+        assert coord._solar_radiation_source == ET0_RADIATION_SOURCE_SENSOR
+
+    def test_falls_back_to_illuminance_when_enabled(self):
+        coord = _make_coordinator()
+        coord.sources = {SRC_LUX: "sensor.lux"}  # no solar_radiation mapped
+        coord.et0_illuminance_fallback = True
+        coord.hass.states.get = lambda eid: {"sensor.lux": _make_state("40000")}.get(eid)
+        val = coord._get_solar_radiation_for_et0()
+        assert val == 40000 * 0.0079
+        assert coord._solar_radiation_source == ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE
+
+    def test_no_fallback_when_disabled(self):
+        coord = _make_coordinator()
+        coord.sources = {SRC_LUX: "sensor.lux"}
+        coord.et0_illuminance_fallback = False
+        coord.hass.states.get = lambda eid: {"sensor.lux": _make_state("40000")}.get(eid)
+        val = coord._get_solar_radiation_for_et0()
+        assert val is None
+        assert coord._solar_radiation_source is None
+
+    def test_no_fallback_when_no_illuminance_source(self):
+        coord = _make_coordinator()
+        coord.sources = {}
+        coord.et0_illuminance_fallback = True
+        val = coord._get_solar_radiation_for_et0()
+        assert val is None
+        assert coord._solar_radiation_source is None
+
+
+# ---------------------------------------------------------------------------
+# Tests: PM ET0 "unavailable" repair issue
+# ---------------------------------------------------------------------------
+
+
+class TestEt0PmUnavailableIssue:
+    def _run(self, solar_forecast_enabled, forecast_lat, sources, et0_present):
+        coord = _make_coordinator()
+        coord.solar_forecast_enabled = solar_forecast_enabled
+        coord.forecast_lat = forecast_lat
+        coord.sources = sources
+        coord.suppress_notifications = False
+        from custom_components.ws_core.const import KEY_ET0_PM_DAILY_MM
+
+        data = {KEY_ET0_PM_DAILY_MM: 3.2} if et0_present else {}
+        now = datetime.now(UTC)
+        with (
+            patch("custom_components.ws_core.coordinator.ir.async_create_issue") as mock_create,
+            patch("custom_components.ws_core.coordinator.ir.async_delete_issue") as mock_delete,
+        ):
+            coord._compute_health(data, now, missing=[], missing_entities=[])
+        return mock_create, mock_delete
+
+    def test_issue_created_when_solar_forecast_on_but_no_source(self):
+        mock_create, _ = self._run(solar_forecast_enabled=True, forecast_lat=37.9, sources={}, et0_present=False)
+        keys = [c.args[2] for c in mock_create.call_args_list]
+        assert any(k.startswith("et0_pm_unavailable") for k in keys)
+
+    def test_no_issue_when_solar_forecast_disabled(self):
+        mock_create, _ = self._run(solar_forecast_enabled=False, forecast_lat=37.9, sources={}, et0_present=False)
+        keys = [c.args[2] for c in mock_create.call_args_list]
+        assert not any(k.startswith("et0_pm_unavailable") for k in keys)
+
+    def test_no_issue_when_source_configured(self):
+        mock_create, _ = self._run(
+            solar_forecast_enabled=True,
+            forecast_lat=37.9,
+            sources={SRC_SOLAR_RADIATION: "sensor.solar"},
+            et0_present=False,
+        )
+        keys = [c.args[2] for c in mock_create.call_args_list]
+        assert not any(k.startswith("et0_pm_unavailable") for k in keys)
+
+    def test_no_issue_when_et0_already_computed(self):
+        mock_create, _ = self._run(solar_forecast_enabled=True, forecast_lat=37.9, sources={}, et0_present=True)
+        keys = [c.args[2] for c in mock_create.call_args_list]
+        assert not any(k.startswith("et0_pm_unavailable") for k in keys)

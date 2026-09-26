@@ -169,6 +169,7 @@ from .const import (
     CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
     CONF_ENABLE_WUNDERGROUND,
+    CONF_ET0_ILLUMINANCE_FALLBACK,
     CONF_FORECAST_API_KEY,
     CONF_FORECAST_ENABLED,
     CONF_FORECAST_ENTITY,
@@ -267,6 +268,7 @@ from .const import (
     DEFAULT_ENABLE_WINDY,
     DEFAULT_ENABLE_WOW,
     DEFAULT_ENABLE_WUNDERGROUND,
+    DEFAULT_ET0_ILLUMINANCE_FALLBACK,
     DEFAULT_FORECAST_INTERVAL_MIN,
     DEFAULT_FORECAST_PROVIDER,
     DEFAULT_GDD_BASE_C,
@@ -308,6 +310,8 @@ from .const import (
     DRIFT_STUCK_BUCKET_SAMPLES,
     DRIFT_STUCK_RATE_RANGE_MAX,
     DRIFT_WINDOW_SAMPLES,
+    ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE,
+    ET0_RADIATION_SOURCE_SENSOR,
     FORECAST_AGREEMENT_ALIGNED_PP,
     FORECAST_AGREEMENT_CONFLICT_PP,
     FORECAST_MAX_RETRY_S,
@@ -356,6 +360,7 @@ from .const import (
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
     KEY_ET0_PM_DAILY_MM,
+    KEY_ET0_PM_RADIATION_SOURCE,
     KEY_FEELS_LIKE_C,
     KEY_FFDI,
     KEY_FFWI,
@@ -431,7 +436,9 @@ from .const import (
     KEY_NORM_WIND_GUST_MS,
     KEY_NORM_WIND_SPEED_MS,
     KEY_NOWCAST_CONFIDENCE,
+    KEY_NOWCAST_FETCHED_AT,
     KEY_NOWCAST_INTENSITY,
+    KEY_NOWCAST_STALE,
     KEY_OWM_STATIONS_STATUS,
     KEY_OZONE,
     KEY_PACKAGE_OK,
@@ -454,6 +461,7 @@ from .const import (
     KEY_RAIN_ANOMALY_NORMAL,
     KEY_RAIN_DISPLAY,
     KEY_RAIN_EXPECTED_1H,
+    KEY_RAIN_EXPECTED_SOURCE,
     KEY_RAIN_NEXT_60MIN,
     KEY_RAIN_NORMAL_MM,
     KEY_RAIN_PROBABILITY,
@@ -539,8 +547,12 @@ from .const import (
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
     LEARNING_SAVE_INTERVAL_S,
+    LUX_TO_WM2_FACTOR,
+    NOWCAST_STALE_MULTIPLIER,
     PRESSURE_HISTORY_INTERVAL_MIN,
     PRESSURE_HISTORY_SAMPLES,
+    RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK,
+    RAIN_EXPECTED_SOURCE_NOWCAST,
     RAIN_RATE_PHYSICAL_CAP_MMPH,
     RAIN_RATE_WINDOW_H,
     REQUIRED_SOURCES,
@@ -576,6 +588,7 @@ from .const import (
     VALID_TEMP_MAX_C,
     VALID_TEMP_MIN_C,
     WIND_SMOOTH_ALPHA,
+    ZAMBRETTI_FALLBACK_RAIN_THRESHOLD_PCT,
     issue_id_for_entry,
     normalize_indoor_rooms,
 )
@@ -971,6 +984,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.solar_panel_tilt = int(_get(CONF_SOLAR_PANEL_TILT, DEFAULT_SOLAR_PANEL_TILT))
         self.solar_interval_min = int(_get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN))
         self._solar_cache: dict[str, Any] | None = None
+        self.et0_illuminance_fallback = bool(_get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK))
+        self._solar_radiation_source: str | None = None
 
         # Risk feature toggles (all default-off, opt-in via wizard)
         self.fog_enabled = bool(_get(CONF_ENABLE_FOG, DEFAULT_ENABLE_FOG))
@@ -2265,6 +2280,113 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_forecast_agreement_api_precip_prob"] = round(api_precip_prob)
         data["_forecast_agreement_delta"] = round(delta)
 
+    def _compute_nowcast(self, data: dict) -> None:
+        """Precipitation nowcast (Open-Meteo minutely_15), with staleness handling.
+
+        The cache is considered stale once older than NOWCAST_STALE_MULTIPLIER x
+        the configured fetch interval. When fresh, blends the NWP buckets with
+        the local rain-gauge rate for the first 30 minutes. When stale or never
+        fetched, falls back to a coarser rain-expected signal derived from the
+        local pressure-trend/Zambretti forecast (KEY_ZAMBRETTI_NUMBER) instead of
+        silently reusing an old NWP value or leaving the entity unavailable.
+        KEY_RAIN_EXPECTED_SOURCE tags which path produced the current value.
+        """
+        nc = self._nowcast_cache
+        fetched_at_iso = nc.get("fetched_at") if nc else None
+
+        nowcast_stale = True
+        if fetched_at_iso:
+            fetched_dt = dt_util.parse_datetime(fetched_at_iso)
+            if fetched_dt is not None:
+                age_s = (dt_util.now() - dt_util.as_local(fetched_dt)).total_seconds()
+                nowcast_stale = age_s > self.nowcast_interval_min * 60 * NOWCAST_STALE_MULTIPLIER
+
+        data[KEY_NOWCAST_FETCHED_AT] = fetched_at_iso
+        data[KEY_NOWCAST_STALE] = nowcast_stale
+
+        if nc and not nowcast_stale:
+            # Local rain rate blending for the first 2 x 15-min buckets (0–30 min window)
+            # Local gauge is ground truth for current conditions; NWP leads at t+30min+
+            raw_times = nc.get("_raw_times")
+            raw_precip = nc.get("_raw_precip")
+            if raw_times and raw_precip and len(raw_precip) >= 2:
+                local_rate_mmph = float(data.get(KEY_RAIN_RATE_FILT) or 0.0)
+                local_rate_per_15min = local_rate_mmph / 4.0  # mm/h → mm per 15-min bucket
+
+                # Work on a mutable copy — never mutate the cached NWP data
+                blended_precip = list(raw_precip)
+                nwp_bucket_0 = blended_precip[0]
+                nwp_bucket_1 = blended_precip[1]
+
+                if local_rate_per_15min > 0.05:
+                    # Local gauge confirms rain: 70% local / 30% NWP for bucket 0,
+                    # 50/50 for bucket 1 (gauge influence fades at t+30 min)
+                    blended_precip[0] = round(0.7 * local_rate_per_15min + 0.3 * nwp_bucket_0, 2)
+                    blended_precip[1] = round(0.5 * local_rate_per_15min + 0.5 * nwp_bucket_1, 2)
+                    nowcast_confidence = "high"
+                elif local_rate_per_15min == 0.0 and nwp_bucket_0 > 0.1:
+                    # Gauge is dry but NWP says rain is here — low confidence
+                    nowcast_confidence = "low"
+                else:
+                    # Gauge and NWP broadly agree
+                    nowcast_confidence = "high" if abs(local_rate_per_15min - nwp_bucket_0) < 0.2 else "medium"
+
+                # Re-derive nowcast from the blended bucket list
+                nc_blended = derive_nowcast(raw_times, blended_precip, dt_util.now())
+                nc_blended["rain_expected_1h"] = bool(
+                    nc_blended.get("next_60min_mm", 0.0) >= NOWCAST_BUCKET_THRESHOLD_MM
+                )
+
+                data[KEY_RAIN_NEXT_60MIN] = nc_blended.get("next_60min_mm")
+                data[KEY_MINUTES_UNTIL_RAIN] = nc_blended.get("minutes_until_rain")
+                data[KEY_MINUTES_UNTIL_DRY] = nc_blended.get("minutes_until_dry")
+                data[KEY_NOWCAST_INTENSITY] = nc_blended.get("intensity")
+                data[KEY_RAIN_EXPECTED_1H] = nc_blended.get("rain_expected_1h")
+                data["_nowcast_peak_rate_mmph"] = nc_blended.get("peak_rate_mmph")
+                data["_nowcast_raining_now"] = nc_blended.get("raining_now")
+                data[KEY_NOWCAST_CONFIDENCE] = nowcast_confidence
+            else:
+                # No raw buckets available — fall back to cached derived values as-is
+                data[KEY_RAIN_NEXT_60MIN] = nc.get("next_60min_mm")
+                data[KEY_MINUTES_UNTIL_RAIN] = nc.get("minutes_until_rain")
+                data[KEY_MINUTES_UNTIL_DRY] = nc.get("minutes_until_dry")
+                data[KEY_NOWCAST_INTENSITY] = nc.get("intensity")
+                data[KEY_RAIN_EXPECTED_1H] = nc.get("rain_expected_1h")
+                data["_nowcast_peak_rate_mmph"] = nc.get("peak_rate_mmph")
+                data["_nowcast_raining_now"] = nc.get("raining_now")
+
+            data[KEY_RAIN_EXPECTED_SOURCE] = RAIN_EXPECTED_SOURCE_NOWCAST
+        else:
+            # Open-Meteo nowcast has failed or gone stale (never fetched, or
+            # older than NOWCAST_STALE_MULTIPLIER x the fetch interval).
+            # Fall back to the coarser local pressure-trend/Zambretti path
+            # instead of silently reusing a stale NWP value or going
+            # unavailable outright.
+            data[KEY_RAIN_NEXT_60MIN] = None
+            data[KEY_MINUTES_UNTIL_RAIN] = None
+            data[KEY_MINUTES_UNTIL_DRY] = None
+            data[KEY_NOWCAST_INTENSITY] = None
+            data["_nowcast_peak_rate_mmph"] = None
+            data["_nowcast_raining_now"] = None
+
+            z_idx = None
+            z_number = data.get(KEY_ZAMBRETTI_NUMBER)
+            if z_number is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    candidate = int(z_number) - 1
+                    if 0 <= candidate < len(ZAMBRETTI_RAIN_PCT):
+                        z_idx = candidate
+
+            if z_idx is not None:
+                z_rain_pct = ZAMBRETTI_RAIN_PCT[z_idx]
+                data[KEY_RAIN_EXPECTED_1H] = z_rain_pct >= ZAMBRETTI_FALLBACK_RAIN_THRESHOLD_PCT
+                data[KEY_NOWCAST_CONFIDENCE] = "low"
+                data[KEY_RAIN_EXPECTED_SOURCE] = RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK
+            else:
+                # Neither a fresh nowcast nor a Zambretti reading is available.
+                data[KEY_RAIN_EXPECTED_1H] = None
+                data[KEY_RAIN_EXPECTED_SOURCE] = None
+
     def _compute_degree_days(
         self, data: dict, now: Any, tc: float | None, dew_c: float | None, rh: float | None, sample: bool = True
     ) -> None:
@@ -2495,8 +2617,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         rain_today = data.get("_rain_today_mm", 0.0) or 0.0
         data[KEY_IRRIGATION_DEFICIT] = calculate_irrigation_deficit(float(et0_daily), float(rain_today))
 
-        # v2.0 Solar energy accumulation (Wh/m²) — requires solar radiation sensor
-        solar_rad = self._get_solar_radiation()
+        # v2.0 Solar energy accumulation (Wh/m²) — requires solar radiation sensor,
+        # or an illuminance-derived estimate when CONF_ET0_ILLUMINANCE_FALLBACK is on.
+        # This feeds the Penman-Monteith ET₀ daily mean below.
+        solar_rad = self._get_solar_radiation_for_et0()
         if solar_rad is not None:
             now_local = dt_util.now()
             solar_date = now_local.strftime("%Y-%m-%d")
@@ -3269,6 +3393,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("forecast_api_failures"))
                 ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stuck_sensors"))
                 ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("sensor_drift_detected"))
+                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("et0_pm_unavailable"))
             else:
                 if missing_entities:
                     ir.async_create_issue(
@@ -3344,6 +3469,29 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 else:
                     ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("sensor_drift_detected"))
+
+                # PM ET₀ silently never appears when enable_solar_forecast is on but
+                # no solar_radiation source is mapped and the illuminance fallback
+                # (CONF_ET0_ILLUMINANCE_FALLBACK) isn't compensating for it.
+                from .const import SRC_SOLAR_RADIATION
+
+                et0_pm_blocked = (
+                    self.solar_forecast_enabled
+                    and self.forecast_lat is not None
+                    and not self.sources.get(SRC_SOLAR_RADIATION)
+                    and data.get(KEY_ET0_PM_DAILY_MM) is None
+                )
+                if et0_pm_blocked:
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        self._issue_id("et0_pm_unavailable"),
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="et0_pm_unavailable",
+                    )
+                else:
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("et0_pm_unavailable"))
 
     # ------------------------------------------------------------------
     # v1.2.0 - Fog, precipitation type, thunderstorm index
@@ -4358,60 +4506,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 data[f"_river_station_code_{code}"] = vr.get("station_code")
 
         # v1.7.0 - Precipitation nowcast (Open-Meteo minutely_15)
-        if self.nowcast_enabled and self._nowcast_cache:
-            nc = self._nowcast_cache
-
-            # Local rain rate blending for the first 2 x 15-min buckets (0–30 min window)
-            # Local gauge is ground truth for current conditions; NWP leads at t+30min+
-            raw_times = nc.get("_raw_times")
-            raw_precip = nc.get("_raw_precip")
-            if raw_times and raw_precip and len(raw_precip) >= 2:
-                local_rate_mmph = float(data.get(KEY_RAIN_RATE_FILT) or 0.0)
-                local_rate_per_15min = local_rate_mmph / 4.0  # mm/h → mm per 15-min bucket
-
-                # Work on a mutable copy — never mutate the cached NWP data
-                blended_precip = list(raw_precip)
-                nwp_bucket_0 = blended_precip[0]
-                nwp_bucket_1 = blended_precip[1]
-
-                if local_rate_per_15min > 0.05:
-                    # Local gauge confirms rain: 70% local / 30% NWP for bucket 0,
-                    # 50/50 for bucket 1 (gauge influence fades at t+30 min)
-                    blended_precip[0] = round(0.7 * local_rate_per_15min + 0.3 * nwp_bucket_0, 2)
-                    blended_precip[1] = round(0.5 * local_rate_per_15min + 0.5 * nwp_bucket_1, 2)
-                    nowcast_confidence = "high"
-                elif local_rate_per_15min == 0.0 and nwp_bucket_0 > 0.1:
-                    # Gauge is dry but NWP says rain is here — low confidence
-                    nowcast_confidence = "low"
-                else:
-                    # Gauge and NWP broadly agree
-                    nowcast_confidence = "high" if abs(local_rate_per_15min - nwp_bucket_0) < 0.2 else "medium"
-
-                # Re-derive nowcast from the blended bucket list
-                nc_blended = derive_nowcast(raw_times, blended_precip, dt_util.now())
-                nc_blended["rain_expected_1h"] = bool(
-                    nc_blended.get("next_60min_mm", 0.0) >= NOWCAST_BUCKET_THRESHOLD_MM
-                )
-
-                data[KEY_RAIN_NEXT_60MIN] = nc_blended.get("next_60min_mm")
-                data[KEY_MINUTES_UNTIL_RAIN] = nc_blended.get("minutes_until_rain")
-                data[KEY_MINUTES_UNTIL_DRY] = nc_blended.get("minutes_until_dry")
-                data[KEY_NOWCAST_INTENSITY] = nc_blended.get("intensity")
-                data[KEY_RAIN_EXPECTED_1H] = nc_blended.get("rain_expected_1h")
-                data["_nowcast_peak_rate_mmph"] = nc_blended.get("peak_rate_mmph")
-                data["_nowcast_raining_now"] = nc_blended.get("raining_now")
-                data[KEY_NOWCAST_CONFIDENCE] = nowcast_confidence
-            else:
-                # No raw buckets available — fall back to cached derived values as-is
-                data[KEY_RAIN_NEXT_60MIN] = nc.get("next_60min_mm")
-                data[KEY_MINUTES_UNTIL_RAIN] = nc.get("minutes_until_rain")
-                data[KEY_MINUTES_UNTIL_DRY] = nc.get("minutes_until_dry")
-                data[KEY_NOWCAST_INTENSITY] = nc.get("intensity")
-                data[KEY_RAIN_EXPECTED_1H] = nc.get("rain_expected_1h")
-                data["_nowcast_peak_rate_mmph"] = nc.get("peak_rate_mmph")
-                data["_nowcast_raining_now"] = nc.get("raining_now")
-
-            data["_nowcast_fetched_at"] = nc.get("fetched_at")
+        if self.nowcast_enabled:
+            self._compute_nowcast(data)
 
         # Moon (pure calculation, no external API)
         if self.moon_enabled:
@@ -4464,6 +4560,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     latitude_deg=float(self.forecast_lat),
                 )
                 data[KEY_ET0_PM_DAILY_MM] = et0_pm
+                data[KEY_ET0_PM_RADIATION_SOURCE] = self._solar_radiation_source or ET0_RADIATION_SOURCE_SENSOR
 
         # --- v1.5.0 wind run, chill hours, clearness index ---
         if self.comfort_indices_enabled:
@@ -5457,6 +5554,37 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not eid:
             return None
         return self._num(self.hass, eid)
+
+    def _get_solar_radiation_for_et0(self) -> float | None:
+        """Solar radiation feeding the Penman-Monteith ET0 daily-energy accumulator.
+
+        Prefers the real solar_radiation sensor. When none is mapped and
+        CONF_ET0_ILLUMINANCE_FALLBACK is enabled, derives an approximate value
+        from an illuminance (lux) sensor via LUX_TO_WM2_FACTOR and records
+        which path was used in self._solar_radiation_source, so the ET₀
+        sensor can tag its result as an estimate. Deliberately not used by
+        the comfort-index calculations (THSW/WBGT/UTCI) elsewhere in this
+        file - those stay silent rather than degrade on an illuminance guess.
+        """
+        from .const import SRC_SOLAR_RADIATION
+
+        eid = self.sources.get(SRC_SOLAR_RADIATION)
+        if eid:
+            val = self._num(self.hass, eid)
+            if val is not None:
+                self._solar_radiation_source = ET0_RADIATION_SOURCE_SENSOR
+                return val
+
+        if self.et0_illuminance_fallback:
+            lux_eid = self.sources.get(SRC_LUX)
+            if lux_eid:
+                lux = self._num(self.hass, lux_eid)
+                if lux is not None:
+                    self._solar_radiation_source = ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE
+                    return float(lux) * LUX_TO_WM2_FACTOR
+
+        self._solar_radiation_source = None
+        return None
 
     # ------------------------------------------------------------------
     # v0.7.0 - Air Quality fetch (Open-Meteo AQI API, free, no key)
