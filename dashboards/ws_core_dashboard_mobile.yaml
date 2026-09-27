@@ -25,7 +25,7 @@ views:
       # ── Headline ────────────────────────────────────────────────
       - type: grid
         cards:
-          - type: custom:mushroom-weather-info-card
+          - type: weather-forecast
             entity: weather.ws
             show_current: true
             show_forecast: false
@@ -44,27 +44,27 @@ views:
       - type: grid
         columns: 2
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_humidity
             name: Humidity
             icon: mdi:water-percent
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_sea_level_pressure
             name: Pressure
             icon: mdi:gauge
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_wind_speed
             name: Wind
             icon: mdi:weather-windy
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_wind_gust
             name: Gust
             icon: mdi:weather-windy-variant
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_rain_today_mm
             name: Rain Today
             icon: mdi:weather-rainy
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_uv_index
             name: UV
             icon: mdi:sun-wireless
