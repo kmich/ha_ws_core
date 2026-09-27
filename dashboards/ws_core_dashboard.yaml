@@ -26,7 +26,7 @@ views:
       # Header: current condition + health
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-weather-info-card
+          - type: weather-forecast
             entity: weather.ws
             show_current: true
             show_forecast: false
@@ -43,17 +43,17 @@ views:
       # Temperature row
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_temperature
             name: Temperature
             icon: mdi:thermometer
             primary_info: state
             secondary_info: last-changed
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_feels_like
             name: Feels Like
             icon: mdi:thermometer-lines
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_dew_point
             name: Dew Point
             icon: mdi:water-circle
@@ -61,15 +61,15 @@ views:
       # Humidity + Pressure row
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_humidity
             name: Humidity
             icon: mdi:water-percent
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_sea_level_pressure
             name: Pressure
             icon: mdi:gauge
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_pressure_trend
             name: Trend
             icon: mdi:trending-up
@@ -77,15 +77,15 @@ views:
       # Wind row
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_wind_speed
             name: Wind
             icon: mdi:weather-windy
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_wind_gust
             name: Gust
             icon: mdi:weather-windy-variant
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_wind_direction
             name: Direction
             icon: mdi:compass
@@ -93,19 +93,19 @@ views:
       # Rain row
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_rain_rate
             name: Rain Rate
             icon: mdi:water
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_rain_today_mm
             name: Today
             icon: mdi:weather-rainy
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_rain_this_week
             name: This Week
             icon: mdi:calendar-week
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_rain_this_month
             name: This Month
             icon: mdi:calendar-month
@@ -113,15 +113,15 @@ views:
       # UV + Illuminance
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_uv_index
             name: UV Index
             icon: mdi:sun-wireless
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_uv_level
             name: UV Level
             icon: mdi:weather-sunny
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_illuminance
             name: Illuminance
             icon: mdi:brightness-7
@@ -129,11 +129,11 @@ views:
       # Rain probability
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_rain_probability_combined
             name: Rain Probability
             icon: mdi:weather-rainy
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_zambretti_forecast
             name: Zambretti
             icon: mdi:crystal-ball
@@ -414,30 +414,30 @@ views:
 
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_indoor_temperature
             name: Indoor Temp
             icon: mdi:home-thermometer
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_indoor_humidity
             name: Indoor Humidity
             icon: mdi:home-humidity
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_indoor_co2
             name: CO₂
             icon: mdi:molecule-co2
 
       - type: horizontal-stack
         cards:
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_indoor_temp_delta
             name: Temp Δ In/Out
             icon: mdi:thermometer-lines
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_indoor_humidity_delta
             name: Humidity Δ In/Out
             icon: mdi:water-percent-alert
-          - type: custom:mushroom-sensor-card
+          - type: custom:mushroom-entity-card
             entity: sensor.ws_indoor_comfort
             name: Comfort Score
             icon: mdi:home-heart

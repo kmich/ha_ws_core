@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.9.1] - 2026-09-27
+
+### Fixed
+
+- **Dashboard custom card dependencies corrected (issue #159).** In `dashboards/ws_core_dashboard.yaml` and `dashboards/ws_core_dashboard_mobile.yaml`, nonexistent `custom:mushroom-sensor-card` card types were replaced with the standard `custom:mushroom-entity-card`, and nonexistent `custom:mushroom-weather-info-card` was replaced with Home Assistant's built-in `weather-forecast` card. Dashboard validation now verifies card types alongside entity references.
+
 ## [2.9.0] - 2026-09-26
 
 ### Added

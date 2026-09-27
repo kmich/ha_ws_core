@@ -133,6 +133,67 @@ def _dashboard_entity_refs(yaml_path: pathlib.Path) -> dict[str, list[int]]:
 
 
 # ---------------------------------------------------------------------------
+# Dashboard card type validation
+# ---------------------------------------------------------------------------
+
+KNOWN_BUILTIN_CARD_TYPES: set[str] = {
+    "conditional",
+    "entities",
+    "entity",
+    "gauge",
+    "grid",
+    "heading",
+    "history-graph",
+    "horizontal-stack",
+    "iframe",
+    "logbook",
+    "markdown",
+    "sections",
+    "vertical-stack",
+    "weather-forecast",
+}
+
+KNOWN_CUSTOM_CARD_TYPES: set[str] = {
+    "custom:apexcharts-card",
+    "custom:button-card",
+    "custom:config-template-card",
+    "custom:mini-graph-card",
+    "custom:mushroom-alarm-control-panel-card",
+    "custom:mushroom-chips-card",
+    "custom:mushroom-climate-card",
+    "custom:mushroom-cover-card",
+    "custom:mushroom-entity-card",
+    "custom:mushroom-fan-card",
+    "custom:mushroom-humidifier-card",
+    "custom:mushroom-light-card",
+    "custom:mushroom-lock-card",
+    "custom:mushroom-media-player-card",
+    "custom:mushroom-number-card",
+    "custom:mushroom-person-card",
+    "custom:mushroom-select-card",
+    "custom:mushroom-template-card",
+    "custom:mushroom-title-card",
+    "custom:mushroom-update-card",
+    "custom:mushroom-vacuum-card",
+    "custom:stack-in-card",
+    "custom:windrose-card",
+}
+
+ALL_KNOWN_CARD_TYPES: set[str] = KNOWN_BUILTIN_CARD_TYPES | KNOWN_CUSTOM_CARD_TYPES
+_CARD_TYPE_RE = re.compile(r"""^\s*(?:-\s*)?type:\s*([a-zA-Z0-9_\-:]+)""")
+
+
+def _dashboard_card_refs(yaml_path: pathlib.Path) -> dict[str, list[int]]:
+    refs: dict[str, list[int]] = {}
+    for lineno, line in enumerate(yaml_path.read_text(encoding="utf-8").splitlines(), 1):
+        m = _CARD_TYPE_RE.match(line)
+        if m:
+            ctype = m.group(1)
+            refs.setdefault(ctype, []).append(lineno)
+    return refs
+
+
+# ---------------------------------------------------------------------------
 # Validation / list
 # ---------------------------------------------------------------------------
 
@@ -148,16 +209,27 @@ def validate(prefix: str = "ws", verbose: bool = False) -> bool:
     for dash_path in dashboards:
         refs = _dashboard_entity_refs(dash_path)
         broken = {eid: lines for eid, lines in refs.items() if eid not in known}
-        if broken:
+        card_refs = _dashboard_card_refs(dash_path)
+        broken_cards = {ctype: lines for ctype, lines in card_refs.items() if ctype not in ALL_KNOWN_CARD_TYPES}
+
+        if broken or broken_cards:
             all_ok = False
-            print(f"\n❌ {dash_path.name}: {len(broken)} broken entity ref(s)")
-            for eid, lines in sorted(broken.items()):
-                line_str = ", ".join(str(line_num) for line_num in lines[:5])
-                if len(lines) > 5:
-                    line_str += f" (+{len(lines) - 5} more)"
-                print(f"   BROKEN  {eid}  (lines: {line_str})")
+            if broken:
+                print(f"\n❌ {dash_path.name}: {len(broken)} broken entity ref(s)")
+                for eid, lines in sorted(broken.items()):
+                    line_str = ", ".join(str(line_num) for line_num in lines[:5])
+                    if len(lines) > 5:
+                        line_str += f" (+{len(lines) - 5} more)"
+                    print(f"   BROKEN  {eid}  (lines: {line_str})")
+            if broken_cards:
+                print(f"\n❌ {dash_path.name}: {len(broken_cards)} invalid card type(s)")
+                for ctype, lines in sorted(broken_cards.items()):
+                    line_str = ", ".join(str(line_num) for line_num in lines[:5])
+                    if len(lines) > 5:
+                        line_str += f" (+{len(lines) - 5} more)"
+                    print(f"   INVALID CARD  {ctype}  (lines: {line_str})")
         else:
-            print(f"OK {dash_path.name}: all {len(refs)} entity refs valid")
+            print(f"OK {dash_path.name}: all {len(refs)} entity refs and {len(card_refs)} card types valid")
             if verbose:
                 for eid in sorted(refs):
                     print(f"   {eid}")
