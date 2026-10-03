@@ -89,11 +89,11 @@ action:
 
 ---
 
-## 5. ⚡ Lightning Proximity Safety (Keep Kids & Pets Safe)
+## 5. ⚡ Lightning Proximity Safety (Physical Sensor or Free Blitzortung)
 
 **The Problem:** Thunderstorms can produce lethal cloud-to-ground strikes miles ahead of the actual rain cloud.
 
-**The Solution:** If you have an Ecowitt WH57 or WeatherFlow Tempest lightning sensor, `ws_core` tracks strike distance, frequency, and provides an automatic "All Clear" countdown when no strikes have occurred for 30 minutes.
+**The Solution:** Works with hardware sensors (Ecowitt WH57, Tempest) **OR the free Blitzortung HA integration** (zero hardware needed!). If Blitzortung is installed, `ws_core` auto-discovers it, tracking strike distance and running a 30-minute "All Clear" countdown when no strikes have occurred.
 
 [![Import Lightning Safety Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Flightning_safety.yaml)
 
@@ -106,3 +106,65 @@ action:
 **The Solution:** `ws_core` calculates the Universal Thermal Climate Index (**UTCI**) and Wet-Bulb Globe Temperature (**WBGT**) — the official standards used by the World Health Organization and OSHA for heat stress warnings during sports and construction.
 
 [![Import Heat Stress Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fheat_stress.yaml)
+
+---
+
+## 🌿 7. Plant Health & Spraying Windows (Delta-T, VPD, Leaf Wetness)
+
+**The Problem:** Applying foliar fertilizer, fungicides, or organic treatments at the wrong time wastes money: if Delta-T is too high, the droplets evaporate before absorption; if too low, droplets don't dry, increasing fungal risk.
+
+**The Solution:** `ws_core` computes agricultural-grade microclimate metrics:
+* **Delta-T Spray Window:** `sensor.ws_delta_t` provides an attribute `spray_suitability` (`ideal`, `marginal`, `unacceptable`).
+* **VPD (Vapor Pressure Deficit):** `sensor.ws_vpd` tells greenhouse growers and plant enthusiasts whether leaves are transpiring optimally.
+* **Leaf Wetness:** `sensor.ws_leaf_wetness` estimates when condensation remains on foliage, helping you predict and prevent black spot, powdery mildew, and blight.
+
+---
+
+## ⚡ 8. Energy & HVAC Optimization (Heating & Cooling Degree Days)
+
+**The Problem:** Heat pumps and AC units consume electricity reactively, spiking bills during peak-tariff hours.
+
+**The Solution:** Track thermal loads with scientific **Degree Days**:
+* **Heating Degree Days (HDD):** `sensor.ws_hdd` measures how cold the day was relative to a base comfort temperature, allowing you to correlate exactly with heating gas or heat pump kWh.
+* **Cooling Degree Days (CDD):** `sensor.ws_cdd` measures summer heat load to trigger pre-cooling automations when solar production is peaked or electricity is cheap.
+* **Growing Degree Days (GDD):** `sensor.ws_gdd` tracks thermal accumulation to predict lawn growth spurts and harvest dates.
+
+---
+
+## 🌍 9. 10-Year Climate Normals (ERA5 Historical Comparison)
+
+**The Problem:** Weather apps tell you it's 24°C, but is that typical or an extreme anomaly for today?
+
+**The Solution:** Enable **Climate Normals** under **Configure → Features**. `ws_core` queries the Open-Meteo ERA5 10-year archive for your specific coordinates, populating:
+* `sensor.ws_temp_anomaly_normal`: Tells you: *"Today is +3.8°C warmer than the 10-year historical average for this date."*
+* `sensor.ws_precip_anomaly_normal`: Compares rainfall against your location's historical seasonal benchmarks.
+
+---
+
+## ❄️ 10. Snow Accumulation & Phase Estimation (Without a Snow Gauge)
+
+**The Problem:** Traditional tipping-bucket rain gauges cannot measure snow until it melts, leaving a blank spot in winter automation.
+
+**The Solution:** `ws_core` uses wet-bulb temperature, surface temperature, and precipitation rate to determine precipitation phase (rain, freezing rain, sleet, snow) and derives estimated snow accumulation (`sensor.ws_snow_rate_hourly` and `sensor.ws_snow_accumulation_24h`), so you know when to salt driveways or turn on pipe heating cables.
+
+---
+
+## 🎯 11. Instant Automations with Native HA Events
+
+Instead of writing slow, poll-based YAML, `ws_core` provides native **Home Assistant Event Entities** for instant sub-second execution:
+
+* `event.ws_rain_event` (`started`, `stopped`)
+* `event.ws_frost_event` (`onset`, `thaw`)
+* `event.ws_lightning_event` (`strike`)
+
+```yaml
+alias: "Instantly Close Blinds on Rain"
+trigger:
+  - platform: state
+    entity_id: event.ws_rain_event
+    to: "started"
+action:
+  - action: cover.close_cover
+    target:
+      entity_id: cover.patio_shades
+```

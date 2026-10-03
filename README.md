@@ -74,6 +74,7 @@ Your smart home shouldn't stop working when your internet connection goes down.
 | **WeatherFlow Tempest** | Tempest Home Assistant integration & local UDP / MQTT | Air temp, station pressure, wind speed/gust, rain, UV, illuminance |
 | **Davis Instruments** | WeatherLink IP, Vantage Pro2, Vantage Vue | Classic PWS measurements, rain year, bar absolute |
 | **Netatmo** | Netatmo Smart Weather Station (Outdoor + Rain + Wind) | Outdoor module readings, rain gauge total, anemometer wind |
+| **Blitzortung (Free Fallback)** | Blitzortung HA integration (crowdsourced network) | Auto-discovered fallback: strikes, distance, proximity (no hardware needed!) |
 | **Shelly / ESPHome / DIY** | Any custom sensor entity with standard device classes | Temperature, humidity, pressure, wind, cumulative rain total |
 
 👉 *Need help mapping your entities? Check out our [Hardware Mapping Guide](docs/hardware_mapping.md).*
@@ -89,7 +90,7 @@ Don't spend hours writing YAML. We provide ready-to-import blueprints with sensi
 | **Rain Start Warning** | Announce via TTS or mobile notification when rain is imminent | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Frain_start.yaml) |
 | **Irrigation Rain Skip** | Automatically skip watering when rainfall or ET₀ indicates sufficient moisture | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Firrigation_rain_skip.yaml) |
 | **High Wind Protection** | Automatically retract awnings and blinds when severe wind gusts are detected | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fhigh_wind.yaml) |
-| **Freeze Warning** | Alert when temperature drops near freezing and turn off exposed irrigation valves | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Ffreeze_alert.yaml) |
+| **Freeze & Frost Protection** | Alert before freezing and automatically shut off outdoor irrigation valves | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Ffreeze_alert.yaml) |
 | **Heat Stress Alert** | Notify when apparent temperature (UTCI) reaches dangerous levels for outdoor activity | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fheat_stress.yaml) |
 
 👉 *Browse all 10 blueprints and configuration options in the [Blueprint Documentation](docs/blueprints.md).*
@@ -132,16 +133,19 @@ In the `dashboards/` directory, you'll find:
 
 ---
 
-## 🔬 Meteorological Precision & Science
+## 🔬 Meteorological Precision & Advanced Intelligence
 
-Behind the friendly sensors, `ws_core` runs rigorous, peer-reviewed meteorological algorithms:
+Behind the friendly sensors, `ws_core` runs rigorous, peer-reviewed meteorological algorithms and advanced power packs:
 
-* **UTCI (Universal Thermal Climate Index):** Complete Bröde (2012) polynomial modeling human heat balance across radiation, humidity, and wind.
-* **Wet Bulb & Frost Point:** Stull (2011) and Buck (1981) formulas with ice-constant handling.
-* **Nowcast Ground-Truth Blending:** Merges high-resolution NWP radar grids with your local physical rain gauge (70% local / 30% forecast) for pinpoint start times.
-* **Adaptive Rain Probability:** Learns over a rolling 90-day window via Brier-score evaluation to continuously improve accuracy.
-* **Multi-Network Weather Sync:** Broadcasts your station observations simultaneously to 8 global networks (WUnderground, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM, Windy).
-* **Full Translation Parity:** Available in English, French, German, Spanish, Italian, Dutch, Polish, and Portuguese.
+* **🌧️ Nowcast Ground-Truth Blending:** Merges high-resolution NWP radar grids with your physical rain gauge (70% local / 30% forecast) for pinpoint start times.
+* **🌿 Plant Health & Agricultural Spraying:** Computes **Delta-T** spray window suitability (know the exact window to spray fertilizer without evaporation or drift), **VPD** (Vapor Pressure Deficit) for greenhouses, and **Leaf Wetness** to detect fungal risks.
+* **⚡ Energy & HVAC Load Optimization:** Tracks **Heating Degree Days (HDD)** and **Cooling Degree Days (CDD)** to forecast heat pump and air conditioning demand and automate pre-cooling with solar energy.
+* **🌍 10-Year Climate Normals (ERA5):** Compares today's temperature and rain against a 10-year historical baseline for your exact coordinates (`sensor.ws_temp_anomaly_normal`).
+* **❄️ Snow Accumulation & Phase:** Uses wet-bulb temperature and precipitation rate to determine snow, sleet, or rain and estimate snow accumulation without requiring a heated snow gauge.
+* **🎯 Native HA Event Entities:** Fires instant sub-second event triggers (`event.ws_rain_event`, `event.ws_frost_event`, `event.ws_lightning_event`) for lag-free automations without numeric polling.
+* **🌡️ Human Thermal Comfort (UTCI & WBGT):** Full Bröde (2012) polynomial modeling human heat balance across radiation, humidity, and wind.
+* **📡 8-Network Simultaneous Uplink:** Broadcasts your station observations simultaneously to WUnderground, Windy, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, and OpenWeatherMap.
+* **🌐 Full Translation Parity:** Available in English, French, German, Spanish, Italian, Dutch, Polish, and Portuguese.
 
 For complete equations, source citations, and mathematical references, see the [**Scientific Documentation**](docs/science.md).
 

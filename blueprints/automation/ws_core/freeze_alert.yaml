@@ -1,7 +1,8 @@
 blueprint:
-  name: "WS Core: Frost Alert"
+  name: "WS Core: Freeze & Frost Protection"
   description: >-
-    Send a notification when the temperature drops below a threshold.
+    Send an alert when the temperature drops near freezing and optionally
+    turn off outdoor irrigation valves or switches to prevent frozen or burst pipes.
     Uses the Weather Station Core temperature sensor with configurable
     threshold and notification target.
   domain: automation
@@ -16,7 +17,7 @@ blueprint:
           domain: sensor
           device_class: temperature
     threshold:
-      name: Frost threshold
+      name: Freeze threshold (°C)
       description: Temperature below which to trigger the alert (°C)
       default: 2.0
       selector:
@@ -25,12 +26,24 @@ blueprint:
           max: 10
           step: 0.5
           unit_of_measurement: "°C"
+    irrigation_entity:
+      name: Irrigation switch or valve to turn off (optional)
+      description: Optional switch or valve to shut down automatically before frost damages pipes. Leave empty to skip.
+      default: ""
+      selector:
+        entity:
+          domain:
+            - switch
+            - valve
     notify_target:
       name: Notification service
       description: "The notification service to call (e.g. notify.mobile_app_phone)"
       default: notify.persistent_notification
       selector:
         text:
+
+variables:
+  irrigation_target: !input irrigation_entity
 
 trigger:
   - platform: numeric_state
@@ -42,9 +55,16 @@ trigger:
 condition: []
 
 action:
+  - if:
+      - condition: template
+        value_template: "{{ irrigation_target != '' and irrigation_target != none }}"
+    then:
+      - action: homeassistant.turn_off
+        target:
+          entity_id: !input irrigation_entity
   - action: !input notify_target
     data:
-      title: "Frost Warning"
+      title: "Freeze / Frost Warning"
       message: >-
         Temperature has dropped to {{ states(trigger.entity_id) }}°C.
-        Protect sensitive plants and check exposed pipes.
+        {% if irrigation_target != '' and irrigation_target != none %}Irrigation shut down automatically. {% endif %}Protect sensitive plants and check exposed pipes.

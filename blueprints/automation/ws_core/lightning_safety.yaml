@@ -2,8 +2,8 @@ blueprint:
   name: "WS Core: Lightning Safety Alert"
   description: >
     Sends alerts when lightning is detected nearby, and notifies when the area
-    is clear (≥30 minutes since last strike). Requires the Lightning Detection
-    feature enabled in ws_core and a lightning sensor mapped.
+    is clear (≥30 minutes since last strike). Works with physical sensors
+    (Ecowitt WH57, Tempest) or the free Blitzortung HA integration.
   domain: automation
   source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/lightning_safety.yaml
   input:
