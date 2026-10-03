@@ -2,6 +2,15 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.9.3] - 2026-10-03
+
+### Changed
+
+- **God-class decomposition (`sensor.py` and `coordinator.py`):**
+  - **`custom_components/ws_core/entity_descriptions.py`:** Extracted the entire declarative sensor catalog (`SENSORS`), `WSSensorDescription`, `_FEATURE_TOGGLE_MAP`, and unit conversion factor dictionaries out of `sensor.py`, reducing `sensor.py` from 3,568 lines to 996 lines (a 72% reduction, -2,572 lines).
+  - **`custom_components/ws_core/uploaders.py`:** Extracted all 8 external weather network upload handlers (Weather Underground, CWOP APRS/TCP, Weathercloud, PWSWeather, UK Met Office WOW, AWEKAS, OpenWeatherMap Stations v3, and Windy.com Stations) along with protocol-specific helpers and `_redact_secrets` out of `coordinator.py` (-508 lines).
+  - **100% Backwards Compatible:** Retained thin delegations in `WSStationCoordinator` and module-level re-exports via `__all__` in `sensor.py`, preserving all existing tests, mock sessions, and public/internal interfaces without breaking changes.
+
 ## [2.9.2] - 2026-10-03
 
 ### Added

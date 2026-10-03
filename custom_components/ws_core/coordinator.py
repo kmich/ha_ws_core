@@ -595,6 +595,17 @@ from .const import (
 )
 from .models import WsData
 from .providers import get_provider
+from .uploaders import (
+    _redact_secrets,
+    async_upload_awekas,
+    async_upload_cwop,
+    async_upload_owm_stations,
+    async_upload_pwsweather,
+    async_upload_weathercloud,
+    async_upload_windy,
+    async_upload_wow,
+    async_upload_wunderground,
+)
 
 try:
     from homeassistant.helpers import issue_registry as ir
@@ -613,19 +624,6 @@ _LOGGER = logging.getLogger(__name__)
 # manifest is tiny and fast, but we still use executor so the call is explicit.
 # The value is cached in a module-level variable after the first read.
 _INTEGRATION_VERSION: str = "unknown"
-
-
-def _redact_secrets(text: Any, *secrets: str | None) -> str:
-    """Return ``str(text)`` with every non-empty secret replaced.
-
-    aiohttp exception messages can embed the request URL, and several
-    services carry their API key in the URL path or query string.
-    """
-    out = str(text)
-    for secret in secrets:
-        if secret:
-            out = out.replace(secret, "**REDACTED**")
-    return out
 
 
 def _load_integration_version() -> str:
@@ -4885,185 +4883,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_upload_wunderground(self) -> None:
         """Upload observation to Weather Underground Personal Weather Station API."""
-        data = self.data
-        if not data or not self.wu_station_id or not self.wu_api_key:
-            return
-
-        now_utc = dt_util.utcnow()
-        date_utc = now_utc.strftime("%Y-%m-%d %H:%M:%S")
-
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        dew_c = data.get(KEY_DEW_POINT_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
-
-        def _c_to_f(c: float) -> float:
-            return round(c * 9 / 5 + 32, 1)
-
-        def _ms_to_mph(ms: float) -> float:
-            return round(float(ms) * 2.23694, 1)
-
-        def _mm_to_in(mm: float) -> float:
-            return round(float(mm) / 25.4, 3)
-
-        def _hpa_to_inhg(hpa: float) -> float:
-            return round(float(hpa) / 33.8639, 2)
-
-        params = {
-            "ID": self.wu_station_id,
-            "PASSWORD": self.wu_api_key,
-            "dateutc": date_utc,
-            "winddir": int(wind_dir),
-            "windspeedmph": _ms_to_mph(wind_ms),
-            "windgustmph": _ms_to_mph(gust_ms),
-            "rainin": _mm_to_in(rain_1h),
-            # WU protocol: rain since local midnight, not a rolling 24h total
-            "dailyrainin": _mm_to_in(rain_today),
-            "action": "updateraw",
-            "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
-        }
-        if temp_c is not None:
-            params["tempf"] = _c_to_f(float(temp_c))
-        if dew_c is not None:
-            params["dewptf"] = _c_to_f(float(dew_c))
-        if humidity is not None:
-            params["humidity"] = int(float(humidity))
-        if press is not None:
-            params["baromin"] = _hpa_to_inhg(float(press))
-
-        url = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                body = await resp.text()
-                if resp.status == 200 and "success" in body.lower():
-                    self._wu_last_upload = now_utc
-                    self._wu_status = "ok"
-                    _LOGGER.debug("WUnderground upload OK")
-                else:
-                    self._wu_status = "error_http"
-                    _LOGGER.warning("WUnderground upload failed HTTP %d: %s", resp.status, body[:120])
-        except (aiohttp.ClientError, TimeoutError) as exc:
-            self._wu_status = "error_network"
-            _LOGGER.warning("WUnderground upload error: %s", _redact_secrets(exc, self.wu_api_key))
-        except Exception as exc:
-            self._wu_status = "error"
-            _LOGGER.error("WUnderground upload unexpected error: %s", _redact_secrets(exc, self.wu_api_key))
+        await async_upload_wunderground(self, async_get_clientsession(self.hass))
 
     # ------------------------------------------------------------------
     # v2.0 - CWOP (Citizen Weather Observer Program) upload via APRS TCP
     # ------------------------------------------------------------------
 
     async def _async_upload_cwop(self) -> None:
-        """Upload observation to CWOP network using APRS protocol over TCP.
-
-        Protocol:
-          1. Connect to cwop.aprs.net:14580
-          2. Send login: user {CALLSIGN} pass {PASSCODE} vers ws_core {VERSION}
-          3. Send APRS weather packet
-          4. Close connection
-
-        APRS weather packet format:
-          {CALLSIGN}>APRS,TCPXX*,qAX,{CALLSIGN}:@{TIME}z{LAT}/{LON}_{WIND}
-        """
-        import asyncio
-
-        data = self.data
-        if not data or not self.cwop_callsign:
-            return
-
-        now_utc = dt_util.utcnow()
-        lat = self.forecast_lat
-        lon = self.forecast_lon
-        if lat is None or lon is None:
-            return
-
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
-        rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
-
-        # APRS uses hundredths of degrees, N/S E/W format
-        lat_f = float(lat)
-        lon_f = float(lon)
-        lat_deg = int(abs(lat_f))
-        lat_min = (abs(lat_f) - lat_deg) * 60
-        lon_deg = int(abs(lon_f))
-        lon_min = (abs(lon_f) - lon_deg) * 60
-        lat_str = f"{lat_deg:02d}{lat_min:05.2f}{'N' if lat_f >= 0 else 'S'}"
-        lon_str = f"{lon_deg:03d}{lon_min:05.2f}{'E' if lon_f >= 0 else 'W'}"
-
-        time_str = now_utc.strftime("%d%H%M")
-
-        def _ms_to_mph(ms: float) -> int:
-            return round(float(ms) * 2.23694)
-
-        def _mm_to_hundredths_in(mm: float) -> int:
-            return round(float(mm) / 25.4 * 100)
-
-        def _c_to_f(c: float) -> int:
-            return round(float(c) * 9 / 5 + 32)
-
-        # APRS weather body
-        wind_dir_s = f"{int(wind_dir):03d}"
-        wind_spd_s = f"{_ms_to_mph(wind_ms):03d}"
-        gust_s = f"g{_ms_to_mph(gust_ms):03d}"
-        temp_s = f"t{_c_to_f(float(temp_c)):03d}" if temp_c is not None else "t..."
-        rain1h_s = f"r{_mm_to_hundredths_in(float(rain_1h)):03d}"
-        rain24h_s = f"p{_mm_to_hundredths_in(float(rain_24h)):03d}"
-        rain_midnight_s = f"P{_mm_to_hundredths_in(float(rain_today)):03d}"
-        # APRS encodes 100 % humidity as "h00" (the field is two digits)
-        hum_s = f"h{round(float(humidity)) % 100:02d}" if humidity is not None else ""
-        baro_s = f"b{round(float(press) * 10):05d}" if press is not None else ""
-
-        weather_body = (
-            f"_{wind_dir_s}/{wind_spd_s}{gust_s}{temp_s}"
-            f"{rain1h_s}{rain24h_s}{rain_midnight_s}{hum_s}{baro_s}"
-            f" ws_core/{_INTEGRATION_VERSION}"
-        )
-
-        packet = (
-            f"{self.cwop_callsign}>APRS,TCPXX*,qAX,{self.cwop_callsign}:"
-            f"@{time_str}z{lat_str}/{lon_str}{weather_body}\r\n"
-        )
-        login = f"user {self.cwop_callsign} pass {self.cwop_passcode} vers ws_core {_INTEGRATION_VERSION}\r\n"
-
-        try:
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(self.cwop_server, self.cwop_port),
-                timeout=15,
-            )
-            try:
-                writer.write(login.encode("ascii"))
-                await writer.drain()
-                # Give server 1 second to respond (it sends a banner)
-                with contextlib.suppress(TimeoutError):
-                    await asyncio.wait_for(reader.read(256), timeout=1.5)
-                writer.write(packet.encode("ascii"))
-                await writer.drain()
-                self._cwop_last_upload = now_utc
-                self._cwop_status = "ok"
-                _LOGGER.debug("CWOP upload OK: %s", packet.strip())
-            finally:
-                writer.close()
-                with contextlib.suppress(Exception):
-                    await writer.wait_closed()
-        except (TimeoutError, OSError) as exc:
-            self._cwop_status = "error_network"
-            _LOGGER.warning("CWOP upload error: %s", exc)
-        except Exception as exc:  # noqa: BLE001
-            self._cwop_status = "error"
-            _LOGGER.error("CWOP upload unexpected error: %s", exc)
+        """Upload observation to CWOP network using APRS protocol over TCP."""
+        await async_upload_cwop(self)
 
     # ------------------------------------------------------------------
     # v2.0 - MQTT Discovery republishing
@@ -5110,65 +4938,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_upload_weathercloud(self) -> None:
         """Upload observation to Weathercloud."""
-        data = self.data
-        if not data or not self.wc_station_id or not self.wc_api_key:
-            return
-
-        now_utc = dt_util.utcnow()
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        dew_c = data.get(KEY_DEW_POINT_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        uv = data.get(KEY_UV)
-
-        def _ms_to_kmh(ms: float) -> float:
-            return round(float(ms) * 3.6, 1)
-
-        def _hpa_to_hpa(v: float) -> float:
-            return round(float(v), 1)
-
-        # Weathercloud API v1 (HTTP GET)
-        params: dict = {
-            "wid": self.wc_station_id,
-            "key": self.wc_api_key,
-            "per": int(self.wc_interval_min),
-        }
-        if temp_c is not None:
-            params["temp"] = round(float(temp_c) * 10)  # Weathercloud uses tenths of °C
-        if dew_c is not None:
-            params["dew"] = round(float(dew_c) * 10)
-        if humidity is not None:
-            params["hum"] = int(float(humidity))
-        if press is not None:
-            params["bar"] = round(float(press) * 10)
-        params["wspdavg"] = round(_ms_to_kmh(wind_ms) * 10)
-        params["wgust"] = round(_ms_to_kmh(gust_ms) * 10)
-        params["wdir"] = int(wind_dir)
-        params["rain"] = round(float(rain_1h) * 10)
-        if uv is not None:
-            params["uvi"] = round(float(uv) * 10)
-
-        url = "https://api.weathercloud.net/v01/set"
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                body = await resp.text()
-                if resp.status == 200:
-                    self._wc_last_upload = now_utc
-                    self._wc_status = "ok"
-                else:
-                    self._wc_status = "error_http"
-                    _LOGGER.warning("Weathercloud upload HTTP %d: %s", resp.status, body[:120])
-        except (aiohttp.ClientError, TimeoutError) as exc:
-            self._wc_status = "error_network"
-            _LOGGER.warning("Weathercloud upload error: %s", _redact_secrets(exc, self.wc_api_key))
-        except Exception as exc:  # noqa: BLE001
-            self._wc_status = "error"
-            _LOGGER.error("Weathercloud upload unexpected error: %s", _redact_secrets(exc, self.wc_api_key))
+        await async_upload_weathercloud(self, async_get_clientsession(self.hass))
 
     # ------------------------------------------------------------------
     # v2.0 - PWSWeather upload
@@ -5176,196 +4946,23 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_upload_pwsweather(self) -> None:
         """Upload observation to PWSWeather (WU-compatible API)."""
-        data = self.data
-        if not data or not self.pws_station_id or not self.pws_api_key:
-            return
-
-        now_utc = dt_util.utcnow()
-        date_utc = now_utc.strftime("%Y-%m-%d %H:%M:%S")
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        dew_c = data.get(KEY_DEW_POINT_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
-
-        def _c_to_f(c: float) -> float:
-            return round(float(c) * 9 / 5 + 32, 1)
-
-        def _ms_to_mph(ms: float) -> float:
-            return round(float(ms) * 2.23694, 1)
-
-        def _mm_to_in(mm: float) -> float:
-            return round(float(mm) / 25.4, 3)
-
-        def _hpa_to_inhg(hpa: float) -> float:
-            return round(float(hpa) / 33.8639, 2)
-
-        params: dict = {
-            "ID": self.pws_station_id,
-            "PASSWORD": self.pws_api_key,
-            "dateutc": date_utc,
-            "winddir": int(wind_dir),
-            "windspeedmph": _ms_to_mph(wind_ms),
-            "windgustmph": _ms_to_mph(gust_ms),
-            "rainin": _mm_to_in(rain_1h),
-            # WU protocol: rain since local midnight, not a rolling 24h total
-            "dailyrainin": _mm_to_in(rain_today),
-            "action": "updateraw",
-            "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
-        }
-        if temp_c is not None:
-            params["tempf"] = _c_to_f(float(temp_c))
-        if dew_c is not None:
-            params["dewptf"] = _c_to_f(float(dew_c))
-        if humidity is not None:
-            params["humidity"] = int(float(humidity))
-        if press is not None:
-            params["baromin"] = _hpa_to_inhg(float(press))
-
-        url = "https://www.pwsweather.com/weatherstation/updateweatherstation.php"
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                body = await resp.text()
-                if resp.status == 200 and "success" in body.lower():
-                    self._pws_last_upload = now_utc
-                    self._pws_status = "ok"
-                else:
-                    self._pws_status = "error_http"
-                    _LOGGER.warning("PWSWeather upload HTTP %d: %s", resp.status, body[:120])
-        except (aiohttp.ClientError, TimeoutError) as exc:
-            self._pws_status = "error_network"
-            _LOGGER.warning("PWSWeather upload error: %s", _redact_secrets(exc, self.pws_api_key))
-        except Exception as exc:  # noqa: BLE001
-            self._pws_status = "error"
-            _LOGGER.error("PWSWeather upload unexpected error: %s", _redact_secrets(exc, self.pws_api_key))
+        await async_upload_pwsweather(self, async_get_clientsession(self.hass))
 
     # ------------------------------------------------------------------
-    # v2.0 - WOW (UK Met Office Weather Observations Website) upload
+    # v2.0 - WOW (Weather Observations Website) upload
     # ------------------------------------------------------------------
 
     async def _async_upload_wow(self) -> None:
         """Upload observation to UK Met Office WOW."""
-        data = self.data
-        if not data or not self.wow_site_id or not self.wow_auth_key:
-            return
-
-        now_utc = dt_util.utcnow()
-        date_utc = now_utc.strftime("%Y-%m-%d %H:%M:%S")
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        dew_c = data.get(KEY_DEW_POINT_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-
-        params: dict = {
-            "siteid": self.wow_site_id,
-            "siteAuthenticationKey": self.wow_auth_key,
-            "dateutc": date_utc,
-            "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
-        }
-        if temp_c is not None:
-            params["tempf"] = round(float(temp_c) * 9 / 5 + 32, 1)
-        if dew_c is not None:
-            params["dewptf"] = round(float(dew_c) * 9 / 5 + 32, 1)
-        if humidity is not None:
-            params["humidity"] = int(float(humidity))
-        if press is not None:
-            params["baromin"] = round(float(press) / 33.8639, 2)
-        if wind_dir is not None:
-            params["winddir"] = int(float(wind_dir))
-        if wind_ms is not None:
-            params["windspeedmph"] = round(float(wind_ms) * 2.23694, 1)
-        if gust_ms is not None:
-            params["windgustmph"] = round(float(gust_ms) * 2.23694, 1)
-        params["rainin"] = round(float(rain_1h) / 25.4, 3)
-
-        url = "https://wow.metoffice.gov.uk/automaticreading"
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status in (200, 201):
-                    self._wow_last_upload = now_utc
-                    self._wow_status = "ok"
-                else:
-                    self._wow_status = "error_http"
-                    _LOGGER.warning("WOW upload HTTP %d", resp.status)
-        except (aiohttp.ClientError, TimeoutError) as exc:
-            self._wow_status = "error_network"
-            _LOGGER.warning("WOW upload error: %s", _redact_secrets(exc, self.wow_auth_key))
-        except Exception as exc:  # noqa: BLE001
-            self._wow_status = "error"
-            _LOGGER.error("WOW upload unexpected error: %s", _redact_secrets(exc, self.wow_auth_key))
+        await async_upload_wow(self, async_get_clientsession(self.hass))
 
     # ------------------------------------------------------------------
     # v2.0 - AWEKAS upload
     # ------------------------------------------------------------------
 
     async def _async_upload_awekas(self) -> None:
-        """Upload observation to AWEKAS (Automatisches WEtterKArtenSystem)."""
-        data = self.data
-        if not data or not self.awekas_username or not self.awekas_password:
-            return
-
-        now_utc = dt_util.utcnow()
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-        snow_mm = None  # snow depth not yet available in ws_core
-
-        # AWEKAS upload format (semicolon-delimited, UTF-8)
-        # username;password;date;time;temp;humidity;pressure;rain;wind;winddir;windgust;;snow;
-        date_str = now_utc.strftime("%d.%m.%Y")
-        time_str = now_utc.strftime("%H:%M")
-        values = [
-            self.awekas_username,
-            self.awekas_password,
-            date_str,
-            time_str,
-            f"{float(temp_c):.1f}" if temp_c is not None else "",
-            f"{int(float(humidity))}" if humidity is not None else "",
-            f"{float(press):.1f}" if press is not None else "",
-            f"{float(rain_1h):.1f}",
-            f"{round(float(wind_ms) * 3.6, 1)}" if wind_ms is not None else "",
-            f"{int(float(wind_dir))}" if wind_dir is not None else "",
-            f"{round(float(gust_ms) * 3.6, 1)}" if gust_ms is not None else "",
-            "",
-            "" if snow_mm is None else f"{snow_mm:.1f}",
-        ]
-        payload = ";".join(values)
-
-        url = "https://data.awekas.at/eingabe_pruefung.php"
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.post(
-                url,
-                data={"val": payload},
-                timeout=aiohttp.ClientTimeout(total=20),
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            ) as resp:
-                if resp.status == 200:
-                    self._awekas_last_upload = now_utc
-                    self._awekas_status = "ok"
-                else:
-                    self._awekas_status = "error_http"
-                    _LOGGER.warning("AWEKAS upload HTTP %d", resp.status)
-        except (aiohttp.ClientError, TimeoutError) as exc:
-            self._awekas_status = "error_network"
-            _LOGGER.warning("AWEKAS upload error: %s", exc)
-        except Exception as exc:  # noqa: BLE001
-            self._awekas_status = "error"
-            _LOGGER.error("AWEKAS upload unexpected error: %s", exc)
+        """Upload observation to AWEKAS."""
+        await async_upload_awekas(self, async_get_clientsession(self.hass))
 
     # ------------------------------------------------------------------
     # v2.0 - OpenWeatherMap Stations API upload
@@ -5373,120 +4970,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_upload_owm_stations(self) -> None:
         """Upload a measurement to the OpenWeatherMap Stations API (v3)."""
-        data = self.data
-        if not data or not self.owm_stations_api_key or not self.owm_stations_station_id:
-            return
-
-        now_utc = dt_util.utcnow()
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H)
-
-        # OWM Stations API expects a JSON array of measurement objects.
-        measurement: dict[str, Any] = {
-            "station_id": self.owm_stations_station_id,
-            "dt": int(now_utc.timestamp()),
-        }
-        if temp_c is not None:
-            measurement["temperature"] = round(float(temp_c), 1)
-        if humidity is not None:
-            measurement["humidity"] = int(float(humidity))
-        if press is not None:
-            measurement["pressure"] = round(float(press), 1)  # hPa
-        if wind_ms is not None:
-            measurement["wind_speed"] = round(float(wind_ms), 1)  # m/s
-        if gust_ms is not None:
-            measurement["wind_gust"] = round(float(gust_ms), 1)
-        if wind_dir is not None:
-            measurement["wind_deg"] = int(float(wind_dir))
-        if rain_1h is not None:
-            measurement["rain_1h"] = round(float(rain_1h), 1)
-
-        url = f"https://api.openweathermap.org/data/3.0/measurements?appid={self.owm_stations_api_key}"
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.post(url, json=[measurement], timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status in (200, 201, 204):
-                    self._owm_stations_last_upload = now_utc
-                    self._owm_stations_status = "ok"
-                elif resp.status in (401, 403):
-                    self._owm_stations_status = "error_auth"
-                    _LOGGER.warning("OWM Stations upload auth error HTTP %d", resp.status)
-                else:
-                    self._owm_stations_status = "error_http"
-                    _LOGGER.warning("OWM Stations upload HTTP %d", resp.status)
-        except (aiohttp.ClientError, TimeoutError) as exc:
-            self._owm_stations_status = "error_network"
-            _LOGGER.warning("OWM Stations upload error: %s", _redact_secrets(exc, self.owm_stations_api_key))
-        except Exception as exc:  # noqa: BLE001
-            self._owm_stations_status = "error"
-            _LOGGER.error("OWM Stations upload unexpected error: %s", _redact_secrets(exc, self.owm_stations_api_key))
+        await async_upload_owm_stations(self, async_get_clientsession(self.hass))
 
     # ------------------------------------------------------------------
-    # v2.0 - Windy.com upload (stations.windy.com)
+    # v2.0 - Windy Stations API upload
     # ------------------------------------------------------------------
 
     async def _async_upload_windy(self) -> None:
         """Upload an observation to Windy.com Stations API."""
-        data = self.data
-        if not data or not self.windy_api_key:
-            return
-
-        now_utc = dt_util.utcnow()
-        temp_c = data.get(KEY_NORM_TEMP_C)
-        dew_c = data.get(KEY_DEW_POINT_C)
-        humidity = data.get(KEY_NORM_HUMIDITY)
-        press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-        wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
-        wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
-        gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
-        rain_1h = data.get(KEY_RAIN_ACCUM_1H)
-
-        obs: dict[str, Any] = {"dateutc": now_utc.strftime("%Y-%m-%d %H:%M:%S")}
-        try:
-            obs["station"] = int(self.windy_station_id) if self.windy_station_id else 0
-        except (TypeError, ValueError):
-            obs["station"] = 0
-        if temp_c is not None:
-            obs["temp"] = round(float(temp_c), 1)  # Windy accepts °C
-        if dew_c is not None:
-            obs["dewpoint"] = round(float(dew_c), 1)
-        if humidity is not None:
-            obs["rh"] = int(float(humidity))
-        if press is not None:
-            obs["pressure"] = round(float(press) * 100.0)  # Windy wants Pa
-        if wind_ms is not None:
-            obs["wind"] = round(float(wind_ms), 1)  # m/s
-        if gust_ms is not None:
-            obs["gust"] = round(float(gust_ms), 1)
-        if wind_dir is not None:
-            obs["winddir"] = int(float(wind_dir))
-        if rain_1h is not None:
-            obs["precip"] = round(float(rain_1h), 1)  # mm last hour
-
-        url = f"https://stations.windy.com/pws/update/{self.windy_api_key}"
-        try:
-            session = async_get_clientsession(self.hass)
-            async with session.post(url, json={"observations": [obs]}, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status in (200, 201, 204):
-                    self._windy_last_upload = now_utc
-                    self._windy_status = "ok"
-                elif resp.status in (401, 403):
-                    self._windy_status = "error_auth"
-                    _LOGGER.warning("Windy upload auth error HTTP %d", resp.status)
-                else:
-                    self._windy_status = "error_http"
-                    _LOGGER.warning("Windy upload HTTP %d", resp.status)
-        except (aiohttp.ClientError, TimeoutError) as exc:
-            self._windy_status = "error_network"
-            _LOGGER.warning("Windy upload error: %s", _redact_secrets(exc, self.windy_api_key))
-        except Exception as exc:  # noqa: BLE001
-            self._windy_status = "error"
-            _LOGGER.error("Windy upload unexpected error: %s", _redact_secrets(exc, self.windy_api_key))
+        await async_upload_windy(self, async_get_clientsession(self.hass))
 
     # ------------------------------------------------------------------
     # CSV / JSON export  (v0.6.0)
