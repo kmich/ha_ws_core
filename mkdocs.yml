@@ -71,7 +71,6 @@ nav:
     - Nowcast: guides/nowcast.md
   - Migrating from Thermal Comfort: migrating_from_thermal_comfort.md
   - Troubleshooting: troubleshooting.md
-  - Launch Kit: launch_kit.md
   - Contributing: contributing.md
 
 extra:

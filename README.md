@@ -6,181 +6,192 @@
 [![Validate][validate-badge]][validate-url]
 [![Translations][translation-badge]][translation-url]
 
-**Know the exact minute the rain starts - and what your weather station was trying to tell you.**
+**Turn your weather station into proactive smart home automations — not just numbers on a dashboard.**
 
-`ws_core` turns the plain temperature, wind, and rain sensors you already have in Home Assistant into a full weather intelligence system. Its headline trick, when you enable Precipitation Nowcast, is watching *your own* rain gauge and correcting the forecast against it, so you get a live countdown to the minute rain begins.
+`ws_core` takes the ordinary temperature, wind, and rain sensors you already have in Home Assistant and turns them into a local weather intelligence engine. It watches *your own* rain gauge to predict the exact minute rain begins, calculates true garden evapotranspiration (ET₀) to stop overwatering, protects awnings from wind gusts, and predicts storms offline — **running 100% locally on your machine with zero cloud dependencies.**
 
 > ### 🌧️ `sensor.ws_minutes_until_rain` → **7 min**
-
-The **50+ core sensors run entirely on your machine**, computed from your own station data. No cloud, no API keys, nothing leaves your network. Optional extras (precipitation nowcast, air quality, forecast blending) add cloud enrichment only when *you* switch them on.
+> *Precipitation nowcasting uses your own gauge as ground truth to give you a live countdown before the first drop falls.*
 
 [![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
-![Enhanced dashboard](screenshots/dashboard-advanced.png)
+---
+
+![How ws_core transforms your smart home](screenshots/architecture_flow.svg)
 
 ---
 
-## 🚀 Try this one thing first
+## ⚡ Why Install `ws_core`? (Before vs. After)
 
-**Never get caught in the rain.** Point `ws_core` at your rain gauge, enable **Precipitation Nowcast** during setup (or later under **Configure → Features**), then watch `sensor.ws_minutes_until_rain` and have Home Assistant announce before the first drop. For simpler rain-rate or probability alerts, the [Rain Start Warning blueprint](blueprints/automation/ws_core/rain_start.yaml) sets up notifications in under a minute.
+Most weather stations in Home Assistant just show raw numbers. `ws_core` transforms those readings into automatic protection for your home and garden:
 
-Once you are hooked, here is the rest:
-
-* **Stop the sprinklers precisely.** Calculates real Evapotranspiration (ET0) so your smart irrigation knows exactly how much water the lawn actually needs.
-* **Forecast with the internet off.** The offline Zambretti forecast predicts the next 12 hours from your local barometric pressure trend alone.
-* **Automate your home around the weather.** 10 ready-to-use blueprints: TTS rain alerts, freeze warnings, irrigation skips, lightning safety, and high-wind awning retraction.
-* **...and 170+ derived sensors in total** covering comfort, fire danger, solar, soil, and data quality once you enable the optional feature packs (see the [nerd section](#-advanced-features-the-nerd-section)).
-
----
-
-## 📡 Does it work with my station?
-
-**If your station is in Home Assistant, it works with `ws_core`.**
-
-Works well with:
-
-| Station / source | How `ws_core` uses it |
+| Your Weather Station Today | With Weather Station Core |
 |---|---|
-| Ecowitt / Ambient Weather | GW-series, WS90, WH57 lightning, rain, wind, solar, UV and indoor sensors already exposed in HA |
-| WeatherFlow Tempest | Temperature, humidity, pressure, wind, rain, UV, illuminance and lightning entities |
-| Davis Instruments | WeatherLink entities for classic PWS measurements and Davis comfort indices |
-| Netatmo | Outdoor module plus optional rain and wind modules |
-| MQTT / REST / template-backed sensors | Any standard HA sensor entities with temperature, humidity, pressure, wind and rain |
-
-All you need are standard sensors like temperature, humidity, pressure, wind, and cumulative rain. The [Hardware Mapping Guide](docs/hardware_mapping.md) shows the usual entity patterns.
+| Displays `21°C` and `15 km/h wind` on a card | **Auto-retracts awnings and blinds** when dangerous wind gusts hit |
+| Sprinklers run on a dumb timer regardless of weather | **Skips watering** using locally calculated evapotranspiration (ET₀) and rainfall |
+| Cloud weather app says *"40% chance of rain"* | **TTS voice alert:** *"🌧️ Rain starting in 7 minutes at your house — close the skylight"* |
+| Internet drops = weather forecasts vanish | **100% offline Zambretti forecast** predicts the next 12 hours from local pressure trends |
+| Raw sensors without context | **50+ core derived insights:** frost point, heat stress (UTCI/WBGT), fire risk, wet-bulb |
 
 ---
 
-## ⚡ The 60-Second Quickstart
+## 🌟 The 4 Core Benefit Pillars
 
-### Install via HACS (Recommended)
+### 1. 🌧️ Smart Rain Defense: Never Get Soaked
+Know before the first drop hits. Enable **Precipitation Nowcast** to combine local radar models with your physical rain gauge. 
+* **Live countdown:** `sensor.ws_minutes_until_rain` gives you minutes to close skylights, pull in outdoor cushions, or walk the dog.
+* **Pre-rain notifications:** Alert your family via phone or smart speaker before rain starts.
+* **Rain dry-time:** `sensor.ws_minutes_until_dry` lets you know when outdoor surfaces will dry after a shower.
+
+### 2. 🌱 Intelligent Garden & Irrigation: Zero Wasted Water
+Stop running sprinklers after a downpour. `ws_core` implements scientific evapotranspiration formulas so your irrigation knows what the soil actually needs.
+* **Reference ET₀ (FAO-56 Penman-Monteith & Hargreaves-Samani):** Calculates daily water loss based on solar radiation, temperature, humidity, and wind.
+* **Smart Irrigation bridge:** Seamlessly feeds ET₀ data into the popular `HAsmartirrigation` integration.
+* **One-click rain skip:** Automatically cancel tomorrow's watering if today's rainfall exceeded lawn requirements.
+
+### 3. 🛡️ Home & Property Protection: Defend Against Extremes
+Safeguard your home against high winds, freezing temperatures, and dangerous heat:
+* **High-wind awning & blind protection:** Instant alerts and automatic retraction commands when wind gusts exceed structural limits.
+* **Freeze & frost warnings:** Accurate Buck (1981) frost-point derivation alerts you to protect sensitive plants and outdoor water pipes.
+* **Heat stress monitoring (UTCI & WBGT):** Gold-standard comfort indices used by the WHO to warn when outdoor work or sports become hazardous.
+* **Fire weather indices:** Complete implementations of Canadian FWI, Australian McArthur FFDI, and US Fosberg FFWI.
+
+### 4. 🔌 100% Local-First Resilience: Privacy & Offline Reliability
+Your smart home shouldn't stop working when your internet connection goes down.
+* **Offline Zambretti forecasting:** A mathematical barometric forecast calibrated to your hemisphere and climate region — 100% local, no cloud, no API keys.
+* **Privacy by design:** All 50+ core derived sensors are computed directly inside Home Assistant on your local hardware.
+* **Zero telemetry:** No coordinates, sensor readings, or personal data ever leave your network unless you explicitly enable an optional external service.
+
+---
+
+## 📡 Hardware Compatibility
+
+**If your weather station is already in Home Assistant, it works with `ws_core`.**
+
+| Station Brand | Supported Models / Integrations | What `ws_core` Uses |
+|---|---|---|
+| **Ecowitt / Ambient Weather** | GW-series, WS90, Wittboy, WH57 lightning, soil, and rain gauges | Outdoor temp, humidity, absolute pressure, wind, rain, lux/solar, lightning |
+| **WeatherFlow Tempest** | Tempest Home Assistant integration & local UDP / MQTT | Air temp, station pressure, wind speed/gust, rain, UV, illuminance |
+| **Davis Instruments** | WeatherLink IP, Vantage Pro2, Vantage Vue | Classic PWS measurements, rain year, bar absolute |
+| **Netatmo** | Netatmo Smart Weather Station (Outdoor + Rain + Wind) | Outdoor module readings, rain gauge total, anemometer wind |
+| **Shelly / ESPHome / DIY** | Any custom sensor entity with standard device classes | Temperature, humidity, pressure, wind, cumulative rain total |
+
+👉 *Need help mapping your entities? Check out our [Hardware Mapping Guide](docs/hardware_mapping.md).*
+
+---
+
+## 🤖 1-Click Automation Blueprints
+
+Don't spend hours writing YAML. We provide ready-to-import blueprints with sensible defaults:
+
+| Blueprint | What It Does | One-Click Install |
+|---|---|---|
+| **Rain Start Warning** | Announce via TTS or mobile notification when rain is imminent | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Frain_start.yaml) |
+| **Irrigation Rain Skip** | Automatically skip watering when rainfall or ET₀ indicates sufficient moisture | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Firrigation_rain_skip.yaml) |
+| **High Wind Protection** | Automatically retract awnings and blinds when severe wind gusts are detected | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fhigh_wind.yaml) |
+| **Freeze Warning** | Alert when temperature drops near freezing and turn off exposed irrigation valves | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Ffreeze_alert.yaml) |
+| **Heat Stress Alert** | Notify when apparent temperature (UTCI) reaches dangerous levels for outdoor activity | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fheat_stress.yaml) |
+
+👉 *Browse all 10 blueprints and configuration options in the [Blueprint Documentation](docs/blueprints.md).*
+
+---
+
+## ⚡ 3-Minute Quickstart
+
+### Step 1: Install via HACS
 
 [![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
 1. Open **HACS** in your Home Assistant sidebar.
-2. Go to **Integrations** → ⋮ → **Custom repositories**.
-3. Add `https://github.com/kmich/ha_ws_core` as an **Integration**.
-4. Search for "Weather Station Core", install, and restart Home Assistant.
+2. Click **Integrations** → ⋮ (top right) → **Custom repositories**.
+3. Paste `https://github.com/kmich/ha_ws_core`, choose category **Integration**, and click **Add**.
+4. Search for **"Weather Station Core"**, download, and restart Home Assistant.
 
-### Configure
+### Step 2: Add Integration & Auto-Discover
 
-Go to **Settings → Devices & Services → Add Integration** and search for "Weather Station Core". The setup wizard asks you to map 7 basic sensors:
+1. In Home Assistant, go to **Settings → Devices & Services → Add Integration**.
+2. Search for **"Weather Station Core"**.
+3. **Auto-Discovery** will automatically identify and suggest matching sensor entities from your station.
+4. Review the mapped entities, click **Submit**, and you're done!
 
-* Temperature, Humidity, Absolute Pressure, Wind Speed, Wind Gust, Wind Direction, Rain Total
-
-That's it! After the wizard completes, 50+ derived sensors appear automatically. Enable additional features like fire danger or nowcasting via the **Configure** button on the integration.
-
-Not sure what to automate first? Start with the [Use Cases](docs/use_cases.md): rain alerts, irrigation skips, awning protection, frost warnings, and air-quality actions.
+50+ core sensors appear instantly. You can enable optional enrichments (air quality, nowcast, multi-network upload) at any time under **Configure → Features**.
 
 ---
 
-## 📊 The "Wow" Dashboards
+## 📊 Drop-in Lovelace Dashboards
 
-`ws_core` comes with drop-in, premium Lovelace dashboards for your data.
+`ws_core` includes pre-built, responsive Lovelace dashboards tailored for your weather data:
 
 | Mobile View | Desktop View |
 |---|---|
 | ![Mobile dashboard](screenshots/mobile_dashboard.png) | ![Desktop dashboard](screenshots/dashboard-advanced.png) |
 
-Check out the `dashboards/` directory for the YAML code. We provide:
-* A `vanilla` dashboard using only native HA cards.
-* An `enhanced` dashboard using popular custom cards (`mini-graph-card`, `mushroom`).
-* Ready-to-use gauge presets with sensible severity color bands.
+In the `dashboards/` directory, you'll find:
+* **Vanilla Dashboard:** Works immediately with 100% native Home Assistant cards (zero custom card dependencies).
+* **Enhanced Dashboard:** Uses popular cards (`mushroom`, `mini-graph-card`) with custom severity color bands and gauges.
 
 ---
 
-## 🤖 Top Automations
+## 🔬 Meteorological Precision & Science
 
-Don't reinvent the wheel. We've included import-ready blueprints to automate your home based on your local weather:
+Behind the friendly sensors, `ws_core` runs rigorous, peer-reviewed meteorological algorithms:
 
-* [**Rain Start Warning:**](blueprints/automation/ws_core/rain_start.yaml) Announce over TTS or send a push notification when rain is expected in the next few minutes.
-* [**Freeze Warning:**](blueprints/automation/ws_core/freeze_alert.yaml) Trigger actions when the temperature drops below freezing.
-* [**High Wind Gusts:**](blueprints/automation/ws_core/high_wind.yaml) Automatically retract your awnings or close the blinds when a high gust is recorded.
-* [**Heat Stress / UTCI:**](blueprints/automation/ws_core/heat_stress.yaml) Notify when outdoor conditions become dangerous for work or exercise.
-* [**Poor Air Quality:**](blueprints/automation/ws_core/poor_aqi.yaml) Close the windows and turn on the air purifiers when PM2.5 spikes.
+* **UTCI (Universal Thermal Climate Index):** Complete Bröde (2012) polynomial modeling human heat balance across radiation, humidity, and wind.
+* **Wet Bulb & Frost Point:** Stull (2011) and Buck (1981) formulas with ice-constant handling.
+* **Nowcast Ground-Truth Blending:** Merges high-resolution NWP radar grids with your local physical rain gauge (70% local / 30% forecast) for pinpoint start times.
+* **Adaptive Rain Probability:** Learns over a rolling 90-day window via Brier-score evaluation to continuously improve accuracy.
+* **Multi-Network Weather Sync:** Broadcasts your station observations simultaneously to 8 global networks (WUnderground, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM, Windy).
+* **Full Translation Parity:** Available in English, French, German, Spanish, Italian, Dutch, Polish, and Portuguese.
 
----
-
-## 🔬 Advanced Features (The "Nerd" Section)
-
-Behind the scenes, `ws_core` implements rigorous meteorological and scientific algorithms to derive the most accurate insights from your station's data:
-
-* **UTCI & WBGT:** The gold-standard heat-stress indices used by the WHO.
-* **Three Fire Danger Systems:** Canadian FWI, Australian McArthur FFDI, and US Fosberg FFWI.
-* **Stull Wet Bulb & Buck Frost Point:** Precise derivations with ice-constant handling.
-* **Nowcast Ground-Truth Blending:** Combines Open-Meteo 15-minute grids with your live rain gauge data (70% local / 30% NWP) for the best short-term prediction.
-* **Network Uploads:** Syncs to 8 networks simultaneously (WUnderground, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM, Windy).
-* **Adaptive Rain Probability:** Learns over a rolling 90-day window whether the local heuristics or the NWP forecasts have been more accurate.
-* **Adaptive Sensor Calibration (opt-in):** Learns a slow bias estimate against the same regional reference point used for QC, and nudges the calibration offsets by a small, bounded amount once confident - so a consistently-off sensor self-corrects without you tracking down a reference station.
-* **Historical Climate Normals (opt-in):** One Open-Meteo archive request builds a ~10-year, day-of-year table of typical highs/lows/rainfall for your location, so `sensor.ws_temp_anomaly_normal` can tell you today is warmer or colder than *this date normally is here* - not just warmer than your station's own recent average.
-* **Snow (opt-in):** No station-agnostic snow gauge exists, so this estimates precipitation phase (rain/sleet/snow) from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio - heuristic, not a measurement, but a genuine gap most PWS integrations leave entirely unaddressed.
-* **Localized UI & Sensors:** The setup wizard (including the hemisphere and climate-region pickers) and the human-readable sensors (conditions summary, alert message, frost risk) follow your Home Assistant language, with English, French, German, Spanish, Italian, Dutch, Polish, and Portuguese built in.
-
-For the math, citations, and formulas behind these features, read the [**Scientific Documentation**](docs/science.md).
+For complete equations, source citations, and mathematical references, see the [**Scientific Documentation**](docs/science.md).
 
 ---
 
-## 🤔 Why not just use template sensors?
+## 🔒 Data & Privacy Disclosure
 
-You can absolutely hand-roll a heat-index template or install Thermal Comfort. The difference is scope and correctness:
+`ws_core` is strictly local-first. All core sensors are derived locally. Optional third-party features are **disabled by default** and only contact external services when explicitly enabled:
 
-| | A few template sensors | Thermal Comfort | **`ws_core`** |
+| Feature | Destination | Data Sent | When Used |
 |---|---|---|---|
-| Comfort indices (heat index, wind chill, dew point) | Manual | ✅ | ✅ |
-| Rain-start countdown from your own gauge | ❌ | ❌ | ✅ |
-| Evapotranspiration (ET0) for irrigation | ❌ | ❌ | ✅ |
-| Offline pressure-trend forecast | ❌ | ❌ | ✅ |
-| Fire danger, UTCI/WBGT, frost point | ❌ | ❌ | ✅ |
-| Ready-made automation blueprints | ❌ | ❌ | ✅ (10) |
-| Runs fully local | ✅ | ✅ | ✅ (core) |
+| **Core Derived Sensors** | *Local Machine* | None (processed locally) | Always (Default) |
+| **Precipitation Nowcast & AQI** | Open-Meteo API | Approximate Coordinates | Only if enabled |
+| **French Vigilance** | Météo-France Public API | Department Code | Only if enabled |
+| **PWS Network Uploads** | Selected Network (e.g. WU, WOW) | Station Readings & User Credentials | Only if enabled |
+| **MQTT Discovery** | Local MQTT Broker | Derived Sensor Values | Only if enabled |
 
-Already on Thermal Comfort? There is a [step-by-step migration guide](docs/migrating_from_thermal_comfort.md) that keeps your history.
+Diagnostics exports automatically **redact all credentials and coordinates** before download.
 
 ---
 
-## 🔒 Data & Privacy
+## ❓ Frequently Asked Questions
 
-`ws_core` is local-first. All core derived sensors are computed on your machine from
-your own station data and never leave your network. Every feature that sends data to a
-third party is **opt-in and disabled by default**, so nothing is transmitted until you
-turn it on in **Configure → Features**.
+<details>
+<summary><b>Why not just write a few template sensors in YAML?</b></summary>
+Template sensors are great for simple math (e.g., Fahrenheit to Celsius), but they cannot easily compute complex meteorological models like Penman-Monteith ET₀, Bröde UTCI polynomials, or 90-day adaptive Brier scores. Template sensors also don't include blueprints, dashboards, diagnostics, or auto-discovery.
+</details>
 
-When you enable them, the following optional features contact external services:
+<details>
+<summary><b>Can I migrate from the Thermal Comfort integration?</b></summary>
+Yes! `ws_core` provides a drop-in replacement with identical or higher-precision comfort indices. Follow our step-by-step <a href="docs/migrating_from_thermal_comfort.md">Thermal Comfort Migration Guide</a> to preserve entity history.
+</details>
 
-| Feature | Destination | Data sent |
-|---|---|---|
-| Forecast (Open-Meteo, Met.no, NWS, OWM, Pirate Weather, Météo France, HA entity) | The selected provider | Your coordinates |
-| Precipitation nowcast, air quality, pollen, sea temperature, solar forecast | Open-Meteo / forecast.solar | Your coordinates |
-| French Vigilance / Vigicrues | Météo-France public APIs | Your department / nearest station |
-| Network uploads (WUnderground, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM, Windy) | Each network you enable | Your live observations and that network's credentials |
-| MQTT republishing | Your own MQTT broker | Derived sensor values |
+<details>
+<summary><b>Do I need any API keys?</b></summary>
+No. The core integration and all 50+ base sensors require zero API keys and work completely offline. Optional extras like Open-Meteo precipitation nowcasting and air quality use free public APIs that also require no registration.
+</details>
 
-API keys and passwords you enter are stored in the Home Assistant config entry. The
-diagnostics export **redacts** all credentials and coordinates, so it is safe to attach
-to a bug report.
-
----
-
-## ❓ FAQ & Troubleshooting
-
-* **Why are my entities unavailable?**
-  Ensure your source sensors are online. If a required sensor (like temperature) is unavailable, dependent derived metrics will gracefully become `unavailable` until the source recovers.
-* **Which sensors do I select during setup?**
-  If Auto-Discovery didn't find your station, read our [Hardware Mapping Guide](docs/hardware_mapping.md) for exactly which Ecowitt, Tempest, or Netatmo entities to select.
-* **How do I migrate from the Thermal Comfort integration?**
-  We have a dedicated [migration guide](docs/migrating_from_thermal_comfort.md) with step-by-step instructions.
-* **Do I need an API Key?**
-  No. All core features run completely offline locally. Optional features like Air Quality or Nowcast use free APIs that require no registration.
-* **Which fire-danger number should I trust?**
-  Use the one calibrated for your region: **FFDI** (`sensor.ws_ffdi`) in Australia and New Zealand, **FWI** (`sensor.ws_fwi`, Canadian system) elsewhere, and **FFWI** (`sensor.ws_ffwi`) as a US/global cross-check. `sensor.ws_fire_risk_score` is a simplified 1-10 display value. None of these is an official warning - always defer to your local fire authority.
-* **Which ET0 should I use for irrigation?**
-  If you have mapped a solar-radiation sensor, prefer `sensor.ws_et0_penman_monteith` (FAO-56 Penman-Monteith, the reference method). Without solar radiation, use `sensor.ws_et0_daily` (Hargreaves-Samani, ±15-20%).
-* **No solar radiation sensor, but I have a lux sensor - can I still get Penman-Monteith ET0?**
-  Yes. Enable "illuminance fallback" in the Solar Forecast step of the config/options flow (requires an illuminance source mapped in Sources). It derives an approximate solar radiation from lux using a standard daylight conversion factor of ~0.0079 W/m² per lux, but real luminous efficacy varies roughly ±25% with sky conditions (clear vs overcast) and sun elevation/spectrum, so treat the result as an estimate, not a pyranometer-grade reading. When this fallback is active, `sensor.ws_et0_penman_monteith` reports a `radiation_source: illuminance_estimate` attribute (vs `sensor` for a real solar-radiation sensor) so downstream automations can tell which mode produced the value. If neither a solar-radiation sensor is mapped nor the fallback is enabled, a repair issue explains why the sensor never appears.
-* **How do I uninstall?**
-  Go to **Settings → Devices & Services → Weather Station Core → ⋮ → Delete**. This removes the integration, its device, and all derived entities and their history. To remove the code as well, delete the repository from **HACS → Integrations**. Any dashboards or blueprints you imported are independent and can be removed separately.
+<details>
+<summary><b>What if some of my sensors are temporarily offline?</b></summary>
+`ws_core` handles sensor degradation gracefully. If your wind sensor goes offline, wind-dependent metrics will report <code>unavailable</code>, while independent metrics (like barometric pressure trends and temperature comfort) continue working seamlessly.
+</details>
 
 ---
+
+## 🤝 Community & Support
+
+* 💬 **Discussions & Showcase:** Share your dashboards and station setups in [GitHub Discussions](https://github.com/kmich/ha_ws_core/discussions).
+* 🐛 **Bug Reports & Feature Requests:** Open an issue on [GitHub Issues](https://github.com/kmich/ha_ws_core/issues).
+* 📖 **Full Documentation:** Visit the [Weather Station Core Documentation](https://kmich.github.io/ha_ws_core/).
 
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [hacs-url]: https://github.com/hacs/integration

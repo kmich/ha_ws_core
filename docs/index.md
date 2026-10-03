@@ -1,83 +1,84 @@
 # Weather Station Core
 
-**Turn any personal weather station into a complete weather intelligence system.**
+**Turn your weather station into proactive smart home automations — not just numbers on a dashboard.**
 
-Weather Station Core (`ws_core`) is a Home Assistant custom integration that reads raw
-sensor data from any HA-integrated weather station and produces 170+ derived
-sensors through a guided setup flow.
+Weather Station Core (`ws_core`) is a Home Assistant custom integration that transforms raw sensor data from any weather station into local predictive intelligence. Predict rain down to the minute, calculate real garden evapotranspiration (ET₀), protect awnings from wind gusts, and predict storms offline — **100% locally on your machine with zero cloud dependencies.**
 
----
-
-## What it does
-
-You provide 7 sensor entities — temperature, humidity, pressure, wind speed, wind gust,
-wind direction, cumulative rainfall. ws_core does the rest.
-
-### Capabilities not available in any other HA weather integration
-
-- **Precipitation nowcast** with minutes-until-rain precision
-  (`sensor.ws_minutes_until_rain`)
-- **UTCI** (Universal Thermal Climate Index, full Bröde 2012 polynomial)
-- **Three fire danger systems**: Canadian FWI, McArthur FFDI (Australia),
-  Fosberg FFWI (US/global)
-- **Zambretti barometric forecast** — fully local, no network call, no API
-- **Penman-Monteith ET₀** for irrigation scheduling (Smart Irrigation compatible)
-- **8 upload targets** in one integration (WU, Weathercloud, WOW, CWOP, and more)
-- **8 translations** at full entity-name parity, including translatable config-flow selectors (hemisphere, climate region) and localized human-readable sensor states (conditions summary, alerts, frost risk)
-
-### Always-on (core features, no API key required)
-
-| What | How |
-|---|---|
-| Zambretti forecast | From your station's pressure + wind data |
-| 36-condition classifier | From illuminance, rain rate, temperature, wind |
-| Wet-bulb, frost point, frost risk | Stull (2011), Buck (1981) + frost-risk category |
-| Pressure trend | WMO No. 306 least-squares regression |
-| Kalman-filtered rain rate | De-noised tipping-bucket readings |
-| ET₀ (Hargreaves-Samani) | No solar radiation sensor required |
-| Adaptive rain probability | 90-day Brier-score blended local + NWP |
-| Streak counters | Dry days, heat days, frost days |
-
-### Optional feature groups
-
-| Group | What it adds |
-|---|---|
-| Comfort Indices | Heat Index, Wind Chill, Humidex, **UTCI**, WBGT, VPD, Delta-T, THW, THSW, chill hours, clearness index, cloud cover |
-| Precipitation Nowcast | `ws_minutes_until_rain`, `ws_minutes_until_dry`, `ws_rain_next_60min`, `ws_rain_expected_1h` |
-| Fire Risk | FWI, FFDI, FFWI, fire risk score (1-10) |
-| Lightning Detection | Strike count, distance, rate, clearance countdown, proximity state |
-| Indoor Sensors | Indoor temp/humidity/CO₂, deltas, comfort score, plus named multi-room monitoring (per-room temp delta, humidity, CO₂ and comfort) |
-| Degree Days | HDD, CDD, GDD, leaf wetness |
-| Moon | Moon phase and illumination |
-| Air Quality | AQI, NO₂, ozone (Open-Meteo, free) |
-| Network Uploads | WU, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP, OWM Stations, Windy |
-| MQTT Discovery | 70+ sensors as MQTT Discovery payloads |
-| Station Diagnostics | Drift detection, spike flags, spatial QC, data-quality score |
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
 ---
 
-## Getting started
+## ⚡ What do you want to automate?
 
-See the [Quickstart](quickstart.md) for a 5-minute installation walkthrough.
-Then pick your first automation from [Use Cases](use_cases.md).
+<div class="grid cards" markdown>
 
-## Which part should I try first?
+-   :material-weather-pouring:{ .lg .middle } __Smart Rain Defense__
 
-| If you care about... | Start with |
-|---|---|
-| Not getting caught in rain | Precipitation Nowcast and `sensor.ws_minutes_until_rain` |
-| Saving water | ET0 sensors and the Irrigation Rain Skip blueprint |
-| Protecting awnings or exterior blinds | High Wind Gusts blueprint |
-| Frost-sensitive plants or pipes | Frost risk sensors and Freeze Warning blueprint |
-| Fire season | FWI, FFDI, FFWI and Fire Danger Alert blueprint |
-| Heat safety | UTCI and WBGT comfort sensors |
-| Data trust | Station Diagnostics and data-quality score |
+    ---
+
+    Predict the exact minute rain begins using your physical rain gauge. Alert your phone and close windows/skylights automatically.
+
+    [:octicons-arrow-right-24: Read Rain Nowcast Guide](guides/nowcast.md)
+
+-   :material-sprinkler-variant:{ .lg .middle } __Precision Garden & Irrigation__
+
+    ---
+
+    Stop overwatering after rain. Uses scientific FAO-56 Penman-Monteith ET₀ to calculate real soil moisture needs.
+
+    [:octicons-arrow-right-24: Read Irrigation Guide](guides/irrigation.md)
+
+-   :material-weather-windy:{ .lg .middle } __Home & Property Protection__
+
+    ---
+
+    Retract awnings and blinds before high wind gusts hit. Receive frost alerts to protect delicate plants and outdoor pipes.
+
+    [:octicons-arrow-right-24: Browse Use Cases](use_cases.md)
+
+-   :material-shield-home:{ .lg .middle } __100% Local Resilience__
+
+    ---
+
+    Offline Zambretti barometric forecasting predicts weather trends with zero internet connection or API keys.
+
+    [:octicons-arrow-right-24: View Science & Calculations](sensors.md)
+
+</div>
 
 ---
 
-## Project status
+## 🚀 The Difference: From Numbers to Action
 
-- **Version:** see [latest release](https://github.com/kmich/ha_ws_core/releases)
-- **License:** MIT
-- **Repository:** [github.com/kmich/ha_ws_core](https://github.com/kmich/ha_ws_core)
-- **Issues:** [GitHub Issues](https://github.com/kmich/ha_ws_core/issues)
+Most weather integrations simply display values like `21°C` or `12 km/h` on a dashboard card. `ws_core` converts those measurements into actionable triggers:
+
+| Standard Weather Integration | With Weather Station Core |
+|---|---|
+| Displays current wind speed on a card | **Automatically retracts outdoor awnings** when severe gusts hit |
+| Sprinklers turn on blindly on a schedule | **Calculates exact evapotranspiration (ET₀)** to skip unnecessary watering |
+| General weather app says *"30% rain chance"* | **TTS voice alert:** *"🌧️ Rain starts in 7 minutes at your home"* |
+| Internet drops = no forecasts | **Offline Zambretti forecast** predicts the next 12 hours locally |
+| Raw sensors without context | **50+ local derived metrics:** frost risk, UTCI heat stress, fire risk, wet-bulb |
+
+---
+
+## 📡 Works With Your Weather Station
+
+If your weather station is connected to Home Assistant, `ws_core` can use it. Supported setups include:
+
+* **Ecowitt / Ambient Weather:** GW-series, WS90 Wittboy, WH57 lightning, soil moisture, and rain gauges.
+* **WeatherFlow Tempest:** Air temperature, pressure, wind gusts, rain rate, and illuminance.
+* **Davis Instruments:** Vantage Pro2, Vantage Vue, and WeatherLink entities.
+* **Netatmo:** Smart Weather Station with outdoor, rain, and wind modules.
+* **DIY / ESPHome / Shelly / MQTT:** Any standard sensor entity reporting temperature, humidity, pressure, wind, and rain.
+
+👉 *See the [Hardware Mapping Guide](hardware_mapping.md) for exact entity mappings for each brand.*
+
+---
+
+## 🛠️ Ready-Made Resources
+
+* **[3-Minute Quickstart](quickstart.md):** Step-by-step installation via HACS with auto-discovery.
+* **[Blueprints](blueprints.md):** 1-click importable automations for rain alerts, wind protection, and irrigation skips.
+* **[Dashboards](dashboards.md):** Drop-in Lovelace dashboards (Vanilla HA cards & Mushroom card versions).
+* **[Sensor Reference](sensors.md):** Complete catalog of all 170+ available derived sensors and feature groups.

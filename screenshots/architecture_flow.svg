@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 440" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="accentRain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="accentGarden" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#34d399" />
+    </linearGradient>
+    <linearGradient id="accentSafety" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dc2626" />
+      <stop offset="100%" stop-color="#f87171" />
+    </linearGradient>
+    <linearGradient id="accentLocal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed" />
+      <stop offset="100%" stop-color="#a78bfa" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="920" height="440" rx="16" fill="url(#bgGrad)" stroke="#334155" stroke-width="1.5" />
+
+  <!-- Title & Subtitle -->
+  <text x="460" y="38" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="700" fill="#f8fafc" letter-spacing="0.5">
+    How Weather Station Core Transforms Your Smart Home
+  </text>
+  <text x="460" y="60" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="400" fill="#94a3b8">
+    From raw station sensors to proactive local intelligence and instant automations
+  </text>
+
+  <!-- 3 MAIN COLUMNS -->
+
+  <!-- COLUMN 1: Inputs (Raw Sensors) -->
+  <g transform="translate(30, 85)">
+    <rect width="240" height="325" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#shadow)" />
+    <rect width="240" height="42" rx="12" fill="#334155" />
+    <!-- Fix rounded bottom corners of header -->
+    <rect y="30" width="240" height="12" fill="#334155" />
+    <text x="120" y="26" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#f1f5f9">
+      1. Your Station Sensors
+    </text>
+
+    <!-- Source tags -->
+    <g transform="translate(16, 56)">
+      <rect width="208" height="36" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1" />
+      <text x="10" y="22" font-family="sans-serif" font-size="12" font-weight="500" fill="#cbd5e1">📡 Any Hardware Brand</text>
+      <text x="198" y="22" text-anchor="end" font-family="sans-serif" font-size="11" fill="#64748b">Ecowitt • Tempest • Davis</text>
+    </g>
+
+    <g transform="translate(16, 102)">
+      <text x="4" y="16" font-family="sans-serif" font-size="11" font-weight="600" fill="#94a3b8" letter-spacing="0.5">RAW INPUT READINGS</text>
+      
+      <!-- Sensor item pills -->
+      <rect y="26" width="208" height="26" rx="4" fill="#0f172a" />
+      <circle cx="14" cy="39" r="4" fill="#38bdf8" />
+      <text x="26" y="43" font-family="sans-serif" font-size="12" fill="#e2e8f0">Outdoor Temperature &amp; Humidity</text>
+
+      <rect y="58" width="208" height="26" rx="4" fill="#0f172a" />
+      <circle cx="14" cy="71" r="4" fill="#60a5fa" />
+      <text x="26" y="75" font-family="sans-serif" font-size="12" fill="#e2e8f0">Absolute Pressure Trend</text>
+
+      <rect y="90" width="208" height="26" rx="4" fill="#0f172a" />
+      <circle cx="14" cy="103" r="4" fill="#34d399" />
+      <text x="26" y="107" font-family="sans-serif" font-size="12" fill="#e2e8f0">Wind Speed, Gust &amp; Direction</text>
+
+      <rect y="122" width="208" height="26" rx="4" fill="#0f172a" />
+      <circle cx="14" cy="135" r="4" fill="#818cf8" />
+      <text x="26" y="139" font-family="sans-serif" font-size="12" fill="#e2e8f0">Cumulative Rainfall Total</text>
+
+      <rect y="154" width="208" height="26" rx="4" fill="#0f172a" />
+      <circle cx="14" cy="167" r="4" fill="#fbbf24" />
+      <text x="26" y="171" font-family="sans-serif" font-size="12" fill="#cbd5e1">Optional: Lux, Solar, Lightning</text>
+    </g>
+
+    <!-- Auto-discovery Badge -->
+    <g transform="translate(16, 280)">
+      <rect width="208" height="30" rx="6" fill="#064e3b" stroke="#059669" stroke-width="1" />
+      <text x="104" y="20" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="600" fill="#6ee7b7">
+        ⚡ Automatic Device Discovery
+      </text>
+    </g>
+  </g>
+
+  <!-- CONNECTOR ARROW 1 -->
+  <g transform="translate(275, 235)">
+    <line x1="0" y1="0" x2="35" y2="0" stroke="#38bdf8" stroke-width="3" stroke-dasharray="4 3" />
+    <polygon points="35,-6 47,0 35,6" fill="#38bdf8" />
+  </g>
+
+  <!-- COLUMN 2: Weather Station Core (The Intelligence Engine) -->
+  <g transform="translate(325, 85)">
+    <rect width="270" height="325" rx="12" fill="#0f172a" stroke="#0284c7" stroke-width="2" filter="url(#shadow)" />
+    <rect width="270" height="42" rx="10" fill="url(#coreGrad)" />
+    <rect y="30" width="270" height="12" fill="#0284c7" />
+    <text x="135" y="26" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#ffffff">
+      2. ws_core Intelligence Engine
+    </text>
+
+    <!-- Calculation modules inside engine -->
+    <g transform="translate(14, 52)">
+      <!-- Module 1 -->
+      <rect width="242" height="52" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <rect x="0" y="0" width="4" height="52" rx="2" fill="#38bdf8" />
+      <text x="14" y="22" font-family="sans-serif" font-size="12" font-weight="600" fill="#f8fafc">Precipitation Nowcast</text>
+      <text x="14" y="40" font-family="sans-serif" font-size="11" fill="#94a3b8">Gauge ground-truth • Minute countdown</text>
+
+      <!-- Module 2 -->
+      <rect y="60" width="242" height="52" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <rect x="0" y="60" width="4" height="52" rx="2" fill="#34d399" />
+      <text x="14" y="82" font-family="sans-serif" font-size="12" font-weight="600" fill="#f8fafc">Smart Irrigation (ET₀)</text>
+      <text x="14" y="100" font-family="sans-serif" font-size="11" fill="#94a3b8">Penman-Monteith &amp; Hargreaves-Samani</text>
+
+      <!-- Module 3 -->
+      <rect y="120" width="242" height="52" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <rect x="0" y="120" width="4" height="52" rx="2" fill="#f87171" />
+      <text x="14" y="142" font-family="sans-serif" font-size="12" font-weight="600" fill="#f8fafc">Safety &amp; Severe Weather</text>
+      <text x="14" y="160" font-family="sans-serif" font-size="11" fill="#94a3b8">Gust risk • UTCI/WBGT • Frost point • Fire</text>
+
+      <!-- Module 4 -->
+      <rect y="180" width="242" height="52" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1" />
+      <rect x="0" y="180" width="4" height="52" rx="2" fill="#a78bfa" />
+      <text x="14" y="202" font-family="sans-serif" font-size="12" font-weight="600" fill="#f8fafc">Offline Zambretti Forecast</text>
+      <text x="14" y="220" font-family="sans-serif" font-size="11" fill="#94a3b8">Pressure trend prediction without internet</text>
+    </g>
+
+    <!-- Guarantee pill -->
+    <g transform="translate(14, 290)">
+      <rect width="242" height="24" rx="12" fill="#1e3a8a" />
+      <text x="121" y="16" text-anchor="middle" font-family="sans-serif" font-size="10.5" font-weight="600" fill="#bfdbfe">
+        🔒 100% Local • Zero Cloud Needed for Core
+      </text>
+    </g>
+  </g>
+
+  <!-- CONNECTOR ARROW 2 -->
+  <g transform="translate(600, 235)">
+    <line x1="0" y1="0" x2="35" y2="0" stroke="#38bdf8" stroke-width="3" stroke-dasharray="4 3" />
+    <polygon points="35,-6 47,0 35,6" fill="#38bdf8" />
+  </g>
+
+  <!-- COLUMN 3: Real Smart Home Automations -->
+  <g transform="translate(640, 85)">
+    <rect width="250" height="325" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#shadow)" />
+    <rect width="250" height="42" rx="12" fill="#334155" />
+    <rect y="30" width="250" height="12" fill="#334155" />
+    <text x="125" y="26" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#f1f5f9">
+      3. Proactive Smart Home
+    </text>
+
+    <!-- Action Card 1 -->
+    <g transform="translate(14, 52)">
+      <rect width="222" height="58" rx="8" fill="#0f172a" stroke="#0284c7" stroke-width="1" />
+      <text x="10" y="22" font-family="sans-serif" font-size="12" font-weight="700" fill="#38bdf8">🌧️ Rain-Start Alerts</text>
+      <text x="10" y="38" font-family="sans-serif" font-size="10.5" fill="#e2e8f0">"Rain in 7 min. Close skylights!"</text>
+      <text x="10" y="50" font-family="sans-serif" font-size="9.5" fill="#64748b">TTS Announcement &amp; Push Notification</text>
+    </g>
+
+    <!-- Action Card 2 -->
+    <g transform="translate(14, 118)">
+      <rect width="222" height="58" rx="8" fill="#0f172a" stroke="#059669" stroke-width="1" />
+      <text x="10" y="22" font-family="sans-serif" font-size="12" font-weight="700" fill="#34d399">🌱 Smart Irrigation Skip</text>
+      <text x="10" y="38" font-family="sans-serif" font-size="10.5" fill="#e2e8f0">Skips watering when ET₀ is low</text>
+      <text x="10" y="50" font-family="sans-serif" font-size="9.5" fill="#64748b">Cuts water bills &amp; saves garden</text>
+    </g>
+
+    <!-- Action Card 3 -->
+    <g transform="translate(14, 184)">
+      <rect width="222" height="58" rx="8" fill="#0f172a" stroke="#dc2626" stroke-width="1" />
+      <text x="10" y="22" font-family="sans-serif" font-size="12" font-weight="700" fill="#f87171">🌬️ Awning &amp; Freeze Protection</text>
+      <text x="10" y="38" font-family="sans-serif" font-size="10.5" fill="#e2e8f0">Retracts covers on high gusts</text>
+      <text x="10" y="50" font-family="sans-serif" font-size="9.5" fill="#64748b">Shuts outdoor taps before freeze</text>
+    </g>
+
+    <!-- Action Card 4 -->
+    <g transform="translate(14, 250)">
+      <rect width="222" height="60" rx="8" fill="#0f172a" stroke="#475569" stroke-width="1" />
+      <text x="10" y="22" font-family="sans-serif" font-size="12" font-weight="700" fill="#cbd5e1">📊 Drop-in Dashboards</text>
+      <text x="10" y="38" font-family="sans-serif" font-size="10.5" fill="#e2e8f0">Native Vanilla &amp; Mushroom cards</text>
+      <text x="10" y="51" font-family="sans-serif" font-size="9.5" fill="#64748b">10 ready-to-import Blueprints included</text>
+    </g>
+  </g>
+</svg>

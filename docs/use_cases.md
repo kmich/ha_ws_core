@@ -1,24 +1,23 @@
-# Use Cases
+# Automation Recipes & Real-World Benefits
 
-Start here if you installed Weather Station Core and want a useful automation in
-the next 10 minutes.
+Weather Station Core is designed to make your smart home **react to the weather automatically**.
 
-All examples assume the default `ws` entity prefix. If you chose a different
-prefix during setup, replace `sensor.ws_...` with your own entity IDs.
+Here are the most popular recipes and automations, complete with 1-click blueprint imports, recommended thresholds, and sample YAML.
 
 ---
 
-## Know before rain starts
+## 1. 🌧️ Save the Laundry & Patio Cushions (Rain Alert)
 
-Best for: laundry outside, skylights, open windows, dog walks, school pickup.
+**The Problem:** Rain starts while your laundry is drying on the line, patio cushions are outside, or upstairs skylights are wide open. Standard weather apps only give broad regional probabilities ("30% chance of rain in London") that don't tell you what's happening at your roof.
 
-Enable **Precipitation Nowcast** under **Configure -> Features**. This creates
-`sensor.ws_minutes_until_rain`.
+**The Solution:** `ws_core` pairs your station's physical rain gauge with 15-minute radar grids to calculate `sensor.ws_minutes_until_rain`.
 
+[![Import Rain Start Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Frain_start.yaml)
+
+### Sample YAML Automation
 ```yaml
-alias: Rain starts soon
-description: Notify when Weather Station Core expects rain within 10 minutes.
-mode: single
+alias: "Weather: Rain Starting Soon Announcement"
+description: "Broadcast an alert when rain is expected within 10 minutes."
 trigger:
   - platform: numeric_state
     entity_id: sensor.ws_minutes_until_rain
@@ -28,99 +27,82 @@ condition:
     entity_id: sensor.ws_minutes_until_rain
     above: 0
 action:
-  - service: notify.mobile_app_your_phone
+  - action: tts.speak
+    target:
+      entity_id: tts.piper
     data:
-      title: Rain soon
-      message: Rain is expected in {{ states('sensor.ws_minutes_until_rain') }} minutes.
+      media_player_entity_id: media_player.living_room_speaker
+      message: "Attention: rain is predicted to start in {{ states('sensor.ws_minutes_until_rain') }} minutes. Please close the patio doors."
+  - action: notify.mobile_app_all_phones
+    data:
+      title: "🌧️ Rain Inbound"
+      message: "Rain starting in ~{{ states('sensor.ws_minutes_until_rain') }} min."
 ```
 
-Prefer no YAML? Import the bundled
-[Rain Start Warning blueprint](blueprints.md) for rain-rate and probability
-alerts.
+---
+
+## 2. 🌱 Smart Irrigation: Stop Watering After It Poured
+
+**The Problem:** Typical timer-based irrigation controllers run on a schedule regardless of whether 25mm of rain fell yesterday. This wastes costly water and drowns roots.
+
+**The Solution:** Use `ws_core` Evapotranspiration (ET₀) and today's rain accumulation (`sensor.ws_rain_today_mm`) to skip or adjust watering.
+
+[![Import Irrigation Rain Skip Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Firrigation_rain_skip.yaml)
+
+### Recommended Sensors for Garden & Irrigation
+* **Penman-Monteith Reference ET₀:** `sensor.ws_et0_penman_monteith` (best when solar radiation sensor is present).
+* **Daily ET₀ (Hargreaves-Samani):** `sensor.ws_et0_daily` (no solar sensor required).
+* **Today's Total Rainfall:** `sensor.ws_rain_today_mm`.
+* **Smart Irrigation Integration:** Feed `sensor.ws_et0_penman_monteith` directly into the popular `HAsmartirrigation` integration as the evapotranspiration source.
 
 ---
 
-## Skip irrigation when nature already helped
+## 3. 🌬️ Protect Outdoor Awnings & Blinds from Wind Gusts
 
-Best for: smart irrigation, garden beds, lawns, balconies with drip irrigation.
+**The Problem:** High summer convective storms or sudden squalls can produce 50+ km/h wind gusts in seconds, bending awning arms or snapping fabric sails before you have time to manually retract them.
 
-Use the bundled
-[Irrigation Rain Skip blueprint](blueprints.md) when possible. It already
-combines recent rain and rain probability.
+**The Solution:** The `ws_core` sustained wind gust monitor detects peak gust velocities and issues immediate cover retraction commands.
 
-For Smart Irrigation, map one of these sensors:
+[![Import High Wind Protection Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fhigh_wind.yaml)
 
-| Need | Entity |
-|---|---|
-| Best ET0 when solar radiation is mapped | `sensor.ws_et0_penman_monteith` |
-| ET0 without solar radiation | `sensor.ws_et0_daily` |
-| Today's measured rainfall | `sensor.ws_rain_today_mm` |
-| Soil-aware demand score | `sensor.ws_irrigation_need_score` |
+### Recommended Gust Thresholds by Hardware
+| Hardware Type | Safe Wind Gust Limit | Trigger Suggestion |
+|---|---|---|
+| Light fabric awning / shade sail | 10–12 m/s (~36–43 km/h) | Immediate retract |
+| Motorized exterior venetian blinds | 12–15 m/s (~43–54 km/h) | Retract with 1 min debounce |
+| Heavy-duty cassette awning | Check manufacturer rating (usually 15–18 m/s) | Retract on sustained gusts |
 
 ---
 
-## Protect awnings and blinds from wind
+## 4. ❄️ Prevent Frozen Outdoor Pipes & Protect Delicate Plants
 
-Best for: awnings, exterior blinds, pergolas, shade sails.
+**The Problem:** Relying on simple ambient temperature often misses radiation frost, where surfaces drop below freezing even if the air sensor reads +2°C.
 
-Use the bundled
-[High Wind Gusts blueprint](blueprints.md) for cover retraction. It is safer
-than a raw automation because it already has inputs for covers and thresholds.
+**The Solution:** `ws_core` derives the **Buck (1981) Frost Point** and **Frost Risk Category**, alerting you hours before damaging ice forms.
 
-Good starting thresholds:
+[![Import Freeze Alert Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Ffreeze_alert.yaml)
 
-| Hardware | Start with |
-|---|---|
-| Light fabric awning | `sensor.ws_wind_gust` above 10-12 m/s |
-| Exterior venetian blinds | `sensor.ws_wind_gust` above 12-15 m/s |
-| Heavy-duty awning | Check the manufacturer rating first |
+### Key Entities
+* `sensor.ws_frost_risk` (Human-readable: *None, Slight, Moderate, High, Severe*)
+* `sensor.ws_frost_point` (Temperature at which frost will deposit on ground surfaces)
+* `sensor.ws_frost_streak_days` (Count of consecutive freezing days)
 
 ---
 
-## Warn before frost
+## 5. ⚡ Lightning Proximity Safety (Keep Kids & Pets Safe)
 
-Best for: plants, exposed pipes, greenhouses, outdoor taps.
+**The Problem:** Thunderstorms can produce lethal cloud-to-ground strikes miles ahead of the actual rain cloud.
 
-Use the bundled
-[Freeze Warning blueprint](blueprints.md) for temperature-triggered alerts.
+**The Solution:** If you have an Ecowitt WH57 or WeatherFlow Tempest lightning sensor, `ws_core` tracks strike distance, frequency, and provides an automatic "All Clear" countdown when no strikes have occurred for 30 minutes.
 
-For a more weather-aware dashboard tile, watch:
-
-| Entity | What it tells you |
-|---|---|
-| `sensor.ws_frost_risk` | Human-readable frost risk category |
-| `sensor.ws_frost_point` | Temperature where frost can form |
-| `sensor.ws_frost_streak_days` | Consecutive frost days |
+[![Import Lightning Safety Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Flightning_safety.yaml)
 
 ---
 
-## Close windows when air quality gets bad
+## 🏃 6. Heat Stress & Outdoor Activity Safety (UTCI & WBGT)
 
-Best for: smoke, dust, city pollution, pollen-sensitive households.
+**The Problem:** Thermometers tell you ambient temperature, but they don't reflect how heat affects the human body under direct sunlight and high humidity.
 
-Enable **Air Quality** under **Configure -> Features**. Then use the bundled
-[Poor Air Quality blueprint](blueprints.md) to notify, close covers, or turn on
-fans/purifiers.
+**The Solution:** `ws_core` calculates the Universal Thermal Climate Index (**UTCI**) and Wet-Bulb Globe Temperature (**WBGT**) — the official standards used by the World Health Organization and OSHA for heat stress warnings during sports and construction.
 
-Core entities:
-
-| Entity | Use |
-|---|---|
-| `sensor.ws_air_quality_index` | Main AQI decision sensor |
-| `sensor.ws_pm2_5` | Smoke and fine particles |
-| `sensor.ws_pm10` | Dust and coarse particles |
-| `sensor.ws_ozone` | Ozone exposure |
-
----
-
-## Choose your first feature pack
-
-| You care about | Enable |
-|---|---|
-| Rain countdown | Precipitation Nowcast |
-| Garden watering | Comfort Indices, Soil Sensors, Solar Forecast |
-| Fire season | Fire Risk, FWI Components |
-| Heat stress | Comfort Indices |
-| Storms | Lightning Detection, Thunderstorm Risk |
-| Dashboards and TTS summaries | Display Sensors |
-| Data confidence | Station Diagnostics |
+[![Import Heat Stress Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fheat_stress.yaml)

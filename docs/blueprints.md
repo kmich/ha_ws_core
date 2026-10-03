@@ -1,148 +1,57 @@
 # Automation Blueprints
 
-Ten automation blueprints are provided in `blueprints/automation/ws_core/`.
-Each is a single YAML file that imports into HA as a configurable automation template.
+`ws_core` includes ten pre-configured automation blueprints located in `blueprints/automation/ws_core/`. Each blueprint imports directly into Home Assistant as an interactive, customizable automation with sensible threshold defaults and hysteresis.
 
 ---
 
-## Installing a blueprint
+## ⚡ 1-Click Blueprint Import
 
-1. Go to **Settings → Automations & Scenes → Blueprints**
-2. Click **Import Blueprint**
-3. Paste the raw URL of the blueprint file from GitHub:
-   `https://raw.githubusercontent.com/kmich/ha_ws_core/main/blueprints/automation/ws_core/<filename>.yaml`
-4. Click **Preview blueprint** then **Import**
-5. Create an automation from the imported blueprint and configure the parameters
+Click any badge below to import the blueprint directly into your Home Assistant instance:
 
----
-
-## Available blueprints
-
-| File | Purpose |
-|---|---|
-| `fire_danger_alert.yaml` | Notify when fire danger reaches a configured threshold, with optional precautionary irrigation. |
-| `freeze_alert.yaml` | Notify when temperature drops below a freeze threshold. |
-| `frost_alert.yaml` | Frost/freeze warning with dew point and frost point context. |
-| `heat_stress.yaml` | Notify when UTCI reaches a dangerous heat-stress level. |
-| `high_wind.yaml` | Notify on sustained wind gusts and optionally retract covers or awnings. |
-| `irrigation_rain_skip.yaml` | Skip or cancel irrigation when rain already fell or is likely. |
-| `lightning_safety.yaml` | Alert when lightning is nearby and send an all-clear after the clearance window. |
-| `poor_aqi.yaml` | Notify when AQI crosses a configured threshold, with optional mitigation actions. |
-| `rain_start.yaml` | Notify or run actions when rain starts/stops or rain probability rises. |
-| `storm_alert.yaml` | Notify when rapid pressure drop suggests storm conditions. |
+| Blueprint | Purpose | 1-Click Import |
+|---|---|---|
+| **Rain Start Warning** | Alert via TTS or phone when rain begins or is imminent; close covers | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Frain_start.yaml) |
+| **Irrigation Rain Skip** | Automatically skip scheduled watering when rainfall or ET₀ indicates moist soil | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Firrigation_rain_skip.yaml) |
+| **High Wind Protection** | Automatically retract awnings and blinds when severe wind gusts are detected | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fhigh_wind.yaml) |
+| **Freeze Warning** | Alert when temperature approaches freezing; optionally shut off outdoor water valves | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Ffreeze_alert.yaml) |
+| **Frost Alert** | Comprehensive frost warning combining temperature, dew point, and frost point | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Ffrost_alert.yaml) |
+| **Lightning Safety** | Alert when lightning strikes within range; send all-clear when 30 min clear | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Flightning_safety.yaml) |
+| **Heat Stress Alert** | Notify when UTCI / apparent temperature reaches dangerous levels for exercise | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fheat_stress.yaml) |
+| **Storm Alert** | Notify when sudden barometric pressure drop signals an approaching storm | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fstorm_alert.yaml) |
+| **Poor Air Quality** | Alert when AQI crosses safety threshold; optionally turn on air purifiers & close vents | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fpoor_aqi.yaml) |
+| **Fire Danger Alert** | Warn when regional fire danger index crosses high threshold; optional precautionary misting | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Ffire_danger_alert.yaml) |
 
 ---
 
-### Heat Stress (`heat_stress.yaml`)
+## Detailed Blueprint Configurations
 
-Sends a notification when the feels-like temperature (apparent temperature) stays above
-a configurable threshold for a sustained period. Uses the ws_core alert hysteresis, so
-a single brief spike won't trigger.
+### 1. Rain Start / Stop (`rain_start.yaml`)
+Triggers when rain starts (rain rate exceeds threshold) or stops. Uses a Kalman-filtered rain rate sensor so brief gauge vibrations or wind shakes don't cause false alarms.
+* **Key parameters:** Rain Rate Sensor, Rain Rate Threshold (default: 0.5 mm/h), Rain Probability Threshold, Notification Service, Optional Actions on Start/Stop (e.g. retract awning, close motorized windows).
 
-**Configurable parameters:**
-- Feels-Like Temperature Sensor (e.g. `sensor.ws_feels_like`)
-- Heat threshold (°C, default: 35 °C, range 20–55 °C)
-- Notification target (e.g. `notify.mobile_app_phone`)
-- Cooldown between repeated notifications (minutes, default: 60)
+### 2. Irrigation Rain Skip (`irrigation_rain_skip.yaml`)
+Prevents lawn and garden overwatering by evaluating measured rainfall and evapotranspiration (ET₀).
+* **Key parameters:** Today's Rainfall Sensor (`sensor.ws_rain_today_mm`), Rain Skip Threshold (default: 5.0 mm), ET₀ Sensor, Irrigation Switch / Valve.
 
-**Required entities:** `sensor.ws_feels_like` (or any temperature sensor with device class `temperature`)
+### 3. High Wind / Gust Alert (`high_wind.yaml`)
+Safeguards outdoor awnings, pergolas, and blinds by monitoring sustained wind gusts.
+* **Key parameters:** Wind Gust Sensor (`sensor.ws_wind_gust`), Gust Threshold (default: 10 m/s ~ 36 km/h), Sustained Duration, Target Cover Entities to Retract.
 
----
+### 4. Lightning Safety (`lightning_safety.yaml`)
+Monitors nearby lightning strikes (e.g. from Ecowitt WH57 or WeatherFlow Tempest) and issues an alert, followed by an official "All Clear" announcement once no strikes occur within 30 minutes.
+* **Key parameters:** Lightning Strike Count & Distance Sensors, Proximity Threshold (default: 16 km / 10 mi), Notification Service.
 
-### Freeze Alert (`freeze_alert.yaml`)
-
-Notifies when temperature drops to or below a freeze threshold. Optionally calls a
-switch off — useful for shutting down irrigation controllers automatically before frost.
-
-**Configurable parameters:**
-- Temperature sensor (e.g. `sensor.ws_temperature`)
-- Freeze threshold (°C, default: 0 °C, range −10 to +5 °C)
-- Notification target
-- Irrigation switch to turn off (optional)
-
-**Required entities:** `sensor.ws_temperature` (or any temperature sensor)
+### 5. Freeze & Frost Alerts (`freeze_alert.yaml` & `frost_alert.yaml`)
+Monitors outdoor temperatures and the scientific Buck (1981) frost point. Triggers before ice forms, enabling pre-emptive protection of sensitive plants and shutting off outdoor hose bibbs.
+* **Key parameters:** Temperature & Frost Point Sensors, Alert Threshold, Optional Outdoor Valve Switch to Turn Off.
 
 ---
 
-### Rain Start / Stop (`rain_start.yaml`)
+## Manual Blueprint Import (Alternative)
 
-Triggers when rain starts (rate rises above a minimum threshold) or stops. Uses the
-filtered rain rate sensor so brief sensor noise doesn't cause false positives.
-Supports optional extra actions on start and stop — for example closing an awning
-when rain starts or reopening it after rain stops.
-
-**Configurable parameters:**
-- Rain Rate Sensor (e.g. `sensor.ws_rain_rate`)
-- Minimum rain rate to be considered raining (mm/h, default: 0.5)
-- Trigger on: rain starts / rain stops / both (default: both)
-- Notification target
-- Additional action on rain start (optional — e.g. close a cover)
-- Additional action on rain stop (optional)
-
-**Required entities:** `sensor.ws_rain_rate`
-
----
-
-### High Wind / Gust Alert (`high_wind.yaml`)
-
-Notifies when wind gusts exceed a threshold for a sustained duration. Optionally
-retracts covers, awnings, or other wind-sensitive devices automatically.
-
-**Configurable parameters:**
-- Wind Gust Sensor (e.g. `sensor.ws_wind_gust`)
-- Gust threshold (m/s, default: 10.0 m/s = ~36 km/h = Beaufort 5)
-- Sustained duration before triggering (minutes, default: 2)
-- Notification target
-- Cover / awning entities to retract (optional)
-
-**Required entities:** `sensor.ws_wind_gust`
-
----
-
-### Poor Air Quality Alert (`poor_aqi.yaml`)
-
-Notifies when the Air Quality Index crosses a configurable threshold. Optionally
-closes windows or activates air purifiers. Trigger is debounced — AQI must be above
-the threshold for 10 minutes before alerting.
-
-**Configurable parameters:**
-- AQI Sensor (e.g. `sensor.ws_air_quality_index`)
-- AQI alert threshold (default: 100 — "Unhealthy for Sensitive Groups")
-- Notification target
-- Window / vent cover or switch entities to close (optional)
-- Air purifier switch or fan entities to activate (optional)
-
-**Required entities:** `sensor.ws_air_quality_index`
-**Requires:** Air Quality feature enabled in Configure → Features
-
----
-
-## Writing your own automations
-
-All sensor entities are standard HA sensors and work with any automation trigger,
-condition, or action. A few useful patterns:
-
-**Trigger on rain starting:**
-```yaml
-trigger:
-  - platform: state
-    entity_id: event.ws_rain_event
-    event_type: rain_start
-```
-
-**Condition: spray window is suitable:**
-```yaml
-condition:
-  - condition: state
-    entity_id: sensor.ws_delta_t
-    attribute: spray_suitability
-    state: ideal
-```
-
-**Action: apply calibration offset:**
-```yaml
-action:
-  - service: ws_core.apply_calibration
-    data:
-      cal_temp_c: -0.5
-```
+If you do not use My Home Assistant:
+1. In Home Assistant, go to **Settings → Automations & Scenes → Blueprints**.
+2. Click **Import Blueprint** (bottom right).
+3. Paste the raw GitHub URL for any blueprint file:
+   `https://raw.githubusercontent.com/kmich/ha_ws_core/main/blueprints/automation/ws_core/<blueprint_name>.yaml`
+4. Click **Preview** and **Import**.
