@@ -57,7 +57,7 @@ condition:
       {{ last is none or (now() - last).total_seconds() / 3600 > (cooldown_hours | int) }}
 
 action:
-  - service: !input notify_target
+  - action: !input notify_target
     data:
       title: "Storm Approaching"
       message: >

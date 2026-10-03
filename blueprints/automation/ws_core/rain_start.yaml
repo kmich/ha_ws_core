@@ -66,7 +66,7 @@ action:
           - condition: trigger
             id: rain_started
         sequence:
-          - service: !input notify_target
+          - action: !input notify_target
             data:
               title: "Rain Detected"
               message: >-
@@ -76,7 +76,7 @@ action:
           - condition: trigger
             id: rain_likely
         sequence:
-          - service: !input notify_target
+          - action: !input notify_target
             data:
               title: "Rain Expected"
               message: >-

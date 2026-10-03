@@ -148,10 +148,16 @@
           "enable_awekas": "Wysyłanie do AWEKAS",
           "enable_owm_stations": "Wysyłanie do OpenWeatherMap Stations",
           "enable_windy": "Wysyłanie do Windy.com",
-          "enable_mqtt": "Republishing MQTT Discovery (publikuj wszystkie pochodne czujniki do brokera MQTT dla Node-RED / zewnętrznych odbiorców)"
+          "enable_mqtt": "Republishing MQTT Discovery (publikuj wszystkie pochodne czujniki do brokera MQTT dla Node-RED / zewnętrznych odbiorców)",
+          "enable_snow": "Snow (precipitation phase + estimated accumulation from your existing rain rate)",
+          "enable_auto_calibration": "Adaptive sensor calibration (learns a bias vs. the regional forecast reference and nudges calibration offsets automatically)",
+          "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
-          "enable_degree_days": "Obliczanie stopniodni wzrostu, ogrzewania i chłodzenia oraz szacowanie wilgotności liści, przydatne do rolnictwa i monitorowania energii."
+          "enable_degree_days": "Obliczanie stopniodni wzrostu, ogrzewania i chłodzenia oraz szacowanie wilgotności liści, przydatne do rolnictwa i monitorowania energii.",
+          "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
       },
       "weathercloud": {
@@ -291,6 +297,43 @@
           "cwop_interval_min": "Interwał wysyłania",
           "_go_back": "← Wróć do poprzedniego kroku"
         }
+      },
+      "indoor_rooms": {
+        "title": "Indoor Rooms",
+        "description": "Define named rooms, each with its own temperature, humidity and/or CO2 sensor. Every room gets its own delta and comfort sensors. Choose an action, or select Done to continue.",
+        "menu_options": {
+          "room_add": "Add a room",
+          "room_edit": "Edit a room",
+          "room_remove": "Remove rooms",
+          "room_done": "Done"
+        }
+      },
+      "room_edit": {
+        "title": "Edit Room",
+        "data": {
+          "room": "Room"
+        }
+      },
+      "room_form": {
+        "title": "Room Details",
+        "description": "Name the room and assign any combination of temperature, humidity and CO2 sensors. Leave a sensor blank to skip that metric for this room.",
+        "data": {
+          "name": "Room name",
+          "temp": "Temperature sensor",
+          "humidity": "Humidity sensor",
+          "co2": "CO2 sensor"
+        },
+        "data_description": {
+          "temp": "Used for the room's indoor/outdoor temperature delta.",
+          "humidity": "Used for the room's indoor/outdoor humidity delta.",
+          "co2": "Used in the room's comfort score."
+        }
+      },
+      "room_remove": {
+        "title": "Remove Rooms",
+        "data": {
+          "rooms": "Rooms to remove"
+        }
       }
     },
     "error": {
@@ -303,7 +346,8 @@
       "temp_out_of_range": "Temperatura jest poza fizycznie możliwym zakresem.",
       "invalid_api_key": "Nieprawidłowy klucz API lub odrzucone dane logowania",
       "cannot_connect": "Nie można połączyć się z API - sprawdź sieć i spróbuj ponownie",
-      "station_not_found": "Nie znaleziono identyfikatora stacji Weather Underground"
+      "station_not_found": "Nie znaleziono identyfikatora stacji Weather Underground",
+      "room_name_required": "Please enter a name for the room."
     },
     "create_entry": {
       "default": "Konfiguracja zakończona! Lokalne prognozy i inteligentne czujniki pogodowe są teraz aktywne.\n\n**Następne kroki:**\n1. Zainstaluj rozszerzony pulpit nawigacyjny (z folderu dashboards/ w repozytorium GitHub)\n2. Skonfiguruj automatyzację ostrzeżeń o deszczu (z folderu blueprints/)"
@@ -449,7 +493,10 @@
           "enable_degree_days": "Stopniodni (HDD, CDD, GDD) i wilgotność liści",
           "enable_lightning": "Czujniki wykrywania wyładowań",
           "enable_indoor": "Czujniki wewnętrzne (temperatura, wilgotność, CO₂)",
-          "enable_soil": "Czujniki glebowe (wilgotność, temperatura, potrzeby nawadniania)"
+          "enable_soil": "Czujniki glebowe (wilgotność, temperatura, potrzeby nawadniania)",
+          "enable_snow": "Snow (precipitation phase + estimated accumulation)",
+          "enable_auto_calibration": "Adaptive sensor calibration (learns bias, nudges calibration automatically)",
+          "enable_climate_normals": "Historical climate normals (today vs. ~10 years of local history)"
         },
         "data_description": {
           "enable_display_sensors": "Czujniki wyświetlania (poziomy, trendy, stan stacji)",
@@ -467,7 +514,10 @@
           "enable_diagnostics": "Dryf czujnika, spójność między czujnikami, flagi jakości, umiejętność/zgodność prognozy, współczynnik słoneczny-lux, klimatologia 30-dniowa",
           "enable_fwi_components": "Kody pośrednie FWI (FFMC/DMC/DC/ISI/BUI). Wymaga włączonego Ryzyka Pożaru do generowania danych",
           "enable_advanced_sensors": "Numer Zambretti (forma numeryczna), ET₀ godzinowa, wygładzony kierunek wiatru",
-          "enable_nowcast": "Nowcast opadów 15-minutowy Open-Meteo: minuty do początku/końca deszczu, suma następnej godziny, intensywność. Bez klucza API"
+          "enable_nowcast": "Nowcast opadów 15-minutowy Open-Meteo: minuty do początku/końca deszczu, suma następnej godziny, intensywność. Bez klucza API",
+          "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
       },
       "indoor_rooms_opt": {
@@ -675,6 +725,10 @@
     "large_calibration_offset": {
       "title": "Zastosowano duży offset kalibracji",
       "description": "Offset kalibracji wynoszący {value} został zastosowany do {field}. Duże offsety mogą wskazywać na awarię sprzętową czujnika, a nie dryf kalibracji. Rozważ wymianę czujnika."
+    },
+    "et0_pm_unavailable": {
+      "title": "PM ET₀ unavailable: no solar_radiation source configured",
+      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
     }
   },
   "entity": {
@@ -2249,6 +2303,147 @@
       },
       "vigicrues_river_flow": {
         "name": "{river} - Przepływ rzeki"
+      },
+      "temperature_high_year": {
+        "name": "Temperature High (Year)"
+      },
+      "temperature_low_year": {
+        "name": "Temperature Low (Year)"
+      },
+      "temperature_high_all_time": {
+        "name": "Temperature High (All-Time)"
+      },
+      "temperature_low_all_time": {
+        "name": "Temperature Low (All-Time)"
+      },
+      "temperature_high_week": {
+        "name": "Temperature High (Week)"
+      },
+      "temperature_low_week": {
+        "name": "Temperature Low (Week)"
+      },
+      "temperature_high_month": {
+        "name": "Temperature High (Month)"
+      },
+      "temperature_low_month": {
+        "name": "Temperature Low (Month)"
+      },
+      "wind_gust_max_month": {
+        "name": "Wind Gust Max (Month)"
+      },
+      "wind_gust_max_year": {
+        "name": "Wind Gust Max (Year)"
+      },
+      "wind_gust_max_all_time": {
+        "name": "Wind Gust Max (All-Time)"
+      },
+      "dry_streak_record": {
+        "name": "Dry Streak Record"
+      },
+      "heat_streak_record": {
+        "name": "Heat Streak Record",
+        "state_attributes": {
+          "threshold_c": {
+            "name": "Threshold (°C)"
+          }
+        }
+      },
+      "frost_streak_record": {
+        "name": "Frost Streak Record",
+        "state_attributes": {
+          "threshold_c": {
+            "name": "Threshold (°C)"
+          }
+        }
+      },
+      "temp_high_normal": {
+        "name": "Temperature High (Normal)",
+        "state_attributes": {
+          "sample_years": {
+            "name": "Sample years"
+          },
+          "fetched_at": {
+            "name": "Fetched at"
+          }
+        }
+      },
+      "temp_low_normal": {
+        "name": "Temperature Low (Normal)"
+      },
+      "rain_normal": {
+        "name": "Rain (Normal)"
+      },
+      "temp_anomaly_normal": {
+        "name": "Temperature Anomaly (Normal)"
+      },
+      "rain_anomaly_normal": {
+        "name": "Rain Anomaly (Normal)"
+      },
+      "auto_calibration": {
+        "name": "Auto Calibration",
+        "state": {
+          "learning": "Learning",
+          "stable": "Stable",
+          "adjusted": "Adjusted"
+        },
+        "state_attributes": {
+          "bias_temp_c": {
+            "name": "Learned temperature bias"
+          },
+          "bias_humidity": {
+            "name": "Learned humidity bias"
+          },
+          "bias_pressure_hpa": {
+            "name": "Learned pressure bias"
+          },
+          "samples": {
+            "name": "Samples"
+          },
+          "last_applied": {
+            "name": "Last applied"
+          }
+        }
+      },
+      "snow_phase": {
+        "name": "Precipitation Phase",
+        "state": {
+          "snow": "Snow",
+          "sleet": "Sleet",
+          "rain": "Rain",
+          "none": "None"
+        }
+      },
+      "snow_rate": {
+        "name": "Snow Rate"
+      },
+      "snow_today": {
+        "name": "Snow Today"
+      },
+      "snow_this_month": {
+        "name": "Snow This Month"
+      },
+      "snow_this_year": {
+        "name": "Snow This Year"
+      },
+      "snow_record_day": {
+        "name": "Snowiest Day",
+        "state_attributes": {
+          "date": {
+            "name": "Date"
+          }
+        }
+      },
+      "indoor_room_delta": {
+        "name": "Temp Delta - {room_name}"
+      },
+      "indoor_room_humidity": {
+        "name": "Humidity - {room_name}"
+      },
+      "indoor_room_co2": {
+        "name": "CO₂ - {room_name}"
+      },
+      "indoor_room_comfort": {
+        "name": "Comfort - {room_name}"
       }
     },
     "select": {
@@ -2401,6 +2596,15 @@
       },
       "ws_enable_windy": {
         "name": "Funkcja: Wysyłanie Windy"
+      },
+      "ws_enable_auto_calibration": {
+        "name": "Feature: Adaptive Sensor Calibration"
+      },
+      "ws_enable_climate_normals": {
+        "name": "Feature: Historical Climate Normals"
+      },
+      "ws_enable_snow": {
+        "name": "Feature: Snow"
       }
     },
     "event": {
@@ -2471,6 +2675,9 @@
       },
       "ws_dew_exceeds_temp": {
         "name": "Punkt rosy przekracza temperaturę"
+      },
+      "ws_snow_falling": {
+        "name": "Snow Falling"
       }
     }
   },

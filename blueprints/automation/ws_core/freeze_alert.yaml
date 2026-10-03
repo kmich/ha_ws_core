@@ -42,7 +42,7 @@ trigger:
 condition: []
 
 action:
-  - service: !input notify_target
+  - action: !input notify_target
     data:
       title: "Frost Warning"
       message: >-

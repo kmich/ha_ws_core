@@ -376,3 +376,88 @@ class TestAccuracy:
         with patch.object(cmod, "determine_current_condition", return_value="cloudy") as cond:
             coord._compute_condition({}, 20.0, 50.0, 1.0, 2.0, 0.0, 10.0, 0.0, 0.0)
         assert cond.call_args.kwargs["illuminance_lx"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 architectural and safety improvements
+# ---------------------------------------------------------------------------
+
+
+def test_diagnostics_redacts_station_ids_and_callsigns():
+    from custom_components.ws_core.diagnostics import REDACTED, _redact
+
+    data = {
+        "cwop_callsign": "CW1234",
+        "wu_station_id": "KCAFOO999",
+        "wc_station_id": "WC_ABC",
+        "wow_site_id": "WOW_123",
+        "pws_station_id": "PWS_FOO",
+        "awekas_username": "awekas_user",
+        "name": "My Station",
+    }
+    redacted = _redact(dict(data))
+    for key in (
+        "cwop_callsign",
+        "wu_station_id",
+        "wc_station_id",
+        "wow_site_id",
+        "pws_station_id",
+        "awekas_username",
+    ):
+        assert redacted[key] == REDACTED, f"{key} was not redacted"
+    assert redacted["name"] == "My Station"
+
+
+def test_sensor_unrecorded_attributes():
+    from custom_components.ws_core.sensor import WSSensor
+
+    assert "forecast" in WSSensor._unrecorded_attributes
+    assert "tiles" in WSSensor._unrecorded_attributes
+    assert "active_alerts" in WSSensor._unrecorded_attributes
+    assert "hourly" in WSSensor._unrecorded_attributes
+    assert "_climatology_stats" in WSSensor._unrecorded_attributes
+
+
+def test_station_runtime_sea_temp_inflight():
+    from custom_components.ws_core.coordinator import WSStationRuntime
+
+    runtime = WSStationRuntime()
+    assert hasattr(runtime, "sea_temp_inflight")
+    assert runtime.sea_temp_inflight is False
+
+
+def test_coordinator_stores_config_entry():
+    mock_entry = MagicMock()
+    coord = _make_coordinator()
+    coord.config_entry = mock_entry
+    assert coord.config_entry is mock_entry
+
+
+@pytest.mark.asyncio
+async def test_async_unload_entry_removes_services():
+    from custom_components.ws_core import (
+        SERVICE_APPLY_CALIBRATION,
+        SERVICE_EXPORT_LEARNING,
+        SERVICE_RESET_LEARNING,
+        SERVICE_RESET_RAIN,
+        async_unload_entry,
+    )
+
+    hass = MagicMock()
+    hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+    hass.config_entries.async_loaded_entries.return_value = []
+    hass.services.has_service.return_value = True
+
+    entry = MagicMock()
+    entry.runtime_data = MagicMock()
+    entry.runtime_data.async_stop = AsyncMock()
+
+    res = await async_unload_entry(hass, entry)
+    assert res is True
+    entry.runtime_data.async_stop.assert_awaited_once()
+
+    removed = [call.args[1] for call in hass.services.async_remove.call_args_list]
+    assert SERVICE_RESET_RAIN in removed
+    assert SERVICE_RESET_LEARNING in removed
+    assert SERVICE_EXPORT_LEARNING in removed
+    assert SERVICE_APPLY_CALIBRATION in removed

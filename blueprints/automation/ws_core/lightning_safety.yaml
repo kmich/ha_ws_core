@@ -59,7 +59,7 @@ action:
           - condition: trigger
             id: lightning_near
         sequence:
-          - service: !input notify_target
+          - action: !input notify_target
             data:
               title: "Lightning Nearby!"
               message: >
@@ -72,14 +72,14 @@ action:
               - condition: template
                 value_template: "{{ (pool_switch | trim) != '' }}"
             then:
-              - service: switch.turn_off
+              - action: switch.turn_off
                 target:
                   entity_id: !input pool_switch
       - conditions:
           - condition: trigger
             id: lightning_clear
         sequence:
-          - service: !input notify_target
+          - action: !input notify_target
             data:
               title: "Lightning All Clear"
               message: >

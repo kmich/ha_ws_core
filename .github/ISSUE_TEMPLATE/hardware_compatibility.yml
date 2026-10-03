@@ -1,0 +1,83 @@
+name: Hardware Compatibility Report
+description: Report a weather station and entity mapping that works with Weather Station Core
+title: "[Compatibility]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping other weather-station owners. Do not include API keys,
+        passwords, serial numbers, public IP addresses, or precise coordinates.
+  - type: input
+    id: station
+    attributes:
+      label: Weather station hardware
+      description: Include the gateway/console and outdoor sensor model where known.
+      placeholder: "Ecowitt GW2000 with WS90"
+    validations:
+      required: true
+  - type: input
+    id: source_integration
+    attributes:
+      label: Home Assistant source integration
+      description: Which integration creates the raw weather entities?
+      placeholder: "Home Assistant Ecowitt integration"
+    validations:
+      required: true
+  - type: input
+    id: ws_core_version
+    attributes:
+      label: Weather Station Core version
+      placeholder: "2.6.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: discovery
+    attributes:
+      label: Mapping method
+      options:
+        - Auto-discovery found the station
+        - I selected the entities manually
+        - Auto-discovery needed manual corrections
+    validations:
+      required: true
+  - type: checkboxes
+    id: inputs
+    attributes:
+      label: Working input types
+      options:
+        - label: Temperature
+        - label: Humidity
+        - label: Absolute pressure
+        - label: Wind speed
+        - label: Wind gust
+        - label: Wind direction
+        - label: Cumulative rain total
+        - label: Rain rate
+        - label: Solar radiation or illuminance
+        - label: UV index
+        - label: Lightning
+        - label: Soil moisture or temperature
+  - type: textarea
+    id: entity_patterns
+    attributes:
+      label: Entity names or patterns
+      description: List non-sensitive entity IDs or naming patterns that would help another owner map the same hardware.
+      placeholder: |
+        Temperature: sensor.weather_station_outdoor_temperature
+        Pressure: sensor.weather_station_absolute_pressure
+        Rain total: sensor.weather_station_daily_rain
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes, corrections, or unavailable inputs
+      description: Mention ambiguous entities, unit conversions, or inputs your station does not expose.
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Documentation permission
+      options:
+        - label: This report may be summarized in the public hardware compatibility documentation.
+          required: true

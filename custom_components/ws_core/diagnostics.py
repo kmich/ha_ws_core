@@ -35,11 +35,25 @@ def _integration_version() -> str:
 
 _VERSION = _integration_version()
 
-# Location keys are redacted for privacy; anything whose key name matches this
-# pattern is a credential (API key, password, passcode, auth/secret/token) and
-# must never appear in a diagnostics export that users routinely attach to
-# public bug reports.
-_LOCATION_KEYS = frozenset({"forecast_lat", "forecast_lon", "sea_temp_lat", "sea_temp_lon"})
+# Location keys and public station identifiers are redacted for privacy;
+# anything whose key name matches this pattern is a credential (API key,
+# password, passcode, auth/secret/token) and must never appear in a diagnostics
+# export that users routinely attach to public bug reports. Public station IDs
+# (CWOP callsigns, WU IDs, etc.) can be queried on public maps to locate a home.
+_LOCATION_KEYS = frozenset(
+    {
+        "forecast_lat",
+        "forecast_lon",
+        "sea_temp_lat",
+        "sea_temp_lon",
+        "cwop_callsign",
+        "wu_station_id",
+        "wc_station_id",
+        "wow_site_id",
+        "pws_station_id",
+        "awekas_username",
+    }
+)
 _SECRET_KEY_RE = re.compile(r"(key|password|passcode|secret|token|auth)", re.IGNORECASE)
 
 

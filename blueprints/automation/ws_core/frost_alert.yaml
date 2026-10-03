@@ -60,7 +60,7 @@ condition:
       {% endif %}
 
 action:
-  - service: !input notify_target
+  - action: !input notify_target
     data:
       title: "Frost Alert"
       message: >

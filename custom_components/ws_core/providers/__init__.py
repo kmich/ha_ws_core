@@ -46,7 +46,7 @@ def get_provider(provider_id: str, hass: object | None = None) -> ForecastProvid
     Falls back to Open-Meteo if the ID is unknown (e.g. after a downgrade).
     Passes hass to providers that require HA state access (ha_weather_entity).
     """
-    cls = PROVIDERS.get(provider_id, OpenMeteoProvider)
     if hass is not None and provider_id == HaWeatherEntityProvider.PROVIDER_ID:
-        return cls(hass)
+        return HaWeatherEntityProvider(hass)  # type: ignore[arg-type]
+    cls = PROVIDERS.get(provider_id, OpenMeteoProvider)
     return cls()

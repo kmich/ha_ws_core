@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
@@ -669,6 +670,7 @@ class WSStationRuntime:
     last_forecast_fetch: Any | None = None
     last_sea_temp_fetch: Any | None = None
     forecast_inflight: bool = False
+    sea_temp_inflight: bool = False
     forecast_consecutive_failures: int = 0
 
     # MSLP cached for Zambretti
@@ -696,10 +698,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def __init__(
         self,
         hass: HomeAssistant,
-        entry_data: dict[str, Any],
+        entry_data: dict[str, Any] | ConfigEntry,
         entry_options: dict[str, Any] | None = None,
+        config_entry: ConfigEntry | None = None,
     ):
         self.hass = hass
+        if not isinstance(entry_data, dict):
+            config_entry = entry_data
+            entry_data = dict(config_entry.data)
+            if entry_options is None:
+                entry_options = dict(config_entry.options)
+
+        if config_entry is None and isinstance(entry_data, dict) and "entry_id" in entry_data:
+            with contextlib.suppress(Exception):
+                config_entry = hass.config_entries.async_get_entry(entry_data["entry_id"])
+
+        self.config_entry = config_entry
         self.entry_data = entry_data
         # entry_options is deliberately pre-merged (data as base, options
         # overriding) rather than left as a bare copy of entry.options. The
@@ -1116,6 +1130,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # No built-in polling: _handle_tick is the single 60 s sampling
             # clock; refreshes are requested explicitly by fetches.
             update_interval=None,
+            config_entry=self.config_entry,
         )
         self._unsubs: list = []
 
@@ -1126,19 +1141,31 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def forecast_provider(self) -> str:
         """Forecast provider ID (default: open_meteo)."""
-        opts = {**self.config_entry.data, **self.config_entry.options}
+        opts = (
+            {**self.config_entry.data, **self.config_entry.options}
+            if self.config_entry is not None
+            else {**self.entry_data, **self.entry_options}
+        )
         return opts.get(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
 
     @property
     def forecast_api_key(self) -> str | None:
         """API key for forecast providers that require one."""
-        opts = {**self.config_entry.data, **self.config_entry.options}
+        opts = (
+            {**self.config_entry.data, **self.config_entry.options}
+            if self.config_entry is not None
+            else {**self.entry_data, **self.entry_options}
+        )
         return opts.get(CONF_FORECAST_API_KEY) or None
 
     @property
     def forecast_entity(self) -> str | None:
         """Entity ID of the HA weather.* entity used as forecast provider."""
-        opts = {**self.config_entry.data, **self.config_entry.options}
+        opts = (
+            {**self.config_entry.data, **self.config_entry.options}
+            if self.config_entry is not None
+            else {**self.entry_data, **self.entry_options}
+        )
         return opts.get(CONF_FORECAST_ENTITY) or None
 
     def _is_imperial(self) -> bool:
@@ -2864,7 +2891,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "&wind_speed_unit=ms&timezone=auto"
             )
             session = async_get_clientsession(self.hass)
-            async with session.get(url, timeout=15) as resp:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status != 200:
                     return
                 payload = await resp.json()
@@ -2925,6 +2952,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "cal_humidity": (-20.0, 20.0),
             "cal_pressure_hpa": (-10.0, 10.0),
         }
+        if self.config_entry is None:
+            return
         new_options = dict(self.config_entry.options)
         applied: dict[str, float] = {}
         for cal_field, delta in deltas.items():
@@ -3021,7 +3050,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "&timezone=auto"
             )
             session = async_get_clientsession(self.hass)
-            async with session.get(url, timeout=60) as resp:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
                 if resp.status != 200:
                     _LOGGER.warning("ws_core: climate normals fetch HTTP %s", resp.status)
                     return
@@ -3030,7 +3059,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if not records:
                 _LOGGER.warning("ws_core: climate normals fetch returned no daily records")
                 return
-            normals = compute_climate_normals(records, window_days=CLIMATE_NORMALS_WINDOW_DAYS)
+            normals = await self.hass.async_add_executor_job(
+                compute_climate_normals, records, CLIMATE_NORMALS_WINDOW_DAYS
+            )
             if not normals:
                 return
             self._climate_normals = normals
@@ -4722,7 +4753,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
             session = async_get_clientsession(self.hass)
-            async with session.get(url, timeout=20) as resp:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                 if resp.status != 200:
                     _LOGGER.warning("Open-Meteo Marine returned HTTP %s", resp.status)
                     return
@@ -4813,7 +4844,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
             session = async_get_clientsession(self.hass)
-            async with session.get(url, timeout=20) as resp:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                 if resp.status != 200:
                     _LOGGER.warning("Open-Meteo nowcast returned HTTP %s", resp.status)
                     return
@@ -4908,7 +4939,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         url = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
         try:
             session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=15) as resp:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 body = await resp.text()
                 if resp.status == 200 and "success" in body.lower():
                     self._wu_last_upload = now_utc
@@ -5124,7 +5155,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         url = "https://api.weathercloud.net/v01/set"
         try:
             session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=15) as resp:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 body = await resp.text()
                 if resp.status == 200:
                     self._wc_last_upload = now_utc
@@ -5198,7 +5229,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         url = "https://www.pwsweather.com/weatherstation/updateweatherstation.php"
         try:
             session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=15) as resp:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 body = await resp.text()
                 if resp.status == 200 and "success" in body.lower():
                     self._pws_last_upload = now_utc
@@ -5259,7 +5290,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         url = "https://wow.metoffice.gov.uk/automaticreading"
         try:
             session = async_get_clientsession(self.hass)
-            async with session.get(url, params=params, timeout=15) as resp:
+            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status in (200, 201):
                     self._wow_last_upload = now_utc
                     self._wow_status = "ok"
@@ -5320,7 +5351,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             async with session.post(
                 url,
                 data={"val": payload},
-                timeout=20,
+                timeout=aiohttp.ClientTimeout(total=20),
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             ) as resp:
                 if resp.status == 200:
@@ -5378,7 +5409,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         url = f"https://api.openweathermap.org/data/3.0/measurements?appid={self.owm_stations_api_key}"
         try:
             session = async_get_clientsession(self.hass)
-            async with session.post(url, json=[measurement], timeout=15) as resp:
+            async with session.post(url, json=[measurement], timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status in (200, 201, 204):
                     self._owm_stations_last_upload = now_utc
                     self._owm_stations_status = "ok"
@@ -5440,7 +5471,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         url = f"https://stations.windy.com/pws/update/{self.windy_api_key}"
         try:
             session = async_get_clientsession(self.hass)
-            async with session.post(url, json={"observations": [obs]}, timeout=15) as resp:
+            async with session.post(url, json={"observations": [obs]}, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status in (200, 201, 204):
                     self._windy_last_upload = now_utc
                     self._windy_status = "ok"

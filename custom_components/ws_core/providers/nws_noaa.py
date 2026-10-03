@@ -8,6 +8,7 @@ from typing import Any
 
 import aiohttp
 
+from ..const import _INTEGRATION_VERSION
 from .base import ForecastProvider
 
 _LOGGER = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class NwsNoaaProvider(ForecastProvider):
     PROVIDER_NAME = "NWS/NOAA"
     REQUIRES_API_KEY = False
 
-    _USER_AGENT = "ha_ws_core/1.2.0 github.com/kmich/ha_ws_core"
+    _USER_AGENT = f"ha_ws_core/{_INTEGRATION_VERSION} github.com/kmich/ha_ws_core"
 
     async def async_fetch(
         self,

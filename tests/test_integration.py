@@ -562,6 +562,13 @@ class TestVersionConsistency:
             content = f.read()
         assert f'version = "{v}"' in content, f"pyproject.toml does not contain version {v!r}"
 
+    def test_const_version(self):
+        """const.py _INTEGRATION_VERSION must match manifest.json version."""
+        v = self._manifest_version()
+        from custom_components.ws_core.const import _INTEGRATION_VERSION
+
+        assert v == _INTEGRATION_VERSION, f"const _INTEGRATION_VERSION {_INTEGRATION_VERSION!r} != manifest {v!r}"
+
 
 class TestOptionsFlowSourceValidation:
     """Regression tests for the options flow (issues #70 and #71)."""

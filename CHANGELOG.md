@@ -2,6 +2,26 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.9.2] - 2026-10-03
+
+### Added
+
+- **Platform test suites:** Added dedicated unit test coverage for config-backed number entities (`tests/test_number_platform.py`), dashboard graph range selector (`tests/test_select_platform.py`), the `weather.*` platform (`tests/test_weather_platform.py`), and forecast provider registry (`tests/test_providers.py`).
+- **Translation completeness:** Synchronized all 8 supported language translation files (`de.json`, `es.json`, `fr.json`, `it.json`, `nl.json`, `pl.json`, `pt.json`) with `en.json`, achieving 100% key parity (0 missing keys across all 1,211 translation entries).
+
+### Changed
+
+- **Modernized automation blueprints:** Upgraded all 10 automation blueprints in `blueprints/automation/ws_core/` to use Home Assistant's modern `action:` syntax instead of the deprecated `service:` syntax.
+- **Explicit `config_entry` on coordinator:** `WSStationCoordinator` now explicitly receives and stores `config_entry` and passes it to `DataUpdateCoordinator.__init__()`, eliminating the ContextVar deprecation warning targeted for removal in Home Assistant 2026.8.
+
+### Fixed
+
+- **Diagnostics privacy leak for station IDs and APRS callsigns:** Expanded diagnostics redaction to include `cwop_callsign`, `wu_station_id`, `wc_station_id`, `wow_site_id`, `pws_station_id`, and `awekas_username`, ensuring users never accidentally disclose their physical home coordinates when attaching diagnostics to public bug reports.
+- **Recorder database bloat prevention:** Added `_unrecorded_attributes` to `WSSensor` (`forecast`, `tiles`, `watt_hours_day`, `hourly`, `raw_times`, `raw_precip`, `active_alerts`, `_climatology_stats`), preventing large multi-element dictionaries and arrays from inflating Home Assistant's SQLite/MariaDB recorder database on every update.
+- **Event-loop blocking during climate normals computation:** Wrapped `compute_climate_normals` in `hass.async_add_executor_job` so the 1.3M-iteration computation runs in a background thread instead of blocking Home Assistant's asyncio event loop.
+- **Service deregistration on unload:** Unloading the final `ws_core` config entry now properly unregisters domain services (`reset_rain_baseline`, `reset_learning_state`, `export_learning_state`, `apply_calibration`) from Home Assistant.
+- **Network timeout hygiene:** Replaced bare integer timeouts across all 11 network call sites in `coordinator.py` with explicit `aiohttp.ClientTimeout(total=...)` objects.
+
 ## [2.9.1] - 2026-09-27
 
 ### Fixed

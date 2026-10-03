@@ -4,7 +4,10 @@
       "user": {
         "title": "Weather Station Core – Crea stazione",
         "description": "Assegna un nome alla tua stazione meteo. Il prefisso sarà usato per tutti gli ID entità (es. prefisso 'ws' crea sensor.ws_temperature).",
-        "data": { "name": "Nome stazione", "prefix": "Prefisso entità (es. ws, giardino, tetto)" }
+        "data": {
+          "name": "Nome stazione",
+          "prefix": "Prefisso entità (es. ws, giardino, tetto)"
+        }
       },
       "required_sources": {
         "title": "Sensori obbligatori",
@@ -145,10 +148,16 @@
           "enable_awekas": "Upload AWEKAS",
           "enable_owm_stations": "Upload OpenWeatherMap Stations",
           "enable_windy": "Upload Windy.com",
-          "enable_mqtt": "Ripubblicazione MQTT Discovery (pubblica tutti i sensori derivati sul broker MQTT per Node-RED / consumatori esterni)"
+          "enable_mqtt": "Ripubblicazione MQTT Discovery (pubblica tutti i sensori derivati sul broker MQTT per Node-RED / consumatori esterni)",
+          "enable_snow": "Snow (precipitation phase + estimated accumulation from your existing rain rate)",
+          "enable_auto_calibration": "Adaptive sensor calibration (learns a bias vs. the regional forecast reference and nudges calibration offsets automatically)",
+          "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
-          "enable_degree_days": "Calcolo di gradi-giorno di crescita, riscaldamento e raffrescamento più una stima della bagnatura fogliare, utile per agricoltura e monitoraggio energetico."
+          "enable_degree_days": "Calcolo di gradi-giorno di crescita, riscaldamento e raffrescamento più una stima della bagnatura fogliare, utile per agricoltura e monitoraggio energetico.",
+          "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
       },
       "weathercloud": {
@@ -288,6 +297,43 @@
           "cwop_interval_min": "Intervallo upload",
           "_go_back": "← Torna al passaggio precedente"
         }
+      },
+      "indoor_rooms": {
+        "title": "Indoor Rooms",
+        "description": "Define named rooms, each with its own temperature, humidity and/or CO2 sensor. Every room gets its own delta and comfort sensors. Choose an action, or select Done to continue.",
+        "menu_options": {
+          "room_add": "Add a room",
+          "room_edit": "Edit a room",
+          "room_remove": "Remove rooms",
+          "room_done": "Done"
+        }
+      },
+      "room_edit": {
+        "title": "Edit Room",
+        "data": {
+          "room": "Room"
+        }
+      },
+      "room_form": {
+        "title": "Room Details",
+        "description": "Name the room and assign any combination of temperature, humidity and CO2 sensors. Leave a sensor blank to skip that metric for this room.",
+        "data": {
+          "name": "Room name",
+          "temp": "Temperature sensor",
+          "humidity": "Humidity sensor",
+          "co2": "CO2 sensor"
+        },
+        "data_description": {
+          "temp": "Used for the room's indoor/outdoor temperature delta.",
+          "humidity": "Used for the room's indoor/outdoor humidity delta.",
+          "co2": "Used in the room's comfort score."
+        }
+      },
+      "room_remove": {
+        "title": "Remove Rooms",
+        "data": {
+          "rooms": "Rooms to remove"
+        }
       }
     },
     "error": {
@@ -300,7 +346,8 @@
       "temp_out_of_range": "La temperatura è fuori dall'intervallo fisicamente possibile.",
       "invalid_api_key": "Chiave API non valida o credenziali rifiutate",
       "cannot_connect": "Impossibile connettersi all'API - controlla la rete e riprova",
-      "station_not_found": "ID stazione Weather Underground non trovato"
+      "station_not_found": "ID stazione Weather Underground non trovato",
+      "room_name_required": "Please enter a name for the room."
     },
     "create_entry": {
       "default": "Configurazione completata! Le previsioni locali e i sensori meteo intelligenti sono ora in funzione.\n\n**Passi successivi:**\n1. Installa la Dashboard Avanzata (dalla cartella dashboards/ del repository GitHub)\n2. Configura un'Automazione Avviso Pioggia (dalla cartella blueprints/)"
@@ -446,7 +493,10 @@
           "enable_degree_days": "Gradi-giorno (HDD, CDD, GDD) e bagnatura fogliare",
           "enable_lightning": "Sensori di rilevamento fulmini",
           "enable_indoor": "Sensori interni (temperatura, umidità, CO₂)",
-          "enable_soil": "Sensori del suolo (umidità, temperatura, necessità irrigazione)"
+          "enable_soil": "Sensori del suolo (umidità, temperatura, necessità irrigazione)",
+          "enable_snow": "Snow (precipitation phase + estimated accumulation)",
+          "enable_auto_calibration": "Adaptive sensor calibration (learns bias, nudges calibration automatically)",
+          "enable_climate_normals": "Historical climate normals (today vs. ~10 years of local history)"
         },
         "data_description": {
           "enable_display_sensors": "Sensori di visualizzazione (livelli, tendenze, salute)",
@@ -464,7 +514,10 @@
           "enable_diagnostics": "Deriva sensore, coerenza inter-sensore, indicatori qualità, abilità/concordanza previsioni, fattore solare-lux, climatologia 30 giorni",
           "enable_fwi_components": "Codici intermedi FWI (FFMC/DMC/DC/ISI/BUI). Richiede Rischio Incendio abilitato per produrre dati",
           "enable_advanced_sensors": "Numero Zambretti (forma numerica), ET₀ oraria, direzione vento smussata",
-          "enable_nowcast": "Nowcast precipitazioni 15 minuti Open-Meteo: minuti all'inizio/fine della pioggia, totale ora successiva, intensità. Senza chiave API"
+          "enable_nowcast": "Nowcast precipitazioni 15 minuti Open-Meteo: minuti all'inizio/fine della pioggia, totale ora successiva, intensità. Senza chiave API",
+          "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
       },
       "indoor_rooms_opt": {
@@ -672,51 +725,101 @@
     "large_calibration_offset": {
       "title": "Offset di calibrazione elevato applicato",
       "description": "È stato applicato un offset di calibrazione di {value} a {field}. Offset elevati potrebbero indicare un guasto hardware del sensore piuttosto che una deriva di calibrazione. Considera di sostituire il sensore."
+    },
+    "et0_pm_unavailable": {
+      "title": "PM ET₀ unavailable: no solar_radiation source configured",
+      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
     }
   },
   "entity": {
     "sensor": {
-      "temperature": { "name": "Temperatura" },
-      "dew_point": { "name": "Punto di rugiada" },
-      "humidity": { "name": "Umidità" },
-      "station_pressure": { "name": "Pressione stazione" },
-      "sea_level_pressure": { "name": "Pressione sul livello del mare" },
-      "wind_speed": { "name": "Velocità del vento" },
-      "wind_gust": { "name": "Raffica di vento" },
-      "wind_direction": { "name": "Direzione del vento" },
-      "rain_total": { "name": "Precipitazione totale" },
-      "rain_rate": { "name": "Intensità di pioggia" },
-      "illuminance": { "name": "Illuminamento" },
-      "uv_index": { "name": "Indice UV" },
+      "temperature": {
+        "name": "Temperatura"
+      },
+      "dew_point": {
+        "name": "Punto di rugiada"
+      },
+      "humidity": {
+        "name": "Umidità"
+      },
+      "station_pressure": {
+        "name": "Pressione stazione"
+      },
+      "sea_level_pressure": {
+        "name": "Pressione sul livello del mare"
+      },
+      "wind_speed": {
+        "name": "Velocità del vento"
+      },
+      "wind_gust": {
+        "name": "Raffica di vento"
+      },
+      "wind_direction": {
+        "name": "Direzione del vento"
+      },
+      "rain_total": {
+        "name": "Precipitazione totale"
+      },
+      "rain_rate": {
+        "name": "Intensità di pioggia"
+      },
+      "illuminance": {
+        "name": "Illuminamento"
+      },
+      "uv_index": {
+        "name": "Indice UV"
+      },
       "battery": {
         "name": "Batteria",
         "state_attributes": {
-          "bars": { "name": "Barre di segnale" }
+          "bars": {
+            "name": "Barre di segnale"
+          }
         }
       },
-      "pressure_trend_raw": { "name": "Tendenza pressione (grezza)" },
-      "pressure_change_window": { "name": "Variazione pressione (finestra)" },
+      "pressure_trend_raw": {
+        "name": "Tendenza pressione (grezza)"
+      },
+      "pressure_change_window": {
+        "name": "Variazione pressione (finestra)"
+      },
       "data_quality_banner": {
         "name": "Banner qualità dati",
         "state_attributes": {
-          "package_ok": { "name": "Pacchetto OK" },
-          "data_quality": { "name": "Qualità dati" },
-          "alert_state": { "name": "Stato allerta" }
+          "package_ok": {
+            "name": "Pacchetto OK"
+          },
+          "data_quality": {
+            "name": "Qualità dati"
+          },
+          "alert_state": {
+            "name": "Stato allerta"
+          }
         }
       },
       "package_status": {
         "name": "Stato pacchetto",
         "state_attributes": {
-          "package_ok": { "name": "Pacchetto OK" },
-          "data_quality": { "name": "Qualità dati" },
-          "alert_state": { "name": "Stato allerta" }
+          "package_ok": {
+            "name": "Pacchetto OK"
+          },
+          "data_quality": {
+            "name": "Qualità dati"
+          },
+          "alert_state": {
+            "name": "Stato allerta"
+          }
         }
       },
       "sensor_quality_flags": {
         "name": "Indicatori qualità sensore",
         "state_attributes": {
-          "flags": { "name": "Indicatori attivi" },
-          "all_clear": { "name": "Tutto a posto" }
+          "flags": {
+            "name": "Indicatori attivi"
+          },
+          "all_clear": {
+            "name": "Tutto a posto"
+          }
         }
       },
       "alert_state": {
@@ -727,22 +830,40 @@
           "warning": "Allerta"
         },
         "state_attributes": {
-          "message": { "name": "Messaggio" },
-          "icon": { "name": "Icona" },
-          "color": { "name": "Colore" },
-          "active_alerts": { "name": "Avvisi attivi" },
-          "alert_count": { "name": "Conteggio avvisi" }
+          "message": {
+            "name": "Messaggio"
+          },
+          "icon": {
+            "name": "Icona"
+          },
+          "color": {
+            "name": "Colore"
+          },
+          "active_alerts": {
+            "name": "Avvisi attivi"
+          },
+          "alert_count": {
+            "name": "Conteggio avvisi"
+          }
         }
       },
       "alert_message": {
         "name": "Messaggio di allerta",
         "state_attributes": {
-          "alert_state": { "name": "Stato allerta" },
-          "icon": { "name": "Icona" },
-          "color": { "name": "Colore" }
+          "alert_state": {
+            "name": "Stato allerta"
+          },
+          "icon": {
+            "name": "Icona"
+          },
+          "color": {
+            "name": "Colore"
+          }
         }
       },
-      "forecast_daily": { "name": "Previsione giornaliera" },
+      "forecast_daily": {
+        "name": "Previsione giornaliera"
+      },
       "forecast_provider": {
         "name": "Fornitore previsioni",
         "state": {
@@ -755,70 +876,118 @@
           "ha_weather_entity": "Entità meteo Home Assistant"
         },
         "state_attributes": {
-          "provider_name": { "name": "Nome fornitore" },
-          "forecast_enabled": { "name": "Previsioni abilitate" }
+          "provider_name": {
+            "name": "Nome fornitore"
+          },
+          "forecast_enabled": {
+            "name": "Previsioni abilitate"
+          }
         }
       },
       "feels_like": {
         "name": "Temperatura percepita",
         "state_attributes": {
-          "wind_contribution_ms": { "name": "Contributo vento (m/s)" },
-          "humidity": { "name": "Umidità (%)" },
-          "actual_temp_c": { "name": "Temperatura reale (°C)" }
+          "wind_contribution_ms": {
+            "name": "Contributo vento (m/s)"
+          },
+          "humidity": {
+            "name": "Umidità (%)"
+          },
+          "actual_temp_c": {
+            "name": "Temperatura reale (°C)"
+          }
         }
       },
-      "wet_bulb_temperature": { "name": "Temperatura di bulbo umido" },
-      "frost_point": { "name": "Punto di brina" },
+      "wet_bulb_temperature": {
+        "name": "Temperatura di bulbo umido"
+      },
+      "frost_point": {
+        "name": "Punto di brina"
+      },
       "cloud_base": {
         "name": "Base delle nubi",
         "state_attributes": {
-          "temp_c": { "name": "Temperatura (°C)" },
-          "dew_point_c": { "name": "Punto di rugiada (°C)" },
-          "spread_c": { "name": "Differenza temp-rugiada (°C)" }
+          "temp_c": {
+            "name": "Temperatura (°C)"
+          },
+          "dew_point_c": {
+            "name": "Punto di rugiada (°C)"
+          },
+          "spread_c": {
+            "name": "Differenza temp-rugiada (°C)"
+          }
         }
       },
       "freezing_level": {
         "name": "Livello di congelamento",
         "state_attributes": {
-          "temp_c": { "name": "Temperatura (°C)" }
+          "temp_c": {
+            "name": "Temperatura (°C)"
+          }
         }
       },
       "wind_gust_factor": {
         "name": "Fattore di raffica",
         "state_attributes": {
-          "gust_ms": { "name": "Velocità raffica (m/s)" },
-          "wind_ms": { "name": "Velocità vento (m/s)" }
+          "gust_ms": {
+            "name": "Velocità raffica (m/s)"
+          },
+          "wind_ms": {
+            "name": "Velocità vento (m/s)"
+          }
         }
       },
-      "heat_index": { "name": "Indice di calore" },
-      "wind_chill": { "name": "Freddo percepito" },
-      "humidex": { "name": "Humidex" },
-      "vpd": { "name": "Deficit di pressione di vapore (VPD)" },
-      "absolute_humidity": { "name": "Umidità assoluta" },
+      "heat_index": {
+        "name": "Indice di calore"
+      },
+      "wind_chill": {
+        "name": "Freddo percepito"
+      },
+      "humidex": {
+        "name": "Humidex"
+      },
+      "vpd": {
+        "name": "Deficit di pressione di vapore (VPD)"
+      },
+      "absolute_humidity": {
+        "name": "Umidità assoluta"
+      },
       "air_density": {
         "name": "Densità dell'aria",
         "state_attributes": {
-          "temp_c": { "name": "Temperatura (°C)" },
-          "pressure_hpa": { "name": "Pressione (hPa)" }
+          "temp_c": {
+            "name": "Temperatura (°C)"
+          },
+          "pressure_hpa": {
+            "name": "Pressione (hPa)"
+          }
         }
       },
       "specific_humidity": {
         "name": "Umidità specifica",
         "state_attributes": {
-          "absolute_humidity_gm3": { "name": "Umidità assoluta (g/m³)" }
+          "absolute_humidity_gm3": {
+            "name": "Umidità assoluta (g/m³)"
+          }
         }
       },
       "wbgt": {
         "name": "WBGT",
         "state_attributes": {
-          "heat_risk": { "name": "Livello rischio calore" },
-          "wet_bulb_c": { "name": "Temperatura bulbo umido (°C)" }
+          "heat_risk": {
+            "name": "Livello rischio calore"
+          },
+          "wet_bulb_c": {
+            "name": "Temperatura bulbo umido (°C)"
+          }
         }
       },
       "utci": {
         "name": "UTCI",
         "state_attributes": {
-          "stress_category": { "name": "Categoria stress termico" }
+          "stress_category": {
+            "name": "Categoria stress termico"
+          }
         }
       },
       "delta_t": {
@@ -834,145 +1003,268 @@
           }
         }
       },
-      "thw_index": { "name": "Indice THW" },
-      "thsw_index": { "name": "Indice THSW" },
-      "wind_run": { "name": "Percorso del vento" },
-      "wind_run_month": { "name": "Percorso del vento questo mese" },
-      "net_radiation": { "name": "Radiazione netta" },
-      "chill_hours_today": { "name": "Ore di freddo oggi" },
-      "chill_hours_season": { "name": "Ore di freddo stagione" },
-      "clearness_index": { "name": "Indice di limpidezza" },
-      "cloud_cover": { "name": "Copertura nuvolosa" },
+      "thw_index": {
+        "name": "Indice THW"
+      },
+      "thsw_index": {
+        "name": "Indice THSW"
+      },
+      "wind_run": {
+        "name": "Percorso del vento"
+      },
+      "wind_run_month": {
+        "name": "Percorso del vento questo mese"
+      },
+      "net_radiation": {
+        "name": "Radiazione netta"
+      },
+      "chill_hours_today": {
+        "name": "Ore di freddo oggi"
+      },
+      "chill_hours_season": {
+        "name": "Ore di freddo stagione"
+      },
+      "clearness_index": {
+        "name": "Indice di limpidezza"
+      },
+      "cloud_cover": {
+        "name": "Copertura nuvolosa"
+      },
       "hdd_today": {
         "name": "Grado-giorno riscaldamento",
         "state_attributes": {
-          "base_c": { "name": "Temperatura base (°C)" }
+          "base_c": {
+            "name": "Temperatura base (°C)"
+          }
         }
       },
-      "hdd_season": { "name": "Gradi-giorno riscaldamento stagione" },
-      "cdd_today": { "name": "Grado-giorno raffrescamento" },
-      "cdd_season": { "name": "Gradi-giorno raffrescamento stagione" },
+      "hdd_season": {
+        "name": "Gradi-giorno riscaldamento stagione"
+      },
+      "cdd_today": {
+        "name": "Grado-giorno raffrescamento"
+      },
+      "cdd_season": {
+        "name": "Gradi-giorno raffrescamento stagione"
+      },
       "gdd_today": {
         "name": "Grado-giorno di crescita",
         "state_attributes": {
-          "base_c": { "name": "Temperatura base (°C)" },
-          "cap_c": { "name": "Soglia superiore (°C)" }
+          "base_c": {
+            "name": "Temperatura base (°C)"
+          },
+          "cap_c": {
+            "name": "Soglia superiore (°C)"
+          }
         }
       },
-      "gdd_season": { "name": "Gradi-giorno di crescita stagione" },
+      "gdd_season": {
+        "name": "Gradi-giorno di crescita stagione"
+      },
       "leaf_wetness": {
         "name": "Bagnatura fogliare",
-        "state": { "wet": "Bagnata", "dry": "Asciutta" },
+        "state": {
+          "wet": "Bagnata",
+          "dry": "Asciutta"
+        },
         "state_attributes": {
-          "dew_point_c": { "name": "Punto di rugiada (°C)" },
-          "humidity_pct": { "name": "Umidità (%)" },
-          "rain_rate_mmph": { "name": "Intensità pioggia (mm/h)" }
+          "dew_point_c": {
+            "name": "Punto di rugiada (°C)"
+          },
+          "humidity_pct": {
+            "name": "Umidità (%)"
+          },
+          "rain_rate_mmph": {
+            "name": "Intensità pioggia (mm/h)"
+          }
         }
       },
       "dominant_wind_direction": {
         "name": "Direzione del vento dominante",
         "state_attributes": {
-          "variability_deg": { "name": "Variabilità direzione (°)" }
+          "variability_deg": {
+            "name": "Variabilità direzione (°)"
+          }
         }
       },
-      "wind_direction_variability": { "name": "Variabilità direzione del vento" },
+      "wind_direction_variability": {
+        "name": "Variabilità direzione del vento"
+      },
       "solar_energy_today": {
         "name": "Energia solare oggi",
         "state_attributes": {
-          "peak_sun_hours": { "name": "Ore di sole di picco" }
+          "peak_sun_hours": {
+            "name": "Ore di sole di picco"
+          }
         }
       },
-      "max_solar_radiation": { "name": "Radiazione solare max (cielo sereno)" },
-      "peak_sun_hours": { "name": "Ore di sole di picco" },
+      "max_solar_radiation": {
+        "name": "Radiazione solare max (cielo sereno)"
+      },
+      "peak_sun_hours": {
+        "name": "Ore di sole di picco"
+      },
       "irrigation_deficit": {
         "name": "Deficit di irrigazione",
         "state_attributes": {
-          "et0_daily_mm": { "name": "ET₀ oggi (mm)" },
-          "rain_today_mm": { "name": "Pioggia oggi (mm)" }
+          "et0_daily_mm": {
+            "name": "ET₀ oggi (mm)"
+          },
+          "rain_today_mm": {
+            "name": "Pioggia oggi (mm)"
+          }
         }
       },
       "et0_daily": {
         "name": "ET₀ (giornaliera)",
         "state_attributes": {
-          "et0_hourly_mm": { "name": "ET₀ oraria (mm)" }
+          "et0_hourly_mm": {
+            "name": "ET₀ oraria (mm)"
+          }
         }
       },
-      "et0_hourly": { "name": "ET₀ (oraria)" },
+      "et0_hourly": {
+        "name": "ET₀ (oraria)"
+      },
       "et0_pm_daily": {
         "name": "ET₀ Penman-Monteith (giornaliera)",
         "state_attributes": {
-          "hargreaves_et0": { "name": "ET₀ Hargreaves (mm)" }
+          "hargreaves_et0": {
+            "name": "ET₀ Hargreaves (mm)"
+          }
         }
       },
       "fire_risk_score": {
         "name": "Punteggio rischio incendio",
         "state_attributes": {
-          "danger_level": { "name": "Livello di pericolo" },
-          "rain_24h_mm": { "name": "Pioggia ultime 24 h (mm)" },
-          "temperature_c": { "name": "Temperatura (°C)" },
-          "humidity_pct": { "name": "Umidità (%)" },
-          "wind_ms": { "name": "Velocità vento (m/s)" },
-          "fwi": { "name": "FWI" },
-          "bui": { "name": "BUI" },
-          "isi": { "name": "ISI" }
+          "danger_level": {
+            "name": "Livello di pericolo"
+          },
+          "rain_24h_mm": {
+            "name": "Pioggia ultime 24 h (mm)"
+          },
+          "temperature_c": {
+            "name": "Temperatura (°C)"
+          },
+          "humidity_pct": {
+            "name": "Umidità (%)"
+          },
+          "wind_ms": {
+            "name": "Velocità vento (m/s)"
+          },
+          "fwi": {
+            "name": "FWI"
+          },
+          "bui": {
+            "name": "BUI"
+          },
+          "isi": {
+            "name": "ISI"
+          }
         }
       },
       "ffdi": {
         "name": "Indice pericolo incendi boschivi (FFDI)",
         "state_attributes": {
-          "danger_level": { "name": "Livello di pericolo" },
-          "temperature_c": { "name": "Temperatura (°C)" },
-          "humidity_pct": { "name": "Umidità (%)" },
-          "wind_kmh": { "name": "Velocità vento (km/h)" }
+          "danger_level": {
+            "name": "Livello di pericolo"
+          },
+          "temperature_c": {
+            "name": "Temperatura (°C)"
+          },
+          "humidity_pct": {
+            "name": "Umidità (%)"
+          },
+          "wind_kmh": {
+            "name": "Velocità vento (km/h)"
+          }
         }
       },
       "ffwi": {
         "name": "Indice meteo incendi (Fosberg)",
         "state_attributes": {
-          "temperature_c": { "name": "Temperatura (°C)" },
-          "humidity_pct": { "name": "Umidità (%)" },
-          "wind_ms": { "name": "Velocità vento (m/s)" }
+          "temperature_c": {
+            "name": "Temperatura (°C)"
+          },
+          "humidity_pct": {
+            "name": "Umidità (%)"
+          },
+          "wind_ms": {
+            "name": "Velocità vento (m/s)"
+          }
         }
       },
-      "fwi_ffmc": { "name": "FWI Codice umidità combustibile fine" },
-      "fwi_dmc": { "name": "FWI Codice umidità lettiera" },
-      "fwi_dc": { "name": "FWI Codice siccità" },
+      "fwi_ffmc": {
+        "name": "FWI Codice umidità combustibile fine"
+      },
+      "fwi_dmc": {
+        "name": "FWI Codice umidità lettiera"
+      },
+      "fwi_dc": {
+        "name": "FWI Codice siccità"
+      },
       "fwi_isi": {
         "name": "FWI Indice propagazione iniziale",
         "state_attributes": {
-          "ffmc": { "name": "FFMC" },
-          "wind_kmh": { "name": "Velocità vento (km/h)" }
+          "ffmc": {
+            "name": "FFMC"
+          },
+          "wind_kmh": {
+            "name": "Velocità vento (km/h)"
+          }
         }
       },
       "fwi_bui": {
         "name": "FWI Indice di accumulo",
         "state_attributes": {
-          "dmc": { "name": "DMC" },
-          "dc": { "name": "DC" }
+          "dmc": {
+            "name": "DMC"
+          },
+          "dc": {
+            "name": "DC"
+          }
         }
       },
       "fwi": {
         "name": "Indice meteo incendi",
         "state_attributes": {
-          "isi": { "name": "ISI" },
-          "bui": { "name": "BUI" },
-          "dsr": { "name": "DSR" },
-          "danger_level": { "name": "Livello di pericolo" }
+          "isi": {
+            "name": "ISI"
+          },
+          "bui": {
+            "name": "BUI"
+          },
+          "dsr": {
+            "name": "DSR"
+          },
+          "danger_level": {
+            "name": "Livello di pericolo"
+          }
         }
       },
       "fwi_dsr": {
         "name": "FWI Indice giornaliero di severità",
         "state_attributes": {
-          "fwi": { "name": "FWI" }
+          "fwi": {
+            "name": "FWI"
+          }
         }
       },
       "sea_surface_temperature": {
         "name": "Temperatura superficiale del mare",
         "state_attributes": {
-          "comfort": { "name": "Livello di comfort" },
-          "hourly_forecast": { "name": "Previsione oraria" },
-          "grid_latitude": { "name": "Latitudine griglia" },
-          "grid_longitude": { "name": "Longitudine griglia" }
+          "comfort": {
+            "name": "Livello di comfort"
+          },
+          "hourly_forecast": {
+            "name": "Previsione oraria"
+          },
+          "grid_latitude": {
+            "name": "Latitudine griglia"
+          },
+          "grid_longitude": {
+            "name": "Longitudine griglia"
+          }
         }
       },
       "wu_status": {
@@ -985,7 +1277,9 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "wc_upload_status": {
@@ -998,7 +1292,9 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "pws_upload_status": {
@@ -1011,7 +1307,9 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "wow_upload_status": {
@@ -1024,7 +1322,9 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "awekas_upload_status": {
@@ -1037,7 +1337,9 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "cwop_status": {
@@ -1049,7 +1351,9 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "owm_stations_status": {
@@ -1063,7 +1367,9 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "windy_status": {
@@ -1077,14 +1383,20 @@
           "error": "Errore"
         },
         "state_attributes": {
-          "last_upload": { "name": "Ultimo upload riuscito" }
+          "last_upload": {
+            "name": "Ultimo upload riuscito"
+          }
         }
       },
       "sensor_spike": {
         "name": "Indicatori picco sensore",
         "state_attributes": {
-          "flags": { "name": "Indicatori attivi" },
-          "all_clear": { "name": "Tutto a posto" }
+          "flags": {
+            "name": "Indicatori attivi"
+          },
+          "all_clear": {
+            "name": "Tutto a posto"
+          }
         }
       },
       "aqi": {
@@ -1101,16 +1413,32 @@
               "hazardous": "Pericoloso"
             }
           },
-          "pm2_5_ug_m3": { "name": "PM2,5 (µg/m³)" },
-          "pm10_ug_m3": { "name": "PM10 (µg/m³)" },
-          "no2_ug_m3": { "name": "NO₂ (µg/m³)" },
-          "ozone_ug_m3": { "name": "Ozono (µg/m³)" }
+          "pm2_5_ug_m3": {
+            "name": "PM2,5 (µg/m³)"
+          },
+          "pm10_ug_m3": {
+            "name": "PM10 (µg/m³)"
+          },
+          "no2_ug_m3": {
+            "name": "NO₂ (µg/m³)"
+          },
+          "ozone_ug_m3": {
+            "name": "Ozono (µg/m³)"
+          }
         }
       },
-      "pm2_5": { "name": "PM2,5" },
-      "pm10": { "name": "PM10" },
-      "no2": { "name": "NO₂" },
-      "ozone": { "name": "Ozono" },
+      "pm2_5": {
+        "name": "PM2,5"
+      },
+      "pm10": {
+        "name": "PM10"
+      },
+      "no2": {
+        "name": "NO₂"
+      },
+      "ozone": {
+        "name": "Ozono"
+      },
       "pollen_level": {
         "name": "Livello pollini",
         "state": {
@@ -1123,17 +1451,35 @@
           "very_high": "Molto alto"
         },
         "state_attributes": {
-          "grass_index": { "name": "Indice graminacee" },
-          "grass_level": { "name": "Livello graminacee" },
-          "tree_index": { "name": "Indice alberi" },
-          "tree_level": { "name": "Livello alberi" },
-          "weed_index": { "name": "Indice erbe infestanti" },
-          "weed_level": { "name": "Livello erbe infestanti" }
+          "grass_index": {
+            "name": "Indice graminacee"
+          },
+          "grass_level": {
+            "name": "Livello graminacee"
+          },
+          "tree_index": {
+            "name": "Indice alberi"
+          },
+          "tree_level": {
+            "name": "Livello alberi"
+          },
+          "weed_index": {
+            "name": "Indice erbe infestanti"
+          },
+          "weed_level": {
+            "name": "Livello erbe infestanti"
+          }
         }
       },
-      "pollen_grass": { "name": "Pollini graminacee" },
-      "pollen_tree": { "name": "Pollini alberi" },
-      "pollen_weed": { "name": "Pollini erbe infestanti" },
+      "pollen_grass": {
+        "name": "Pollini graminacee"
+      },
+      "pollen_tree": {
+        "name": "Pollini alberi"
+      },
+      "pollen_weed": {
+        "name": "Pollini erbe infestanti"
+      },
       "moon": {
         "name": "Luna",
         "state": {
@@ -1160,21 +1506,37 @@
               "waning_crescent": "Luna calante"
             }
           },
-          "illumination_pct": { "name": "Illuminazione (%)" },
-          "age_days": { "name": "Età (giorni)" },
-          "days_to_full_moon": { "name": "Giorni alla luna piena" },
-          "days_to_new_moon": { "name": "Giorni alla luna nuova" }
+          "illumination_pct": {
+            "name": "Illuminazione (%)"
+          },
+          "age_days": {
+            "name": "Età (giorni)"
+          },
+          "days_to_full_moon": {
+            "name": "Giorni alla luna piena"
+          },
+          "days_to_new_moon": {
+            "name": "Giorni alla luna nuova"
+          }
         }
       },
-      "moon_illumination": { "name": "Illuminazione lunare" },
+      "moon_illumination": {
+        "name": "Illuminazione lunare"
+      },
       "solar_forecast_today": {
         "name": "Previsione solare oggi",
         "state_attributes": {
-          "tomorrow_kwh": { "name": "Domani (kWh)" },
-          "status": { "name": "Stato" }
+          "tomorrow_kwh": {
+            "name": "Domani (kWh)"
+          },
+          "status": {
+            "name": "Stato"
+          }
         }
       },
-      "solar_forecast_tomorrow": { "name": "Previsione solare domani" },
+      "solar_forecast_tomorrow": {
+        "name": "Previsione solare domani"
+      },
       "fog_probability": {
         "name": "Probabilità di nebbia",
         "state_attributes": {
@@ -1187,7 +1549,9 @@
               "unlikely": "Improbabile"
             }
           },
-          "dew_point_depression_c": { "name": "Depressione punto di rugiada (°C)" }
+          "dew_point_depression_c": {
+            "name": "Depressione punto di rugiada (°C)"
+          }
         }
       },
       "thunderstorm_risk": {
@@ -1203,26 +1567,36 @@
               "negligible": "Trascurabile"
             }
           },
-          "contributing_factors": { "name": "Fattori contribuenti" },
-          "caveat": { "name": "Avvertenza" }
+          "contributing_factors": {
+            "name": "Fattori contribuenti"
+          },
+          "caveat": {
+            "name": "Avvertenza"
+          }
         }
       },
       "dry_streak": {
         "name": "Serie di siccità",
         "state_attributes": {
-          "last_rain_date": { "name": "Data ultima pioggia" }
+          "last_rain_date": {
+            "name": "Data ultima pioggia"
+          }
         }
       },
       "heat_streak": {
         "name": "Serie di caldo",
         "state_attributes": {
-          "threshold_c": { "name": "Soglia (°C)" }
+          "threshold_c": {
+            "name": "Soglia (°C)"
+          }
         }
       },
       "frost_streak": {
         "name": "Serie di gelo",
         "state_attributes": {
-          "threshold_c": { "name": "Soglia (°C)" }
+          "threshold_c": {
+            "name": "Soglia (°C)"
+          }
         }
       },
       "frost_risk": {
@@ -1241,8 +1615,12 @@
           "warning": "Avviso"
         },
         "state_attributes": {
-          "drifting_sensors": { "name": "Sensori in deriva" },
-          "all_clear": { "name": "Tutto a posto" }
+          "drifting_sensors": {
+            "name": "Sensori in deriva"
+          },
+          "all_clear": {
+            "name": "Tutto a posto"
+          }
         }
       },
       "sensor_consistency": {
@@ -1252,50 +1630,78 @@
           "warning": "Avviso"
         },
         "state_attributes": {
-          "flags": { "name": "Indicatori di coerenza" },
-          "all_clear": { "name": "Tutto a posto" }
+          "flags": {
+            "name": "Indicatori di coerenza"
+          },
+          "all_clear": {
+            "name": "Tutto a posto"
+          }
         }
       },
       "sensor_stuck": {
         "name": "Sensore bloccato (indicatori)",
         "state_attributes": {
-          "stuck_sensors": { "name": "Nomi sensori bloccati" },
-          "all_clear": { "name": "Tutto a posto" }
+          "stuck_sensors": {
+            "name": "Nomi sensori bloccati"
+          },
+          "all_clear": {
+            "name": "Tutto a posto"
+          }
         }
       },
       "data_quality_score": {
         "name": "Punteggio qualità dati",
         "state_attributes": {
-          "quality_flags": { "name": "Indicatori qualità attivi" },
-          "stuck_flags": { "name": "Conteggio sensori bloccati" }
+          "quality_flags": {
+            "name": "Indicatori qualità attivi"
+          },
+          "stuck_flags": {
+            "name": "Conteggio sensori bloccati"
+          }
         }
       },
       "neighbor_qc": {
         "name": "Indicatori CQ vicini",
         "state_attributes": {
-          "flags": { "name": "Indicatori attivi" },
-          "all_clear": { "name": "Tutto a posto" }
+          "flags": {
+            "name": "Indicatori attivi"
+          },
+          "all_clear": {
+            "name": "Tutto a posto"
+          }
         }
       },
-      "climatology_30d": { "name": "Climatologia (30 giorni)" },
+      "climatology_30d": {
+        "name": "Climatologia (30 giorni)"
+      },
       "temperature_anomaly_30d": {
         "name": "Anomalia temperatura (30 giorni)",
         "state_attributes": {
-          "normal_30d_c": { "name": "Normale 30 giorni (°C)" }
+          "normal_30d_c": {
+            "name": "Normale 30 giorni (°C)"
+          }
         }
       },
       "rain_anomaly_30d": {
         "name": "Anomalia pioggia (30 giorni)",
         "state_attributes": {
-          "normal_30d_avg_mm": { "name": "Media 30 giorni (mm)" }
+          "normal_30d_avg_mm": {
+            "name": "Media 30 giorni (mm)"
+          }
         }
       },
-      "temp_anomaly_90d": { "name": "Anomalia temperatura (90 giorni)" },
-      "rain_anomaly_90d": { "name": "Anomalia pioggia (90 giorni)" },
+      "temp_anomaly_90d": {
+        "name": "Anomalia temperatura (90 giorni)"
+      },
+      "rain_anomaly_90d": {
+        "name": "Anomalia pioggia (90 giorni)"
+      },
       "solar_lux_factor": {
         "name": "Fattore solare-lux",
         "state_attributes": {
-          "calibration_days": { "name": "Giorni di calibrazione" }
+          "calibration_days": {
+            "name": "Giorni di calibrazione"
+          }
         }
       },
       "forecast_agreement": {
@@ -1306,36 +1712,72 @@
           "conflict": "Conflitto"
         },
         "state_attributes": {
-          "zambretti_implied_rain_pct": { "name": "Pioggia implicita Zambretti (%)" },
-          "openmeteo_precip_prob": { "name": "Prob. precipitazioni Open-Meteo (%)" },
-          "delta_pp": { "name": "Delta (pp)" },
-          "zambretti_forecast": { "name": "Previsione Zambretti" }
+          "zambretti_implied_rain_pct": {
+            "name": "Pioggia implicita Zambretti (%)"
+          },
+          "openmeteo_precip_prob": {
+            "name": "Prob. precipitazioni Open-Meteo (%)"
+          },
+          "delta_pp": {
+            "name": "Delta (pp)"
+          },
+          "zambretti_forecast": {
+            "name": "Previsione Zambretti"
+          }
         }
       },
       "forecast_skill": {
         "name": "Abilità di previsione",
         "state_attributes": {
-          "brier_score_local": { "name": "Punteggio Brier (locale)" },
-          "brier_score_openmeteo": { "name": "Punteggio Brier (Open-Meteo)" },
-          "blend_local": { "name": "Peso blend (locale)" },
-          "blend_openmeteo": { "name": "Peso blend (Open-Meteo)" },
-          "n_outcomes": { "name": "Conteggio campioni" }
+          "brier_score_local": {
+            "name": "Punteggio Brier (locale)"
+          },
+          "brier_score_openmeteo": {
+            "name": "Punteggio Brier (Open-Meteo)"
+          },
+          "blend_local": {
+            "name": "Peso blend (locale)"
+          },
+          "blend_openmeteo": {
+            "name": "Peso blend (Open-Meteo)"
+          },
+          "n_outcomes": {
+            "name": "Conteggio campioni"
+          }
         }
       },
       "conditions_summary": {
         "name": "Condizioni attuali",
         "state_attributes": {
-          "temperature_c": { "name": "Temperatura (°C)" },
-          "feels_like_c": { "name": "Temperatura percepita (°C)" },
-          "rain_rate_mmph": { "name": "Intensità pioggia (mm/h)" },
-          "wind_speed_ms": { "name": "Velocità vento (m/s)" },
-          "wind_direction": { "name": "Direzione del vento" },
-          "condition": { "name": "Condizione" }
+          "temperature_c": {
+            "name": "Temperatura (°C)"
+          },
+          "feels_like_c": {
+            "name": "Temperatura percepita (°C)"
+          },
+          "rain_rate_mmph": {
+            "name": "Intensità pioggia (mm/h)"
+          },
+          "wind_speed_ms": {
+            "name": "Velocità vento (m/s)"
+          },
+          "wind_direction": {
+            "name": "Direzione del vento"
+          },
+          "condition": {
+            "name": "Condizione"
+          }
         }
       },
-      "forecast_brier_local": { "name": "Punteggio Brier previsioni (locale)" },
-      "forecast_brier_api": { "name": "Punteggio Brier previsioni (API)" },
-      "forecast_blend_weight_local": { "name": "Peso blend previsioni (locale)" },
+      "forecast_brier_local": {
+        "name": "Punteggio Brier previsioni (locale)"
+      },
+      "forecast_brier_api": {
+        "name": "Punteggio Brier previsioni (API)"
+      },
+      "forecast_blend_weight_local": {
+        "name": "Peso blend previsioni (locale)"
+      },
       "vigilance_max_level": {
         "name": "Meteo-Vigilance",
         "state": {
@@ -1354,15 +1796,29 @@
           "rouge": "Rosso (pericolo incendio estremo)"
         },
         "state_attributes": {
-          "department": { "name": "Dipartimento" },
-          "all_phenomena": { "name": "Tutti i fenomeni attivi" },
-          "fetched_at": { "name": "Ultimo aggiornamento" }
+          "department": {
+            "name": "Dipartimento"
+          },
+          "all_phenomena": {
+            "name": "Tutti i fenomeni attivi"
+          },
+          "fetched_at": {
+            "name": "Ultimo aggiornamento"
+          }
         }
       },
-      "river_level": { "name": "Livello del fiume" },
-      "rain_next_60min": { "name": "Pioggia prossimi 60 min" },
-      "minutes_until_rain": { "name": "Minuti alla pioggia" },
-      "minutes_until_dry": { "name": "Minuti all'asciutto" },
+      "river_level": {
+        "name": "Livello del fiume"
+      },
+      "rain_next_60min": {
+        "name": "Pioggia prossimi 60 min"
+      },
+      "minutes_until_rain": {
+        "name": "Minuti alla pioggia"
+      },
+      "minutes_until_dry": {
+        "name": "Minuti all'asciutto"
+      },
       "nowcast_intensity": {
         "name": "Intensità nowcast",
         "state": {
@@ -1412,32 +1868,60 @@
           "insufficient_data": "Dati insufficienti"
         },
         "state_attributes": {
-          "z_number": { "name": "Numero Z" },
-          "mslp_hpa": { "name": "Pressione sul livello del mare (hPa)" },
-          "trend_3h_hpa": { "name": "Tendenza pressione 3 h (hPa/h)" },
-          "wind_quadrant": { "name": "Quadrante del vento" },
-          "pressure_trend_display": { "name": "Tendenza pressione" }
+          "z_number": {
+            "name": "Numero Z"
+          },
+          "mslp_hpa": {
+            "name": "Pressione sul livello del mare (hPa)"
+          },
+          "trend_3h_hpa": {
+            "name": "Tendenza pressione 3 h (hPa/h)"
+          },
+          "wind_quadrant": {
+            "name": "Quadrante del vento"
+          },
+          "pressure_trend_display": {
+            "name": "Tendenza pressione"
+          }
         }
       },
-      "zambretti_number": { "name": "Numero Zambretti" },
+      "zambretti_number": {
+        "name": "Numero Zambretti"
+      },
       "wind_beaufort": {
         "name": "Scala Beaufort",
         "state_attributes": {
-          "description": { "name": "Descrizione" },
-          "speed_ms": { "name": "Velocità vento (m/s)" },
-          "speed_kmh": { "name": "Velocità vento (km/h)" },
-          "gust_ms": { "name": "Velocità raffica (m/s)" },
-          "gust_kmh": { "name": "Velocità raffica (km/h)" }
+          "description": {
+            "name": "Descrizione"
+          },
+          "speed_ms": {
+            "name": "Velocità vento (m/s)"
+          },
+          "speed_kmh": {
+            "name": "Velocità vento (km/h)"
+          },
+          "gust_ms": {
+            "name": "Velocità raffica (m/s)"
+          },
+          "gust_kmh": {
+            "name": "Velocità raffica (km/h)"
+          }
         }
       },
       "wind_quadrant": {
         "name": "Quadrante del vento",
         "state_attributes": {
-          "degrees": { "name": "Direzione (°)" },
-          "using_smoothed": { "name": "Usando direzione smussata" }
+          "degrees": {
+            "name": "Direzione (°)"
+          },
+          "using_smoothed": {
+            "name": "Usando direzione smussata"
+          }
         }
       },
-      "wind_direction_smoothed": { "name": "Direzione vento smussata" },
+      "wind_direction_smoothed": {
+        "name": "Direzione vento smussata"
+      },
       "current_condition": {
         "name": "Condizione attuale",
         "state": {
@@ -1472,29 +1956,55 @@
           "african-dust": "Polvere africana"
         },
         "state_attributes": {
-          "icon": { "name": "Icona" },
-          "mdi_icon": { "name": "Icona MDI" },
-          "color": { "name": "Colore" },
-          "description": { "name": "Descrizione" },
-          "severity": { "name": "Gravità" },
-          "rain_rate": { "name": "Intensità pioggia (mm/h)" },
-          "wind_gust": { "name": "Raffica di vento (m/s)" },
-          "temperature": { "name": "Temperatura (°C)" }
+          "icon": {
+            "name": "Icona"
+          },
+          "mdi_icon": {
+            "name": "Icona MDI"
+          },
+          "color": {
+            "name": "Colore"
+          },
+          "description": {
+            "name": "Descrizione"
+          },
+          "severity": {
+            "name": "Gravità"
+          },
+          "rain_rate": {
+            "name": "Intensità pioggia (mm/h)"
+          },
+          "wind_gust": {
+            "name": "Raffica di vento (m/s)"
+          },
+          "temperature": {
+            "name": "Temperatura (°C)"
+          }
         }
       },
       "rain_probability": {
         "name": "Probabilità di pioggia",
         "state_attributes": {
-          "mslp_hpa": { "name": "Pressione sul livello del mare (hPa)" },
-          "pressure_trend_3h": { "name": "Tendenza pressione 3 h" },
-          "humidity_pct": { "name": "Umidità (%)" },
-          "wind_quadrant": { "name": "Quadrante del vento" }
+          "mslp_hpa": {
+            "name": "Pressione sul livello del mare (hPa)"
+          },
+          "pressure_trend_3h": {
+            "name": "Tendenza pressione 3 h"
+          },
+          "humidity_pct": {
+            "name": "Umidità (%)"
+          },
+          "wind_quadrant": {
+            "name": "Quadrante del vento"
+          }
         }
       },
       "rain_probability_combined": {
         "name": "Probabilità di pioggia (combinata)",
         "state_attributes": {
-          "local_probability_pct": { "name": "Probabilità locale (%)" }
+          "local_probability_pct": {
+            "name": "Probabilità locale (%)"
+          }
         }
       },
       "rain_display": {
@@ -1507,19 +2017,41 @@
           "heavy": "Forte"
         },
         "state_attributes": {
-          "rain_rate": { "name": "Intensità pioggia (mm/h)" },
-          "rain_today": { "name": "Pioggia oggi (mm)" },
-          "rain_24h": { "name": "Pioggia ultime 24 h (mm)" },
-          "is_raining": { "name": "Attualmente in corso" }
+          "rain_rate": {
+            "name": "Intensità pioggia (mm/h)"
+          },
+          "rain_today": {
+            "name": "Pioggia oggi (mm)"
+          },
+          "rain_24h": {
+            "name": "Pioggia ultime 24 h (mm)"
+          },
+          "is_raining": {
+            "name": "Attualmente in corso"
+          }
         }
       },
-      "rain_last_1h": { "name": "Pioggia ultima 1 h" },
-      "rain_last_24h": { "name": "Pioggia ultime 24 h" },
-      "rain_today": { "name": "Pioggia oggi" },
-      "rain_this_week": { "name": "Pioggia questa settimana" },
-      "rain_this_month": { "name": "Pioggia questo mese" },
-      "rain_this_year": { "name": "Pioggia quest'anno" },
-      "rain_rate_max_24h": { "name": "Intensità max pioggia (24 h)" },
+      "rain_last_1h": {
+        "name": "Pioggia ultima 1 h"
+      },
+      "rain_last_24h": {
+        "name": "Pioggia ultime 24 h"
+      },
+      "rain_today": {
+        "name": "Pioggia oggi"
+      },
+      "rain_this_week": {
+        "name": "Pioggia questa settimana"
+      },
+      "rain_this_month": {
+        "name": "Pioggia questo mese"
+      },
+      "rain_this_year": {
+        "name": "Pioggia quest'anno"
+      },
+      "rain_rate_max_24h": {
+        "name": "Intensità max pioggia (24 h)"
+      },
       "pressure_trend": {
         "name": "Tendenza pressione",
         "state": {
@@ -1530,16 +2062,26 @@
           "falling_rapidly": "In rapido calo"
         },
         "state_attributes": {
-          "change_3h_hpa": { "name": "Variazione 3 h (hPa)" },
-          "change_3h": { "name": "Variazione 3 h (hPa) [alias]" },
-          "trend_rate_hpah": { "name": "Tasso di tendenza (hPa/h)" },
-          "mslp_hpa": { "name": "Pressione sul livello del mare (hPa)" },
-          "arrow": { "name": "Indicatore freccia" },
-          "color": { "name": "Colore" }
+          "change_3h_hpa": {
+            "name": "Variazione 3 h (hPa)"
+          },
+          "change_3h": {
+            "name": "Variazione 3 h (hPa) [alias]"
+          },
+          "trend_rate_hpah": {
+            "name": "Tasso di tendenza (hPa/h)"
+          },
+          "mslp_hpa": {
+            "name": "Pressione sul livello del mare (hPa)"
+          },
+          "arrow": {
+            "name": "Indicatore freccia"
+          },
+          "color": {
+            "name": "Colore"
+          }
         }
       },
-      "pressure_trend_raw": { "name": "Tendenza pressione (grezza)" },
-      "pressure_change_window": { "name": "Variazione pressione (finestra)" },
       "station_health": {
         "name": "Salute stazione",
         "state": {
@@ -1549,22 +2091,40 @@
           "offline": "Offline"
         },
         "state_attributes": {
-          "color": { "name": "Colore" },
-          "battery_pct": { "name": "Batteria (%)" },
-          "data_quality": { "name": "Qualità dati" }
+          "color": {
+            "name": "Colore"
+          },
+          "battery_pct": {
+            "name": "Batteria (%)"
+          },
+          "data_quality": {
+            "name": "Qualità dati"
+          }
         }
       },
       "forecast_tiles": {
         "name": "Riquadri previsione",
         "state_attributes": {
-          "tiles": { "name": "Riquadri previsione" },
-          "count": { "name": "Numero riquadri" }
+          "tiles": {
+            "name": "Riquadri previsione"
+          },
+          "count": {
+            "name": "Numero riquadri"
+          }
         }
       },
-      "temperature_high_24h": { "name": "Temperatura max (24 h)" },
-      "temperature_low_24h": { "name": "Temperatura min (24 h)" },
-      "temperature_average_24h": { "name": "Temperatura media (24 h)" },
-      "wind_gust_max_24h": { "name": "Raffica max (24 h)" },
+      "temperature_high_24h": {
+        "name": "Temperatura max (24 h)"
+      },
+      "temperature_low_24h": {
+        "name": "Temperatura min (24 h)"
+      },
+      "temperature_average_24h": {
+        "name": "Temperatura media (24 h)"
+      },
+      "wind_gust_max_24h": {
+        "name": "Raffica max (24 h)"
+      },
       "humidity_level": {
         "name": "Livello di umidità",
         "state": {
@@ -1588,35 +2148,53 @@
           "extreme": "Estremo"
         },
         "state_attributes": {
-          "uv_index": { "name": "Indice UV" },
-          "recommendation": { "name": "Raccomandazione" },
-          "burn_time_fair_skin": { "name": "Tempo di scottatura (pelle chiara, min)" }
+          "uv_index": {
+            "name": "Indice UV"
+          },
+          "recommendation": {
+            "name": "Raccomandazione"
+          },
+          "burn_time_fair_skin": {
+            "name": "Tempo di scottatura (pelle chiara, min)"
+          }
         }
       },
       "temperature_display": {
         "name": "Visualizzazione temperatura",
         "state_attributes": {
-          "bar_percent": { "name": "Riempimento barra (%)" },
-          "color": { "name": "Colore" }
+          "bar_percent": {
+            "name": "Riempimento barra (%)"
+          },
+          "color": {
+            "name": "Colore"
+          }
         }
       },
       "lightning_count_1h": {
         "name": "Fulmini (1 h)",
         "state_attributes": {
-          "rate_per_min": { "name": "Frequenza colpi (al min)" }
+          "rate_per_min": {
+            "name": "Frequenza colpi (al min)"
+          }
         }
       },
       "lightning_distance": {
         "name": "Distanza fulmine",
         "state_attributes": {
-          "proximity": { "name": "Stato di prossimità" }
+          "proximity": {
+            "name": "Stato di prossimità"
+          }
         }
       },
-      "lightning_rate": { "name": "Frequenza fulmini" },
+      "lightning_rate": {
+        "name": "Frequenza fulmini"
+      },
       "lightning_clearance": {
         "name": "Tempo di sicurezza fulmini",
         "state_attributes": {
-          "safe": { "name": "Sicuro (≥30 min)" }
+          "safe": {
+            "name": "Sicuro (≥30 min)"
+          }
         }
       },
       "lightning_proximity": {
@@ -1626,44 +2204,76 @@
           "clear": "Libero"
         },
         "state_attributes": {
-          "distance_km": { "name": "Distanza (km)" },
-          "clearance_min": { "name": "Minuti dall'ultimo colpo" }
+          "distance_km": {
+            "name": "Distanza (km)"
+          },
+          "clearance_min": {
+            "name": "Minuti dall'ultimo colpo"
+          }
         }
       },
-      "lightning_azimuth": { "name": "Azimut fulmine" },
+      "lightning_azimuth": {
+        "name": "Azimut fulmine"
+      },
       "indoor_temperature": {
         "name": "Temperatura interna",
         "state_attributes": {
-          "outdoor_temp_c": { "name": "Temperatura esterna (°C)" },
-          "delta_c": { "name": "Delta interno/esterno (°C)" }
+          "outdoor_temp_c": {
+            "name": "Temperatura esterna (°C)"
+          },
+          "delta_c": {
+            "name": "Delta interno/esterno (°C)"
+          }
         }
       },
       "indoor_humidity": {
         "name": "Umidità interna",
         "state_attributes": {
-          "outdoor_humidity_pct": { "name": "Umidità esterna (%)" },
-          "delta_pct": { "name": "Delta interno/esterno (%)" }
+          "outdoor_humidity_pct": {
+            "name": "Umidità esterna (%)"
+          },
+          "delta_pct": {
+            "name": "Delta interno/esterno (%)"
+          }
         }
       },
-      "indoor_co2": { "name": "CO₂ interna" },
-      "indoor_temp_delta": { "name": "Differenza temperatura interno/esterno" },
-      "indoor_humidity_delta": { "name": "Differenza umidità interno/esterno" },
+      "indoor_co2": {
+        "name": "CO₂ interna"
+      },
+      "indoor_temp_delta": {
+        "name": "Differenza temperatura interno/esterno"
+      },
+      "indoor_humidity_delta": {
+        "name": "Differenza umidità interno/esterno"
+      },
       "indoor_comfort": {
         "name": "Punteggio comfort interno",
         "state_attributes": {
-          "co2_ppm": { "name": "CO₂ (ppm)" },
-          "temp_c": { "name": "Temperatura (°C)" },
-          "humidity_pct": { "name": "Umidità (%)" }
+          "co2_ppm": {
+            "name": "CO₂ (ppm)"
+          },
+          "temp_c": {
+            "name": "Temperatura (°C)"
+          },
+          "humidity_pct": {
+            "name": "Umidità (%)"
+          }
         }
       },
       "soil_moisture": {
         "name": "Umidità del suolo",
         "state_attributes": {
-          "deficit_pct": { "name": "Deficit di umidità (%)" }
+          "deficit_pct": {
+            "name": "Deficit di umidità (%)"
+          }
         }
       },
-      "soil_temperature": { "name": "Temperatura del suolo" },
-      "soil_moisture_deficit": { "name": "Deficit umidità del suolo" },
+      "soil_temperature": {
+        "name": "Temperatura del suolo"
+      },
+      "soil_moisture_deficit": {
+        "name": "Deficit umidità del suolo"
+      },
       "irrigation_need": {
         "name": "Necessità di irrigazione",
         "state": {
@@ -1674,14 +2284,167 @@
           "critical": "Critica"
         },
         "state_attributes": {
-          "score": { "name": "Punteggio necessità irrigazione" },
-          "soil_moisture_pct": { "name": "Umidità del suolo (%)" },
-          "soil_moisture_deficit_pct": { "name": "Deficit umidità del suolo (%)" }
+          "score": {
+            "name": "Punteggio necessità irrigazione"
+          },
+          "soil_moisture_pct": {
+            "name": "Umidità del suolo (%)"
+          },
+          "soil_moisture_deficit_pct": {
+            "name": "Deficit umidità del suolo (%)"
+          }
         }
       },
-      "irrigation_need_score": { "name": "Punteggio necessità irrigazione" },
-      "vigicrues_river_level": { "name": "{river} - Livello del fiume" },
-      "vigicrues_river_flow": { "name": "{river} - Portata del fiume" }
+      "irrigation_need_score": {
+        "name": "Punteggio necessità irrigazione"
+      },
+      "vigicrues_river_level": {
+        "name": "{river} - Livello del fiume"
+      },
+      "vigicrues_river_flow": {
+        "name": "{river} - Portata del fiume"
+      },
+      "temperature_high_year": {
+        "name": "Temperature High (Year)"
+      },
+      "temperature_low_year": {
+        "name": "Temperature Low (Year)"
+      },
+      "temperature_high_all_time": {
+        "name": "Temperature High (All-Time)"
+      },
+      "temperature_low_all_time": {
+        "name": "Temperature Low (All-Time)"
+      },
+      "temperature_high_week": {
+        "name": "Temperature High (Week)"
+      },
+      "temperature_low_week": {
+        "name": "Temperature Low (Week)"
+      },
+      "temperature_high_month": {
+        "name": "Temperature High (Month)"
+      },
+      "temperature_low_month": {
+        "name": "Temperature Low (Month)"
+      },
+      "wind_gust_max_month": {
+        "name": "Wind Gust Max (Month)"
+      },
+      "wind_gust_max_year": {
+        "name": "Wind Gust Max (Year)"
+      },
+      "wind_gust_max_all_time": {
+        "name": "Wind Gust Max (All-Time)"
+      },
+      "dry_streak_record": {
+        "name": "Dry Streak Record"
+      },
+      "heat_streak_record": {
+        "name": "Heat Streak Record",
+        "state_attributes": {
+          "threshold_c": {
+            "name": "Threshold (°C)"
+          }
+        }
+      },
+      "frost_streak_record": {
+        "name": "Frost Streak Record",
+        "state_attributes": {
+          "threshold_c": {
+            "name": "Threshold (°C)"
+          }
+        }
+      },
+      "temp_high_normal": {
+        "name": "Temperature High (Normal)",
+        "state_attributes": {
+          "sample_years": {
+            "name": "Sample years"
+          },
+          "fetched_at": {
+            "name": "Fetched at"
+          }
+        }
+      },
+      "temp_low_normal": {
+        "name": "Temperature Low (Normal)"
+      },
+      "rain_normal": {
+        "name": "Rain (Normal)"
+      },
+      "temp_anomaly_normal": {
+        "name": "Temperature Anomaly (Normal)"
+      },
+      "rain_anomaly_normal": {
+        "name": "Rain Anomaly (Normal)"
+      },
+      "auto_calibration": {
+        "name": "Auto Calibration",
+        "state": {
+          "learning": "Learning",
+          "stable": "Stable",
+          "adjusted": "Adjusted"
+        },
+        "state_attributes": {
+          "bias_temp_c": {
+            "name": "Learned temperature bias"
+          },
+          "bias_humidity": {
+            "name": "Learned humidity bias"
+          },
+          "bias_pressure_hpa": {
+            "name": "Learned pressure bias"
+          },
+          "samples": {
+            "name": "Samples"
+          },
+          "last_applied": {
+            "name": "Last applied"
+          }
+        }
+      },
+      "snow_phase": {
+        "name": "Precipitation Phase",
+        "state": {
+          "snow": "Snow",
+          "sleet": "Sleet",
+          "rain": "Rain",
+          "none": "None"
+        }
+      },
+      "snow_rate": {
+        "name": "Snow Rate"
+      },
+      "snow_today": {
+        "name": "Snow Today"
+      },
+      "snow_this_month": {
+        "name": "Snow This Month"
+      },
+      "snow_this_year": {
+        "name": "Snow This Year"
+      },
+      "snow_record_day": {
+        "name": "Snowiest Day",
+        "state_attributes": {
+          "date": {
+            "name": "Date"
+          }
+        }
+      },
+      "indoor_room_delta": {
+        "name": "Temp Delta - {room_name}"
+      },
+      "indoor_room_humidity": {
+        "name": "Humidity - {room_name}"
+      },
+      "indoor_room_co2": {
+        "name": "CO₂ - {room_name}"
+      },
+      "indoor_room_comfort": {
+        "name": "Comfort - {room_name}"
+      }
     },
     "select": {
       "ws_graph_range": {
@@ -1694,66 +2457,190 @@
       }
     },
     "number": {
-      "ws_thresh_wind_gust": { "name": "Avviso: Soglia raffica di vento" },
-      "ws_thresh_rain_rate": { "name": "Avviso: Soglia intensità pioggia" },
-      "ws_thresh_freeze": { "name": "Avviso: Soglia gelo" },
-      "ws_cal_temp": { "name": "Calibrazione: Temperatura" },
-      "ws_cal_humidity": { "name": "Calibrazione: Umidità" },
-      "ws_cal_pressure": { "name": "Calibrazione: Pressione" },
-      "ws_cal_wind": { "name": "Calibrazione: Velocità del vento" },
-      "ws_staleness_timeout": { "name": "Regolazione: Timeout obsolescenza" },
-      "ws_rain_filter_alpha": { "name": "Regolazione: Lisciamento filtro pioggia" },
-      "ws_pressure_trend_window": { "name": "Regolazione: Finestra tendenza pressione" },
-      "ws_lightning_proximity": { "name": "Avviso: Soglia prossimità fulmine" },
-      "ws_hdd_base": { "name": "Gradi-giorno: Temperatura base HDD" },
-      "ws_cdd_base": { "name": "Gradi-giorno: Temperatura base CDD" },
-      "ws_gdd_base": { "name": "Gradi-giorno: Temperatura base GDD" },
-      "ws_gdd_cap": { "name": "Gradi-giorno: Limite superiore GDD" }
+      "ws_thresh_wind_gust": {
+        "name": "Avviso: Soglia raffica di vento"
+      },
+      "ws_thresh_rain_rate": {
+        "name": "Avviso: Soglia intensità pioggia"
+      },
+      "ws_thresh_freeze": {
+        "name": "Avviso: Soglia gelo"
+      },
+      "ws_cal_temp": {
+        "name": "Calibrazione: Temperatura"
+      },
+      "ws_cal_humidity": {
+        "name": "Calibrazione: Umidità"
+      },
+      "ws_cal_pressure": {
+        "name": "Calibrazione: Pressione"
+      },
+      "ws_cal_wind": {
+        "name": "Calibrazione: Velocità del vento"
+      },
+      "ws_staleness_timeout": {
+        "name": "Regolazione: Timeout obsolescenza"
+      },
+      "ws_rain_filter_alpha": {
+        "name": "Regolazione: Lisciamento filtro pioggia"
+      },
+      "ws_pressure_trend_window": {
+        "name": "Regolazione: Finestra tendenza pressione"
+      },
+      "ws_lightning_proximity": {
+        "name": "Avviso: Soglia prossimità fulmine"
+      },
+      "ws_hdd_base": {
+        "name": "Gradi-giorno: Temperatura base HDD"
+      },
+      "ws_cdd_base": {
+        "name": "Gradi-giorno: Temperatura base CDD"
+      },
+      "ws_gdd_base": {
+        "name": "Gradi-giorno: Temperatura base GDD"
+      },
+      "ws_gdd_cap": {
+        "name": "Gradi-giorno: Limite superiore GDD"
+      }
     },
     "switch": {
-      "ws_enable_animations": { "name": "Dashboard: Animazioni" },
-      "ws_enable_display_sensors": { "name": "Funzione: Sensori di visualizzazione" },
-      "ws_enable_fire_risk_score": { "name": "Funzione: Rischio incendio" },
-      "ws_enable_sea_temp": { "name": "Funzione: Temperatura superficiale del mare" },
-      "ws_enable_wunderground": { "name": "Funzione: Weather Underground" },
-      "ws_enable_air_quality": { "name": "Funzione: Indice qualità dell'aria" },
-      "ws_enable_pollen": { "name": "Funzione: Livelli pollini" },
-      "ws_enable_moon": { "name": "Funzione: Fase lunare" },
-      "ws_enable_solar_forecast": { "name": "Funzione: Previsione fotovoltaica" },
-      "ws_enable_fog": { "name": "Funzione: Probabilità nebbia" },
-      "ws_enable_thunderstorm_risk": { "name": "Funzione: Rischio temporale" },
-      "ws_enable_comfort_indices": { "name": "Funzione: Indici di comfort" },
-      "ws_enable_vigilance_meteo": { "name": "Funzione: Meteo Vigilance" },
-      "ws_enable_vigicrues": { "name": "Funzione: Livello fiumi Vigicrues" },
-      "ws_enable_diagnostics": { "name": "Funzione: Diagnostica stazione" },
-      "ws_enable_fwi_components": { "name": "Funzione: Componenti FWI" },
-      "ws_enable_advanced_sensors": { "name": "Funzione: Sensori avanzati" },
-      "ws_enable_nowcast": { "name": "Funzione: Nowcast precipitazioni" },
-      "ws_suppress_notifications": { "name": "Impostazione: Abilita notifiche HA" },
-      "ws_enable_degree_days": { "name": "Funzione: Gradi-giorno e bagnatura fogliare" },
-      "ws_enable_lightning": { "name": "Funzione: Rilevamento fulmini" },
-      "ws_enable_indoor": { "name": "Funzione: Sensori interni" },
-      "ws_enable_soil": { "name": "Funzione: Sensori del suolo" },
-      "ws_enable_weathercloud": { "name": "Funzione: Upload Weathercloud" },
-      "ws_enable_pwsweather": { "name": "Funzione: Upload PWSWeather" },
-      "ws_enable_wow": { "name": "Funzione: Upload WOW" },
-      "ws_enable_awekas": { "name": "Funzione: Upload AWEKAS" },
-      "ws_enable_mqtt": { "name": "Funzione: MQTT Discovery" },
-      "ws_enable_cwop": { "name": "Funzione: Upload CWOP" },
-      "ws_enable_owm_stations": { "name": "Funzione: Upload OpenWeatherMap" },
-      "ws_enable_windy": { "name": "Funzione: Upload Windy" }
+      "ws_enable_animations": {
+        "name": "Dashboard: Animazioni"
+      },
+      "ws_enable_display_sensors": {
+        "name": "Funzione: Sensori di visualizzazione"
+      },
+      "ws_enable_fire_risk_score": {
+        "name": "Funzione: Rischio incendio"
+      },
+      "ws_enable_sea_temp": {
+        "name": "Funzione: Temperatura superficiale del mare"
+      },
+      "ws_enable_wunderground": {
+        "name": "Funzione: Weather Underground"
+      },
+      "ws_enable_air_quality": {
+        "name": "Funzione: Indice qualità dell'aria"
+      },
+      "ws_enable_pollen": {
+        "name": "Funzione: Livelli pollini"
+      },
+      "ws_enable_moon": {
+        "name": "Funzione: Fase lunare"
+      },
+      "ws_enable_solar_forecast": {
+        "name": "Funzione: Previsione fotovoltaica"
+      },
+      "ws_enable_fog": {
+        "name": "Funzione: Probabilità nebbia"
+      },
+      "ws_enable_thunderstorm_risk": {
+        "name": "Funzione: Rischio temporale"
+      },
+      "ws_enable_comfort_indices": {
+        "name": "Funzione: Indici di comfort"
+      },
+      "ws_enable_vigilance_meteo": {
+        "name": "Funzione: Meteo Vigilance"
+      },
+      "ws_enable_vigicrues": {
+        "name": "Funzione: Livello fiumi Vigicrues"
+      },
+      "ws_enable_diagnostics": {
+        "name": "Funzione: Diagnostica stazione"
+      },
+      "ws_enable_fwi_components": {
+        "name": "Funzione: Componenti FWI"
+      },
+      "ws_enable_advanced_sensors": {
+        "name": "Funzione: Sensori avanzati"
+      },
+      "ws_enable_nowcast": {
+        "name": "Funzione: Nowcast precipitazioni"
+      },
+      "ws_suppress_notifications": {
+        "name": "Impostazione: Abilita notifiche HA"
+      },
+      "ws_enable_degree_days": {
+        "name": "Funzione: Gradi-giorno e bagnatura fogliare"
+      },
+      "ws_enable_lightning": {
+        "name": "Funzione: Rilevamento fulmini"
+      },
+      "ws_enable_indoor": {
+        "name": "Funzione: Sensori interni"
+      },
+      "ws_enable_soil": {
+        "name": "Funzione: Sensori del suolo"
+      },
+      "ws_enable_weathercloud": {
+        "name": "Funzione: Upload Weathercloud"
+      },
+      "ws_enable_pwsweather": {
+        "name": "Funzione: Upload PWSWeather"
+      },
+      "ws_enable_wow": {
+        "name": "Funzione: Upload WOW"
+      },
+      "ws_enable_awekas": {
+        "name": "Funzione: Upload AWEKAS"
+      },
+      "ws_enable_mqtt": {
+        "name": "Funzione: MQTT Discovery"
+      },
+      "ws_enable_cwop": {
+        "name": "Funzione: Upload CWOP"
+      },
+      "ws_enable_owm_stations": {
+        "name": "Funzione: Upload OpenWeatherMap"
+      },
+      "ws_enable_windy": {
+        "name": "Funzione: Upload Windy"
+      },
+      "ws_enable_auto_calibration": {
+        "name": "Feature: Adaptive Sensor Calibration"
+      },
+      "ws_enable_climate_normals": {
+        "name": "Feature: Historical Climate Normals"
+      },
+      "ws_enable_snow": {
+        "name": "Feature: Snow"
+      }
     },
     "binary_sensor": {
-      "ws_package_ok": { "name": "Pacchetto OK" },
-      "ws_rain_expected_1h": { "name": "Pioggia prevista (1 h)" },
-      "ws_temperature_stuck": { "name": "Sensore temperatura bloccato" },
-      "ws_humidity_stuck": { "name": "Sensore umidità bloccato" },
-      "ws_pressure_stuck": { "name": "Sensore pressione bloccato" },
-      "ws_temperature_out_of_range": { "name": "Temperatura fuori intervallo" },
-      "ws_humidity_out_of_range": { "name": "Umidità fuori intervallo" },
-      "ws_pressure_out_of_range": { "name": "Pressione fuori intervallo" },
-      "ws_wind_gust_below_wind": { "name": "Raffica inferiore alla velocità del vento" },
-      "ws_dew_exceeds_temp": { "name": "Punto di rugiada supera la temperatura" }
+      "ws_package_ok": {
+        "name": "Pacchetto OK"
+      },
+      "ws_rain_expected_1h": {
+        "name": "Pioggia prevista (1 h)"
+      },
+      "ws_temperature_stuck": {
+        "name": "Sensore temperatura bloccato"
+      },
+      "ws_humidity_stuck": {
+        "name": "Sensore umidità bloccato"
+      },
+      "ws_pressure_stuck": {
+        "name": "Sensore pressione bloccato"
+      },
+      "ws_temperature_out_of_range": {
+        "name": "Temperatura fuori intervallo"
+      },
+      "ws_humidity_out_of_range": {
+        "name": "Umidità fuori intervallo"
+      },
+      "ws_pressure_out_of_range": {
+        "name": "Pressione fuori intervallo"
+      },
+      "ws_wind_gust_below_wind": {
+        "name": "Raffica inferiore alla velocità del vento"
+      },
+      "ws_dew_exceeds_temp": {
+        "name": "Punto di rugiada supera la temperatura"
+      },
+      "ws_snow_falling": {
+        "name": "Snow Falling"
+      }
     },
     "event": {
       "ws_rain_event": {

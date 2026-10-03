@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import pathlib
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
@@ -14,6 +12,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.loader import async_get_integration
 
 from .const import (
     CONF_CAL_HUMIDITY,
@@ -208,7 +207,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _async_remove_orphaned_forecaster_entities(hass, entry)
 
-    coordinator = WSStationCoordinator(hass, {**entry.data, "entry_id": entry.entry_id}, entry.options)
+    coordinator = WSStationCoordinator(
+        hass, {**entry.data, "entry_id": entry.entry_id}, entry.options, config_entry=entry
+    )
     entry.runtime_data = coordinator
 
     try:
@@ -221,19 +222,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # The 60s tick scheduler will retry all fetches automatically.
 
     # Create a device for the station.
-    # Use executor_job so that the manifest.json read does not block the HA
-    # event loop (HA logs "Detected blocking call to read_text" otherwise).
     dev_reg = dr.async_get(hass)
-    _manifest_path = pathlib.Path(__file__).parent / "manifest.json"
-    _manifest_text = await hass.async_add_executor_job(_manifest_path.read_text, "utf-8")
-    _manifest = json.loads(_manifest_text)
+    _integration = await async_get_integration(hass, DOMAIN)
     dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
         manufacturer="Weather Station Core",
         model="Derived Weather Package",
-        sw_version=_manifest.get("version", "unknown"),
+        sw_version=_integration.version or "unknown",
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -406,6 +403,15 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     await entry.runtime_data.async_stop()
+    if not hass.config_entries.async_loaded_entries(DOMAIN):
+        for svc in (
+            SERVICE_RESET_RAIN,
+            SERVICE_RESET_LEARNING,
+            SERVICE_EXPORT_LEARNING,
+            SERVICE_APPLY_CALIBRATION,
+        ):
+            if hass.services.has_service(DOMAIN, svc):
+                hass.services.async_remove(DOMAIN, svc)
     return unload_ok
 
 

@@ -2964,6 +2964,18 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
     """
 
     _attr_has_entity_name = True
+    _unrecorded_attributes = frozenset(
+        {
+            "forecast",
+            "tiles",
+            "watt_hours_day",
+            "hourly",
+            "raw_times",
+            "raw_precip",
+            "active_alerts",
+            "_climatology_stats",
+        }
+    )
 
     # Keys that benefit from restore (slow-to-warm-up or accumulating sensors)
     _RESTORE_KEYS = {

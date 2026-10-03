@@ -759,6 +759,10 @@
     "large_calibration_offset": {
       "title": "Important décalage d'étalonnage appliqué",
       "description": "Un décalage d'étalonnage de {value} a été appliqué à {field}. Les décalages importants peuvent indiquer une panne matérielle du capteur plutôt qu'une simple dérive d'étalonnage. Envisagez de remplacer le capteur."
+    },
+    "et0_pm_unavailable": {
+      "title": "ET₀ PM indisponible : aucune source de rayonnement solaire configurée",
+      "description": "Les prévisions solaires sont activées, le capteur ET₀ Penman-Monteith devrait donc être disponible, mais n'apparaît pas car aucune source de rayonnement solaire n'est mappée dans les sources de cette intégration. Mappez un capteur de rayonnement solaire (pyranomètre) ou activez le repli basé sur l'éclairement dans les options si vous possédez un capteur de lux (moins précis, étiqueté comme estimation)."
     }
   },
   "entity": {
