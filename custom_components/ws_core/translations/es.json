@@ -27,6 +27,7 @@
         "title": "Sensores opcionales",
         "description": "Estos sensores mejoran los valores derivados pero no son obligatorios. Déjelos en blanco para omitir.",
         "data": {
+          "rain_year": "Sensor de lluvia acumulada del año (se reinicia anualmente)",
           "illuminance": "Iluminancia / radiación solar (lux)",
           "uv_index": "Índice UV",
           "dew_point": "Punto de rocío (si lo proporciona la estación; si no, se calcula)",
@@ -455,6 +456,7 @@
         "title": "Sensores fuente opcionales",
         "description": "Actualice las entidades fuente opcionales. Vacíe un campo para dejar de usar esa fuente opcional.",
         "data": {
+          "rain_year": "Sensor de lluvia acumulada del año (se reinicia anualmente)",
           "illuminance": "Iluminancia / radiación solar (lux)",
           "uv_index": "Índice UV",
           "dew_point": "Punto de rocío (si lo proporciona la estación; si no, se calcula)",

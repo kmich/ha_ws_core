@@ -35,6 +35,8 @@ from custom_components.ws_core.const import (
     KEY_PACKAGE_OK,
     KEY_RAIN_EXPECTED_1H,
     KEY_RAIN_EXPECTED_SOURCE,
+    KEY_RAIN_THIS_MONTH_MM,
+    KEY_RAIN_THIS_YEAR_MM,
     KEY_SEA_LEVEL_PRESSURE_HPA,
     KEY_TEMP_HIGH_ALL_TIME,
     KEY_TEMP_HIGH_MONTH,
@@ -64,6 +66,7 @@ from custom_components.ws_core.const import (
     SRC_LUX,
     SRC_PRESS,
     SRC_RAIN_TOTAL,
+    SRC_RAIN_YEAR,
     SRC_SOLAR_RADIATION,
     SRC_TEMP,
     SRC_WIND,
@@ -197,6 +200,11 @@ def _make_coordinator(
     coord._rain_this_year_mm = 0.0
     coord._rain_this_year_key = ""
     coord._rain_this_year_last_total = None
+    coord._rain_today_mm = 0.0
+    coord._rain_today_date = ""
+    coord._rain_today_last_total = None
+    coord._rain_prev_day_date = ""
+    coord._rain_prev_day_mm = 0.0
     coord._temp_high_year = None
     coord._temp_low_year = None
     coord._temp_year_key = ""
@@ -772,6 +780,71 @@ class TestRollingWindows:
         accum = WSStationCoordinator._rain_accum_24h_from_totals(history)
         # Should count 0→1, 1→2, skip 2→0 (reset), 0→1 = total 3mm
         assert abs(accum - 3.0) < 0.1
+
+
+class TestYearlyRainSource:
+    """Issue #161: station year-to-date totals must not start at zero."""
+
+    def _compute(self, coord, now, total):
+        from custom_components.ws_core.const import KEY_NORM_RAIN_TOTAL_MM
+
+        data = {KEY_NORM_RAIN_TOTAL_MM: total}
+        with patch.object(dt_util, "now", return_value=now):
+            coord._compute_derived_precipitation(data, now, total)
+        return data
+
+    def test_station_total_includes_rain_before_installation(self):
+        coord = _make_coordinator(rain_total=432.1)
+        coord.sources[SRC_RAIN_YEAR] = "sensor.rain"
+        now = datetime(2026, 10, 5, tzinfo=UTC)
+        data = self._compute(coord, now, 432.1)
+        assert data[KEY_RAIN_THIS_YEAR_MM] == 432.1
+        assert data[KEY_RAIN_THIS_MONTH_MM] == 0.0
+
+    def test_station_total_overrides_restored_accumulator_and_follows_reset(self):
+        coord = _make_coordinator()
+        coord.sources[SRC_RAIN_YEAR] = "sensor.yearly"
+        state = _make_state("432.1", "mm")
+        original_get = coord.hass.states.get
+        coord.hass.states.get = lambda eid: state if eid == "sensor.yearly" else original_get(eid)
+        coord._rain_this_year_key = "2026"
+        coord._rain_this_year_mm = 12.3
+        coord._rain_this_year_last_total = 5.2
+        assert self._compute(coord, datetime(2026, 12, 31, tzinfo=UTC), 5.2)[KEY_RAIN_THIS_YEAR_MM] == 432.1
+        state.state = "0.4"
+        assert self._compute(coord, datetime(2027, 1, 1, tzinfo=UTC), 5.6)[KEY_RAIN_THIS_YEAR_MM] == 0.4
+        state.state = "0"
+        assert self._compute(coord, datetime(2027, 1, 2, tzinfo=UTC), 5.6)[KEY_RAIN_THIS_YEAR_MM] == 0.0
+
+    def test_inches_are_converted_to_mm(self):
+        coord = _make_coordinator()
+        coord.sources[SRC_RAIN_YEAR] = "sensor.yearly"
+        original_get = coord.hass.states.get
+        state = _make_state("10", "in")
+        coord.hass.states.get = lambda eid: state if eid == "sensor.yearly" else original_get(eid)
+        assert self._compute(coord, datetime(2026, 10, 5, tzinfo=UTC), 5.2)[KEY_RAIN_THIS_YEAR_MM] == 254.0
+
+    def test_invalid_station_total_is_unknown_and_recovers(self):
+        coord = _make_coordinator()
+        coord.sources[SRC_RAIN_YEAR] = "sensor.yearly"
+        original_get = coord.hass.states.get
+        state = _make_state("unavailable", "mm")
+        coord.hass.states.get = lambda eid: state if eid == "sensor.yearly" else original_get(eid)
+        now = datetime(2026, 10, 5, tzinfo=UTC)
+        for value in ("unavailable", "unknown", "nan", "inf", "-1", "bad"):
+            state.state = value
+            assert self._compute(coord, now, 5.2)[KEY_RAIN_THIS_YEAR_MM] is None
+        state.state = "100.2"
+        assert self._compute(coord, now, 5.2)[KEY_RAIN_THIS_YEAR_MM] == 100.2
+        coord.hass.states.get = original_get
+        assert self._compute(coord, now, 5.2)[KEY_RAIN_THIS_YEAR_MM] is None
+
+    def test_unmapped_counter_still_accumulates_and_resets(self):
+        coord = _make_coordinator()
+        now = datetime(2026, 10, 5, tzinfo=UTC)
+        assert self._compute(coord, now, 400.0)[KEY_RAIN_THIS_YEAR_MM] == 0.0
+        assert self._compute(coord, now + timedelta(minutes=1), 402.5)[KEY_RAIN_THIS_YEAR_MM] == 2.5
+        assert self._compute(coord, datetime(2027, 1, 1, tzinfo=UTC), 0.4)[KEY_RAIN_THIS_YEAR_MM] == 0.0
 
 
 class TestRainRateWindow:

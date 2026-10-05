@@ -18,10 +18,13 @@ If you are using the Auto-Discovery feature during setup, your required sensors 
 | **Rain Total** | `sensor.*_yearly_rain` or `_event_rain` | `ws_core` works best with a continually increasing counter, so `yearly_rain` is safest. |
 
 **Optional Ecowitt Sensors to Map:**
+*   **Year-to-date rainfall:** `sensor.*_yearly_rain` (or `sensor.*_yearly_piezo_rain` for the WH90). This makes **Rain This Year** match the station's annual total, including rainfall before WS Core was installed. You can select the same yearly entity for both Rain Total and Year-to-date rainfall. Existing installations can add this mapping under Configure → Optional sensors.
 *   **Solar Radiation:** `sensor.*_solar_radiation` (Enables Penman-Monteith ET0)
 *   **UV Index:** `sensor.*_uv_index`
 *   **Lightning Strikes:** `sensor.*_lightning_strike_count` (WH57)
 *   **Lightning Distance:** `sensor.*_lightning_strike_distance` (WH57)
+
+Without a Year-to-date rainfall source, Rain This Year accumulates new rainfall observed by WS Core and resets on January 1. It cannot recover rainfall from before installation. With the source mapped, an unavailable annual sensor makes Rain This Year unknown until that source recovers.
 
 ---
 

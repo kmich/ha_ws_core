@@ -199,6 +199,7 @@ from .const import (
     SRC_LUX,
     SRC_PRESS,
     SRC_RAIN_TOTAL,
+    SRC_RAIN_YEAR,
     SRC_TEMP,
     SRC_UV,
     SRC_WIND,
@@ -397,6 +398,7 @@ def _guess_defaults(hass: HomeAssistant) -> dict[str, str]:
         SRC_GUST: ["_wind_gust", "ws_01_speed_2", "speed_2", "gust"],
         SRC_WIND_DIR: ["_wind_direction", "_wind_dir", "ws_01_direction", "direction"],
         SRC_RAIN_TOTAL: ["_rain_total", "_precipitation", "_yearly_rain", "ws_01_precipitation", "rainfall"],
+        SRC_RAIN_YEAR: ["_yearly_rain", "_yearly_piezo_rain"],
         SRC_LUX: ["_illuminance", "ws_01_illuminance", "lux"],
         SRC_UV: ["_uv_index", "ws_01_uv_index", "uv"],
         SRC_DEW_POINT: ["_dew_point", "ws_01_dew_point"],
@@ -587,10 +589,10 @@ def _validate_numeric_sensor(hass: HomeAssistant, eid: str, allow_unknown: bool 
     return None
 
 
-# Optional source keys whose sensors are normally idle/"unknown" outside of
-# an active event (currently: lightning distance/azimuth/count). Kept for
-# backwards compatibility with callers referencing this set (issue #88).
-_ALLOW_UNKNOWN_SOURCE_KEYS = {SRC_LIGHTNING_DISTANCE, SRC_LIGHTNING_AZIMUTH, SRC_LIGHTNING_COUNT}
+# Optional sources allowed to be unknown during setup: lightning sensors can
+# be idle outside an event, and annual rain may await a station update.
+# Kept for backwards compatibility with callers referencing this set (issue #88).
+_ALLOW_UNKNOWN_SOURCE_KEYS = {SRC_LIGHTNING_DISTANCE, SRC_LIGHTNING_AZIMUTH, SRC_LIGHTNING_COUNT, SRC_RAIN_YEAR}
 
 
 def _merge_submitted_sources(defaults: dict[str, str], user_input: dict[str, Any], keys: list[str]) -> dict[str, str]:

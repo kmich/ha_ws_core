@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.10.0] - 2026-10-05
+
+### Fixed
+
+- **Rain This Year missing the station's existing annual total (issue #161):** Added an optional Year-to-date rainfall source. When mapped, Rain This Year reads the station's annual counter directly (with inch-to-mm conversion), including rainfall before installation and station counter resets. Previously it always started at zero and accumulated only new rainfall, so it could match Rain This Month after setup. Unmapped stations retain the calculated annual accumulator. Existing installations can select their annual sensor in Configure → Optional sensors.
+
 ## [2.9.3] - 2026-10-03
 
 ### Changed

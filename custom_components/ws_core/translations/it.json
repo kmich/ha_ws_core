@@ -27,6 +27,7 @@
         "title": "Sensori opzionali",
         "description": "Questi sensori migliorano i valori derivati ma non sono obbligatori. Lascia vuoto per saltare.",
         "data": {
+          "rain_year": "Sensore pioggia dall’inizio dell’anno (azzeramento annuale)",
           "illuminance": "Illuminamento / radiazione solare (lux)",
           "uv_index": "Indice UV",
           "dew_point": "Punto di rugiada (se fornito dalla stazione; altrimenti calcolato)",
@@ -455,6 +456,7 @@
         "title": "Sensori sorgente opzionali",
         "description": "Aggiorna le entità sorgente opzionali. Cancella un campo per smettere di usare quella sorgente opzionale.",
         "data": {
+          "rain_year": "Sensore pioggia dall’inizio dell’anno (azzeramento annuale)",
           "illuminance": "Illuminamento / radiazione solare (lux)",
           "uv_index": "Indice UV",
           "dew_point": "Punto di rugiada (se fornito dalla stazione; altrimenti calcolato)",

@@ -27,6 +27,7 @@
         "title": "Optionale Sensoren",
         "description": "Diese Sensoren verbessern abgeleitete Messwerte, sind aber nicht erforderlich. Leer lassen zum Überspringen.",
         "data": {
+          "rain_year": "Sensor für Niederschlag seit Jahresbeginn (jährlicher Reset)",
           "illuminance": "Beleuchtungsstärke / Solarstrahlung (Lux)",
           "uv_index": "UV-Index",
           "dew_point": "Taupunkt (falls von der Station geliefert; sonst wird er berechnet)",
@@ -455,6 +456,7 @@
         "title": "Optionale Quellsensoren",
         "description": "Aktualisiere optionale Quell-Entitäten. Feld leeren, um eine optionale Quelle zu deaktivieren.",
         "data": {
+          "rain_year": "Sensor für Niederschlag seit Jahresbeginn (jährlicher Reset)",
           "illuminance": "Beleuchtungsstärke / Solarstrahlung (Lux)",
           "uv_index": "UV-Index",
           "dew_point": "Taupunkt (falls von der Station geliefert; sonst wird er berechnet)",

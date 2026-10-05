@@ -226,6 +226,22 @@ class TestValidateNumericSensor:
 class TestGuessDefaults:
     """Tests for _guess_defaults auto-detection (issues #135, #149)."""
 
+    def test_annual_source_only_guesses_annual_counter(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.ws_core.config_flow import _guess_defaults
+        from custom_components.ws_core.const import SRC_RAIN_YEAR
+
+        hass = MagicMock()
+        hass.config_entries.async_entries.return_value = []
+        monthly = MagicMock(entity_id="sensor.gw1100_monthly_rain")
+        lifetime = MagicMock(entity_id="sensor.gw1100_rain_total")
+        hass.states.async_all.return_value = [monthly, lifetime]
+        assert SRC_RAIN_YEAR not in _guess_defaults(hass)
+        for eid in ("sensor.gw1100_yearly_rain", "sensor.gw1100_yearly_piezo_rain"):
+            hass.states.async_all.return_value = [monthly, lifetime, MagicMock(entity_id=eid)]
+            assert _guess_defaults(hass)[SRC_RAIN_YEAR] == eid
+
     def test_ignores_non_sensor_domains(self):
         from unittest.mock import MagicMock
 

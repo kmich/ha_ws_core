@@ -77,7 +77,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_wind_direction_variability` | ° | Circular standard deviation of wind direction |
 | `sensor.ws_rain_this_week` | mm | Rolling weekly rainfall accumulator |
 | `sensor.ws_rain_this_month` | mm | Rolling monthly rainfall accumulator |
-| `sensor.ws_rain_this_year` | mm | Rolling yearly rainfall accumulator |
+| `sensor.ws_rain_this_year` | mm | Station year-to-date total when mapped; otherwise rainfall observed by WS Core since January 1 (or installation) |
 | `sensor.ws_rain_rate_max_24h` | mm/h | Rolling 24h maximum rain rate |
 
 ---

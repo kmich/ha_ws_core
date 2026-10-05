@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.9.3"
+_INTEGRATION_VERSION = "2.10.0"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -306,6 +306,7 @@ SRC_WIND = "wind_speed"
 SRC_GUST = "wind_gust"
 SRC_WIND_DIR = "wind_direction"
 SRC_RAIN_TOTAL = "rain_total"
+SRC_RAIN_YEAR = "rain_year"  # station's year-to-date total, optional
 SRC_LUX = "illuminance"
 SRC_UV = "uv_index"
 SRC_DEW_POINT = "dew_point"
@@ -324,6 +325,7 @@ SRC_SOIL_TEMP = "soil_temperature"  # soil temperature (°C or unit-detected)
 
 REQUIRED_SOURCES = [SRC_TEMP, SRC_HUM, SRC_PRESS, SRC_WIND, SRC_GUST, SRC_WIND_DIR, SRC_RAIN_TOTAL]
 OPTIONAL_SOURCES = [
+    SRC_RAIN_YEAR,
     SRC_LUX,
     SRC_UV,
     SRC_DEW_POINT,

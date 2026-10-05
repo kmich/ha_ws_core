@@ -27,6 +27,7 @@
         "title": "Optionele sensoren",
         "description": "Deze sensoren verbeteren afgeleide waarden maar zijn niet vereist. Laat leeg om over te slaan.",
         "data": {
+          "rain_year": "Neerslagsensor sinds het begin van het jaar (jaarlijkse reset)",
           "illuminance": "Lichtsterkte / zonnestraling (lux)",
           "uv_index": "UV-index",
           "dew_point": "Dauwpunt (indien geleverd door station; anders berekend)",
@@ -455,6 +456,7 @@
         "title": "Optionele bronsensoren",
         "description": "Werk optionele bronentiteiten bij. Wis een veld om die optionele bron niet meer te gebruiken.",
         "data": {
+          "rain_year": "Neerslagsensor sinds het begin van het jaar (jaarlijkse reset)",
           "illuminance": "Lichtsterkte / zonnestraling (lux)",
           "uv_index": "UV-index",
           "dew_point": "Dauwpunt (indien geleverd door station; anders berekend)",

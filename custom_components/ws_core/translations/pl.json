@@ -27,6 +27,7 @@
         "title": "Czujniki opcjonalne",
         "description": "Te czujniki poprawiają wartości pochodne, ale nie są wymagane. Pozostaw puste, aby pominąć.",
         "data": {
+          "rain_year": "Czujnik opadów od początku roku (reset coroczny)",
           "illuminance": "Natężenie światła / promieniowanie słoneczne (lx)",
           "uv_index": "Indeks UV",
           "dew_point": "Punkt rosy (jeśli dostarcza go stacja; w przeciwnym razie obliczany)",
@@ -455,6 +456,7 @@
         "title": "Opcjonalne czujniki źródłowe",
         "description": "Zaktualizuj opcjonalne encje źródłowe. Wyczyść pole, aby zatrzymać używanie danego czujnika opcjonalnego.",
         "data": {
+          "rain_year": "Czujnik opadów od początku roku (reset coroczny)",
           "illuminance": "Natężenie światła / promieniowanie słoneczne (lx)",
           "uv_index": "Indeks UV",
           "dew_point": "Punkt rosy (jeśli dostarcza go stacja; w przeciwnym razie obliczany)",

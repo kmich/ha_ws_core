@@ -27,6 +27,7 @@
         "title": "Capteurs facultatifs",
         "description": "Mettre à jour les entités optionnelles. Effacez le champ pour désactiver le capteur correspondant.",
         "data": {
+          "rain_year": "Capteur de pluie depuis le début de l’année (remise à zéro annuelle)",
           "illuminance": "Éclairement / rayonnement solaire (lux)",
           "uv_index": "Indice UV",
           "dew_point": "Point de rosée (calculé si absent)",
@@ -485,6 +486,7 @@
         "title": "Capteurs facultatifs",
         "description": "Mettre à jour les entités optionnelles. Effacez le champ pour désactiver le capteur correspondant.",
         "data": {
+          "rain_year": "Capteur de pluie depuis le début de l’année (remise à zéro annuelle)",
           "illuminance": "Éclairement / rayonnement solaire (lux)",
           "uv_index": "Indice UV",
           "dew_point": "Point de rosée (calculé si absent)",

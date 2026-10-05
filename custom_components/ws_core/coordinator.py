@@ -572,6 +572,7 @@ from .const import (
     SRC_LUX,
     SRC_PRESS,
     SRC_RAIN_TOTAL,
+    SRC_RAIN_YEAR,
     SRC_SOIL_MOISTURE,
     SRC_SOIL_TEMP,
     SRC_TEMP,
@@ -2167,6 +2168,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif rain_total_mm is not None and self._rain_this_year_last_total is None:
             self._rain_this_year_last_total = float(rain_total_mm)
         data[KEY_RAIN_THIS_YEAR_MM] = round(self._rain_this_year_mm, 1)
+
+        # A station's year-to-date counter includes rain before WS Core was
+        # installed. A generic cumulative counter cannot supply that baseline.
+        # Keep the calculated accumulator independent for unmapped stations.
+        if yearly_source := self.sources.get(SRC_RAIN_YEAR):
+            yearly_raw = self._num(self.hass, yearly_source)
+            data[KEY_RAIN_THIS_YEAR_MM] = (
+                round(self._to_mm(yearly_raw, self._uom(self.hass, yearly_source)), 1)
+                if yearly_raw is not None and yearly_raw >= 0
+                else None
+            )
 
         # v2.0 — Max rain rate in rolling 24h window
         rate_hist = self._history_view(self._rain_rate_history_24h, now, rain_rate, sample)

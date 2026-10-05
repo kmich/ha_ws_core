@@ -27,6 +27,7 @@
         "title": "Optional sensors",
         "description": "These sensors improve derived metrics but are not required. Leave blank to skip.",
         "data": {
+          "rain_year": "Year-to-date rainfall sensor (resets annually)",
           "illuminance": "Illuminance / solar radiation (lux)",
           "uv_index": "UV index",
           "dew_point": "Dew point (if your station provides it; otherwise it is calculated)",
@@ -455,6 +456,7 @@
         "title": "Optional source sensors",
         "description": "Update optional source entities. Clear a field to stop using that optional source.",
         "data": {
+          "rain_year": "Year-to-date rainfall sensor (resets annually)",
           "illuminance": "Illuminance / solar radiation (lux)",
           "uv_index": "UV index",
           "dew_point": "Dew point (if your station provides it; otherwise it is calculated)",
