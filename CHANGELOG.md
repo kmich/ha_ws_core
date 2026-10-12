@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.10.1] - 2026-10-12
+
+### Fixed
+
+- **Device registry setup crash on existing installations (issue #163):** In Home Assistant 2026.10+, _integration.version returns an AwesomeVersion instance. When updating an existing station device whose sw_version in the device registry was None or unset, evaluating AwesomeVersion != None raised AwesomeVersionCompareException: Not a valid AwesomeVersion object, aborting config entry setup. sw_version is now explicitly cast to string (str(_integration.version)).
+
 ## [2.10.0] - 2026-10-05
 
 ### Fixed

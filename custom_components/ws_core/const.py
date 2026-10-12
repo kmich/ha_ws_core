@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.10.0"
+_INTEGRATION_VERSION = "2.10.1"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 

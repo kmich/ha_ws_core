@@ -668,3 +668,129 @@ class TestOptionsFlowSourceValidation:
 
         # Must not raise vol.Invalid for the empty weather entity.
         schema(user_input)
+
+
+class TestDeviceRegistrySetup:
+    """Issue #163: Ensure device registry setup converts AwesomeVersion to str."""
+
+    async def test_setup_entry_sw_version_with_unmigrated_device(self, hass):
+        """Device registry update must not raise AwesomeVersionCompareException when sw_version is None."""
+        from awesomeversion import AwesomeVersion, AwesomeVersionCompareException
+        from homeassistant.helpers import device_registry as dr
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        from custom_components.ws_core import async_setup_entry
+        from custom_components.ws_core.const import DOMAIN
+
+        dev_reg = dr.async_get(hass)
+        entry_id = "test_entry_issue_163"
+
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            entry_id=entry_id,
+            title="Weather Station",
+            data={
+                CONF_SOURCES: SOURCES,
+                CONF_ELEVATION_M: 50.0,
+                CONF_HEMISPHERE: "northern",
+                CONF_CLIMATE_REGION: "mediterranean",
+                CONF_STALENESS_S: 900,
+                CONF_FORECAST_ENABLED: False,
+                CONF_ENABLE_ZAMBRETTI: True,
+            },
+            options={},
+        )
+        entry.add_to_hass(hass)
+
+        # Simulate existing device with sw_version=None in device registry
+        existing_device = dev_reg.async_get_or_create(
+            config_entry_id=entry_id,
+            identifiers={(DOMAIN, entry_id)},
+            name="Weather Station",
+            manufacturer="Weather Station Core",
+            model="Derived Weather Package",
+            sw_version=None,
+        )
+        assert existing_device.sw_version is None
+
+        # Verify that passing AwesomeVersion directly triggers the crash when old.sw_version is None
+        with pytest.raises(AwesomeVersionCompareException):
+            dev_reg.async_get_or_create(
+                config_entry_id=entry_id,
+                identifiers={(DOMAIN, entry_id)},
+                sw_version=AwesomeVersion("2.10.1"),
+            )
+
+        # Now test that async_setup_entry successfully updates the device without crashing
+        mock_integration = MagicMock()
+        mock_integration.version = AwesomeVersion("2.10.1")
+
+        with (
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator") as mock_coord_cls,
+            patch("custom_components.ws_core.async_get_integration", return_value=mock_integration),
+            patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True),
+        ):
+            mock_coord = mock_coord_cls.return_value
+
+            async def _start():
+                pass
+
+            mock_coord.async_start = _start
+
+            result = await async_setup_entry(hass, entry)
+            assert result is True
+
+        updated_device = dev_reg.async_get_device(identifiers={(DOMAIN, entry_id)})
+        assert updated_device is not None
+        assert updated_device.sw_version == "2.10.1"
+        assert isinstance(updated_device.sw_version, str)
+
+    async def test_setup_entry_sw_version_fallback_when_version_is_none(self, hass):
+        """sw_version falls back to 'unknown' string if integration.version is None."""
+        from homeassistant.helpers import device_registry as dr
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        from custom_components.ws_core import async_setup_entry
+        from custom_components.ws_core.const import DOMAIN
+
+        dev_reg = dr.async_get(hass)
+        entry_id = "test_entry_version_none"
+
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            entry_id=entry_id,
+            title="Weather Station",
+            data={
+                CONF_SOURCES: SOURCES,
+                CONF_ELEVATION_M: 50.0,
+                CONF_HEMISPHERE: "northern",
+                CONF_CLIMATE_REGION: "mediterranean",
+                CONF_STALENESS_S: 900,
+                CONF_FORECAST_ENABLED: False,
+                CONF_ENABLE_ZAMBRETTI: True,
+            },
+            options={},
+        )
+        entry.add_to_hass(hass)
+
+        mock_integration = MagicMock()
+        mock_integration.version = None
+
+        with (
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator") as mock_coord_cls,
+            patch("custom_components.ws_core.async_get_integration", return_value=mock_integration),
+            patch.object(hass.config_entries, "async_forward_entry_setups", return_value=True),
+        ):
+            mock_coord = mock_coord_cls.return_value
+
+            async def _start():
+                pass
+
+            mock_coord.async_start = _start
+
+            result = await async_setup_entry(hass, entry)
+            assert result is True
+
+        device = dev_reg.async_get_device(identifiers={(DOMAIN, entry_id)})
+        assert device is not None
+        assert device.sw_version == "unknown"
