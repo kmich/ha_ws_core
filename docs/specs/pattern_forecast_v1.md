@@ -521,7 +521,10 @@ All probability sensors are `unknown` while their target is `collecting` or `pau
 
 **Translations:** entity names, enum states and `top_factors` keys in `strings.json` and all 8 `translations/*.json`.
 
-**Docs examples** (no blueprint changes in v1): a frost-protection automation gated on `maturity == skilled`, and a dashboard card showing all targets with their maturity. Wiring `sensor.ws_pattern_frost_12h` into the existing `frost_alert` / `freeze_alert` blueprints as an optional early-warning trigger is a follow-up.
+**Docs and blueprints:**
+
+- Docs examples: a frost-protection automation gated on `maturity == skilled`, and a dashboard card showing all targets with their maturity.
+- The existing `frost_alert` / `freeze_alert` blueprints gain an optional early-warning input. If the user picks `sensor.ws_pattern_frost_12h` and a probability threshold, the alert can fire before the temperature actually drops, but only while that sensor's `maturity` is `skilled`. Left empty, the blueprints behave exactly as today.
 
 ---
 
@@ -531,7 +534,7 @@ All probability sensors are `unknown` while their target is `collecting` or `pau
 - **No new threshold fields.** Every target reuses an existing setting (`thresh_freeze_c`, `thresh_heat_day_c`, `thresh_wind_gust_ms`, `lightning_proximity_km`), so there is one definition of "frost", "hot day" and "strong gust" across the integration. Horizons, the rain threshold, learning rates and maturity gates are `PATTERN_*` constants in `const.py`.
 - **Storm data source:**
   - **With a hardware lightning detector mapped,** the storm target uses it automatically. No question is asked, and Blitzortung is ignored.
-  - **Without one, but with Blitzortung entities discovered,** a follow-up step `pattern_forecast` appears after `features`, in both setup and options. It follows the existing chained-step pattern (like `sea_temp`) and holds one boolean:
+  - **Without one, but with Blitzortung entities discovered,** an extra config step `pattern_forecast` appears after `features`, in both setup and options. It follows the existing chained-step pattern (like `sea_temp`) and holds one boolean:
     - `CONF_PATTERN_STORM_INTERNET_LIGHTNING = "pattern_storm_internet_lightning"`, `DEFAULT_PATTERN_STORM_INTERNET_LIGHTNING = False`.
     - Field description (en): "Use internet lightning data (Blitzortung) for the storm forecast. You don't have a lightning detector, so the storm forecast can only work with data downloaded from the Blitzortung community network. All other forecasts stay 100% local. Off by default."
   - **With neither,** no storm target is created. The status sensor attributes say why.
@@ -559,7 +562,7 @@ Revisit default-on in a later minor, once beta stations show typical time-to-`sk
 - **Cross-station or transfer learning,** shared priors, model import/export between users, any skill telemetry.
 - **k-NN analog matching;** a separate calibration layer (Platt/isotonic).
 - **Amount or intensity predictions** (how much rain, how cold, how strong); horizons other than those listed; minute-level timing.
-- **`weather` entity integration;** binary "likely" sensors; blueprint changes (docs examples only).
+- **`weather` entity integration;** binary "likely" sensors; new blueprints (only the optional frost early-warning input on the two existing frost/freeze blueprints is in scope).
 - **User-tunable hyperparameters;** per-target enable toggles.
 - **Day-of-year seasonality features.**
 
@@ -577,13 +580,28 @@ Baseline from recent history: a typical ws_core feature PR is **about 500-750 ad
 
 **Pattern Forecast with five targets: about 3,400-4,000 added lines including tests. Roughly 5-6x a typical feature.** The engine is built around a small **target registry**, where each target declares its window, label rule, feature mask, event rule and threshold source. Adding a target after the first is then mostly declaration plus tests, not new machinery.
 
-It lands as three PRs, all in the same release:
+### Already landed (not part of the Pattern Forecast PR)
 
-| PR | Contents | Est. lines (code + tests) |
+These prerequisites were done in commit `7719020` and need no further work:
+
+- **Off switch for the hourly neighbor-QC fetch:** `enable_neighbor_qc`, on by default, plus `switch.ws_enable_neighbor_qc`, strings in all 8 languages and tests. ws_core can now run fully offline.
+- **Corrected local-first claims** in the README, the docs homepage and the Data & Privacy Disclosure (section 0).
+- **This spec.**
+
+### One PR
+
+All of Pattern Forecast ships as **a single PR** for 2.11.0. Nothing is split into follow-ups.
+
+It is built as four ordered commits so it can be reviewed commit by commit, and so each commit leaves the test suite green:
+
+| Commit | Contents | Est. lines (code + tests) |
 |---|---|---|
 | **1. Engine** | New pure module `pattern_forecast.py` (no HA imports): feature pool, standardizer, target registry (5 targets / 7 models), LR + AdaGrad, pending buffer with window tallies, labeling, prequential scoring, maturity, per-target reset, (de)serialization with validation. Tests on synthetic weather series per target | ~900 + ~900 |
 | **2. Integration** | Coordinator hooks (issue tick, 24 h pressure deque, night fraction, last-daylight clearness, store load/save, data keys), `const.py`, 9 sensor descriptions, feature switch, config + options flow including the internet-lightning step, lightning-source locality check and labelling, `strings.json` + 8 translations, reset/export service targets, diagnostics | ~700 + ~400 |
-| **3. History + docs** | Recorder long-term statistics replay (executor, masking, per-target labels, swap-in), `docs/guides/pattern_forecast.md` (including a table comparing the four "chance of rain" style sensors), `sensors.md` rows, mkdocs nav, example automations and dashboard card | ~450 + ~250 |
+| **3. Learning from history** | Recorder long-term statistics replay (executor, masking, per-target labels, swap-in) | ~350 + ~200 |
+| **4. Docs and blueprints** | `docs/guides/pattern_forecast.md` (including a table comparing the four "chance of rain" style sensors), `sensors.md` rows, mkdocs nav, README feature entry, example automations and dashboard card. Also an optional early-warning trigger on `sensor.ws_pattern_frost_12h` in the existing `frost_alert` / `freeze_alert` blueprints. CHANGELOG entry and manifest version bump to 2.11.0 | ~200 + ~50 |
+
+**Total: about 3,400-4,000 lines.** The PR is large on purpose, to keep the feature in one place. Commit 1 is self-contained and holds most of the logic, so reviewers can read the engine and its tests first and then check that commits 2-4 only wire it in.
 
 **Key tests:**
 
@@ -633,6 +651,6 @@ It lands as three PRs, all in the same release:
 
 1. **Rain threshold for the WS90:** 0.1 or 0.2 mm? Answer from your own recorder data: check the smallest step the rain total moves by (the resolution), and how often lone single counts happen while humidity is low (likely false counts).
 2. **"Skilled" bars:** are 10-15 real events plus beating the usual rate by 2% the right bars? Revisit after the beta with real numbers.
-3. ~~Ship learning from past history in the same release?~~ **Decided:** yes, all three PRs land before 2.11.0 ships.
+3. ~~Ship learning from past history in the same release?~~ **Decided:** yes. Everything ships in one PR for 2.11.0 (section 8).
 4. ~~README: correct the local-first claims before this feature is announced?~~ **Done** (section 0), including the new off switch for the neighbor-QC fetch.
 5. ~~Blitzortung: exclude entirely, or allow as a labelled opt-in?~~ **Decided:** allowed as an explicit opt-in for storm only, off by default, labelled (section 0).
