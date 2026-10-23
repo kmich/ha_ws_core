@@ -463,7 +463,7 @@ All are gated by `CONF_ENABLE_PATTERN_FORECAST` through `_FEATURE_TOGGLE_MAP`, a
 | `sensor.ws_pattern_heat_24h` | same | Always |
 | `sensor.ws_pattern_gust_3h` | same | Always |
 | `sensor.ws_pattern_storm_3h` | same | With a mapped local lightning detector, or with the internet-lightning opt-in (friendly name then ends in "(internet lightning)"; entity ID unchanged, so automations survive a source switch) |
-| `sensor.ws_pattern_forecast_status` | enum: `collecting` (nothing published yet), `learning` (some published, none skilled), `active` (at least one skilled) | Always |
+| `sensor.ws_pattern_forecast_status` | enum: `collecting` (still training), `waiting` (required inputs missing), `learning` (some published, none skilled), `active` (at least one skilled) | Always |
 | `sensor.ws_pattern_forecast_skill` | Number of targets currently `skilled` | `EntityCategory.DIAGNOSTIC`, disabled by default |
 
 All probability sensors are `unknown` while their target is `collecting` or `paused`.

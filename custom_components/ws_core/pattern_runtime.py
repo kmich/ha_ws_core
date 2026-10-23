@@ -70,6 +70,8 @@ from .const import (
     PATTERN_BIN_COUNT,
     PATTERN_HISTORY_DAYS,
     PATTERN_ISSUE_INTERVAL_MIN,
+    PATTERN_MIN_DAYS_COLLECTING,
+    PATTERN_MIN_EVENTS_COLLECTING,
     PATTERN_RAIN_JUMP_CAP_MM,
     PATTERN_SOURCE_INTERNET,
     PATTERN_SOURCE_LOCAL,
@@ -99,6 +101,7 @@ from .pattern_forecast import (
     async_save_engine,
 )
 from .pattern_sources import find_blitzortung_entities, source_fingerprint, storm_source
+from .pattern_wind import direction_vectors
 
 if TYPE_CHECKING:
     from .coordinator import WSStationCoordinator
@@ -177,6 +180,7 @@ class PatternRuntime:
         self._published: dict[str, Any] = {}
         self._error_logged = False
         self._history_running = False
+        self._warm_start: dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # configuration
@@ -443,8 +447,26 @@ class PatternRuntime:
         }
         if o["model_maturity"] == "collecting":
             attrs["progress_pct"] = o["progress_pct"]
+            model = eng.models[tid]
+            attrs["days_checked"] = round(eng.days_checked(model), 1)
+            attrs["days_required"] = PATTERN_MIN_DAYS_COLLECTING
+            attrs["events_collected"] = model.ev_live + model.ev_hist
+            attrs["events_required"] = PATTERN_MIN_EVENTS_COLLECTING
         if o["reason"]:
             attrs["reason"] = o["reason"]
+            feature = o["reason"].removeprefix("waiting_for:")
+            attrs["explanation"] = {
+                "wind_u": "Waiting for recent wind speed and direction history (three 15-minute bins).",
+                "wind_v": "Waiting for recent wind speed and direction history (three 15-minute bins).",
+                "wind_speed": "Waiting for recent wind speed history (three 15-minute bins).",
+                "dp_24h": "Waiting for pressure history from 24 hours ago.",
+            }.get(feature, f"Waiting for usable recent {feature.replace('_', ' ')} data.")
+        elif o["model_maturity"] == "collecting":
+            attrs["reason"] = "collecting_training_data"
+            attrs["explanation"] = (
+                f"Collecting: {attrs['events_collected']}/{attrs['events_required']} events, "
+                f"{attrs['days_checked']}/{attrs['days_required']} checked days."
+            )
         return attrs
 
     def _rebuild_published(self) -> None:
@@ -465,6 +487,8 @@ class PatternRuntime:
                 "events_from_history": o["events_from_history"],
                 "events_required": o["events_required"],
                 "bss": sk["bss"],
+                "reason": outputs[tid].get("reason"),
+                "explanation": outputs[tid].get("explanation"),
             }
             skill[tid] = sk
         status_attrs: dict[str, Any] = {
@@ -473,6 +497,7 @@ class PatternRuntime:
             "internet_inputs": eng.internet_inputs(),
             "last_trained_at": _iso(eng.last_trained_at),
             "storm_target": self._storm_target_text(),
+            "warm_start": dict(self._warm_start),
         }
         self._published = {
             "probs": probs,
@@ -557,7 +582,14 @@ class PatternRuntime:
             return self.coord.sources.get(SRC_WIND_DIR) or None
         return self.history_entity(name, ts)
 
-    def build_recent_bins(self, plan: dict[str, str | None], meta: dict, rows: dict, now_ts: float) -> list[dict]:
+    def build_recent_bins(
+        self,
+        plan: dict[str, str | None],
+        meta: dict,
+        rows: dict,
+        now_ts: float,
+        vectors: dict[float, tuple[float, float]] | None = None,
+    ) -> list[dict]:
         """5-minute statistics -> 15-min history bins shaped like the live ones.
 
         Bin ``B`` covers ``[B - 15 min, B)``: temperature and dew point depression
@@ -630,22 +662,28 @@ class PatternRuntime:
                 h = max(0.0, min(100.0, h + cal_h))
                 if h > 0:
                     d = round(max(0.0, t - calculate_dew_point(t, h)), 2)
-            # Like live ticks, a period counts for wind only with both a speed and a
-            # trustworthy direction; u, v and speed are averaged over those periods.
+            # Speed coverage is independent; vectors additionally need a trustworthy
+            # direction (circular statistics or raw circular components).
             ss, us, vs = [], [], []
             for p in periods:
                 sp = num(wind.get(p), "mean")
-                drow = dirs.get(p)
-                dm, dlo, dhi = num(drow, "mean"), num(drow, "min"), num(drow, "max")
-                if sp is None or dm is None:
-                    continue
-                if not (dir_circular or (dlo is not None and dhi is not None and dhi - dlo <= _DIR_MAX_SPREAD_DEG)):
+                if sp is None:
                     continue
                 sp = max(0.0, c._to_ms(sp, unit("wind")) + cal_w)
-                ang = math.radians(dm)
                 ss.append(sp)
-                us.append(-sp * math.sin(ang))
-                vs.append(-sp * math.cos(ang))
+                drow = dirs.get(p)
+                dm, dlo, dhi = num(drow, "mean"), num(drow, "min"), num(drow, "max")
+                trusted = dm is not None and (
+                    dir_circular or (dlo is not None and dhi is not None and dhi - dlo <= _DIR_MAX_SPREAD_DEG)
+                )
+                if trusted:
+                    sin_dir, cos_dir = math.sin(math.radians(dm)), math.cos(math.radians(dm))
+                elif vectors and p in vectors:
+                    sin_dir, cos_dir = vectors[p]
+                else:
+                    continue
+                us.append(-sp * sin_dir)
+                vs.append(-sp * cos_dir)
             gusts = [g for g in (num(gust.get(p), "max") for p in periods) if g is not None]
             bin_ = {
                 "ts": b,
@@ -657,11 +695,27 @@ class PatternRuntime:
                 "g": max(0.0, c._to_ms(max(gusts), unit("gust")) + cal_w) if gusts else None,
                 "r": rise(rain_end, b, PATTERN_RAIN_JUMP_CAP_MM),
                 "k": rise(strike_end, b, PATTERN_STRIKE_JUMP_CAP) if self.storm_source else None,
-                "n": 5 * len(ss),
+                "n": 5 * len(us),
+                "sn": 5 * len(ss),
             }
             if any(bin_[key] is not None for key in ("t", "d", "s", "g", "r")):
                 bins.append(bin_)
         return bins
+
+    def _fetch_direction_vectors(self, eid: str, start: datetime, end: datetime) -> dict:
+        """Recover circular direction from raw recorder history, on its executor."""
+        from homeassistant.components.recorder.history import get_significant_states
+
+        history = get_significant_states(
+            self.coord.hass,
+            start,
+            end,
+            [eid],
+            significant_changes_only=False,
+            no_attributes=True,
+        )
+        samples = [(s.last_updated.timestamp(), s.state) for s in history.get(eid, [])]
+        return direction_vectors(samples, start.timestamp(), end.timestamp(), float(self.coord.staleness_s))
 
     def _recent_job(self, plan: dict[str, str | None], now_ts: float) -> list[dict]:
         """Read the last ~3.5 h of 5-minute statistics. Runs on the recorder executor."""
@@ -672,7 +726,20 @@ class PatternRuntime:
         meta, rows = self._fetch_statistics(
             ids, datetime.fromtimestamp(start_ts, UTC), datetime.fromtimestamp(now_ts, UTC), period="5minute"
         )
-        return self.build_recent_bins(plan, meta, rows, now_ts)
+        bins = self.build_recent_bins(plan, meta, rows, now_ts)
+        recent = [b for b in bins if now_ts - b["ts"] < 3300]
+        if (eid := plan.get("dir")) and sum(b["n"] > 0 for b in recent) < 3:
+            try:
+                vectors = self._fetch_direction_vectors(
+                    eid,
+                    datetime.fromtimestamp(start_ts, UTC),
+                    datetime.fromtimestamp(now_ts, UTC),
+                )
+            except Exception as err:  # noqa: BLE001 - raw history may be excluded or purged
+                _LOGGER.debug("ws_core pattern forecast: no raw wind-direction history: %s", err)
+            else:
+                bins = self.build_recent_bins(plan, meta, rows, now_ts, vectors)
+        return bins
 
     async def _async_seed_recent(self, now: datetime) -> int:
         """Seed the 15-min history bins from the recorder (every startup, before any replay)."""
@@ -684,6 +751,13 @@ class PatternRuntime:
             _LOGGER.debug("ws_core pattern forecast: no short-term statistics to seed from: %s", err)
             return 0
         wet = [b["ts"] for b in bins if (b.get("r") or 0.0) > 0.0]
+        recent = [b for b in bins if ts - b["ts"] < 3300]
+        self._warm_start = {
+            "seeded_at": _iso(ts),
+            "wind_direction_bins": sum(b["n"] > 0 for b in recent),
+            "wind_speed_bins": sum(b.get("sn", b["n"]) > 0 for b in recent),
+            "bins_required": 3,
+        }
         if wet:
             self.engine.seed_last_rain(max(wet))
         return self.engine.seed_bins(bins)
@@ -979,4 +1053,5 @@ class PatternRuntime:
             "history_learn": eng.history_learn,
             "pending": len(eng.pending),
             "targets_registered": [t.target_id for t in TARGETS],
+            "warm_start": dict(self._warm_start),
         }

@@ -1231,7 +1231,8 @@
         "state": {
           "collecting": "Collecte de données",
           "learning": "Apprentissage",
-          "active": "Actif"
+          "active": "Actif",
+          "waiting": "En attente des données"
         }
       },
       "pattern_forecast_skill": {

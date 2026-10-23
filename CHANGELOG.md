@@ -2,6 +2,24 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.12.0] - 2026-10-23
+
+### Added
+
+- **Explain unknown values.** Sensors expose `reason`, `explanation` and `data_status` attributes when no value can be calculated. Heat and wind-chill indices explain their valid conditions; solar sensors explain missing radiation inputs and the optional illuminance estimate; nowcast countdowns distinguish missing data from no predicted transition; lightning sensors explain missing strike locations or clearance history. Event entities explain when no event has been recorded. Valid numeric states, entity IDs and formulas are preserved.
+- **Pattern Forecast waiting status and progress.** The overall status now reports `waiting` when missing inputs prevent forecasts from publishing, instead of suggesting that training is incomplete. Each collecting forecast exposes its event and checked-day requirements. Missing-input explanations are included on the target and status sensors. The waiting state is translated in all eight languages.
+- **Startup diagnostics.** Pattern Forecast reports recent usable wind-direction and wind-speed bin counts in `warm_start`, including the three-bin requirement.
+
+### Fixed
+
+- **Wind speed discarded when direction was missing or unsuitable.** Live and replayed wind-speed coverage is now tracked independently of direction, so frost does not wait for a wind bearing it does not use. Existing stored bins remain readable without resetting learned models.
+- **Wind startup delay with arithmetic direction statistics spanning north.** When recent direction statistics cannot safely provide vectors, startup can use the recorder's raw direction history to calculate time-weighted circular components. Unknown, unavailable, stale and incomplete periods are excluded. This reads only the last few hours locally, on the recorder executor; if history is unavailable, live collection still fills the gap.
+- **Blank dashboard “Why” column.** Both Pattern Forecast dashboards now show the blocking explanation or collection progress before forecast factors, with a fallback for older integration versions. Existing pasted dashboards need their card YAML updated to receive this display change.
+
+### Notes
+
+- `unknown` remains correct for an inapplicable formula, a missing source, no recorded event, no predicted rain transition, or insufficient training. Values are never replaced with fabricated zeroes. Pattern Forecast skill requirements and automation gates are unchanged.
+
 ## [2.11.2] - 2026-10-23
 
 ### Fixed

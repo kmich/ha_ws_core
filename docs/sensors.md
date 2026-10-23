@@ -112,7 +112,7 @@ Probability sensors are `unknown` (never 0 %) while a forecast is `collecting` o
 | `sensor.ws_pattern_heat_24h` | % | Always |
 | `sensor.ws_pattern_gust_3h` | % | Always |
 | `sensor.ws_pattern_storm_3h` | % | With a mapped lightning detector, or with the internet lightning option (the name then ends in "(internet lightning)"; the entity ID does not change) |
-| `sensor.ws_pattern_forecast_status` | `collecting` / `learning` / `active` (`active` = at least one forecast is `skilled`) | Always |
+| `sensor.ws_pattern_forecast_status` | `collecting` / `waiting` / `learning` / `active` (`active` = at least one forecast is `skilled`) | Always |
 | `sensor.ws_pattern_forecast_skill` | Number of forecasts currently `skilled` (diagnostic, disabled by default) | Always |
 
 **Probability sensor attributes** (the same on every forecast):

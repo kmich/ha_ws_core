@@ -1957,7 +1957,8 @@
         "state": {
           "collecting": "Gegevens verzamelen",
           "learning": "Aan het leren",
-          "active": "Actief"
+          "active": "Actief",
+          "waiting": "Wachten op invoer"
         }
       },
       "pattern_forecast_skill": {

@@ -1197,7 +1197,8 @@
         "state": {
           "collecting": "Collecting data",
           "learning": "Learning",
-          "active": "Active"
+          "active": "Active",
+          "waiting": "Waiting for inputs"
         }
       },
       "pattern_forecast_skill": {

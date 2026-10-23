@@ -62,7 +62,19 @@ async def async_setup_entry(
 
 if _HAS_EVENT:
 
-    class WSRainEvent(CoordinatorEntity, EventEntity):
+    class WSEventEntity(CoordinatorEntity, EventEntity):
+        """Explain the normal empty state before the first weather transition."""
+
+        @property
+        def extra_state_attributes(self) -> dict[str, Any]:
+            if self.state is None:
+                return {
+                    "reason": "no_event_recorded",
+                    "explanation": "No matching weather event has been recorded yet.",
+                }
+            return {}
+
+    class WSRainEvent(WSEventEntity):
         """Fires when rain starts or stops."""
 
         _attr_event_types = ["started", "stopped"]
@@ -108,7 +120,7 @@ if _HAS_EVENT:
                 self.async_write_ha_state()
             self._prev_raining = is_raining
 
-    class WSFrostEvent(CoordinatorEntity, EventEntity):
+    class WSFrostEvent(WSEventEntity):
         """Fires when temperature crosses the freeze threshold."""
 
         _attr_event_types = ["frost", "thaw"]
@@ -155,7 +167,7 @@ if _HAS_EVENT:
                 self.async_write_ha_state()
             self._prev_frozen = is_frozen
 
-    class WSLightningEvent(CoordinatorEntity, EventEntity):
+    class WSLightningEvent(WSEventEntity):
         """Fires when new lightning strikes are detected."""
 
         _attr_event_types = ["strike_detected", "proximity_alert"]

@@ -832,7 +832,19 @@ class PatternEngine:
 
     @staticmethod
     def _new_acc() -> dict[str, Any]:
-        return {"n": 0, "t": None, "d": None, "u": 0.0, "v": 0.0, "s": 0.0, "wn": 0, "g": None, "r": None, "k": None}
+        return {
+            "n": 0,
+            "t": None,
+            "d": None,
+            "u": 0.0,
+            "v": 0.0,
+            "s": 0.0,
+            "wn": 0,
+            "sn": 0,
+            "g": None,
+            "r": None,
+            "k": None,
+        }
 
     def _cov(self, group: str, ok: bool, ts: float) -> float:
         """Seconds of coverage this tick adds for an input group (0 across any gap)."""
@@ -898,8 +910,10 @@ class PatternEngine:
         if obs.wind_u is not None and obs.wind_v is not None and obs.wind_speed is not None:
             acc["u"] += float(obs.wind_u)
             acc["v"] += float(obs.wind_v)
-            acc["s"] += float(obs.wind_speed)
             acc["wn"] += 1
+        if obs.wind_speed is not None:
+            acc["s"] += float(obs.wind_speed)
+            acc["sn"] += 1
         gust_ok = obs.gust is not None
         if gust_ok:
             g = float(obs.gust)  # type: ignore[arg-type]
@@ -1083,11 +1097,12 @@ class PatternEngine:
                     "d": acc["d"],
                     "u": acc["u"] / wn if wn else None,
                     "v": acc["v"] / wn if wn else None,
-                    "s": acc["s"] / wn if wn else None,
+                    "s": acc["s"] / acc["sn"] if acc["sn"] else None,
                     "g": acc["g"],
                     "r": acc["r"],
                     "k": acc["k"],
                     "n": wn,
+                    "sn": acc["sn"],
                 }
             )
         self._acc = self._new_acc()
@@ -1168,7 +1183,15 @@ class PatternEngine:
                 continue
             clean = {k: (float(b[k]) if _finite(b.get(k)) else None) for k in self._BIN_KEYS}
             n = b.get("n")
-            seeds.append({"ts": float(b["ts"]), **clean, "n": int(n) if _finite(n) and n > 0 else 0})
+            sn = b.get("sn", n)
+            seeds.append(
+                {
+                    "ts": float(b["ts"]),
+                    **clean,
+                    "n": int(n) if _finite(n) and n > 0 else 0,
+                    "sn": int(sn) if _finite(sn) and sn > 0 else 0,
+                }
+            )
         merged = sorted(live + seeds, key=lambda b: b["ts"])[-PATTERN_BIN_COUNT:]
         self.bins = deque(merged, maxlen=PATTERN_BIN_COUNT)
         kept = {b["ts"] for b in merged}
@@ -1189,7 +1212,8 @@ class PatternEngine:
             return min(cand, key=lambda b: abs((ts - b["ts"]) - age_s)) if cand else None
 
         def mean_of(key: str) -> float | None:
-            pts = [(b[key], b["n"]) for b in hour_bins if b[key] is not None and b["n"]]
+            count = "sn" if key == "s" else "n"
+            pts = [(b[key], b.get(count, b["n"])) for b in hour_bins if b[key] is not None and b.get(count, b["n"])]
             if len(pts) < 3:
                 return None
             w = sum(n for _, n in pts)
@@ -1657,12 +1681,14 @@ class PatternEngine:
         return self._skill_of(self.window_stats(tid, self._now_ts, PATTERN_SCORING_WEEKS))
 
     def overall_status(self) -> str:
-        """``collecting`` (nothing published yet), ``learning`` or ``active`` (>= 1 skilled)."""
+        """Report published forecasts, or distinguish missing inputs from training."""
         states = [self.target_status(t) for t in self.models]
         if any(s == "skilled" for s in states):
             return "active"
         if any(s in ("learning", "degraded") for s in states):
             return "learning"
+        if any(o.get("reason") for o in self._last_issue.values()):
+            return "waiting"
         return "collecting"
 
     def skilled_count(self) -> int:

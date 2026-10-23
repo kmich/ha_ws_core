@@ -219,7 +219,7 @@ class TestEntities:
 
         status = next(s for s in SENSORS if s.key == KEY_PATTERN_FORECAST_STATUS)
         assert status.device_class == SensorDeviceClass.ENUM
-        assert status.options == ["collecting", "learning", "active"]
+        assert status.options == ["collecting", "waiting", "learning", "active"]
         skill = next(s for s in SENSORS if s.key == KEY_PATTERN_FORECAST_SKILL)
         assert skill.entity_category == EntityCategory.DIAGNOSTIC
         assert skill.entity_registry_enabled_default is False
@@ -304,7 +304,7 @@ class TestTranslations:
             attrs = sensors[key]["state_attributes"]
             assert set(attrs["maturity"]["state"]) == {"collecting", "learning", "skilled", "degraded", "paused"}
             assert set(attrs["data_source"]["state"]) == {"local", "internet"}
-        assert set(sensors[KEY_PATTERN_FORECAST_STATUS]["state"]) == {"collecting", "learning", "active"}
+        assert set(sensors[KEY_PATTERN_FORECAST_STATUS]["state"]) == {"collecting", "waiting", "learning", "active"}
         assert d["entity"]["switch"]["ws_enable_pattern_forecast"]["name"]
         for step, form in (("features", d["config"]["step"]), ("features_opt", d["options"]["step"])):
             assert form[step]["data"]["enable_pattern_forecast"]
@@ -624,7 +624,7 @@ class TestCoordinatorHooks:
         for tid, key in PATTERN_TARGET_KEYS.items():
             if tid != "storm_3h":
                 assert key in data and data[key] is None  # unknown, never 0%
-        assert data[KEY_PATTERN_FORECAST_STATUS] == "collecting"
+        assert data[KEY_PATTERN_FORECAST_STATUS] == "waiting"  # recent/24 h inputs are not ready
         assert data[KEY_PATTERN_FORECAST_SKILL] == 0
         rain = data[const.KEY_PATTERN_OUTPUTS]["rain_3h"]
         assert rain["maturity"] == "collecting" and rain["progress_pct"] == 0
@@ -667,7 +667,7 @@ class TestCoordinatorHooks:
         coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True}, sources, states)
         for _ in range(3):
             data = coord._compute(sample=True)
-        assert data[KEY_PATTERN_FORECAST_STATUS] == "collecting"
+        assert data[KEY_PATTERN_FORECAST_STATUS] == "waiting"  # three live ticks cannot build 24 h history
         assert data["pattern_rain_3h"] is None
         # the same compute with the feature off carries no pattern keys at all
         off, _ = make_coord({}, sources, states)
