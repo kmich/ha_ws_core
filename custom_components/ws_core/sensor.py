@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
@@ -117,6 +118,7 @@ from .const import (
     KEY_OWM_STATIONS_STATUS,
     KEY_OZONE,
     KEY_PACKAGE_STATUS,
+    KEY_PATTERN_STORM_3H,
     KEY_PEAK_SUN_HOURS,
     KEY_PM2_5,
     KEY_PM10,
@@ -206,6 +208,7 @@ from .const import (
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
+    PATTERN_SOURCE_INTERNET,
     UNIT_TEMP_C,
     normalize_indoor_rooms,
 )
@@ -244,11 +247,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     opts = {**entry.data, **entry.options}
 
+    pattern = getattr(coordinator, "_pattern", None)
     filtered: list[WSSensorDescription] = []
     for desc in SENSORS:
         toggle_key = _FEATURE_TOGGLE_MAP.get(desc.key)
         if toggle_key is not None and not opts.get(toggle_key, False):
             continue
+        if desc.key == KEY_PATTERN_STORM_3H:
+            # Pattern Forecast storm target: needs a mapped local lightning detector or
+            # the explicit internet-lightning opt-in. With internet data the name says so
+            # ("(internet lightning)"); the entity id and unique_id stay the same.
+            source = pattern.storm_source if pattern is not None else None
+            if source is None:
+                continue
+            if source == PATTERN_SOURCE_INTERNET:
+                desc = dataclasses.replace(desc, translation_key="pattern_storm_3h_internet")
         filtered.append(desc)
 
     entities: list[SensorEntity] = [WSSensor(coordinator, entry, desc, prefix) for desc in filtered]
@@ -403,6 +416,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             "raw_precip",
             "active_alerts",
             "_climatology_stats",
+            # Pattern Forecast: bulky or fast-changing, not worth recording
+            "top_factors",
+            "per_target",
+            "history_learn",
         }
     )
 

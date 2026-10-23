@@ -17,7 +17,8 @@ References:
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Moon phase UI helpers
@@ -254,6 +255,53 @@ def calculate_clearness_index(solar_rad_wm2: float, sun_elev_deg: float) -> floa
     if rs_max <= 0:
         return None
     return round(min(1.0, solar_rad_wm2 / rs_max), 3)
+
+
+def solar_elevation_deg(lat_deg: float, lon_deg: float, when_utc: Any) -> float:
+    """Sun elevation above the horizon in degrees (no refraction), pure local math.
+
+    Low-precision NOAA solar position (declination and equation of time from
+    the fractional year); good to well under a degree, which is plenty for
+    "is the sun up" questions. ``when_utc`` is a timezone-aware datetime.
+    """
+    utc = when_utc.astimezone(UTC) if when_utc.tzinfo is not None else when_utc.replace(tzinfo=UTC)
+    doy = utc.timetuple().tm_yday
+    hour = utc.hour + utc.minute / 60.0 + utc.second / 3600.0
+    g = 2.0 * math.pi / 365.0 * (doy - 1 + (hour - 12.0) / 24.0)
+    eqtime = 229.18 * (
+        0.000075
+        + 0.001868 * math.cos(g)
+        - 0.032077 * math.sin(g)
+        - 0.014615 * math.cos(2 * g)
+        - 0.040849 * math.sin(2 * g)
+    )
+    decl = (
+        0.006918
+        - 0.399912 * math.cos(g)
+        + 0.070257 * math.sin(g)
+        - 0.006758 * math.cos(2 * g)
+        + 0.000907 * math.sin(2 * g)
+        - 0.002697 * math.cos(3 * g)
+        + 0.00148 * math.sin(3 * g)
+    )
+    true_solar_min = (hour * 60.0 + eqtime + 4.0 * lon_deg) % 1440.0
+    hour_angle = math.radians(true_solar_min / 4.0 - 180.0)
+    lat = math.radians(lat_deg)
+    cos_zenith = math.sin(lat) * math.sin(decl) + math.cos(lat) * math.cos(decl) * math.cos(hour_angle)
+    return 90.0 - math.degrees(math.acos(max(-1.0, min(1.0, cos_zenith))))
+
+
+def night_fraction_ahead(
+    lat_deg: float, lon_deg: float, now_utc: Any, hours: float = 12.0, step_min: int = 30
+) -> float:
+    """Fraction of the next ``hours`` with the sun below the horizon (0.0 - 1.0)."""
+    n = max(1, int(hours * 60 / step_min))
+    dark = 0
+    for k in range(n):
+        t = now_utc + timedelta(minutes=(k + 0.5) * step_min)
+        if solar_elevation_deg(lat_deg, lon_deg, t) < -0.833:
+            dark += 1
+    return dark / n
 
 
 def clearness_to_cloud_cover(kt: float) -> int:

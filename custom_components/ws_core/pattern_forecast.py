@@ -698,6 +698,7 @@ class PatternEngine:
         self.last_trained_at: float | None = None
         self.first_obs_ts: float | None = None
         self.last_rain_ts: float | None = None
+        self.last_day_clear: list[float] | None = None  # [clearness, ts] carried through the night
         self._episodes: dict[str, dict[str, Any]] = {
             "rain": {"ts": None, "amt": 0.0, "counted": False},
             "gust": {"ts": None, "amt": 0.0, "counted": False},
@@ -1148,6 +1149,10 @@ class PatternEngine:
         if hourly is None:
             hourly = int(ts // 60) % 60 == 0
         self._close_bin(ts)
+        if inst.last_day_clearness is not None:
+            self.last_day_clear = [float(inst.last_day_clearness), ts]
+        elif self.last_day_clear is not None and ts - self.last_day_clear[1] < 26 * 3600.0:
+            inst.last_day_clearness = self.last_day_clear[0]
         feats, now_flags = self._features(ts, inst)
         if inst.mslp is not None:
             self.pressure.append([ts, float(inst.mslp)])
@@ -1372,6 +1377,7 @@ class PatternEngine:
             "episodes": {k: dict(v) for k, v in self._episodes.items()},
             "first_obs_ts": self.first_obs_ts,
             "last_rain_ts": self.last_rain_ts,
+            "last_day_clear": list(self.last_day_clear) if self.last_day_clear else None,
             "last_trained_at": self.last_trained_at,
             "history_learn": self.history_learn,
         }
@@ -1489,6 +1495,8 @@ class PatternEngine:
         for key in ("first_obs_ts", "last_rain_ts", "last_trained_at"):
             v = data.get(key)
             setattr(eng, key, float(v) if _finite(v) else None)
+        ldc = data.get("last_day_clear")
+        eng.last_day_clear = [float(ldc[0]), float(ldc[1])] if _floats_ok(ldc, 2) else None
         hl = data.get("history_learn")
         eng.history_learn = hl if isinstance(hl, dict) else {}
         return eng

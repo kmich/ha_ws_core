@@ -17,7 +17,8 @@ reset_learning_state:
   name: Reset learning state
   description: >-
     Resets some or all of the integration's persistent learned state
-    (solar lux factor, forecast skill outcomes, dry/heat/frost streaks).
+    (solar lux factor, forecast skill outcomes, dry/heat/frost streaks, and the
+    Pattern Forecast models, which then start over in the collecting state).
   fields:
     entry_id:
       name: Config entry ID (optional)
@@ -38,11 +39,13 @@ reset_learning_state:
             - "solar"
             - "forecast"
             - "streaks"
+            - "pattern_forecast"
 
 export_learning_state:
   name: Export learning state
   description: >-
-    Logs the current learning state to the HA log (for diagnostics).
+    Logs the current learning state to the HA log (for diagnostics), plus a
+    Pattern Forecast summary (maturity and skill per target, named weights).
   fields:
     entry_id:
       name: Config entry ID (optional)

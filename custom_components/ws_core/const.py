@@ -748,6 +748,42 @@ PATTERN_EVENT_GAP_H = {"rain": 6.0, "gust": 6.0, "storm": 3.0}
 # Starting probability (the station's "usual rate" before any data)
 PATTERN_PRIOR_RATE = {"rain": 0.10, "frost": 0.05, "heat": 0.05, "gust": 0.03, "storm": 0.02}
 
+# Feature toggle (off by default: upgrades gain no entities, storage or recorder query)
+CONF_ENABLE_PATTERN_FORECAST = "enable_pattern_forecast"
+DEFAULT_ENABLE_PATTERN_FORECAST = False
+# The one network-fed input: Blitzortung lightning for the storm target only,
+# used only when no hardware detector is mapped. Labelled everywhere it shows.
+CONF_PATTERN_STORM_INTERNET_LIGHTNING = "pattern_storm_internet_lightning"
+DEFAULT_PATTERN_STORM_INTERNET_LIGHTNING = False
+
+# Data keys - probability sensors (percent 0-100, None while collecting or paused)
+KEY_PATTERN_RAIN_1H = "pattern_rain_1h"
+KEY_PATTERN_RAIN_3H = "pattern_rain_3h"
+KEY_PATTERN_RAIN_6H = "pattern_rain_6h"
+KEY_PATTERN_FROST_12H = "pattern_frost_12h"
+KEY_PATTERN_HEAT_24H = "pattern_heat_24h"
+KEY_PATTERN_GUST_3H = "pattern_gust_3h"
+KEY_PATTERN_STORM_3H = "pattern_storm_3h"
+KEY_PATTERN_FORECAST_STATUS = "pattern_forecast_status"  # collecting | learning | active
+KEY_PATTERN_FORECAST_SKILL = "pattern_forecast_skill"  # number of skilled targets
+# target id (pattern_forecast.TARGETS) -> data key
+PATTERN_TARGET_KEYS = {
+    "rain_1h": KEY_PATTERN_RAIN_1H,
+    "rain_3h": KEY_PATTERN_RAIN_3H,
+    "rain_6h": KEY_PATTERN_RAIN_6H,
+    "frost_12h": KEY_PATTERN_FROST_12H,
+    "heat_24h": KEY_PATTERN_HEAT_24H,
+    "gust_3h": KEY_PATTERN_GUST_3H,
+    "storm_3h": KEY_PATTERN_STORM_3H,
+}
+# Hidden payloads the sensors read their attributes from
+KEY_PATTERN_OUTPUTS = "_pattern_outputs"  # target id -> attribute dict
+KEY_PATTERN_STATUS_ATTRS = "_pattern_status_attrs"
+KEY_PATTERN_SKILL_ATTRS = "_pattern_skill_attrs"
+# Storm data source values
+PATTERN_SOURCE_LOCAL = "local"
+PATTERN_SOURCE_INTERNET = "internet"
+
 # Suppress HA Repairs notifications (issue #20)
 CONF_SUPPRESS_NOTIFICATIONS = "suppress_notifications"
 DEFAULT_SUPPRESS_NOTIFICATIONS = False

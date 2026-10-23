@@ -153,12 +153,14 @@
           "enable_snow": "Snow (precipitation phase + estimated accumulation from your existing rain rate)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns a bias vs. the regional forecast reference and nudges calibration offsets automatically)",
           "enable_neighbor_qc": "Comprobación de sensores (comparación horaria con Open-Meteo para detectar sensores averiados; envía tus coordenadas)",
+          "enable_pattern_forecast": "Pronóstico por patrones (aprende los patrones de tu estación para estimar la probabilidad de lluvia, helada, un día caluroso, rachas fuertes y tormentas; funciona en local)",
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
           "enable_degree_days": "Cálculo de grados-día de crecimiento, calefacción y refrigeración, más una estimación de humedad foliar, útil para agricultura y seguimiento energético.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Activada por defecto. Una vez por hora compara tu temperatura, humedad y presión con el valor de Open-Meteo para las coordenadas configuradas y muestra las diferencias grandes en sensor.ws_neighbor_qc_flags. Desactívala para detener la petición. La calibración adaptativa, si está activada, la sigue usando.",
+          "enable_pattern_forecast": "Aprende del propio historial de tu estación para estimar la probabilidad de lluvia, helada, un día caluroso, rachas fuertes y (con un detector de rayos local) tormentas en las próximas horas. Cada pronóstico muestra valores cuando ha visto suficientes ejemplos de tu estación, a menudo de inmediato si Home Assistant ya tiene historial a largo plazo de tus sensores. Funciona por completo en este equipo.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -231,6 +233,17 @@
           "mqtt_state_prefix": "Prefijo del topic de estado (predeterminado: ws_core)",
           "mqtt_interval_min": "Intervalo de publicación",
           "_go_back": "← Volver al paso anterior"
+        }
+      },
+      "pattern_forecast": {
+        "title": "Pronóstico por patrones: datos de tormenta",
+        "description": "No hay ningún detector de rayos asignado, pero la integración Blitzortung está instalada. El pronóstico de tormenta puede usar sus datos de rayos por internet.",
+        "data": {
+          "pattern_storm_internet_lightning": "Usar datos de rayos por internet (Blitzortung) para el pronóstico de tormenta",
+          "_go_back": "← Volver al paso anterior"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Usar datos de rayos por internet (Blitzortung) para el pronóstico de tormenta. No tienes un detector de rayos, así que el pronóstico de tormenta solo puede funcionar con datos descargados de la red comunitaria Blitzortung. El resto de pronósticos siguen siendo 100 % locales. Desactivado por defecto."
         }
       },
       "sea_temp": {
@@ -501,6 +514,7 @@
           "enable_snow": "Snow (precipitation phase + estimated accumulation)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns bias, nudges calibration automatically)",
           "enable_neighbor_qc": "Comprobación de sensores (comparación horaria con Open-Meteo; envía tus coordenadas)",
+          "enable_pattern_forecast": "Pronóstico por patrones (probabilidad aprendida de lluvia, helada, calor, rachas y tormentas; funciona en local)",
           "enable_climate_normals": "Historical climate normals (today vs. ~10 years of local history)"
         },
         "data_description": {
@@ -522,6 +536,7 @@
           "enable_nowcast": "Nowcast de precipitación de 15 minutos de Open-Meteo: minutos hasta que empiece/pare la lluvia, total de la próxima hora, intensidad. Sin clave API",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Activada por defecto. Una vez por hora compara tu temperatura, humedad y presión con el valor de Open-Meteo para las coordenadas configuradas y muestra las diferencias grandes en sensor.ws_neighbor_qc_flags. Desactívala para detener la petición. La calibración adaptativa, si está activada, la sigue usando.",
+          "enable_pattern_forecast": "Aprende del propio historial de tu estación para estimar la probabilidad de lluvia, helada, un día caluroso, rachas fuertes y (con un detector de rayos local) tormentas en las próximas horas. Cada pronóstico muestra valores cuando ha visto suficientes ejemplos de tu estación, a menudo de inmediato si Home Assistant ya tiene historial a largo plazo de tus sensores. Funciona por completo en este equipo.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -576,6 +591,16 @@
           "enable_windy": "Subida a Windy.com",
           "enable_cwop": "Subida CWOP / APRS",
           "enable_mqtt": "Republicación MQTT Discovery"
+        }
+      },
+      "pattern_forecast_opt": {
+        "title": "Pronóstico por patrones: datos de tormenta",
+        "description": "No hay ningún detector de rayos asignado, pero la integración Blitzortung está instalada. El pronóstico de tormenta puede usar sus datos de rayos por internet.",
+        "data": {
+          "pattern_storm_internet_lightning": "Usar datos de rayos por internet (Blitzortung) para el pronóstico de tormenta"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Usar datos de rayos por internet (Blitzortung) para el pronóstico de tormenta. No tienes un detector de rayos, así que el pronóstico de tormenta solo puede funcionar con datos descargados de la red comunitaria Blitzortung. El resto de pronósticos siguen siendo 100 % locales. Desactivado por defecto."
         }
       },
       "sea_temp_opt": {
@@ -990,6 +1015,193 @@
       },
       "river_level": {
         "name": "Nivel del río"
+      },
+      "pattern_rain_1h": {
+        "name": "Patrón lluvia 1 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_3h": {
+        "name": "Patrón lluvia 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_6h": {
+        "name": "Patrón lluvia 6 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_frost_12h": {
+        "name": "Patrón helada 12 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_heat_24h": {
+        "name": "Patrón calor 24 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_gust_3h": {
+        "name": "Patrón rachas 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h": {
+        "name": "Patrón tormenta 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h_internet": {
+        "name": "Patrón tormenta 3 h (rayos por internet)",
+        "state_attributes": {
+          "maturity": {
+            "name": "Madurez",
+            "state": {
+              "collecting": "Recopilando datos",
+              "learning": "Aprendiendo",
+              "skilled": "Fiable",
+              "degraded": "Degradado",
+              "paused": "En pausa"
+            }
+          },
+          "data_source": {
+            "name": "Fuente de datos",
+            "state": {
+              "local": "Local",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_forecast_status": {
+        "name": "Pronóstico por patrones: estado",
+        "state": {
+          "collecting": "Recopilando datos",
+          "learning": "Aprendiendo",
+          "active": "Activo"
+        }
+      },
+      "pattern_forecast_skill": {
+        "name": "Pronóstico por patrones: acierto"
       },
       "rain_next_60min": {
         "name": "Lluvia próximos 60 min"
@@ -2609,6 +2821,9 @@
       "ws_enable_neighbor_qc": {
         "name": "Función: Comprobación de sensores"
       },
+      "ws_enable_pattern_forecast": {
+        "name": "Función: Pronóstico por patrones"
+      },
       "ws_enable_climate_normals": {
         "name": "Feature: Historical Climate Normals"
       },
@@ -2728,6 +2943,38 @@
         "pirate_weather": "Pirate Weather (nivel gratuito, clave API)",
         "meteo_france": "Météo France (nivel gratuito, clave API)",
         "ha_weather_entity": "Entidad meteorológica de Home Assistant (sin llamadas API)"
+      }
+    },
+    "pattern_factor": {
+      "options": {
+        "afternoon": "Tarde",
+        "air_near_saturation": "Aire cerca de la saturación",
+        "already_cold": "Ya hace frío",
+        "calm_wind": "Viento en calma",
+        "clear_sky": "Cielo despejado",
+        "cloudy": "Nublado",
+        "cooling_fast": "Enfriamiento rápido",
+        "dry_air": "Aire seco",
+        "gusty_now": "Rachas ahora",
+        "hot_yesterday": "Calor ayer",
+        "lightning_nearby": "Rayos cerca",
+        "long_dry_spell": "Racha seca prolongada",
+        "long_night": "Noche larga por delante",
+        "night": "Noche",
+        "pressure_falling": "Presión en descenso",
+        "pressure_rising": "Presión en ascenso",
+        "raining_now": "Lloviendo ahora",
+        "sunny": "Soleado",
+        "warm_and_humid": "Cálido y húmedo",
+        "warm_wind_sector": "Dirección de viento cálida",
+        "wet_wind_sector": "Dirección de viento húmeda",
+        "windy_now": "Ventoso ahora"
+      }
+    },
+    "pattern_effect": {
+      "options": {
+        "raises": "Aumenta la probabilidad",
+        "lowers": "Reduce la probabilidad"
       }
     },
     "hemisphere": {

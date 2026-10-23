@@ -114,4 +114,11 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
         "runtime": runtime_info,
         "data_quality": (data or {}).get(KEY_DATA_QUALITY),
         "quality_flags": (data or {}).get(KEY_SENSOR_QUALITY_FLAGS, []),
+        # Pattern Forecast: maturity and skill per target, named weights, standardizer
+        # stats and whether internet lightning is in use. No location data.
+        "pattern_forecast": (
+            coord._pattern.diagnostics()
+            if coord is not None and getattr(coord, "_pattern", None) is not None
+            else {"enabled": False}
+        ),
     }

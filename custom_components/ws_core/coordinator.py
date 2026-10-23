@@ -158,6 +158,7 @@ from .const import (
     CONF_ENABLE_NEIGHBOR_QC,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
+    CONF_ENABLE_PATTERN_FORECAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_SEA_TEMP,
@@ -259,6 +260,7 @@ from .const import (
     DEFAULT_ENABLE_NEIGHBOR_QC,
     DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_OWM_STATIONS,
+    DEFAULT_ENABLE_PATTERN_FORECAST,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_SNOW,
@@ -597,6 +599,7 @@ from .const import (
     normalize_indoor_rooms,
 )
 from .models import WsData
+from .pattern_runtime import PatternRuntime
 from .providers import get_provider
 from .uploaders import (
     _redact_secrets,
@@ -1050,6 +1053,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # see _neighbor_qc_fetch_needed for why auto-calibration also keeps it alive.
         self.neighbor_qc_enabled = bool(_get(CONF_ENABLE_NEIGHBOR_QC, DEFAULT_ENABLE_NEIGHBOR_QC))
 
+        # v2.11 Pattern Forecast (opt-in): local learning forecaster. All of its logic
+        # lives in PatternRuntime / pattern_forecast.py; the coordinator only hooks it in.
+        self.pattern_enabled = bool(_get(CONF_ENABLE_PATTERN_FORECAST, DEFAULT_ENABLE_PATTERN_FORECAST))
+        self._pattern: PatternRuntime | None = PatternRuntime(self) if self.pattern_enabled else None
+
         # v1.8.4 Suppress HA Repairs notifications (issue #20)
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
 
@@ -1258,6 +1266,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("ws_core: failed to restore history state (starting fresh): %s", err)
 
+        # v2.11 - Pattern Forecast engine (its own store, so a learning-state schema
+        # bump never wipes trained models and vice versa). A missing or corrupt store
+        # starts fresh; async_load_engine never raises.
+        if self._pattern is not None:
+            await self._pattern.async_load(self._pattern.make_store(entry_id))
+
         # v2.7 - Climate normals table (its own store: infrequently written,
         # ~365 entries, kept separate from the frequently-saved learning blob)
         if self.climate_normals_enabled:
@@ -1396,6 +1410,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._history_store is not None:
             with contextlib.suppress(Exception):
                 await self._history_store.async_save(self._dump_history_state())
+        if self._pattern is not None:
+            await self._pattern.async_save()
         # v2.0: remove MQTT Discovery entries on clean shutdown
         if self.mqtt_enabled and self._mqtt_discovery_published:
             from .mqtt_publisher import async_unpublish_discovery
@@ -1406,6 +1422,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._mqtt_discovery_prefix,
                     self.entry_options.get("prefix", "ws"),
                 )
+
+    async def async_reset_pattern_forecast(self) -> None:
+        """Service hook (reset_learning_state, target pattern_forecast)."""
+        if self._pattern is not None:
+            await self._pattern.async_reset()
 
     @callback
     def _handle_source_change(self, event) -> None:
@@ -4058,6 +4079,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self._history_store is not None:
                 with contextlib.suppress(Exception):
                     await self._history_store.async_save(self._dump_history_state())
+            if self._pattern is not None:
+                await self._pattern.async_save()
 
     # ------------------------------------------------------------------
     # v1.7.1 - rolling-window history + accumulator persistence (issue #16)
@@ -4416,6 +4439,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_consistency_checks(data, now)
         self._compute_learning_sensors(data)
         self._compute_conditions_summary(data)
+
+        # v2.11 Pattern Forecast: fed on the 60 s sample tick only (never from
+        # _handle_source_change), issues on the 15-minute marks, reads local sensors only.
+        pattern = getattr(self, "_pattern", None)
+        if pattern is not None:
+            pattern.update(data, now, sample)
 
         # Solar lux factor learning (A4): update on clear days near solar noon
         if sample and lux is not None and self._learning_state.solar_lux_factor:
