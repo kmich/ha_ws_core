@@ -644,7 +644,8 @@ class TestCoordinatorHooks:
         assert rt._threshold_display("rain") == (0.008, "in")
         assert rt._threshold_display("frost") == (32.0, "°F")
 
-    def test_full_compute_publishes_the_pattern_keys(self):
+    @pytest.mark.parametrize(("minute", "expected"), [(0, "waiting"), (7, "collecting")])
+    def test_full_compute_publishes_the_pattern_keys(self, minute, expected):
         sources = {
             "temperature": "sensor.t",
             "humidity": "sensor.h",
@@ -665,9 +666,12 @@ class TestCoordinatorHooks:
             "sun.sun": state("above_horizon", elevation=30),
         }
         coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True}, sources, states)
-        for _ in range(3):
-            data = coord._compute(sample=True)
-        assert data[KEY_PATTERN_FORECAST_STATUS] == "waiting"  # three live ticks cannot build 24 h history
+        # Before the first issue mark no forecast has been attempted; at an issue
+        # mark missing recent/24 h history is explicitly reported as waiting.
+        with patch.object(pattern_runtime.dt_util, "utcnow", return_value=datetime(2026, 3, 1, 12, minute, tzinfo=UTC)):
+            for _ in range(3):
+                data = coord._compute(sample=True)
+        assert data[KEY_PATTERN_FORECAST_STATUS] == expected
         assert data["pattern_rain_3h"] is None
         # the same compute with the feature off carries no pattern keys at all
         off, _ = make_coord({}, sources, states)
