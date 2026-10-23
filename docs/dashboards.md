@@ -106,9 +106,11 @@ Paste individual card definitions into any existing dashboard.
 
 ## Pattern Forecast card
 
-The shipped dashboards do not include Pattern Forecast. The
+The Weather dashboard (`weather_dashboard.yaml`) has a Pattern Forecast section at the
+end of its Advanced page. It appears once `switch.ws_enable_pattern_forecast` is on and
+shows every forecast's chance, maturity and top factors. For any other dashboard, the
 [Pattern Forecast guide](guides/pattern_forecast.md#a-dashboard-card) has a native
-Markdown card that lists every forecast with its maturity; paste it into any dashboard.
+Markdown card that lists every forecast with its maturity; paste it in.
 
 ---
 

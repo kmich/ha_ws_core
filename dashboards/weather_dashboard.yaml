@@ -3939,3 +3939,62 @@ views:
               entities:
                 - entity: sensor.ws_auto_calibration
                   name: Status
+
+      - type: grid
+        column_span: 4
+        columns: 3
+        card_mod:
+          style: |
+            ha-card {
+              background: transparent !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 0 !important;
+            }
+        cards:
+          - type: heading
+            heading: Pattern Forecast (2.11, opt-in)
+            heading_style: title
+            icon: mdi:chart-bell-curve-cumulative
+
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_pattern_forecast
+                state: "on"
+            card:
+              type: entities
+              title: Chance in the next hours
+              icon: mdi:weather-partly-rainy
+              entities:
+                - entity: sensor.ws_pattern_forecast_status
+                  name: Status
+                - entity: sensor.ws_pattern_rain_1h
+                  name: Rain, 1 h
+                - entity: sensor.ws_pattern_rain_3h
+                  name: Rain, 3 h
+                - entity: sensor.ws_pattern_rain_6h
+                  name: Rain, 6 h
+                - entity: sensor.ws_pattern_frost_12h
+                  name: Frost, 12 h
+                - entity: sensor.ws_pattern_heat_24h
+                  name: Hot day, 24 h
+                - entity: sensor.ws_pattern_gust_3h
+                  name: Strong gust, 3 h
+
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.ws_enable_pattern_forecast
+                state: "on"
+            card:
+              type: markdown
+              title: Maturity and why
+              content: |
+                {% set t = [('sensor.ws_pattern_rain_1h', 'Rain, 1 h'), ('sensor.ws_pattern_rain_3h', 'Rain, 3 h'), ('sensor.ws_pattern_rain_6h', 'Rain, 6 h'), ('sensor.ws_pattern_frost_12h', 'Frost, 12 h'), ('sensor.ws_pattern_heat_24h', 'Hot day, 24 h'), ('sensor.ws_pattern_gust_3h', 'Strong gust, 3 h'), ('sensor.ws_pattern_storm_3h', 'Thunderstorm, 3 h')] %}
+                | Forecast | Maturity | Why |
+                |---|---|---|
+                {% for e, label in t if state_attr(e, 'maturity') %}| {{ label }} | {{ state_attr(e, 'maturity') }} | {% for f in state_attr(e, 'top_factors') or [] %}{{ f.factor | replace('_', ' ') }} ({{ f.effect }}){{ ', ' if not loop.last }}{% endfor %} |
+                {% endfor %}
+
+                Numbers read unknown while a forecast is still collecting. Use one in automations once its maturity is **skilled**.

@@ -118,6 +118,14 @@ from .const import (
     KEY_OWM_STATIONS_STATUS,
     KEY_OZONE,
     KEY_PACKAGE_STATUS,
+    KEY_PATTERN_FORECAST_SKILL,
+    KEY_PATTERN_FORECAST_STATUS,
+    KEY_PATTERN_FROST_12H,
+    KEY_PATTERN_GUST_3H,
+    KEY_PATTERN_HEAT_24H,
+    KEY_PATTERN_RAIN_1H,
+    KEY_PATTERN_RAIN_3H,
+    KEY_PATTERN_RAIN_6H,
     KEY_PATTERN_STORM_3H,
     KEY_PEAK_SUN_HOURS,
     KEY_PM2_5,
@@ -745,6 +753,17 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_SNOW_THIS_MONTH_CM: "snow_this_month",
             KEY_SNOW_THIS_YEAR_CM: "snow_this_year",
             KEY_SNOW_RECORD_DAY_CM: "snow_record_day",
+            # v2.11 Pattern Forecast. Same as the fallback slug; listed so the
+            # dashboard validator (scripts/validate_dashboard_entities.py) knows them.
+            KEY_PATTERN_RAIN_1H: "pattern_rain_1h",
+            KEY_PATTERN_RAIN_3H: "pattern_rain_3h",
+            KEY_PATTERN_RAIN_6H: "pattern_rain_6h",
+            KEY_PATTERN_FROST_12H: "pattern_frost_12h",
+            KEY_PATTERN_HEAT_24H: "pattern_heat_24h",
+            KEY_PATTERN_GUST_3H: "pattern_gust_3h",
+            KEY_PATTERN_STORM_3H: "pattern_storm_3h",
+            KEY_PATTERN_FORECAST_STATUS: "pattern_forecast_status",
+            KEY_PATTERN_FORECAST_SKILL: "pattern_forecast_skill",
         }
         if key in overrides:
             return overrides[key]
