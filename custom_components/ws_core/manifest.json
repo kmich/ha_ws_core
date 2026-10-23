@@ -2,7 +2,8 @@
   "domain": "ws_core",
   "name": "Weather Station Core",
   "after_dependencies": [
-    "mqtt"
+    "mqtt",
+    "recorder"
   ],
   "codeowners": [
     "@kmich"
