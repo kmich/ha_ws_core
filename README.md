@@ -138,6 +138,7 @@ In the `dashboards/` directory, you'll find:
 Behind the friendly sensors, `ws_core` runs rigorous, peer-reviewed meteorological algorithms and advanced power packs:
 
 * **🌧️ Nowcast Ground-Truth Blending:** Blends Open-Meteo's 15-minute precipitation forecast with your physical rain gauge (70% gauge / 30% forecast for the next 15 minutes, 50/50 for the 15 after) for sharper rain start times.
+* **🔮 Pattern Forecast (opt-in):** Learns from your own station to estimate the *chance* of rain (1/3/6 h), frost, a hot day, strong gusts and thunderstorms over windows of hours. These are probabilities, not a countdown, and not a regional forecast. It needs time to learn, shows `unknown` until it has enough examples (often right away if Home Assistant already has long-term statistics of your sensors), and scores itself so you can gate automations on `maturity: skilled`. 100% local; the only exception is an optional, labelled setting that lets the storm forecast use Blitzortung internet lightning data if you have no detector. See the [guide](https://kmich.github.io/ha_ws_core/guides/pattern_forecast/) and the [method](https://kmich.github.io/ha_ws_core/science/#pattern-forecast).
 * **🌿 Plant Health & Agricultural Spraying:** Computes **Delta-T** spray window suitability (know the exact window to spray fertilizer without evaporation or drift), **VPD** (Vapor Pressure Deficit) for greenhouses, and **Leaf Wetness** to detect fungal risks.
 * **⚡ Energy & HVAC Load Optimization:** Tracks **Heating Degree Days (HDD)** and **Cooling Degree Days (CDD)** to forecast heat pump and air conditioning demand and automate pre-cooling with solar energy.
 * **🌍 10-Year Climate Normals (ERA5):** Compares today's temperature and rain against a 10-year historical baseline for your exact coordinates (`sensor.ws_temp_anomaly_normal`).
@@ -167,6 +168,7 @@ For complete equations, source citations, and mathematical references, see the [
 | **French Vigilance** | French government geocoder (api-adresse.data.gouv.fr), then OpenDataSoft | Coordinates to the geocoder, then department code | Only if enabled |
 | **Vigicrues River Levels** | Hub'Eau (French government) | Coordinates or chosen station ID | Only if enabled |
 | **Lightning via Blitzortung** | Blitzortung network (through its own HA integration) | Whatever the Blitzortung integration sends | Only if that integration is installed and no lightning sensor is mapped |
+| **Pattern Forecast storm data (internet lightning)** | Blitzortung network (through its own HA integration) | Nothing sent by ws_core | Only if Pattern Forecast is enabled, no lightning detector is mapped, and you turn on *Use internet lightning data*. Labelled in the sensor name and attributes. All other Pattern Forecast sensors are fully local |
 | **PWS Network Uploads** | Selected network (e.g. WU, WOW) | Station readings & user credentials | Only if enabled |
 | **MQTT Discovery** | Local MQTT broker | Derived sensor values | Only if enabled |
 

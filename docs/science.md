@@ -317,12 +317,173 @@ Quality — the Air Quality Index (AQI).*
 
 ---
 
+## Pattern Forecast {#pattern-forecast}
+
+Pattern Forecast is the one part of `ws_core` that learns. It estimates the probability
+that an event happens at this station within a window, using only this station's own
+sensors. This section is the method; the [user guide](guides/pattern_forecast.md)
+shows how to use it.
+
+### Events and thresholds
+
+| Forecast | Event, checked against | Window | Threshold |
+|---|---|---|---|
+| Rain | Rain total gains at least 0.2 mm | 1 h, 3 h, 6 h | fixed (a conventional measurable-rain floor, one tip of a 0.2 mm bucket) |
+| Frost | Lowest temperature at or below the freeze threshold | 12 h | `thresh_freeze_c`, default 0 °C |
+| Heat | Highest temperature at or above the hot-day threshold | 24 h | `thresh_heat_day_c`, default 30 °C |
+| Gust | Highest gust at or above the gust alert threshold | 3 h | `thresh_wind_gust_ms`, default 17 m/s |
+| Storm | At least 2 lightning strikes within the proximity distance | 3 h | `lightning_proximity_km`, default 15 km |
+
+Forecasts are issued every 15 minutes (on :00, :15, :30, :45). Rain, gust and storm
+models learn from every issue; frost and heat learn from the on-the-hour issues only,
+because their 12 to 24 h windows overlap so much that quarter-hour samples add almost
+no information.
+
+### Features
+
+One pool of 23 inputs is computed at each issue. Each forecast uses a fixed subset
+(a tick marks use); every model also has a bias term. All values are metric.
+
+| # | Feature | Definition | Rain | Frost | Heat | Gust | Storm |
+|---|---|---|:-:|:-:|:-:|:-:|:-:|
+| 1 | `mslp` | Sea-level pressure, hPa | x | x | x | x | x |
+| 2 | `dp_3h` | 3 h pressure tendency (least-squares) | x | x | | x | x |
+| 3 | `dp_24h` | 24 h pressure change | x | x | x | x | |
+| 4 | `temp` | Temperature, °C | | x | x | | x |
+| 5 | `dpd` | Dew point depression, T - Td | x | x | x | | x |
+| 6 | `dpd_1h` | Change in `dpd` over 1 h | x | | | | x |
+| 7 | `t_1h` | Temperature change over 1 h | x | x | | x | x |
+| 8 | `t_3h` | Temperature change over 3 h | | x | x | | |
+| 9 | `t_max_24h` | Highest temperature, last 24 h | | | x | | |
+| 10 | `wind_u` | 1 h mean east-west wind component | x | | x | x | |
+| 11 | `wind_v` | 1 h mean north-south wind component | x | | x | x | |
+| 12 | `wind_speed` | 1 h mean wind speed | | x | | x | |
+| 13 | `gust_1h` | Highest gust, last 1 h | | | | x | x |
+| 14 | `rain_1h` | log(1 + rain in the last 1 h, mm) | x | x | | | x |
+| 15 | `dry_hours` | log(1 + hours since rain), capped at 48 h | x | | x | | |
+| 16 | `cloud_deficit` | 1 - clearness index while the sun is up, else 0 | x | | x | | x |
+| 17 | `solar_ok` | 1 when feature 16 is real, else 0 | x | | x | | x |
+| 18 | `last_day_clearness` | Clearness of the last daylight hour, carried through the night | | x | | | |
+| 19 | `last_day_clearness_ok` | 1 when feature 18 is real | | x | | | |
+| 20 | `night_frac_12h` | Fraction of the next 12 h with the sun below the horizon (local solar-position math) | | x | | | |
+| 21 | `hour_sin` | sin(2 pi * local hour / 24) | x | x | x | x | x |
+| 22 | `hour_cos` | cos(2 pi * local hour / 24) | x | x | x | x | x |
+| 23 | `lightning_1h` | log(1 + strikes within proximity, last 1 h) | | | | | x |
+| | **Inputs per forecast** | | **14** | **14** | **13** | **10** | **13** |
+
+Wind direction enters as east-west and north-south components, because an angle cannot
+be averaged or fed to a linear model; calm wind is a separate speed input for the same
+reason. Missing solar data becomes 0 plus a `_ok` = 0 flag, so the model can tell
+"clear" from "no data".
+
+### Model
+
+Each forecast is one small online logistic regression over its features plus a bias:
+`p = 1 / (1 + exp(-(w0 + sum(wi * zi))))`.
+
+- **Standardizer.** A running mean and variance per feature, shared by all models:
+  Welford's algorithm for the first 7 days of samples, then a slow exponential average
+  with a half-life of about 30 days. Standardized values `z` are clipped to +/-5, so one
+  sensor spike cannot blow up a weight.
+- **Training.** Stochastic gradient descent with an L2 penalty on the weights (not the
+  bias), AdaGrad per-weight step sizes and a **learning-rate floor**, so the model
+  never stops adapting to the seasons. Gradients are clipped and the weight norm is
+  bounded. After each update, a non-finite or out-of-bound weight restores the model's
+  last daily checkpoint.
+- **Plain log loss.** No class weighting, because weighting a rare event destroys
+  calibration.
+- **Monotone rain.** The events are nested (rain within 1 h implies rain within 3 h), so
+  after prediction `p3 = max(p3, p1)` and `p6 = max(p6, p3)`.
+- **Size.** About 100 weights, tens of microseconds per prediction, pure Python, no
+  numpy, no new dependency.
+- **Explanation.** Each feature's signed contribution `wi * zi` is mapped to a
+  deterministic factor key (for example falling pressure, clear sky); the three largest
+  become `top_factors`.
+
+### Labels
+
+Every issued forecast waits in a small pending buffer, keeping running tallies, until its
+window closes. Then the label is decided:
+
+- If valid readings cover **less than 90 %** of the window, or Home Assistant was down
+  or restarted while it was open, the label is **unknown and discarded**. Missing data
+  is never read as "it did not happen"; that would bias every model low.
+- Counters (rain, lightning) sum **positive deltas**. A decrease is a counter reset, not
+  negative rain. A single jump far beyond what is physically possible invalidates the
+  window.
+- Lightning strikes count only within the proximity distance when a distance sensor is
+  mapped.
+
+### Scoring
+
+The forecast is **scored first, then trained on** (prequential evaluation), so the score
+is never flattered by the example it just learned from. Over weekly aggregates covering
+the last 52 weeks:
+
+- The **Brier score** of the model, `mean((p - y)^2)`.
+- The **Brier skill score** versus the station's usual rate, `BSS = 1 - B_model / B_usual`,
+  where the usual rate is a 30-day running base rate. 0 means no better than always
+  saying the usual chance, 1 is perfect, negative is worse.
+- The Brier score of **conditional persistence** ("same as now": wet now, frost in the
+  last 24 h, hot in the last 24 h, strong gust in the last 3 h, lightning in the last
+  hour), reported as `bss_vs_persistence`. This is the bar to clear where persistence is
+  strong (rain 1 h, heat).
+- A 10-bin **reliability** table (count, mean forecast, observed frequency).
+- For information only: the Brier score of the existing heuristics (`rain_probability`
+  and `thunderstorm_risk`) where one exists.
+
+### Maturity
+
+Events, not samples, are counted, because consecutive samples are strongly
+autocorrelated. An event is a rain, gust or storm episode (separated from the previous by
+6 h, 6 h and 3 h of quiet), a local night whose minimum reached the freeze threshold, or
+a local date whose maximum reached the hot-day threshold.
+
+| Forecast | Leaves `collecting` at | `skilled` when, within the last 52 weeks of live data |
+|---|---|---|
+| Rain | 7 days and 5 events | at least 15 events and BSS above 0.02 |
+| Frost | 7 days and 5 frost nights | at least 10 frost nights and BSS above 0.02 |
+| Heat | 7 days and 5 hot days | at least 10 hot days and BSS above 0.02 |
+| Gust | 7 days and 5 episodes | at least 10 episodes and BSS above 0.02 |
+| Storm | 7 days and 5 episodes | at least 10 episodes and BSS above 0.02 |
+
+A `skilled` forecast becomes `degraded` when its BSS over the last 5 weeks is 0 or less,
+judged only when those weeks contain at least 3 events; otherwise the previous verdict
+stands, so a seasonal forecast does not flap out of season. The gates are constants and
+may be tuned after beta data. Input checks reuse the existing staleness, spike, drift
+and stuck-sensor detectors; a flagged input pauses only the forecasts that use it.
+
+### Learning from recorder statistics
+
+Home Assistant keeps hourly long-term statistics (mean, min, max, sum) of sensors that
+have a `state_class`. When Pattern Forecast starts with an empty model it replays up to
+365 days of them through the same unit conversion and calibration offsets as live data,
+on the recorder executor and on a copy of the models, then swaps the result in.
+
+Replay is approximate and is labelled as such: one sample per hour; the hourly mean
+stands in for the instantaneous value; 1 h and 3 h changes come from hourly means;
+frost labels use the hourly minimum and heat labels the hourly maximum; wind direction
+is masked (an angle cannot be averaged across 0 and 360 degrees), so `wind_u` and
+`wind_v` receive no gradient; storm labels have no distance filter; clearness inputs
+are unavailable. Replayed samples count toward leaving `collecting`, but never toward
+`skilled`, because skill must be proven on live 15-minute data.
+
+### Local-first contract
+
+Inputs and labels come only from the configured source sensors. It never reads the
+forecast cache, nowcast, climate normals, neighbor quality control or any other
+network-fed value, and it sends nothing anywhere. The single exception is the explicit,
+labelled, off-by-default option to use Blitzortung lightning for the storm forecast when
+no detector is mapped; it feeds only the storm model.
+
+---
+
 ## Services {#services}
 
 | Service | Description |
 |---|---|
 | `ws_core.reset_rain_baseline` | Reset the internal rain total baseline (useful after station rain counter resets) |
-| `ws_core.reset_learning_state` | Reset learned solar factor, forecast skill and/or streak counters |
+| `ws_core.reset_learning_state` | Reset learned solar factor, forecast skill, streak counters and/or the Pattern Forecast models |
 | `ws_core.export_learning_state` | Write the learning state to the Home Assistant log |
 | `ws_core.apply_calibration` | Write sensor calibration offsets from an automation or Developer Tools |
 
@@ -374,6 +535,11 @@ Download diagnostics via **Settings → Devices & Services → Weather Station C
 6. 24h statistics are computed from rolling windows that are persisted to disk and
    restored on HA restart, so a normal restart preserves them. Extended downtime
    still leaves a gap in the window until it refills.
+7. Pattern Forecast needs time and real events at your station before a forecast is
+   published, may never mature where an event is rare, is seasonal (heat and storm are
+   beta until a summer of live data has been checked), and sees only what one station's
+   sensors reveal. It is not a regional or radar forecast. Learning from history is
+   approximate (see [Pattern Forecast](#pattern-forecast)).
 
 ---
 

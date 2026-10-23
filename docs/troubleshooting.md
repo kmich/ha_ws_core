@@ -24,6 +24,32 @@
 
 ---
 
+## Pattern Forecast {#pattern-forecast}
+
+See the [Pattern Forecast guide](guides/pattern_forecast.md) for how it works.
+
+| Symptom | Likely cause | What to do |
+|---|---|---|
+| Every Pattern sensor is `unknown` | The forecast is `collecting`: fewer than 7 days of checked forecasts or fewer than 5 events | Wait; check `progress_pct` and `sensor.ws_pattern_forecast_status` attributes. `unknown` is deliberate, never a fake 0 % |
+| Stuck in `collecting` for weeks (rain) | Dry climate or season: not enough rain events | Normal. Events are counted, not days. Learning from history helps if Home Assistant has statistics |
+| Stuck in `collecting` for frost, heat or storm | The event does not happen where you live, or not in this season | Normal and reported honestly rather than inventing numbers. You can disable the entity |
+| `history_learn` says `no statistics for sensor.x` | The source sensor has no `state_class`, is excluded from the recorder, or was never recorded | Give the sensor a `state_class` (measurement, or total_increasing for rain) and make sure the recorder includes it. The forecast then learns live only |
+| `history_learn` says `too short` | Less than a day of statistics exists | It uses what exists and keeps learning live |
+| `maturity` is `paused` | An input is unavailable, stale, or flagged by the drift, stuck or spike checks (see `reason`) | Fix the sensor; the forecast resumes by itself. Check Station Diagnostics |
+| `reason` shows `waiting_for:dp_24h` | The first 24 hours after a fresh start: a 24 h pressure change needs 24 h of history | Wait a day |
+| No `sensor.ws_pattern_storm_3h` | No lightning detector is mapped, and the internet lightning option is off | Map a detector's strike count sensor in Configure, or, if the Blitzortung integration is installed, turn on **Use internet lightning data** (Configure → Features). The status sensor's `storm_target` attribute says which case applies |
+| Storm sensor name ends in "(internet lightning)" and stays `unknown` | The Blitzortung integration is not installed, is disabled, or its entities are unavailable | Install or enable it. The feed is checked in the entity registry and must be available |
+| `maturity` went from `skilled` to `degraded` | Over the last 5 weeks, with at least 3 events, the forecast stopped beating the station's usual rate | It is shown, not hidden. A changed sensor, a new location or a different season can cause it. Reset it if the cause was a one-off |
+| A forecast restarted at `collecting` after I changed a setting | The freeze, heat, gust or lightning proximity threshold, or the storm source, defines what the forecast predicts | Expected: only that forecast relearns, from history. Mapping a different station, or editing the elevation, restarts all of them |
+| I want to start over | | Call `ws_core.reset_learning_state` with **target** `pattern_forecast` (Developer Tools → Actions). All forecasts return to `collecting` and relearn from history. `all` includes it |
+| Probabilities seem too high or low | Not enough examples yet, or sensor siting | Look at `brier_skill` and `usual_rate`; see the guide's notes on frost siting and the rain threshold |
+
+`ws_core.export_learning_state` writes maturity, skill and the named model weights to the
+Home Assistant log, and the diagnostics download includes a `pattern_forecast` section
+(no location data).
+
+---
+
 ## Diagnostics export
 
 Download a full diagnostics report via:

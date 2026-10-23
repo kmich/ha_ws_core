@@ -22,6 +22,14 @@ Forecast** without reinstalling.
 
 ---
 
+## Pattern Forecast does not use a provider
+
+[Pattern Forecast](guides/pattern_forecast.md) is independent of the provider you choose
+here. It uses none of the provider's data, learns only from your own station, and keeps
+working with the forecast turned off or the network unplugged.
+
+---
+
 ## Open-Meteo (default)
 
 Global hourly and daily forecast. No account, no API key. Updated every 15 minutes.

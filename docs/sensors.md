@@ -98,6 +98,52 @@ Refreshes every 15 minutes.
 
 ---
 
+## Pattern Forecast (`enable_pattern_forecast`) {#pattern-forecast}
+
+Off by default. Learns from your own station; see the [Pattern Forecast guide](guides/pattern_forecast.md).
+Probability sensors are `unknown` (never 0 %) while a forecast is `collecting` or `paused`.
+
+| Entity ID | State | Created |
+|---|---|---|
+| `sensor.ws_pattern_rain_1h` | % (0-100), measurement | Always |
+| `sensor.ws_pattern_rain_3h` | % | Always |
+| `sensor.ws_pattern_rain_6h` | % | Always |
+| `sensor.ws_pattern_frost_12h` | % | Always |
+| `sensor.ws_pattern_heat_24h` | % | Always |
+| `sensor.ws_pattern_gust_3h` | % | Always |
+| `sensor.ws_pattern_storm_3h` | % | With a mapped lightning detector, or with the internet lightning option (the name then ends in "(internet lightning)"; the entity ID does not change) |
+| `sensor.ws_pattern_forecast_status` | `collecting` / `learning` / `active` (`active` = at least one forecast is `skilled`) | Always |
+| `sensor.ws_pattern_forecast_skill` | Number of forecasts currently `skilled` (diagnostic, disabled by default) | Always |
+
+**Probability sensor attributes** (the same on every forecast):
+
+| Attribute | Meaning |
+|---|---|
+| `target`, `horizon_h` | `rain` / `frost` / `heat` / `gust` / `storm` and the window in hours |
+| `data_source` | `local`, or `internet` (storm only, with the opt-in) |
+| `threshold`, `threshold_unit` | The threshold that counts as "it happened", in your display units |
+| `maturity` | `collecting` / `learning` / `skilled` / `degraded` / `paused`. Gate automations on `skilled` |
+| `progress_pct` | Progress out of `collecting` (only while collecting) |
+| `brier_skill` | Skill versus the station's usual rate over the last 52 weeks (0 = no better, 1 = perfect) |
+| `usual_rate` | The station's usual chance for this event (30-day running rate) |
+| `issued_at`, `valid_until` | When the forecast was issued and when its window ends |
+| `top_factors` | Up to three `{factor, effect}` entries, deterministic keys |
+| `samples_trained` | Number of examples the model has learned from |
+| `reason` | Why there is no number right now (for example `waiting_for:dp_24h`) |
+
+**Status sensor attributes:** `per_target` (maturity, progress, live events, events from
+history, events required, skill), `history_learn` (learning-from-history result per
+forecast), `internet_inputs` (empty, or `[storm_3h]`), `last_trained_at`, `storm_target`.
+
+**Skill sensor attributes:** `per_target`, each with `brier`, `brier_usual`,
+`brier_persistence`, `brier_heuristic`, `bss`, `bss_vs_persistence`, `n_scored`, `events`
+and the `reliability` bins.
+
+Services: `ws_core.reset_learning_state` accepts target `pattern_forecast`;
+`ws_core.export_learning_state` logs a Pattern Forecast summary.
+
+---
+
 ## Optional: Comfort Indices (`enable_comfort_indices`)
 
 All 23 sensors are created when the feature is enabled.
@@ -422,3 +468,4 @@ a coordinator reload automatically.
 | `switch.ws_enable_solar_forecast` | Solar PV forecast |
 | `switch.ws_enable_comfort_indices` | All comfort and heat-stress indices |
 | `switch.ws_enable_neighbor_qc` | Hourly sensor sanity check against Open-Meteo (on by default; sends your coordinates) |
+| `switch.ws_enable_pattern_forecast` | Pattern Forecast: learned chance of rain, frost, heat, gusts and storms (off by default; local) |

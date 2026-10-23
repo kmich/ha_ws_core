@@ -28,6 +28,14 @@ Weather Station Core (`ws_core`) is a Home Assistant custom integration that tra
 
     [:octicons-arrow-right-24: Read Irrigation Guide](guides/irrigation.md)
 
+-   :material-chart-timeline-variant:{ .lg .middle } __Learned Chances: Rain, Frost, Heat, Gusts, Storms__
+
+    ---
+
+    Pattern Forecast learns from your own station and scores itself. It gives the chance of rain, frost, a hot day, strong gusts and storms over the next hours, 100% local (the storm forecast can optionally use internet lightning data if you have no detector). It needs time to learn and shows `unknown` until it has earned trust.
+
+    [:octicons-arrow-right-24: Read the Pattern Forecast Guide](guides/pattern_forecast.md)
+
 -   :material-weather-windy:{ .lg .middle } __Home & Property Protection__
 
     ---

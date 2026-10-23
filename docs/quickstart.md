@@ -134,6 +134,7 @@ Toggle optional feature groups on or off. You can change these later via Configu
 | FWI Components | Individual FWI moisture codes |
 | Advanced Sensors | Zambretti number, hourly ET₀, smoothed wind direction |
 | Precipitation Nowcast | Creates `sensor.ws_minutes_until_rain`, intensity, and 60-min total |
+| Pattern Forecast | Learns your station's patterns: chance of rain (1/3/6 h), frost, hot day, strong gusts and storms. Off by default, local, shows `unknown` until it has learned. See the [guide](guides/pattern_forecast.md) |
 
 ### Step 8 — Alerts
 

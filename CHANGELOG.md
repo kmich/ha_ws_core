@@ -2,10 +2,20 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [Unreleased]
+## [2.11.0] - 2026-10-23
 
 ### Added
 
+- **Pattern Forecast (opt-in, off by default).** A local, learning forecaster that trains only on your own station and gives the chance of **rain** (next 1, 3 and 6 h), **frost** (12 h), a **hot day** (24 h), a **strong gust** (3 h) and a **thunderstorm** (3 h), checked against what the station measures afterwards. Enable it under setup or Configure → Features (or `switch.ws_enable_pattern_forecast`).
+  - **9 new entities:** `sensor.ws_pattern_rain_1h`, `_rain_3h`, `_rain_6h`, `_frost_12h`, `_heat_24h`, `_gust_3h`, `_storm_3h`, plus `sensor.ws_pattern_forecast_status` and a disabled-by-default diagnostic `sensor.ws_pattern_forecast_skill`. Values are `unknown` (never 0 %) until a forecast has seen enough examples; each carries a `maturity` attribute (`collecting`, `learning`, `skilled`, `degraded`, `paused`), its measured skill versus the station's usual rate and persistence, and up to three deterministic `top_factors`. Gate automations on `maturity` being `skilled`.
+  - **Thresholds reuse your existing settings** (freeze, hot day, gust, lightning proximity). Changing one restarts only that forecast; the rain threshold is fixed at 0.2 mm.
+  - **Learns from history.** On first enable, after a reset and for any forecast restarted by a settings change, it replays up to a year of Home Assistant's own long-term statistics (in the background, off the event loop) so seasonal forecasts do not start from zero. Replayed history counts toward leaving `collecting` but never toward `skilled`. The result is reported per forecast.
+  - **Local by default.** Inputs and labels come only from your configured sensors; it never reads forecast, nowcast, climate-normal or neighbor-QC data and sends nothing anywhere. The one exception is the storm forecast: with no lightning detector mapped, an extra setup/Configure question offers to use Blitzortung internet lightning data. It is off by default, ignored whenever a detector is mapped, feeds only the storm forecast, and is labelled (sensor name suffix "(internet lightning)", `data_source: internet`, `internet_inputs` on the status sensor, and in diagnostics).
+  - **Services and diagnostics:** `ws_core.reset_learning_state` gains target `pattern_forecast` (also included in `all`); `ws_core.export_learning_state` logs a Pattern Forecast summary; the diagnostics download has a `pattern_forecast` section (no location data).
+  - **Blueprints:** the Frost Alert and Freeze Protection blueprints gain an optional early-warning input for `sensor.ws_pattern_frost_12h` that fires only while its `maturity` is `skilled`. Left empty, they behave exactly as before.
+  - **Docs:** new [Pattern Forecast guide](https://kmich.github.io/ha_ws_core/guides/pattern_forecast/), a method section in the Scientific Documentation, sensor reference and troubleshooting sections, and translations in all 8 languages. No new dependencies.
+  - **Heat and storm are labelled beta** until a full summer of live data has been checked.
+- **Local solar-position helpers** (`solar_elevation_deg`, `night_fraction_ahead`) used for the frost forecast's night-length input.
 - **Off switch for the hourly sensor sanity check (neighbor QC).** Once an hour ws_core compares your temperature, humidity and pressure with Open-Meteo's reading for your configured coordinates, which sends those coordinates to Open-Meteo. Until now this ran whenever a location was configured, with no way to turn it off, so ws_core could not run fully offline. A new **Sensor sanity check** option (setup and Configure → Features, plus `switch.ws_enable_neighbor_qc`) now controls it. It stays on by default, so existing installs behave exactly as before. With it off, no request is made and `sensor.ws_neighbor_qc_flags` reads unknown instead of "all clear". Adaptive sensor calibration uses the same hourly reference, so while that opt-in feature is enabled the request continues (only the QC flags stop).
 
 ### Changed
