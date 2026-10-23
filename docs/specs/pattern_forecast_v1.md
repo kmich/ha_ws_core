@@ -654,3 +654,26 @@ It is built as four ordered commits so it can be reviewed commit by commit, and 
 3. ~~Ship learning from past history in the same release?~~ **Decided:** yes. Everything ships in one PR for 2.11.0 (section 8).
 4. ~~README: correct the local-first claims before this feature is announced?~~ **Done** (section 0), including the new off switch for the neighbor-QC fetch.
 5. ~~Blitzortung: exclude entirely, or allow as a labelled opt-in?~~ **Decided:** allowed as an explicit opt-in for storm only, off by default, labelled (section 0).
+
+---
+
+## Implementation notes
+
+Decisions made while building the four commits where the spec was ambiguous or silent. Each names the commit that made it.
+
+### Commit 1 (engine)
+
+- **`PATTERN_*` algorithm constants** (rates, gates, caps, priors) are in `const.py` from commit 1 because the engine imports them. The `CONF_` / `DEFAULT_` / `KEY_` names arrive with the wiring in commit 2.
+- **Engine API.** `observe(ts, Observation)` runs on every 60 s tick (tallies, events, label resolution); `issue(ts, Instant)` runs on the 15-minute marks. Timestamps are UTC epoch seconds. The local UTC offset is passed in so frost nights and hot days use the local date.
+- **Extra persisted keys** beyond the spec table: `recent_bins` (thirteen 15-minute bins, the short history behind the 1 h / 3 h changes and 1 h wind means, 3 h of coverage), `episodes`, `first_obs_ts`, `last_rain_ts`, `last_trained_at`. All are bounded. The standardizer keeps a per-feature count list instead of a single `n`, because masked features update less often.
+- **Warm-up.** `dpd_1h`, `t_1h`, `t_3h`, the 1 h wind means, `gust_1h`, `rain_1h` and `lightning_1h` need at least three bins in the last hour (or a bin near 1 h / 3 h ago). A target whose mask contains a missing feature publishes nothing for that issue (`reason: waiting_for:<feature>`) and opens no pending entry. Exposed as `paused` only once the target has left `collecting`; before that it stays `collecting`.
+- **`dp_24h`** is the change in sea-level pressure versus the 15-minute slot 24 h ago (tolerance +/-7.5 min).
+- **`solar_ok`** is 1 only while the sun is up and a clearness index exists, so at night `cloud_deficit = 0` and `solar_ok = 0`.
+- **Downtime discards labels.** Besides the 90% coverage rule, a gap of more than 15 minutes between ticks, or a restart, marks every window still open as unlabellable, so a tail that was never observed is never called "no" (the spec's "or HA was down during it"). Shorter holes only reduce coverage.
+- **Float slack.** Rain and strike sums compare with a 1e-6 tolerance, because sums of 0.2 mm tips land at 0.19999999999999996.
+- **Event definitions** (maturity counts these, independent of forecast samples): rain, gust and storm are episodes separated by 6 h, 6 h and 3 h without activity; an episode counts once its rain reaches the rain threshold, its first gust above threshold, or its second strike within proximity. A frost night is a noon-to-noon local window containing a reading at or below the freeze threshold; a heat day is a local date with a reading at or above the heat threshold.
+- **Lightning proximity** filters the strikes of a tick by the latest strike distance reading when a distance sensor exists; without one every strike counts.
+- **Scoring details.** Weekly rows are keyed by the week the label was resolved. The usual rate and each conditional-persistence rate are running rates (shrunk toward a per-kind prior at first, about a 30-day EMA later). Persistence falls back to the usual rate until its condition has 10 samples. Brier skill is reported only once the window has seen at least one event.
+- **Initial bias** of every model is the logit of a per-kind prior rate, so the first published numbers are not 50%.
+- **Explanation.** `top_factors` accumulates the signed contributions of the features behind each factor key; a factor is reported only when its condition is actually present (the sign of the standardized value matches), and the two hour-of-day features map to `afternoon` (12-18 h) or `night` (21-05 h).
+- **Test cadence.** The synthetic-station tests tick every 5 minutes, so `PatternEngine` takes a `tick_cap_s` argument (default 180 s) for the longest gap that still counts as coverage.
