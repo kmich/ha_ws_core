@@ -7,11 +7,12 @@ the default `ws` prefix — if you used a different prefix, replace `ws` through
 
 | File | Description | Required HACS cards |
 |---|---|---|
-| `weather_dashboard_vanilla.yaml` | Single view using **only native HA cards** — works immediately, no HACS frontend cards. | none |
-| `weather_dashboard.yaml` | Rich animated single-page dashboard. | `button-card`, `mini-graph-card`, `stack-in-card`, `config-template-card`, `windrose-card`, `card-mod`, `kiosk-mode` |
+| `weather_dashboard_vanilla.yaml` | Four views (Weather / Radar / Station / Activities) using **only native HA cards**. Works immediately, no HACS frontend cards. | none |
+| `weather_dashboard.yaml` | Rich animated two-page dashboard (Weather + Advanced), including the opt-in Pattern Forecast section. | `button-card`, `mini-graph-card`, `stack-in-card`, `config-template-card`, `windrose-card`, `card-mod`, `kiosk-mode` |
 | `ws_core_dashboard.yaml` | **v2.0** full 6-view dashboard: Now / Charts / Advanced / Records / Diagnostics / Indoor. Covers core, comfort, fire, agro, solar, upload status, data quality and events. | `mushroom`, `mini-graph-card` |
 | `ws_core_dashboard_mobile.yaml` | **v2.0** single-column, touch-optimised layout for phones (HA Sections). | `mushroom`, `mini-graph-card` |
-| `ws_core_gauge_presets.yaml` | **v2.0** drop-in gauge cards with sensible severity bands for 12 common sensors. Copy individual cards into any view. | none (built-in `gauge` card) |
+| `ws_core_bubble_dashboard.yaml` | **v2.11** mobile-first dashboard: summary buttons, six pop-ups (Temperature / Rain / Wind / Forecast with Pattern Forecast / Garden & Air / Station) and a bottom bar. | Bubble Card **v3.2.0+** |
+| `ws_core_gauge_presets.yaml` | **v2.0** drop-in gauge cards with sensible severity bands for 13 common sensors. Not a dashboard: copy individual cards into any view. | none (built-in `gauge` card) |
 
 ## Installation
 

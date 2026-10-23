@@ -57,3 +57,74 @@ def test_no_invalid_mushroom_cards():
         text = yf.read_text(encoding="utf-8")
         for card in forbidden:
             assert card not in text, f"Found forbidden '{card}' in {yf.name}"
+
+
+# ---------------------------------------------------------------------------
+# Bubble Card dashboard (ws_core_bubble_dashboard.yaml)
+# ---------------------------------------------------------------------------
+
+BUBBLE_DASHBOARD = DASHBOARDS_DIR / "ws_core_bubble_dashboard.yaml"
+
+
+def _bubble_cards(node, out=None):
+    """Every custom:bubble-card in a parsed dashboard, at any depth."""
+    out = [] if out is None else out
+    if isinstance(node, list):
+        for item in node:
+            _bubble_cards(item, out)
+    elif isinstance(node, dict):
+        if node.get("type") == "custom:bubble-card":
+            out.append(node)
+        for value in node.values():
+            _bubble_cards(value, out)
+    return out
+
+
+def _bubble_links(node, out=None):
+    """Every '#hash' a button or the bottom bar navigates to."""
+    out = [] if out is None else out
+    if isinstance(node, list):
+        for item in node:
+            _bubble_links(item, out)
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            if key == "navigation_path" or key.endswith("_link"):
+                out.append(value)
+            _bubble_links(value, out)
+    return out
+
+
+def test_bubble_popups_use_standalone_format():
+    """Bubble Card v3.2+ pop-ups hold their content in `cards`, not a vertical-stack wrapper."""
+    config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
+    popups = [c for c in _bubble_cards(config) if c.get("card_type") == "pop-up"]
+    assert popups, "Bubble dashboard should define pop-ups"
+    for popup in popups:
+        assert popup.get("cards"), f"Pop-up {popup.get('hash')} has no cards"
+    for view in config["views"]:
+        for card in view.get("cards", []):
+            if card.get("type") == "vertical-stack":
+                first = (card.get("cards") or [{}])[0]
+                assert first.get("card_type") != "pop-up", "Pop-up uses the old vertical-stack wrapper"
+
+
+def test_bubble_popup_hashes_unique_and_every_link_resolves():
+    config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
+    hashes = [c["hash"] for c in _bubble_cards(config) if c.get("card_type") == "pop-up"]
+    assert len(hashes) == len(set(hashes)), f"Duplicate pop-up hashes: {hashes}"
+    links = _bubble_links(config)
+    assert links, "Bubble dashboard should link to its pop-ups"
+    for link in links:
+        assert link in hashes, f"Link {link!r} opens no pop-up"
+
+
+def test_bubble_bottom_bar_is_last_card_in_view():
+    """Bubble Card requires the horizontal-buttons-stack to be the view's last card, outside any stack."""
+    config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
+    for view in config["views"]:
+        cards = view.get("cards", [])
+        stacks = [c for c in _bubble_cards(cards) if c.get("card_type") == "horizontal-buttons-stack"]
+        if not stacks:
+            continue
+        assert len(stacks) == 1, "One bottom bar per view"
+        assert cards[-1] is stacks[0], "The bottom bar must be the last top-level card in the view"

@@ -155,6 +155,7 @@ KNOWN_BUILTIN_CARD_TYPES: set[str] = {
 
 KNOWN_CUSTOM_CARD_TYPES: set[str] = {
     "custom:apexcharts-card",
+    "custom:bubble-card",
     "custom:button-card",
     "custom:config-template-card",
     "custom:mini-graph-card",

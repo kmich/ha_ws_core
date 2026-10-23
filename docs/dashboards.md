@@ -1,8 +1,17 @@
 # Dashboards
 
-Weather Station Core ships with three bundled Lovelace dashboards in the `dashboards/`
-directory. All are copy-paste YAML — no additional setup beyond pasting into the
-raw configuration editor.
+Weather Station Core ships five ready-made Lovelace dashboards and one set of drop-in
+gauge cards in the `dashboards/` directory. All are copy-paste YAML: no setup beyond
+pasting into the raw configuration editor.
+
+| File | What it is | Custom cards needed |
+|---|---|---|
+| [`weather_dashboard_vanilla.yaml`](#vanilla-dashboard-weather_dashboard_vanillayaml) | Native-cards dashboard that works immediately | none |
+| [`weather_dashboard.yaml`](#enhanced-dashboard-weather_dashboardyaml) | Rich, animated two-page dashboard (Weather + Advanced) | `button-card` and six others |
+| [`ws_core_dashboard.yaml`](#v20-full-dashboard-ws_core_dashboardyaml) | Six-view dashboard covering every sensor group | `mushroom`, `mini-graph-card` |
+| [`ws_core_dashboard_mobile.yaml`](#v20-mobile-dashboard-ws_core_dashboard_mobileyaml) | Single-column phone layout | `mushroom`, `mini-graph-card` |
+| [`ws_core_bubble_dashboard.yaml`](#bubble-card-dashboard-ws_core_bubble_dashboardyaml) | Mobile-first dashboard with pop-ups and a bottom bar | Bubble Card v3.2.0+ |
+| [`ws_core_gauge_presets.yaml`](#gauge-presets-ws_core_gauge_presetsyaml) | Not a dashboard: gauge cards to paste into your own | none |
 
 ---
 
@@ -88,6 +97,29 @@ All the same data as the full dashboard but stacked vertically for portrait scre
 including the **Recent Weather Events** logbook card.
 
 **HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
+
+---
+
+## Bubble Card Dashboard (`ws_core_bubble_dashboard.yaml`)
+
+Mobile-first dashboard built on [Bubble Card](https://github.com/Clooos/Bubble-Card).
+One page of summary buttons (temperature, rain, wind, outlook, garden) plus the
+provider forecast. Tap a button, or use the bottom bar, to open its pop-up:
+
+| Pop-up | Shows |
+|---|---|
+| Temperature | 24 h high/low and graph, feels like, dew and frost point, UTCI and WBGT (comfort indices) |
+| Rain | Totals, days since rain, nowcast countdown, Pattern Forecast rain chances |
+| Wind | Gust, strongest gust in 24 h, Beaufort, direction, 24 h graph |
+| Forecast | Pressure trend and sea-level pressure, Pattern Forecast frost / heat / gust with a maturity-and-why table, thunderstorm and fog risk, hourly forecast |
+| Garden & Air | ET₀, water deficit, VPD, UV, solar forecast, air quality, pollen, fire risk |
+| Station | Data quality, sensor package, battery, stuck sensors, alerts |
+
+Cards for opt-in features only appear when that feature's switch is on, so nothing
+shows *unavailable* for features you haven't enabled.
+
+**HACS frontend dependencies required:** Bubble Card **v3.2.0 or later**. The pop-ups use
+the standalone format introduced in v3.2.0. Everything else is a built-in card.
 
 ---
 

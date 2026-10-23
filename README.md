@@ -127,9 +127,18 @@ Don't spend hours writing YAML. We provide ready-to-import blueprints with sensi
 |---|---|
 | ![Mobile dashboard](screenshots/mobile_dashboard.png) | ![Desktop dashboard](screenshots/dashboard-advanced.png) |
 
-In the `dashboards/` directory, you'll find:
-* **Vanilla Dashboard:** Works immediately with 100% native Home Assistant cards (zero custom card dependencies).
-* **Enhanced Dashboard:** Uses popular cards (`mushroom`, `mini-graph-card`) with custom severity color bands and gauges.
+In the `dashboards/` directory, you'll find five dashboards and a set of gauge cards:
+
+| Dashboard | Style | Custom cards needed |
+|---|---|---|
+| **Vanilla** (`weather_dashboard_vanilla.yaml`) | Four views, native Home Assistant cards only | none |
+| **Enhanced** (`weather_dashboard.yaml`) | Animated two-page Weather + Advanced dashboard, with the Pattern Forecast section | `button-card` and six others |
+| **Full** (`ws_core_dashboard.yaml`) | Six views covering every sensor group | `mushroom`, `mini-graph-card` |
+| **Mobile** (`ws_core_dashboard_mobile.yaml`) | Single-column phone layout | `mushroom`, `mini-graph-card` |
+| **Bubble** (`ws_core_bubble_dashboard.yaml`) | Mobile-first, with pop-ups and a bottom bar | Bubble Card v3.2.0+ |
+| **Gauge presets** (`ws_core_gauge_presets.yaml`) | Not a dashboard: 13 gauge cards to paste into your own | none |
+
+See the [Dashboards guide](https://kmich.github.io/ha_ws_core/dashboards/) for what each one shows and how to install it.
 
 ---
 
