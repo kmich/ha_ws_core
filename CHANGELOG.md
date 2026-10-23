@@ -2,6 +2,16 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Off switch for the hourly sensor sanity check (neighbor QC).** Once an hour ws_core compares your temperature, humidity and pressure with Open-Meteo's reading for your configured coordinates, which sends those coordinates to Open-Meteo. Until now this ran whenever a location was configured, with no way to turn it off, so ws_core could not run fully offline. A new **Sensor sanity check** option (setup and Configure → Features, plus `switch.ws_enable_neighbor_qc`) now controls it. It stays on by default, so existing installs behave exactly as before. With it off, no request is made and `sensor.ws_neighbor_qc_flags` reads unknown instead of "all clear". Adaptive sensor calibration uses the same hourly reference, so while that opt-in feature is enabled the request continues (only the QC flags stop).
+
+### Changed
+
+- **README and docs homepage now describe internet use accurately.** Removed the "100% local, zero cloud dependencies" and "predict the exact minute rain begins from your own gauge" claims: the precipitation nowcast is Open-Meteo's 15-minute forecast blended with your gauge. The Data & Privacy Disclosure now lists every external service the integration can contact, including the two that are on by default (the weather forecast and the sensor sanity check), adaptive calibration, sea temperature, climate normals, solar forecast, Vigicrues, and Blitzortung, and corrects French Vigilance (it sends coordinates to the government geocoder before querying by department code).
+
 ## [2.10.1] - 2026-10-12
 
 ### Fixed

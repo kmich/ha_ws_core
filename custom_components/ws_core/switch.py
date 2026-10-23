@@ -37,6 +37,7 @@ from .const import (
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
+    CONF_ENABLE_NEIGHBOR_QC,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
     CONF_ENABLE_POLLEN,
@@ -70,6 +71,7 @@ from .const import (
     DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_MQTT,
+    DEFAULT_ENABLE_NEIGHBOR_QC,
     DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_OWM_STATIONS,
     DEFAULT_ENABLE_POLLEN,
@@ -218,6 +220,18 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_NOWCAST,
         name="Feature: Precipitation Nowcast",
         icon="mdi:weather-pouring",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_NEIGHBOR_QC,
+        default=DEFAULT_ENABLE_NEIGHBOR_QC,
+        name="Feature: Sensor Sanity Check",
+        icon="mdi:map-check-outline",
+        description=(
+            "Hourly comparison of your temperature, humidity and pressure against Open-Meteo's "
+            "reading for your configured coordinates, to flag broken sensors. Sends your "
+            "coordinates to Open-Meteo. On by default; turn off to stop the request "
+            "(adaptive calibration, if enabled, still uses it)."
+        ),
     ),
     # v2.0
     WSFeatureDesc(

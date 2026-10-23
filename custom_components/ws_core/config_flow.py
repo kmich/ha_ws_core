@@ -54,6 +54,7 @@ from .const import (
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
+    CONF_ENABLE_NEIGHBOR_QC,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
     CONF_ENABLE_POLLEN,
@@ -133,6 +134,7 @@ from .const import (
     DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_MQTT,
+    DEFAULT_ENABLE_NEIGHBOR_QC,
     DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_OWM_STATIONS,
     DEFAULT_ENABLE_POLLEN,
@@ -1071,6 +1073,9 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             self._data[CONF_ENABLE_FWI_COMPONENTS] = bool(user_input.get(CONF_ENABLE_FWI_COMPONENTS, False))
             self._data[CONF_ENABLE_ADVANCED_SENSORS] = bool(user_input.get(CONF_ENABLE_ADVANCED_SENSORS, False))
             self._data[CONF_ENABLE_NOWCAST] = bool(user_input.get(CONF_ENABLE_NOWCAST, False))
+            self._data[CONF_ENABLE_NEIGHBOR_QC] = bool(
+                user_input.get(CONF_ENABLE_NEIGHBOR_QC, DEFAULT_ENABLE_NEIGHBOR_QC)
+            )
             # v2.0 feature toggles
             self._data[CONF_ENABLE_DEGREE_DAYS] = bool(
                 user_input.get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)
@@ -1171,6 +1176,9 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
                         CONF_ENABLE_ADVANCED_SENSORS, default=DEFAULT_ENABLE_ADVANCED_SENSORS
                     ): selector.BooleanSelector(),
                     vol.Optional(CONF_ENABLE_NOWCAST, default=DEFAULT_ENABLE_NOWCAST): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_NEIGHBOR_QC, default=DEFAULT_ENABLE_NEIGHBOR_QC
+                    ): selector.BooleanSelector(),
                     # v2.0 feature toggles
                     vol.Optional(
                         CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS
@@ -2035,6 +2043,10 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_NOWCAST,
                         default=g(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_NEIGHBOR_QC,
+                        default=g(CONF_ENABLE_NEIGHBOR_QC, DEFAULT_ENABLE_NEIGHBOR_QC),
                     ): selector.BooleanSelector(),
                     vol.Optional(
                         CONF_ENABLE_DEGREE_DAYS, default=g(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)

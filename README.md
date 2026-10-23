@@ -8,10 +8,10 @@
 
 **Turn your weather station into proactive smart home automations — not just numbers on a dashboard.**
 
-`ws_core` takes the ordinary temperature, wind, and rain sensors you already have in Home Assistant and turns them into a local weather intelligence engine. It watches *your own* rain gauge to predict the exact minute rain begins, calculates true garden evapotranspiration (ET₀) to stop overwatering, protects awnings from wind gusts, and predicts storms offline — **running 100% locally on your machine with zero cloud dependencies.**
+`ws_core` takes the ordinary temperature, wind, and rain sensors you already have in Home Assistant and turns them into a local weather intelligence engine. It calculates true garden evapotranspiration (ET₀) to stop overwatering, protects awnings from wind gusts, warns of frost and heat stress, and forecasts from your own barometer. **Every derived sensor is computed locally on your machine.** The few features that use internet data (the weather forecast, and opt-in extras like the rain nowcast) are listed in the [Data & Privacy Disclosure](#-data--privacy-disclosure).
 
 > ### 🌧️ `sensor.ws_minutes_until_rain` → **7 min**
-> *Precipitation nowcasting uses your own gauge as ground truth to give you a live countdown before the first drop falls.*
+> *The optional Precipitation Nowcast blends Open-Meteo's 15-minute precipitation forecast with your own rain gauge to give you a live countdown before the first drop falls.*
 
 [![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
@@ -38,7 +38,7 @@ Most weather stations in Home Assistant just show raw numbers. `ws_core` transfo
 ## 🌟 The 4 Core Benefit Pillars
 
 ### 1. 🌧️ Smart Rain Defense: Never Get Soaked
-Know before the first drop hits. Enable **Precipitation Nowcast** to combine local radar models with your physical rain gauge. 
+Know before the first drop hits. Enable **Precipitation Nowcast** (uses the free Open-Meteo API, no key needed) to combine its 15-minute precipitation forecast with your physical rain gauge. 
 * **Live countdown:** `sensor.ws_minutes_until_rain` gives you minutes to close skylights, pull in outdoor cushions, or walk the dog.
 * **Pre-rain notifications:** Alert your family via phone or smart speaker before rain starts.
 * **Rain dry-time:** `sensor.ws_minutes_until_dry` lets you know when outdoor surfaces will dry after a shower.
@@ -56,11 +56,11 @@ Safeguard your home against high winds, freezing temperatures, and dangerous hea
 * **Heat stress monitoring (UTCI & WBGT):** Gold-standard comfort indices used by the WHO to warn when outdoor work or sports become hazardous.
 * **Fire weather indices:** Complete implementations of Canadian FWI, Australian McArthur FFDI, and US Fosberg FFWI.
 
-### 4. 🔌 100% Local-First Resilience: Privacy & Offline Reliability
+### 4. 🔌 Local-First Resilience: Privacy & Offline Reliability
 Your smart home shouldn't stop working when your internet connection goes down.
-* **Offline Zambretti forecasting:** A mathematical barometric forecast calibrated to your hemisphere and climate region — 100% local, no cloud, no API keys.
-* **Privacy by design:** All 50+ core derived sensors are computed directly inside Home Assistant on your local hardware.
-* **Zero telemetry:** No coordinates, sensor readings, or personal data ever leave your network unless you explicitly enable an optional external service.
+* **Offline Zambretti forecasting:** A mathematical barometric forecast calibrated to your hemisphere and climate region. 100% local, no cloud, no API keys.
+* **Privacy by design:** All 50+ core derived sensors are computed directly inside Home Assistant on your local hardware, and keep working when the internet is down.
+* **No telemetry:** ws_core never sends usage data or analytics anywhere. Out of the box it does fetch a weather forecast and an hourly sensor sanity check from Open-Meteo, which requires sending your configured coordinates. Everything else that touches the internet is off until you enable it. See the [Data & Privacy Disclosure](#-data--privacy-disclosure) for the full list.
 
 ---
 
@@ -74,7 +74,7 @@ Your smart home shouldn't stop working when your internet connection goes down.
 | **WeatherFlow Tempest** | Tempest Home Assistant integration & local UDP / MQTT | Air temp, station pressure, wind speed/gust, rain, UV, illuminance |
 | **Davis Instruments** | WeatherLink IP, Vantage Pro2, Vantage Vue | Classic PWS measurements, rain year, bar absolute |
 | **Netatmo** | Netatmo Smart Weather Station (Outdoor + Rain + Wind) | Outdoor module readings, rain gauge total, anemometer wind |
-| **Blitzortung (Free Fallback)** | Blitzortung HA integration (crowdsourced network) | Auto-discovered fallback: strikes, distance, proximity (no hardware needed!) |
+| **Blitzortung (Free Fallback)** | Blitzortung HA integration (crowdsourced network, uses internet data) | Auto-discovered fallback when no lightning sensor is mapped: strikes, distance, proximity (no hardware needed) |
 | **Shelly / ESPHome / DIY** | Any custom sensor entity with standard device classes | Temperature, humidity, pressure, wind, cumulative rain total |
 
 👉 *Need help mapping your entities? Check out our [Hardware Mapping Guide](docs/hardware_mapping.md).*
@@ -137,7 +137,7 @@ In the `dashboards/` directory, you'll find:
 
 Behind the friendly sensors, `ws_core` runs rigorous, peer-reviewed meteorological algorithms and advanced power packs:
 
-* **🌧️ Nowcast Ground-Truth Blending:** Merges high-resolution NWP radar grids with your physical rain gauge (70% local / 30% forecast) for pinpoint start times.
+* **🌧️ Nowcast Ground-Truth Blending:** Blends Open-Meteo's 15-minute precipitation forecast with your physical rain gauge (70% gauge / 30% forecast for the next 15 minutes, 50/50 for the 15 after) for sharper rain start times.
 * **🌿 Plant Health & Agricultural Spraying:** Computes **Delta-T** spray window suitability (know the exact window to spray fertilizer without evaporation or drift), **VPD** (Vapor Pressure Deficit) for greenhouses, and **Leaf Wetness** to detect fungal risks.
 * **⚡ Energy & HVAC Load Optimization:** Tracks **Heating Degree Days (HDD)** and **Cooling Degree Days (CDD)** to forecast heat pump and air conditioning demand and automate pre-cooling with solar energy.
 * **🌍 10-Year Climate Normals (ERA5):** Compares today's temperature and rain against a 10-year historical baseline for your exact coordinates (`sensor.ws_temp_anomaly_normal`).
@@ -153,15 +153,24 @@ For complete equations, source citations, and mathematical references, see the [
 
 ## 🔒 Data & Privacy Disclosure
 
-`ws_core` is strictly local-first. All core sensors are derived locally. Optional third-party features are **disabled by default** and only contact external services when explicitly enabled:
+`ws_core` is local-first: every derived sensor is computed on your machine, and nothing is ever sent for analytics or telemetry. Some features fetch data from the internet. **Two of them are on by default**; everything else stays off until you enable it:
 
 | Feature | Destination | Data Sent | When Used |
 |---|---|---|---|
-| **Core Derived Sensors** | *Local Machine* | None (processed locally) | Always (Default) |
-| **Precipitation Nowcast & AQI** | Open-Meteo API | Approximate Coordinates | Only if enabled |
-| **French Vigilance** | Météo-France Public API | Department Code | Only if enabled |
-| **PWS Network Uploads** | Selected Network (e.g. WU, WOW) | Station Readings & User Credentials | Only if enabled |
-| **MQTT Discovery** | Local MQTT Broker | Derived Sensor Values | Only if enabled |
+| **Core Derived Sensors** | *Local machine* | Nothing | Always |
+| **Weather Forecast** | Your chosen provider (default: Open-Meteo) | Configured coordinates (plus your API key for providers that need one) | **On by default.** Turn off in the integration's Configure options, or pick an existing HA weather entity as the provider (no ws_core call) |
+| **Sensor Sanity Check** (neighbor QC) | Open-Meteo API | Configured coordinates | **On by default**, hourly. Turn off with the *Sensor sanity check* option (or `switch.ws_enable_neighbor_qc`) |
+| **Adaptive Sensor Calibration** | Open-Meteo API (same hourly request as the sanity check) | Configured coordinates | Only if enabled (keeps the hourly request running even with the sanity check off) |
+| **Precipitation Nowcast, Air Quality & Pollen** | Open-Meteo API | Configured coordinates | Only if enabled |
+| **Sea Temperature, Climate Normals** | Open-Meteo Marine / Archive API | Configured coordinates | Only if enabled |
+| **Solar Forecast** | Forecast.Solar | Configured coordinates | Only if enabled |
+| **French Vigilance** | French government geocoder (api-adresse.data.gouv.fr), then OpenDataSoft | Coordinates to the geocoder, then department code | Only if enabled |
+| **Vigicrues River Levels** | Hub'Eau (French government) | Coordinates or chosen station ID | Only if enabled |
+| **Lightning via Blitzortung** | Blitzortung network (through its own HA integration) | Whatever the Blitzortung integration sends | Only if that integration is installed and no lightning sensor is mapped |
+| **PWS Network Uploads** | Selected network (e.g. WU, WOW) | Station readings & user credentials | Only if enabled |
+| **MQTT Discovery** | Local MQTT broker | Derived sensor values | Only if enabled |
+
+To run fully offline, turn off the weather forecast and the sensor sanity check, and leave the optional internet features disabled. All core derived sensors keep working.
 
 Diagnostics exports automatically **redact all credentials and coordinates** before download.
 
@@ -181,7 +190,7 @@ Yes! `ws_core` provides a drop-in replacement with identical or higher-precision
 
 <details>
 <summary><b>Do I need any API keys?</b></summary>
-No. The core integration and all 50+ base sensors require zero API keys and work completely offline. Optional extras like Open-Meteo precipitation nowcasting and air quality use free public APIs that also require no registration.
+No. The core integration and all 50+ base sensors require zero API keys and keep working offline. The default weather forecast and optional extras like the precipitation nowcast and air quality use Open-Meteo's free public APIs, which need no registration.
 </details>
 
 <details>

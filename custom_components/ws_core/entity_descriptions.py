@@ -498,10 +498,11 @@ SENSORS: list[WSSensorDescription] = [
         name="WS Neighbor QC Flags",
         icon="mdi:map-check-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda d: len(d.get(KEY_NEIGHBOR_QC) or []),
+        # None when enable_neighbor_qc is off: unknown, not "0 flags, all clear".
+        value_fn=lambda d: None if d.get(KEY_NEIGHBOR_QC) is None else len(d[KEY_NEIGHBOR_QC]),
         attrs_fn=lambda d: {
             "flags": d.get(KEY_NEIGHBOR_QC) or [],
-            "all_clear": len(d.get(KEY_NEIGHBOR_QC) or []) == 0,
+            "all_clear": None if d.get(KEY_NEIGHBOR_QC) is None else len(d[KEY_NEIGHBOR_QC]) == 0,
         },
     ),
     # v2.0 — Temporal spike (σ-based step-change) detection

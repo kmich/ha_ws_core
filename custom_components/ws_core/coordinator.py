@@ -155,6 +155,7 @@ from .const import (
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
+    CONF_ENABLE_NEIGHBOR_QC,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
     CONF_ENABLE_POLLEN,
@@ -255,6 +256,7 @@ from .const import (
     DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_MQTT,
+    DEFAULT_ENABLE_NEIGHBOR_QC,
     DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_OWM_STATIONS,
     DEFAULT_ENABLE_POLLEN,
@@ -1044,6 +1046,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.nowcast_interval_min = int(_get(CONF_NOWCAST_INTERVAL_MIN, DEFAULT_NOWCAST_INTERVAL_MIN))
         self._nowcast_cache: dict[str, Any] | None = None
 
+        # Hourly neighbor-QC fetch (Open-Meteo current conditions). On by default;
+        # see _neighbor_qc_fetch_needed for why auto-calibration also keeps it alive.
+        self.neighbor_qc_enabled = bool(_get(CONF_ENABLE_NEIGHBOR_QC, DEFAULT_ENABLE_NEIGHBOR_QC))
+
         # v1.8.4 Suppress HA Repairs notifications (issue #20)
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
 
@@ -1315,7 +1321,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._start_periodic(self._async_fetch_nowcast, self.nowcast_interval_min * 60, "ws_core_nowcast_fetch", 20)
         # v2.0: spatial neighbor QC (hourly fetch from Open-Meteo)
         self._neighbor_qc_cache: dict | None = None
-        if has_location:
+        if has_location and self._neighbor_qc_fetch_needed():
             self._start_periodic(self._async_fetch_neighbor_qc, 60 * 60, "ws_core_neighbor_qc_fetch", 60)
         # v2.7 - Climate normals: check daily whether the cached table is stale
         # (CLIMATE_NORMALS_REFRESH_DAYS) rather than re-fetching on a fixed cadence.
@@ -2882,12 +2888,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._snow_this_year_cm += new_snow_cm
         data[KEY_SNOW_THIS_YEAR_CM] = round(self._snow_this_year_cm, 1)
 
+    def _neighbor_qc_fetch_needed(self) -> bool:
+        """Whether the hourly neighbor-QC fetch has a consumer.
+
+        The QC flags need it (enable_neighbor_qc, on by default), and so does
+        opt-in adaptive calibration, which uses the same reference sample. With
+        both off, nothing is fetched and the coordinates never leave the machine.
+        """
+        return self.neighbor_qc_enabled or bool(
+            self.entry_options.get(CONF_ENABLE_AUTO_CALIBRATION, DEFAULT_ENABLE_AUTO_CALIBRATION)
+        )
+
     async def _async_fetch_neighbor_qc(self) -> None:
         """Fetch Open-Meteo current weather as a spatial QC reference.  (v2.0)
 
         Compares local station readings against the nearest NWP grid point.
         Flags large deviations (>5°C temperature, >20 hPa pressure, >20% humidity)
         as potential sensor errors. Runs hourly; results cached in coordinator.
+        Only scheduled when _neighbor_qc_fetch_needed() is true.
         """
         lat = self.forecast_lat
         lon = self.forecast_lon
@@ -2996,6 +3014,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _compute_neighbor_qc(self, data: dict) -> None:
         """Compare local readings against cached NWP grid point; populate flags."""
+        if not getattr(self, "neighbor_qc_enabled", DEFAULT_ENABLE_NEIGHBOR_QC):
+            # Switched off: no flags at all (None, not [] - "no check ran" is not "all clear").
+            data[KEY_NEIGHBOR_QC] = None
+            return
         cache = getattr(self, "_neighbor_qc_cache", None)
         flags: list[str] = []
         if cache:

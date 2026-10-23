@@ -968,6 +968,12 @@ KEY_SNOW_RECORD_DAY_CM = "snow_record_day_cm"  # snowiest single day ever (issue
 KEY_SENSOR_STUCK = "sensor_stuck_flags"  # list of stuck sensor names
 KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
 KEY_NEIGHBOR_QC = "neighbor_qc_flags"  # list of neighbor-comparison flags
+# Off switch for the hourly neighbor-QC fetch (Open-Meteo current conditions at
+# the configured coordinates). On by default to keep existing behaviour. Opt-in
+# adaptive calibration reuses the same fetch, so the fetch keeps running while
+# that feature is on even with this switch off; only the QC flags stop.
+CONF_ENABLE_NEIGHBOR_QC = "enable_neighbor_qc"
+DEFAULT_ENABLE_NEIGHBOR_QC = True
 KEY_SENSOR_SPIKE = "sensor_spike_flags"  # list of σ-based step-change flags
 
 # Spike detection thresholds (sigma multiplier + minimum samples)

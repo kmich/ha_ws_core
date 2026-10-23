@@ -152,11 +152,13 @@
           "enable_mqtt": "MQTT Discovery herpublicatie (publiceer alle afgeleide sensoren naar MQTT-broker voor Node-RED / externe afnemers)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation from your existing rain rate)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns a bias vs. the regional forecast reference and nudges calibration offsets automatically)",
+          "enable_neighbor_qc": "Sensorcontrole (elk uur vergelijken met Open-Meteo om defecte sensoren te vinden; verstuurt je coördinaten)",
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
           "enable_degree_days": "Berekening van groei-, verwarmings- en koelgraaddagen plus een schatting van de bladnatheid, nuttig voor landbouw en energiebeheer.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -498,6 +500,7 @@
           "enable_soil": "Bodemsensoren (vochtigheid, temperatuur, irrigatiebehoefte)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns bias, nudges calibration automatically)",
+          "enable_neighbor_qc": "Sensorcontrole (elk uur vergelijken met Open-Meteo; verstuurt je coördinaten)",
           "enable_climate_normals": "Historical climate normals (today vs. ~10 years of local history)"
         },
         "data_description": {
@@ -518,6 +521,7 @@
           "enable_advanced_sensors": "Zambretti-nummer (numerieke vorm), uurlijkse ET₀, afgevlakte windrichting",
           "enable_nowcast": "Open-Meteo 15-minuten neerslag-nowcast: minuten tot regen begint/stopt, totaal volgend uur, intensiteit. Geen API-sleutel",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -2601,6 +2605,9 @@
       },
       "ws_enable_auto_calibration": {
         "name": "Feature: Adaptive Sensor Calibration"
+      },
+      "ws_enable_neighbor_qc": {
+        "name": "Functie: Sensorcontrole"
       },
       "ws_enable_climate_normals": {
         "name": "Feature: Historical Climate Normals"

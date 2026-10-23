@@ -421,3 +421,4 @@ a coordinator reload automatically.
 | `switch.ws_enable_moon` | Moon phase and illumination |
 | `switch.ws_enable_solar_forecast` | Solar PV forecast |
 | `switch.ws_enable_comfort_indices` | All comfort and heat-stress indices |
+| `switch.ws_enable_neighbor_qc` | Hourly sensor sanity check against Open-Meteo (on by default; sends your coordinates) |

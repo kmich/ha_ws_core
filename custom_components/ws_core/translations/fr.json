@@ -154,6 +154,7 @@
           "enable_cwop": "Envoi vers CWOP / APRS",
           "enable_mqtt": "MQTT (publier les capteurs sur un broker MQTT pour Node-RED / externes)",
           "enable_auto_calibration": "Étalonnage adaptatif du capteur (apprend le biais par rapport à la référence de prévision régionale et ajuste automatiquement les décalages d'étalonnage)",
+          "enable_neighbor_qc": "Contrôle de cohérence des capteurs (comparaison horaire avec Open-Meteo pour repérer les capteurs défaillants ; envoie vos coordonnées)",
           "enable_climate_normals": "Historique des normales climatiques (compare la journée d'aujourd'hui à environ 10 ans d'historiques locaux, archives Open-Meteo, sans clé API)"
         },
         "data_description": {
@@ -170,6 +171,7 @@
           "enable_vigilance_meteo": "Récupère la couleur de vigilance et la nature des alertes départementales officielles.",
           "enable_vigicrues": "Remonte les hauteurs d'eau et débits des stations hydrologiques environnantes (Hub'Eau v2).",
           "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer.",
+          "enable_neighbor_qc": "Activé par défaut. Une fois par heure, compare votre température, humidité et pression à la valeur Open-Meteo pour vos coordonnées configurées et liste les écarts importants dans sensor.ws_neighbor_qc_flags. Désactivez-le pour arrêter la requête. L'étalonnage adaptatif, s'il est activé, continue de l'utiliser.",
           "enable_diagnostics": "Analyse la cohérence des données, la dérive des capteurs, les normales saisonnières et la fiabilité des prévisions.",
           "enable_fwi_components": "Expose les codes intermédiaires de l'indice incendie (FFMC, DMC, DC, ISI, BUI). Requiert l'indice de risque d'incendie.",
           "enable_advanced_sensors": "Génère les prévisions barométriques Zambretti, l'évapotranspiration horaire (ET₀) et le lissage du vent.",
@@ -527,6 +529,7 @@
           "enable_indoor": "Prendre en compte les capteurs intérieurs",
           "enable_soil": "Capteurs de sol (humidité, température, besoin en irrigation)",
           "enable_auto_calibration": "Étalonnage adaptatif du capteur (apprend le biais par rapport à la référence de prévision régionale et ajuste automatiquement les décalages d'étalonnage)",
+          "enable_neighbor_qc": "Contrôle de cohérence des capteurs (comparaison horaire avec Open-Meteo ; envoie vos coordonnées)",
           "enable_climate_normals": "Historique des normales climatiques (compare la journée d'aujourd'hui à environ 10 ans d'historiques locaux, archives Open-Meteo, sans clé API)",
           "enable_snow": "Neige (phase de précipitation + accumulation estimée à partir de votre intensité de pluie actuelle)"
         },
@@ -553,7 +556,8 @@
           "enable_soil": "Calcule le besoin en eau des plantes, l'évaporation et suit vos sondes d'humidité du sol.",
           "enable_climate_normals": "Désactivé par défaut. Une requête à l'API d'archives (actualisée mensuellement) génère un tableau des moyennes historiques de températures minimales/maximales et de précipitations pour chaque jour de l'année, de sorte que sensor.ws_temperature_anomaly_normal reflète la journée d'aujourd'hui par rapport à l'historique plutôt que par rapport à la moyenne récente de votre propre station.",
           "enable_snow": "Heuristique, pas une mesure : il n'existe aucun nivomètre indépendant de la station. Estime la phase de précipitation à partir de la température du thermomètre mouillé et l'accumulation de neige à partir de votre intensité de pluie actuelle via un rapport neige/eau liquide dépendant de la température.",
-          "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer."
+          "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer.",
+          "enable_neighbor_qc": "Activé par défaut. Une fois par heure, compare votre température, humidité et pression à la valeur Open-Meteo pour vos coordonnées configurées et liste les écarts importants dans sensor.ws_neighbor_qc_flags. Désactivez-le pour arrêter la requête. L'étalonnage adaptatif, s'il est activé, continue de l'utiliser."
         }
       },
       "indoor_rooms_opt": {
@@ -2644,6 +2648,9 @@
       },
       "ws_enable_auto_calibration": {
         "name": "Calibration adaptative des capteurs"
+      },
+      "ws_enable_neighbor_qc": {
+        "name": "Contrôle de cohérence des capteurs"
       },
       "ws_enable_climate_normals": {
         "name": "Normales climatiques historiques"
