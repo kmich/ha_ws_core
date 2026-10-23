@@ -2022,7 +2022,8 @@
         "state": {
           "collecting": "A recolher dados",
           "learning": "A aprender",
-          "active": "Ativo"
+          "active": "Ativo",
+          "waiting": "A aguardar dados"
         }
       },
       "pattern_forecast_skill": {

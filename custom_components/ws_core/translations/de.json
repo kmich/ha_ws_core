@@ -1990,7 +1990,8 @@
         "state": {
           "collecting": "Sammelt Daten",
           "learning": "Lernt",
-          "active": "Aktiv"
+          "active": "Aktiv",
+          "waiting": "Warten auf Eingangsdaten"
         }
       },
       "pattern_forecast_skill": {

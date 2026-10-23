@@ -2662,7 +2662,7 @@ SENSORS.append(
         name="WS Pattern Forecast Status",
         icon="mdi:brain",
         device_class=SensorDeviceClass.ENUM,
-        options=["collecting", "learning", "active"],
+        options=["collecting", "waiting", "learning", "active"],
         native_unit=None,
         state_class=None,
         value_fn=lambda d: d.get(KEY_PATTERN_FORECAST_STATUS),

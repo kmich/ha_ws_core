@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.11.2"
+_INTEGRATION_VERSION = "2.12.0"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -775,7 +775,7 @@ KEY_PATTERN_FROST_12H = "pattern_frost_12h"
 KEY_PATTERN_HEAT_24H = "pattern_heat_24h"
 KEY_PATTERN_GUST_3H = "pattern_gust_3h"
 KEY_PATTERN_STORM_3H = "pattern_storm_3h"
-KEY_PATTERN_FORECAST_STATUS = "pattern_forecast_status"  # collecting | learning | active
+KEY_PATTERN_FORECAST_STATUS = "pattern_forecast_status"  # collecting | waiting | learning | active
 KEY_PATTERN_FORECAST_SKILL = "pattern_forecast_skill"  # number of skilled targets
 # target id (pattern_forecast.TARGETS) -> data key
 PATTERN_TARGET_KEYS = {

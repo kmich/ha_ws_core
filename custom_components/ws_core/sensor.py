@@ -231,6 +231,7 @@ from .entity_descriptions import (
     SENSORS,
     WSSensorDescription,
 )
+from .sensor_status import unknown_status
 
 __all__ = [
     "SENSORS",
@@ -823,6 +824,14 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        attrs = self._value_attributes
+        if self.native_value is None and "maturity" not in attrs:
+            for key, value in unknown_status(self._desc.key, self.coordinator, self.coordinator.data or {}).items():
+                attrs.setdefault(key, value)
+        return attrs
+
+    @property
+    def _value_attributes(self) -> dict[str, Any]:
         d = self.coordinator.data or {}
         if self._desc.attrs_fn is not None:
             try:

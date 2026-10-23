@@ -10,6 +10,8 @@ import os
 import pathlib
 import sys
 
+import jinja2
+import pytest
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -57,6 +59,41 @@ def test_no_invalid_mushroom_cards():
         text = yf.read_text(encoding="utf-8")
         for card in forbidden:
             assert card not in text, f"Found forbidden '{card}' in {yf.name}"
+
+
+@pytest.mark.parametrize("filename", ["weather_dashboard.yaml", "ws_core_bubble_dashboard.yaml"])
+@pytest.mark.parametrize("scenario", ["paused", "collecting", "learning", "old_version"])
+def test_pattern_table_explains_unknowns_without_hiding_factors(filename, scenario):
+    config = yaml.safe_load((DASHBOARDS_DIR / filename).read_text(encoding="utf-8"))
+
+    def markdowns(node):
+        if isinstance(node, dict):
+            if node.get("title") == "Maturity and why":
+                yield node["content"]
+            for value in node.values():
+                yield from markdowns(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from markdowns(value)
+
+    attrs = {"maturity": scenario, "progress_pct": 20}
+    if scenario == "paused":
+        attrs.update(reason="waiting_for:wind_u", explanation="Waiting for recent wind history.")
+    elif scenario == "learning":
+        attrs["top_factors"] = [{"factor": "pressure_falling", "effect": "raises"}]
+    elif scenario == "old_version":
+        attrs.update(maturity="paused", reason="waiting_for:wind_u")
+    env = jinja2.Environment()
+    env.globals.update(states=lambda e: "unknown", state_attr=lambda e, a: attrs.get(a))
+    rendered = "\n".join(env.from_string(template).render() for template in markdowns(config))
+    assert rendered
+    expected = {
+        "paused": "Waiting for recent wind history.",
+        "collecting": "Collecting: 20%",
+        "learning": "pressure falling (raises)",
+        "old_version": "waiting_for:wind_u",
+    }
+    assert expected[scenario] in rendered
 
 
 # ---------------------------------------------------------------------------

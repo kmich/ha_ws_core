@@ -36,7 +36,7 @@ lower than the 3 h chance.
 
 Two more entities report on the feature itself:
 
-- `sensor.ws_pattern_forecast_status` is `collecting`, `learning` or `active`.
+- `sensor.ws_pattern_forecast_status` is `collecting`, `waiting` (required inputs missing), `learning` or `active`.
 - `sensor.ws_pattern_forecast_skill` (diagnostic, disabled by default) counts how many
   forecasts are currently proven `skilled`.
 
@@ -318,10 +318,10 @@ content: |-
     ('Hot day, next 24 h', 'sensor.ws_pattern_heat_24h'),
     ('Strong gust, next 3 h', 'sensor.ws_pattern_gust_3h'),
   ] %}
-  | Event | Chance | Status |
-  |---|---|---|
+  | Event | Chance | Status | Why |
+  |---|---|---|---|
   {% for name, entity in rows -%}
-  | {{ name }} | {% if is_number(states(entity)) %}{{ states(entity) | float(0) | round(0) | int }} %{% else %}-{% endif %} | {{ state_attr(entity, 'maturity') or 'n/a' }} |
+  | {{ name }} | {% if is_number(states(entity)) %}{{ states(entity) | float(0) | round(0) | int }} %{% else %}-{% endif %} | {{ state_attr(entity, 'maturity') or 'n/a' }} | {{ state_attr(entity, 'explanation') or state_attr(entity, 'reason') or '' }} |
   {% endfor %}
   Overall: {{ states('sensor.ws_pattern_forecast_status') }}
 ```

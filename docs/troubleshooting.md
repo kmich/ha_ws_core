@@ -1,5 +1,38 @@
 # Troubleshooting
 
+## Understanding unknown values
+
+An `unknown` value means that a calculation cannot currently return a meaningful
+number; it does not by itself mean the station is offline. Since 2.12.0, open the
+entity's attributes to read `reason` and `explanation`. Ordinary sensors also
+expose a machine-readable `data_status`. These attributes disappear when a valid
+value returns. Event entities explain when no matching event has been recorded.
+
+| Entity group | Why it can be unknown | Action |
+|---|---|---|
+| Heat Index, THW, THSW | This implementation requires at least 27 °C and 40% humidity; THSW also needs solar radiation | Use Feels Like for general conditions; wait for applicable weather |
+| Wind Chill | Requires at most 10 °C and wind above 4.8 km/h | Expected in mild weather |
+| Solar Energy, Peak Sun Hours, Net Radiation | No valid solar radiation input | Map a W/m² sensor, or enable the optional illuminance fallback with a mapped lux source for an estimate |
+| Clearness Index, Cloud Cover | Requires measured solar radiation and sun elevation of at least 5° | Map radiation; wait for daylight. These do not use the lux fallback |
+| Lightning distance, bearing, proximity | No mapped/discovered location source, or no valid strike location from it yet | Check the source entity; Blitzortung can report zero strikes with an unknown distance |
+| Lightning clearance | No strike observed since the entry loaded | Expected until a strike is observed; unknown does not establish safety |
+| Rain/frost/lightning events | No corresponding event recorded yet | Expected; the state is the last event time |
+| Minutes Until Rain / Dry | No matching transition within the nowcast window, or nowcast data not ready | Read `reason`; check Rain Expected and Rain Next 60 min |
+| Pattern Forecast | Missing recent inputs, or too few checked days/events | Read `explanation`, `progress_pct`, `events_collected` and `days_checked` |
+
+Pattern Forecast status `waiting` means missing inputs prevent any forecast from
+publishing. `collecting` means training is not yet sufficient. Individual targets
+can still be collecting while others publish. Its `warm_start` attribute reports
+how many recent wind bins were recovered. At least three usable 15-minute bins
+are needed. Raw recorder direction history can recover circular wind components
+when arithmetic statistics span north; if excluded or purged, live bins fill the
+gap. Wind speed remains usable even without direction.
+
+The updated Weather and Bubble dashboard templates display explanations and
+collection progress in the “Why” column. Dashboards already pasted into Home
+Assistant must have that card's YAML updated; upgrading the integration alone
+does not replace a stored dashboard.
+
 ---
 
 ## Common issues
@@ -37,7 +70,7 @@ See the [Pattern Forecast guide](guides/pattern_forecast.md) for how it works.
 | `history_learn` says `too short` | Less than a day of statistics exists. In 2.11.0 this also showed for rain gauges whose running total is recorded as a measurement (e.g. the Shelly WS90), which affected rain and frost | It uses what exists and keeps learning live. 2.11.1 reads measurement-type rain totals from their hourly maximum and retries those forecasts automatically |
 | `maturity` is `paused` | An input is unavailable, stale, or flagged by the drift, stuck or spike checks (see `reason`) | Fix the sensor; the forecast resumes by itself. Check Station Diagnostics |
 | `reason` shows `waiting_for:dp_24h` | A 24 h pressure change needs a reading from 24 h ago | Since 2.11.1 the learning-from-history step (about 2 minutes after start) fills the last day of pressure from the recorder, so this clears then. Without recorder statistics for pressure, wait a day |
-| `reason` shows `waiting_for:dpd_1h`, `t_1h`, `t_3h`, `wind_u` or `gust_1h` | These need readings from 1 h or 3 h ago, or several in the last hour | Since 2.11.2 the same step fills the last 3 hours from the recorder's 5-minute statistics, so this clears about 2 minutes after start. The recorder keeps 5-minute statistics for 10 days by default; without them (or after a longer outage) the inputs fill live within 1 to 3 hours |
+| `reason` shows `waiting_for:dpd_1h`, `t_1h`, `t_3h`, `wind_u` or `gust_1h` | These need readings from 1 h or 3 h ago, or several in the last hour | Startup seeds the last 3 hours from recorder statistics after about 2 minutes; forecasts then retry at the next 15-minute issue. Since 2.12.0 unsafe arithmetic wind-direction statistics can fall back to circular components from raw history. If suitable history is excluded, purged or unavailable, wind needs three usable 15-minute bins and other changes may need up to 3 h live. Check `warm_start` and the target's `explanation` |
 | No `sensor.ws_pattern_storm_3h` | No lightning detector is mapped, and the internet lightning option is off | Map a detector's strike count sensor in Configure, or, if the Blitzortung integration is installed, turn on **Use internet lightning data** (Configure → Features). The status sensor's `storm_target` attribute says which case applies |
 | Storm sensor name ends in "(internet lightning)" and stays `unknown` | The Blitzortung integration is not installed, is disabled, or its entities are unavailable | Install or enable it. The feed is checked in the entity registry and must be available |
 | `maturity` went from `skilled` to `degraded` | Over the last 5 weeks, with at least 3 events, the forecast stopped beating the station's usual rate | It is shown, not hidden. A changed sensor, a new location or a different season can cause it. Reset it if the cause was a one-off |
