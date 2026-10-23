@@ -1147,6 +1147,38 @@ class PatternEngine:
         kept = {p[0] for p in merged}
         return sum(1 for s in seeds if s[0] in kept)
 
+    _BIN_KEYS = ("t", "d", "u", "v", "s", "g", "r", "k")
+
+    def seed_bins(self, bins: list[dict[str, Any]]) -> int:
+        """Fill gaps in the 3 h of 15-min history bins from recorder statistics.
+
+        Feeds the 1 h / 3 h changes, the 1 h wind and gust and the last-hour rain,
+        so forecasts can publish right after a restart instead of after 1-3 h of
+        live readings. Live bins always win: a seed within 7.5 min of a live bin
+        is dropped. Returns how many seed bins were kept.
+        """
+        live = [dict(b) for b in self.bins]
+        seeds = []
+        for b in bins:
+            if (
+                not isinstance(b, dict)
+                or not _finite(b.get("ts"))
+                or any(abs(b["ts"] - q["ts"]) <= 450.0 for q in live)
+            ):
+                continue
+            clean = {k: (float(b[k]) if _finite(b.get(k)) else None) for k in self._BIN_KEYS}
+            n = b.get("n")
+            seeds.append({"ts": float(b["ts"]), **clean, "n": int(n) if _finite(n) and n > 0 else 0})
+        merged = sorted(live + seeds, key=lambda b: b["ts"])[-PATTERN_BIN_COUNT:]
+        self.bins = deque(merged, maxlen=PATTERN_BIN_COUNT)
+        kept = {b["ts"] for b in merged}
+        return sum(1 for s in seeds if s["ts"] in kept)
+
+    def seed_last_rain(self, ts: float | None) -> None:
+        """Remember an earlier rain from history, so `dry_hours` is right after a fresh start."""
+        if _finite(ts) and (self.last_rain_ts is None or ts > self.last_rain_ts):
+            self.last_rain_ts = float(ts)
+
     def _features(self, ts: float, inst: Instant) -> tuple[dict[str, float | None], dict[str, bool]]:
         """Raw feature values plus the per-target 'wet/hot/...now' persistence conditions."""
         bins = list(self.bins)

@@ -2,6 +2,13 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.11.2] - 2026-10-23
+
+### Fixed
+
+- **Pattern Forecast showed no numbers for 1 to 3 hours after every start.** The 1 h and 3 h changes (`dpd_1h`, `t_1h`, `t_3h`), the 1 h wind and gust and the last-hour rain come from 15-minute history bins that only filled from live readings, so after switching the feature on, and after every restart, each forecast reported `waiting_for:...` until enough live readings existed. Every start now fills the last 3 hours of bins from the recorder's 5-minute short-term statistics, about 2 minutes after startup. The bins are built like the live ones (last 5-minute temperature and dew point depression, mean wind vector and speed, max gust, rise of the rain total, including totals recorded as measurement statistics). Live bins always win, unfinished 5-minute periods are never used, and a 5-minute direction mean is only trusted when that period's min and max are within 90 degrees (an arithmetic mean of degrees is meaningless across north) or the statistic is a circular mean.
+- **`dry_hours` started from zero on a fresh start.** The history replay and the 5-minute warm start now set the time of the last rain from the recorder, instead of counting from the moment Pattern Forecast was switched on.
+
 ## [2.11.1] - 2026-10-23
 
 ### Fixed

@@ -121,19 +121,25 @@ class FakeRecorder:
         return await asyncio.get_running_loop().run_in_executor(None, fn, *args)
 
 
-def make_runtime(options: dict | None = None, stats=None, sources: dict | None = None):
+def make_runtime(options: dict | None = None, stats=None, sources: dict | None = None, stats5=None):
     coord, table = make_coord({CONF_ENABLE_PATTERN_FORECAST: True, **(options or {})}, sources or SOURCES)
     rt = coord._pattern
     meta, rows = stats if stats is not None else year_of_statistics()
+    meta5, rows5 = stats5 if stats5 is not None else ({}, {})
     threads: list[str] = []
     loop_thread = threading.current_thread().name
 
-    def fetch(entity_ids, start, end):
+    periods: list[str] = []
+
+    def fetch(entity_ids, start, end, period="hour"):
         threads.append(threading.current_thread().name)
-        return {k: v for k, v in meta.items() if k in entity_ids}, {k: v for k, v in rows.items() if k in entity_ids}
+        periods.append(period)
+        m, r = (meta5, rows5) if period == "5minute" else (meta, rows)
+        return {k: v for k, v in m.items() if k in entity_ids}, {k: v for k, v in r.items() if k in entity_ids}
 
     rt._fetch_statistics = fetch  # type: ignore[method-assign]
     rt._test_threads = threads  # type: ignore[attr-defined]
+    rt._test_periods = periods  # type: ignore[attr-defined]
     rt._test_loop_thread = loop_thread  # type: ignore[attr-defined]
     return coord, rt
 
@@ -253,12 +259,15 @@ class TestReplay:
         assert all(v == 0 for v in seen["n_updates"].values()) and seen["hl"] == {}
         assert all(m.n_updates > 0 for m in rt.engine.models.values())
 
-    def test_second_call_is_a_no_op(self):
+    def test_second_call_does_not_replay_again(self):
         coord, rt = make_runtime()
         learn(rt)
-        calls = len(rt._test_threads)
+        hourly = rt._test_periods.count("hour")
         learn(rt)
-        assert len(rt._test_threads) == calls  # every target already learned: no recorder read
+        # every target already learned: no second year-long read, only the cheap
+        # 5-minute warm start that runs at every start (2.11.2)
+        assert rt._test_periods.count("hour") == hourly
+        assert rt._test_periods[-1] == "5minute"
 
     def test_live_state_survives_the_swap(self):
         coord, rt = make_runtime()

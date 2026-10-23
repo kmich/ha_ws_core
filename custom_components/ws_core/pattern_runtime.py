@@ -67,6 +67,7 @@ from .const import (
     KEY_TEMP_LOW_24H,
     KEY_THUNDERSTORM_RISK,
     LUX_TO_WM2_FACTOR,
+    PATTERN_BIN_COUNT,
     PATTERN_HISTORY_DAYS,
     PATTERN_ISSUE_INTERVAL_MIN,
     PATTERN_RAIN_JUMP_CAP_MM,
@@ -84,6 +85,7 @@ from .const import (
     SRC_RAIN_TOTAL,
     SRC_TEMP,
     SRC_WIND,
+    SRC_WIND_DIR,
 )
 from .pattern_forecast import (
     POOL,
@@ -124,6 +126,14 @@ _HISTORY_SOURCE_KEY = {
     "rain": SRC_RAIN_TOTAL,
 }
 _CUMULATIVE_INPUTS = ("rain", "lightning")
+# Inputs of the 15-min history bins, seeded at startup from 5-minute statistics
+_RECENT_INPUTS = ("temp", "hum", "wind", "dir", "gust", "rain", "lightning")
+_BIN_S = PATTERN_ISSUE_INTERVAL_MIN * 60.0
+_PERIOD_S = 300.0  # recorder short-term statistics period
+# A 5-minute mean of a direction is only trusted when the period's min and max
+# are this close: a wider spread may straddle north, where an arithmetic mean
+# of degrees is meaningless (350 and 10 average to 180).
+_DIR_MAX_SPREAD_DEG = 90.0
 
 # Observation input groups an upstream quality flag can take out
 _FLAG_BY_NAME = {
@@ -526,15 +536,157 @@ class PatternRuntime:
             return self._blitz_entities(ts).get(SRC_LIGHTNING_COUNT)
         return None
 
-    def _fetch_statistics(self, entity_ids: set[str], start: datetime, end: datetime) -> tuple[dict, dict]:
-        """Hourly statistics and metadata. Synchronous: runs on the recorder executor."""
+    def _fetch_statistics(
+        self, entity_ids: set[str], start: datetime, end: datetime, period: str = "hour"
+    ) -> tuple[dict, dict]:
+        """Statistics ("hour" long-term or "5minute" short-term) and metadata.
+
+        Synchronous: runs on the recorder executor.
+        """
         from homeassistant.components.recorder.statistics import list_statistic_ids, statistics_during_period
 
         meta = {m["statistic_id"]: m for m in list_statistic_ids(self.coord.hass, statistic_ids=entity_ids)}
         rows = statistics_during_period(
-            self.coord.hass, start, end, set(meta), "hour", None, {"mean", "min", "max", "sum", "state"}
+            self.coord.hass, start, end, set(meta), period, None, {"mean", "min", "max", "sum", "state"}
         )
         return meta, rows
+
+    def recent_entity(self, name: str, ts: float) -> str | None:
+        """Entity whose 5-minute statistics feed one input of the history bins."""
+        if name == "dir":
+            return self.coord.sources.get(SRC_WIND_DIR) or None
+        return self.history_entity(name, ts)
+
+    def build_recent_bins(self, plan: dict[str, str | None], meta: dict, rows: dict, now_ts: float) -> list[dict]:
+        """5-minute statistics -> 15-min history bins shaped like the live ones.
+
+        Bin ``B`` covers ``[B - 15 min, B)``: temperature and dew point depression
+        are the last 5-minute mean (live keeps the last reading), wind and speed
+        the mean of the bin's periods, gust their max, and rain / strikes the rise
+        of the running total over the bin (a decrease is a reset, a jump is unknown).
+        Only complete periods are used, so a period still being recorded never
+        stands in for live data.
+        """
+        c = self.coord
+        o = c.entry_options
+        cal_t = float(o.get(CONF_CAL_TEMP_C, 0.0))
+        cal_h = float(o.get(CONF_CAL_HUMIDITY, 0.0))
+        cal_w = float(o.get(CONF_CAL_WIND_MS, 0.0))
+
+        def unit(name: str) -> str:
+            eid = plan.get(name)
+            return str((meta.get(eid) or {}).get("unit_of_measurement") or "") if eid else ""
+
+        def by_start(name: str) -> dict[float, dict]:
+            eid = plan.get(name)
+            out: dict[float, dict] = {}
+            for r in (rows.get(eid) or []) if eid else []:
+                ts = self._row_ts(r)
+                if ts is not None and ts + _PERIOD_S <= now_ts:
+                    out[ts] = r
+            return out
+
+        def num(row: dict | None, key: str) -> float | None:
+            v = None if row is None else row.get(key)
+            return float(v) if isinstance(v, (int, float)) and math.isfinite(v) else None
+
+        temp, hum, wind, dirs, gust = (by_start(n) for n in ("temp", "hum", "wind", "dir", "gust"))
+        dir_circular = (meta.get(plan.get("dir") or "") or {}).get("mean_type") == 2
+
+        def cumulative_end(name: str, conv: Any) -> dict[float, float]:
+            """Running total at the end of each period."""
+            eid = plan.get(name)
+            if not eid:
+                return {}
+            per = by_start(name)
+            key = self._cumulative_key(meta.get(eid) or {}, list(per.values()))
+            out = {}
+            for ts, r in per.items():
+                v = num(r, key)
+                if v is not None:
+                    out[ts] = conv(v)
+            return out
+
+        rain_end = cumulative_end("rain", lambda v: c._to_mm(v, unit("rain")))
+        strike_end = cumulative_end("lightning", lambda v: v)
+
+        def rise(ends: dict[float, float], b: float, cap: float) -> float | None:
+            a, z = ends.get(b - _BIN_S - _PERIOD_S), ends.get(b - _PERIOD_S)
+            if a is None or z is None:
+                return None
+            d = z - a
+            return 0.0 if d < 0 else (None if d > cap else round(d, 4))
+
+        last = math.floor(now_ts / _BIN_S) * _BIN_S
+        bins: list[dict] = []
+        for k in range(PATTERN_BIN_COUNT - 1, -1, -1):
+            b = last - k * _BIN_S
+            periods = [b - _BIN_S + i * _PERIOD_S for i in range(3)]
+            t_raw = num(temp.get(periods[-1]), "mean")
+            t = None if t_raw is None else round(c._to_celsius(t_raw, unit("temp")) + cal_t, 2)
+            h = num(hum.get(periods[-1]), "mean")
+            d = None
+            if t is not None and h is not None:
+                h = max(0.0, min(100.0, h + cal_h))
+                if h > 0:
+                    d = round(max(0.0, t - calculate_dew_point(t, h)), 2)
+            # Like live ticks, a period counts for wind only with both a speed and a
+            # trustworthy direction; u, v and speed are averaged over those periods.
+            ss, us, vs = [], [], []
+            for p in periods:
+                sp = num(wind.get(p), "mean")
+                drow = dirs.get(p)
+                dm, dlo, dhi = num(drow, "mean"), num(drow, "min"), num(drow, "max")
+                if sp is None or dm is None:
+                    continue
+                if not (dir_circular or (dlo is not None and dhi is not None and dhi - dlo <= _DIR_MAX_SPREAD_DEG)):
+                    continue
+                sp = max(0.0, c._to_ms(sp, unit("wind")) + cal_w)
+                ang = math.radians(dm)
+                ss.append(sp)
+                us.append(-sp * math.sin(ang))
+                vs.append(-sp * math.cos(ang))
+            gusts = [g for g in (num(gust.get(p), "max") for p in periods) if g is not None]
+            bin_ = {
+                "ts": b,
+                "t": t,
+                "d": d,
+                "u": sum(us) / len(us) if us else None,
+                "v": sum(vs) / len(vs) if vs else None,
+                "s": sum(ss) / len(ss) if ss else None,
+                "g": max(0.0, c._to_ms(max(gusts), unit("gust")) + cal_w) if gusts else None,
+                "r": rise(rain_end, b, PATTERN_RAIN_JUMP_CAP_MM),
+                "k": rise(strike_end, b, PATTERN_STRIKE_JUMP_CAP) if self.storm_source else None,
+                "n": 5 * len(ss),
+            }
+            if any(bin_[key] is not None for key in ("t", "d", "s", "g", "r")):
+                bins.append(bin_)
+        return bins
+
+    def _recent_job(self, plan: dict[str, str | None], now_ts: float) -> list[dict]:
+        """Read the last ~3.5 h of 5-minute statistics. Runs on the recorder executor."""
+        ids = {e for e in plan.values() if e}
+        if not ids:
+            return []
+        start_ts = math.floor(now_ts / _BIN_S) * _BIN_S - PATTERN_BIN_COUNT * _BIN_S - _PERIOD_S
+        meta, rows = self._fetch_statistics(
+            ids, datetime.fromtimestamp(start_ts, UTC), datetime.fromtimestamp(now_ts, UTC), period="5minute"
+        )
+        return self.build_recent_bins(plan, meta, rows, now_ts)
+
+    async def _async_seed_recent(self, now: datetime) -> int:
+        """Seed the 15-min history bins from the recorder (every startup, before any replay)."""
+        ts = now.timestamp()
+        plan = {name: self.recent_entity(name, ts) for name in _RECENT_INPUTS}
+        try:
+            bins = await _recorder_instance(self.coord.hass).async_add_executor_job(partial(self._recent_job, plan, ts))
+        except Exception as err:  # noqa: BLE001 - recorder missing or busy: warm up live instead
+            _LOGGER.debug("ws_core pattern forecast: no short-term statistics to seed from: %s", err)
+            return 0
+        wet = [b["ts"] for b in bins if (b.get("r") or 0.0) > 0.0]
+        if wet:
+            self.engine.seed_last_rain(max(wet))
+        return self.engine.seed_bins(bins)
 
     @staticmethod
     def _row_ts(row: dict) -> float | None:
@@ -694,10 +846,14 @@ class PatternRuntime:
                 replayable.append(tid)
         report: dict[str, dict[str, Any]] = {}
         pressure_seed: list[list[float]] = []
+        last_rain_ts: float | None = None
         if replayable:
             need_night = any(trainer.models[t].spec.kind == "frost" for t in replayable)
             hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
             pressure_seed = PatternEngine.pressure_seed_from_history(hist)
+            wet = [j for j, r in enumerate(hist.rain) if r is not None and r > 0.0]
+            if wet:
+                last_rain_ts = hist.start_ts + (wet[-1] + 1) * 3600.0
             report = trainer.replay(hist, replayable, update_std)
             for tid in replayable:
                 r = report[tid]
@@ -710,24 +866,38 @@ class PatternRuntime:
                     }
                 else:
                     statuses[tid] = {"status": "ok", "reason": None, "samples": r["samples"], "events": r["events"]}
-        return {"trained": trainer, "report": report, "statuses": statuses, "pressure_seed": pressure_seed}
+        return {
+            "trained": trainer,
+            "report": report,
+            "statuses": statuses,
+            "pressure_seed": pressure_seed,
+            "last_rain_ts": last_rain_ts,
+        }
 
     async def async_learn_history(self) -> None:
-        """Replay up to a year of recorder statistics into targets that have not learned yet.
+        """Warm start from the recorder, then replay a year of statistics where needed.
 
-        The read and the training run on the recorder executor against a copy of
-        the engine; the result is swapped in here on the event loop. Replayed
-        samples never count toward ``skilled``.
+        Every run (startup, reset, threshold change) first seeds the 15-min history
+        bins from the last ~3 h of 5-minute statistics, so the 1 h / 3 h inputs exist
+        straight away. Targets that have not learned yet then replay up to a year of
+        hourly statistics: the read and the training run on the recorder executor
+        against a copy of the engine, and the result is swapped in here on the event
+        loop. Replayed samples never count toward ``skilled``.
         """
         if self._history_running:
             return
-        eng = self.engine
-        now = dt_util.utcnow()
-        targets = eng.targets_needing_replay(now.timestamp())
-        if not targets:
-            return
         self._history_running = True
         try:
+            now = dt_util.utcnow()
+            bins = await self._async_seed_recent(now)
+            if bins:
+                _LOGGER.info("ws_core pattern forecast: seeded %d recent 15-min history bins from the recorder", bins)
+            eng = self.engine
+            targets = eng.targets_needing_replay(now.timestamp())
+            if not targets:
+                if bins:
+                    await self.async_save()
+                return
             update_std = eng.std_is_cold()
             end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
             n = PATTERN_HISTORY_DAYS * 24
@@ -753,6 +923,7 @@ class PatternRuntime:
             # The 24 h pressure change needs a reading from a day ago; seed it from the
             # replayed hours so forecasts do not wait a day after being switched on.
             seeded = eng.seed_pressure(result.get("pressure_seed") or [])
+            eng.seed_last_rain(result.get("last_rain_ts"))
             self._rebuild_published()
             _LOGGER.info(
                 "ws_core pattern forecast: learned from history (%s), seeded %d pressure readings",
