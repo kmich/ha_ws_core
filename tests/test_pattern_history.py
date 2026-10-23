@@ -16,7 +16,9 @@ from custom_components.ws_core import pattern_runtime
 from custom_components.ws_core.const import (
     CONF_ENABLE_PATTERN_FORECAST,
     CONF_PATTERN_STORM_INTERNET_LIGHTNING,
+    PATTERN_HISTORY_METHOD,
     PATTERN_HISTORY_RETRY_S,
+    PATTERN_PRESSURE_SLOTS,
     SRC_LIGHTNING_COUNT,
 )
 from custom_components.ws_core.pattern_forecast import (
@@ -588,3 +590,148 @@ class TestEngineReplay:
 
     def test_pool_names_unchanged_by_replay_module(self):
         assert len(POOL) == 23
+
+
+# ---------------------------------------------------------------------------
+# 2.11.1: rain totals recorded as measurement statistics, and the 24 h
+# pressure history seeded from the replay
+# ---------------------------------------------------------------------------
+
+
+def measurement_rain(stats):
+    """The same year, but with the rain total recorded as a measurement sensor.
+
+    That is what the recorder keeps for e.g. a Shelly WS90 (state_class:
+    measurement on a running total): hourly mean/min/max, no sum or state.
+    """
+    meta, rows = stats
+    meta = {k: dict(v) for k, v in meta.items()}
+    meta["sensor.r"].update(has_sum=False, has_mean=True)
+    rows = dict(rows)
+    rows["sensor.r"] = [
+        {"start": r["start"], "mean": r["state"], "min": r["state"], "max": r["state"]} for r in rows["sensor.r"]
+    ]
+    return meta, rows
+
+
+class TestMeasurementRainTotals:
+    def test_cumulative_key_prefers_sum_then_state_then_max(self):
+        key = pattern_runtime.PatternRuntime._cumulative_key
+        assert key({"has_sum": True}, [{"sum": 1.0, "state": 1.0}]) == "sum"
+        assert key({"has_sum": False}, [{"state": 4.0}]) == "state"
+        assert key({"has_sum": False}, [{"mean": 4.0, "max": 4.2, "state": None}]) == "max"
+        assert key({"has_sum": False, "has_mean": True}, [{"mean": 4.0, "min": 4.0, "max": 4.2}]) == "max"
+
+    def test_hourly_max_gives_the_same_rain_as_the_sum(self):
+        stats = year_of_statistics()
+        coord, rt = make_runtime(stats=stats)
+        plan = {n: rt.history_entity(n, START_TS) for n in ("temp", "hum", "press", "wind", "gust", "rain")}
+        from_sum = rt.build_history(plan, *stats, START_TS, N, need_night=False).rain
+        from_max = rt.build_history(plan, *measurement_rain(stats), START_TS, N, need_night=False).rain
+        assert sum(1 for v in from_max if v is not None) > N // 2
+        assert all(
+            (a is None) == (b is None) and (a is None or abs(a - b) < 1e-9)
+            for a, b in zip(from_sum, from_max, strict=True)
+        )
+
+    def test_rain_and_frost_learn_when_the_total_is_a_measurement(self):
+        coord, rt = make_runtime(stats=measurement_rain(year_of_statistics()))
+        learn(rt)
+        t = rt.engine.history_learn["targets"]
+        for tid in ("rain_1h", "rain_3h", "rain_6h", "frost_12h"):
+            assert t[tid]["status"] == "ok", (tid, t[tid])
+            assert t[tid]["samples"] > 1000
+        assert rt.engine.models["rain_3h"].ev_hist > 0
+
+
+class TestReplayMethodRetry:
+    def test_targets_that_failed_under_an_older_method_retry_at_once(self):
+        coord, rt = make_runtime()
+        learn(rt)
+        now = NOW.timestamp()
+        assert rt.engine.targets_needing_replay(now + 3600) == []
+        targets = rt.engine.history_learn["targets"]
+        # what 2.11.0 left behind for a measurement-type rain gauge: no method recorded
+        targets["rain_3h"] = {"status": "too_short", "reason": "x", "samples": 0, "events": 0, "attempted_at": now}
+        assert rt.engine.targets_needing_replay(now + 3600) == ["rain_3h"]
+
+    def test_targets_that_failed_under_the_current_method_wait_a_week(self):
+        meta, rows = year_of_statistics()
+        rows["sensor.r"] = []
+        coord, rt = make_runtime(stats=(meta, rows))
+        learn(rt)
+        now = NOW.timestamp()
+        entry = rt.engine.history_learn["targets"]["rain_3h"]
+        assert entry["status"] != "ok" and entry["method"] == PATTERN_HISTORY_METHOD
+        assert "rain_3h" not in rt.engine.targets_needing_replay(now + 3600)
+        assert "rain_3h" in rt.engine.targets_needing_replay(now + PATTERN_HISTORY_RETRY_S + 10)
+
+    def test_a_malformed_method_counts_as_old(self):
+        coord, rt = make_runtime()
+        learn(rt)
+        now = NOW.timestamp()
+        rt.engine.history_learn["targets"]["gust_3h"] = {
+            "status": "too_short",
+            "reason": None,
+            "attempted_at": now,
+            "method": "bogus",
+        }
+        assert rt.engine.targets_needing_replay(now + 60) == ["gust_3h"]
+
+
+class TestPressureSeed:
+    def test_replay_seeds_a_day_of_pressure(self, learned):
+        coord, rt = learned
+        eng = rt.engine
+        assert len(eng.pressure) == PATTERN_PRESSURE_SLOTS
+        first, last = eng.pressure[0][0], eng.pressure[-1][0]
+        assert last <= NOW.timestamp() and last - first >= 23.5 * 3600
+        assert all(p[0] % 900.0 == 0 for p in eng.pressure)
+        # the next live issues all find their reading from 24 h before
+        for k in range(4):
+            assert eng.pressure_change_24h(NOW.timestamp() + 900.0 * k, 1013.0) is not None
+
+    def test_seed_is_interpolated_between_hourly_means(self):
+        n = 30
+        mslp = [1000.0 + j for j in range(n)]
+        hist = HourlyHistory(
+            start_ts=START_TS,
+            n=n,
+            mslp=mslp,
+            temp=[None] * n,
+            temp_min=[None] * n,
+            temp_max=[None] * n,
+            dpd=[None] * n,
+            wind=[None] * n,
+            gust=[None] * n,
+            rain=[None] * n,
+            strikes=[None] * n,
+            night_frac=[None] * n,
+            tz_offset=[0.0] * n,
+        )
+        pts = dict((t, v) for t, v in PatternEngine.pressure_seed_from_history(hist))
+        mid = START_TS + 10 * 3600.0 + 1800.0  # centre of hour 10
+        assert pts[mid] == 1010.0
+        assert pts[mid + 900.0] == 1010.25
+        assert max(pts) == START_TS + (n - 1) * 3600.0 + 1800.0
+
+    def test_seed_never_bridges_a_missing_hour(self):
+        n = 30
+        mslp: list[float | None] = [1000.0 + j for j in range(n)]
+        mslp[20] = None
+        hist = HourlyHistory(START_TS, n, mslp, *([[None] * n] * 9), [0.0] * n)
+        pts = PatternEngine.pressure_seed_from_history(hist)
+        hole_start = START_TS + 19 * 3600.0 + 1800.0
+        hole_end = START_TS + 21 * 3600.0 + 1800.0
+        assert not any(hole_start < t < hole_end for t, _ in pts)
+
+    def test_live_readings_always_win(self):
+        eng = PatternEngine(Thresholds())
+        live_ts = NOW.timestamp() - 2 * 3600.0
+        eng.pressure.append([live_ts, 990.0])
+        seeds = [[live_ts, 1020.0], [live_ts - 900.0, 1019.0], [float("nan"), 1.0]]
+        kept = eng.seed_pressure(seeds)
+        assert kept == 1
+        assert [live_ts, 990.0] in [list(p) for p in eng.pressure]
+        assert [live_ts - 900.0, 1019.0] in [list(p) for p in eng.pressure]
+        assert len(eng.pressure) == 2

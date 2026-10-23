@@ -2,6 +2,13 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.11.1] - 2026-10-23
+
+### Fixed
+
+- **Pattern Forecast rain and frost did not learn from history on many stations.** Stations that report their rain total with `state_class: measurement` (for example the Shelly WS90) get only hourly mean/min/max in the recorder's long-term statistics, and 2.11.0 looked only for a running sum or stored state. Rain (1/3/6 h) and frost then reported `history: too short (no complete hours of statistics)` and had to learn from scratch. The replay now reads such a running total from its hourly maximum, and forecasts that failed under 2.11.0 retry at the next replay instead of waiting a week.
+- **Pattern Forecast showed no numbers for the first 24 hours.** The 24 h pressure change needs a reading from a day ago, which only built up live, so every forecast waited a day (`waiting_for:dp_24h`) even when it had already learned from history. The learning-from-history step now fills the last day of sea-level pressure from the recorder (interpolated to the 15-minute grid, never across a missing hour, live readings always win), so forecasts can publish as soon as it finishes, about 2 minutes after start.
+
 ## [2.11.0] - 2026-10-23
 
 ### Added

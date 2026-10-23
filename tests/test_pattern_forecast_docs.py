@@ -156,15 +156,15 @@ def test_original_temperature_trigger_is_untouched():
     assert first["platform"] == "numeric_state" and first["below"] == "<input:threshold>"
 
 
-def test_versions_are_consistent_at_2_11_0():
+def test_versions_are_consistent():
     manifest = json.loads((ROOT / "custom_components/ws_core/manifest.json").read_text(encoding="utf-8"))
-    assert manifest["version"] == "2.11.0"
+    version = manifest["version"]
     assert manifest["requirements"] == []
-    assert 'version = "2.11.0"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert '_INTEGRATION_VERSION = "2.11.0"' in (ROOT / "custom_components/ws_core/const.py").read_text(
+    assert f'version = "{version}"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert f'_INTEGRATION_VERSION = "{version}"' in (ROOT / "custom_components/ws_core/const.py").read_text(
         encoding="utf-8"
     )
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "## [2.11.0]" in changelog and "## [Unreleased]" not in changelog
+    assert f"## [{version}]" in changelog and "## [Unreleased]" not in changelog
     section = changelog.split("## [2.11.0]", 1)[1].split("\n## [", 1)[0]
     assert "Pattern Forecast" in section and "neighbor qc" in section.lower()

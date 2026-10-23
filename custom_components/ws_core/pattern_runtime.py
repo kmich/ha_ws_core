@@ -561,6 +561,21 @@ class PatternRuntime:
         return 0.0 if off is None else off.total_seconds()
 
     @staticmethod
+    def _cumulative_key(meta_entry: dict, rows: list[dict]) -> str:
+        """Which hourly statistic holds a cumulative counter's running total.
+
+        ``sum`` for total/total_increasing sensors, else the stored ``state``. Many
+        stations (e.g. the Shelly WS90) report their rain total with
+        state_class: measurement, so the recorder keeps only mean/min/max; for a
+        running total the hourly ``max`` is its value at the end of the hour.
+        """
+        if meta_entry.get("has_sum"):
+            return "sum"
+        if any(r.get("state") is not None for r in rows):
+            return "state"
+        return "max"
+
+    @staticmethod
     def _hourly_delta(cum: list[float | None], cap: float) -> list[float | None]:
         """Per-hour change of a cumulative counter: a decrease is a reset (0), a jump is invalid."""
         out: list[float | None] = [None] * len(cum)
@@ -605,7 +620,7 @@ class PatternRuntime:
             eid = plan.get(name)
             if not eid:
                 return [None] * n
-            key = "sum" if (meta.get(eid) or {}).get("has_sum") else "state"
+            key = self._cumulative_key(meta.get(eid) or {}, rws(name))
             return self._series(rws(name), start_ts, n, key, conv)
 
         rain = self._hourly_delta(cumulative("rain", lambda v: c._to_mm(v, unit("rain"))), PATTERN_RAIN_JUMP_CAP_MM)
@@ -678,9 +693,11 @@ class PatternRuntime:
             else:
                 replayable.append(tid)
         report: dict[str, dict[str, Any]] = {}
+        pressure_seed: list[list[float]] = []
         if replayable:
             need_night = any(trainer.models[t].spec.kind == "frost" for t in replayable)
             hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
+            pressure_seed = PatternEngine.pressure_seed_from_history(hist)
             report = trainer.replay(hist, replayable, update_std)
             for tid in replayable:
                 r = report[tid]
@@ -693,7 +710,7 @@ class PatternRuntime:
                     }
                 else:
                     statuses[tid] = {"status": "ok", "reason": None, "samples": r["samples"], "events": r["events"]}
-        return {"trained": trainer, "report": report, "statuses": statuses}
+        return {"trained": trainer, "report": report, "statuses": statuses, "pressure_seed": pressure_seed}
 
     async def async_learn_history(self) -> None:
         """Replay up to a year of recorder statistics into targets that have not learned yet.
@@ -733,10 +750,14 @@ class PatternRuntime:
                     },
                 }
             eng.adopt_replay(result["trained"], result["report"], result["statuses"], update_std, now.timestamp())
+            # The 24 h pressure change needs a reading from a day ago; seed it from the
+            # replayed hours so forecasts do not wait a day after being switched on.
+            seeded = eng.seed_pressure(result.get("pressure_seed") or [])
             self._rebuild_published()
             _LOGGER.info(
-                "ws_core pattern forecast: learned from history (%s)",
+                "ws_core pattern forecast: learned from history (%s), seeded %d pressure readings",
                 {t: s["status"] for t, s in result["statuses"].items()},
+                seeded,
             )
             await self.async_save()
         finally:

@@ -37,6 +37,7 @@ from .const import (
     PATTERN_DRY_HOURS_CAP,
     PATTERN_EVENT_GAP_H,
     PATTERN_GRAD_CLIP,
+    PATTERN_HISTORY_METHOD,
     PATTERN_HISTORY_RETRY_S,
     PATTERN_HISTORY_STD_WEIGHT,
     PATTERN_L2,
@@ -1103,6 +1104,49 @@ class PatternEngine:
                 best = (t, v)
         return None if best is None else mslp - best[1]
 
+    @staticmethod
+    def pressure_seed_from_history(hist: HourlyHistory) -> list[list[float]]:
+        """15-min sea-level pressure points for the last ~25 h of a replay.
+
+        Hourly means sit at the middle of their hour; points on the :00/:15/:30/:45
+        grid are interpolated between neighbouring hours (never across a missing
+        hour), so the live 24 h pressure change has a reference on day one.
+        """
+        first = max(0, hist.n - 27)
+        centers = [
+            (hist.start_ts + j * 3600.0 + 1800.0, float(v))
+            for j, v in enumerate(hist.mslp[first:], start=first)
+            if v is not None
+        ]
+        out: list[list[float]] = []
+        for (t0, v0), (t1, v1) in zip(centers, centers[1:], strict=False):
+            if t1 - t0 > 3600.0 + 1.0:
+                continue
+            t = math.ceil(t0 / 900.0) * 900.0
+            while t < t1:
+                out.append([t, round(v0 + (v1 - v0) * (t - t0) / (t1 - t0), 2)])
+                t += 900.0
+        if centers and centers[-1][0] % 900.0 == 0:
+            out.append([centers[-1][0], round(centers[-1][1], 2)])
+        return out
+
+    def seed_pressure(self, points: list[list[float]]) -> int:
+        """Fill gaps in the 24 h pressure history from replayed statistics.
+
+        Live readings always win: a seed point within 7.5 min of a live one is
+        dropped. Returns how many seed points were kept.
+        """
+        live = [list(p) for p in self.pressure]
+        seeds = [
+            [float(t), float(v)]
+            for t, v in points
+            if _finite(t) and _finite(v) and not any(abs(t - q[0]) <= 450.0 for q in live)
+        ]
+        merged = sorted(live + seeds, key=lambda p: p[0])[-PATTERN_PRESSURE_SLOTS:]
+        self.pressure = deque(merged, maxlen=PATTERN_PRESSURE_SLOTS)
+        kept = {p[0] for p in merged}
+        return sum(1 for s in seeds if s[0] in kept)
+
     def _features(self, ts: float, inst: Instant) -> tuple[dict[str, float | None], dict[str, bool]]:
         """Raw feature values plus the per-target 'wet/hot/...now' persistence conditions."""
         bins = list(self.bins)
@@ -1308,9 +1352,13 @@ class PatternEngine:
         out = []
         for tid in self.active_target_ids():
             entry = done.get(tid)
-            stale = entry is not None and (
-                entry.get("status") != "ok"
-                and now_ts - float(entry.get("attempted_at", 0.0)) >= PATTERN_HISTORY_RETRY_S
+            stale = (
+                entry is not None
+                and entry.get("status") != "ok"
+                and (
+                    now_ts - float(entry.get("attempted_at", 0.0)) >= PATTERN_HISTORY_RETRY_S
+                    or (float(entry["method"]) if _finite(entry.get("method")) else 1.0) < PATTERN_HISTORY_METHOD
+                )
             )
             if entry is None or stale:
                 out.append(tid)
@@ -1496,7 +1544,7 @@ class PatternEngine:
         targets = dict((self.history_learn or {}).get("targets") or {})
         for tid, st in statuses.items():
             if tid in self.models:
-                targets[tid] = {**st, "attempted_at": now_ts}
+                targets[tid] = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
         oks = [t for t in targets.values() if t.get("status") == "ok"]
         spans = [r["last"] - r["first"] for r in report.values() if r["first"] is not None]
         failed = [f"{t}: {v.get('reason')}" for t, v in targets.items() if v.get("status") != "ok"]
