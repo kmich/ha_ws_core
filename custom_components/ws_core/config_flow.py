@@ -54,8 +54,10 @@ from .const import (
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
+    CONF_ENABLE_NEIGHBOR_QC,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
+    CONF_ENABLE_PATTERN_FORECAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_SEA_TEMP,
@@ -80,6 +82,7 @@ from .const import (
     CONF_FORECAST_PROVIDER,
     CONF_HEMISPHERE,
     CONF_NAME,
+    CONF_PATTERN_STORM_INTERNET_LIGHTNING,
     CONF_PREFIX,
     CONF_PRESSURE_TREND_WINDOW_H,
     CONF_PRESSURE_UNIT,
@@ -133,8 +136,10 @@ from .const import (
     DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_MQTT,
+    DEFAULT_ENABLE_NEIGHBOR_QC,
     DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_OWM_STATIONS,
+    DEFAULT_ENABLE_PATTERN_FORECAST,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_SEA_TEMP,
@@ -154,6 +159,7 @@ from .const import (
     DEFAULT_FORECAST_PROVIDER,
     DEFAULT_HEMISPHERE,
     DEFAULT_NAME,
+    DEFAULT_PATTERN_STORM_INTERNET_LIGHTNING,
     DEFAULT_PREFIX,
     DEFAULT_PRESSURE_TREND_WINDOW_H,
     DEFAULT_PRESSURE_UNIT,
@@ -213,6 +219,7 @@ from .const import (
     WIND_UNIT_OPTIONS,
 )
 from .flow_steps import SharedFlowSteps
+from .pattern_sources import internet_choice_needed
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1071,6 +1078,9 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             self._data[CONF_ENABLE_FWI_COMPONENTS] = bool(user_input.get(CONF_ENABLE_FWI_COMPONENTS, False))
             self._data[CONF_ENABLE_ADVANCED_SENSORS] = bool(user_input.get(CONF_ENABLE_ADVANCED_SENSORS, False))
             self._data[CONF_ENABLE_NOWCAST] = bool(user_input.get(CONF_ENABLE_NOWCAST, False))
+            self._data[CONF_ENABLE_NEIGHBOR_QC] = bool(
+                user_input.get(CONF_ENABLE_NEIGHBOR_QC, DEFAULT_ENABLE_NEIGHBOR_QC)
+            )
             # v2.0 feature toggles
             self._data[CONF_ENABLE_DEGREE_DAYS] = bool(
                 user_input.get(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)
@@ -1097,109 +1107,139 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             self._data[CONF_ENABLE_CLIMATE_NORMALS] = bool(
                 user_input.get(CONF_ENABLE_CLIMATE_NORMALS, DEFAULT_ENABLE_CLIMATE_NORMALS)
             )
-            # Navigation chain
-            if self._data[CONF_ENABLE_SEA_TEMP]:
-                return await self.async_step_sea_temp()
-            if self._data[CONF_ENABLE_WUNDERGROUND]:
-                return await self.async_step_wunderground()
-            if self._data[CONF_ENABLE_AIR_QUALITY]:
-                return await self.async_step_air_quality()
-            if self._data[CONF_ENABLE_POLLEN]:
-                return await self.async_step_pollen()
-            if self._data[CONF_ENABLE_SOLAR_FORECAST]:
-                return await self.async_step_solar_forecast()
-            if self._data[CONF_ENABLE_VIGICRUES]:
-                return await self.async_step_vigicrues_station()
-            if self._data[CONF_ENABLE_INDOOR]:
-                return await self.async_step_indoor_rooms()
-            if self._data[CONF_ENABLE_WEATHERCLOUD]:
-                return await self.async_step_weathercloud()
-            if self._data[CONF_ENABLE_PWSWEATHER]:
-                return await self.async_step_pwsweather()
-            if self._data[CONF_ENABLE_WOW]:
-                return await self.async_step_wow()
-            if self._data[CONF_ENABLE_AWEKAS]:
-                return await self.async_step_awekas()
-            if self._data[CONF_ENABLE_OWM_STATIONS]:
-                return await self.async_step_owm_stations()
-            if self._data[CONF_ENABLE_WINDY]:
-                return await self.async_step_windy()
-            if self._data[CONF_ENABLE_CWOP]:
-                return await self.async_step_cwop()
-            if self._data[CONF_ENABLE_MQTT]:
-                return await self.async_step_mqtt_config()
-            return await self.async_step_alerts()
+            self._data[CONF_ENABLE_PATTERN_FORECAST] = bool(
+                user_input.get(CONF_ENABLE_PATTERN_FORECAST, DEFAULT_ENABLE_PATTERN_FORECAST)
+            )
+            # v2.11: the internet-lightning question only appears when it can matter
+            if internet_choice_needed(self.hass, self._data):
+                return await self.async_step_pattern_forecast()
+            return await self._features_chain()
 
         return self._show_step(
             step_id="features",
+            data_schema=self._features_schema(),
+            last_step=False,
+        )
+
+    async def async_step_pattern_forecast(self, user_input: dict[str, Any] | None = None):
+        """Pattern Forecast storm data source (only when no lightning detector is mapped
+        but the Blitzortung integration is present)."""
+        if user_input is not None:
+            back = await self._handle_back(user_input)
+            if back:
+                return back
+            self._data[CONF_PATTERN_STORM_INTERNET_LIGHTNING] = bool(
+                user_input.get(CONF_PATTERN_STORM_INTERNET_LIGHTNING, DEFAULT_PATTERN_STORM_INTERNET_LIGHTNING)
+            )
+            return await self._features_chain()
+
+        return self._show_step(
+            step_id="pattern_forecast",
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        CONF_ENABLE_DISPLAY_SENSORS, default=DEFAULT_ENABLE_DISPLAY_SENSORS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_FIRE_RISK, default=DEFAULT_ENABLE_FIRE_RISK): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_FOG, default=DEFAULT_ENABLE_FOG): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_THUNDERSTORM, default=DEFAULT_ENABLE_THUNDERSTORM
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_SEA_TEMP, default=DEFAULT_ENABLE_SEA_TEMP): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_WUNDERGROUND, default=DEFAULT_ENABLE_WUNDERGROUND
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_AIR_QUALITY, default=DEFAULT_ENABLE_AIR_QUALITY
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_POLLEN, default=DEFAULT_ENABLE_POLLEN): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_MOON, default=DEFAULT_ENABLE_MOON): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_SOLAR_FORECAST, default=DEFAULT_ENABLE_SOLAR_FORECAST
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_COMFORT_INDICES, default=DEFAULT_ENABLE_COMFORT_INDICES
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_VIGILANCE_METEO, default=DEFAULT_ENABLE_VIGILANCE_METEO
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_VIGICRUES, default=DEFAULT_ENABLE_VIGICRUES): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_DIAGNOSTICS, default=DEFAULT_ENABLE_DIAGNOSTICS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_FWI_COMPONENTS, default=DEFAULT_ENABLE_FWI_COMPONENTS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_ADVANCED_SENSORS, default=DEFAULT_ENABLE_ADVANCED_SENSORS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_NOWCAST, default=DEFAULT_ENABLE_NOWCAST): selector.BooleanSelector(),
-                    # v2.0 feature toggles
-                    vol.Optional(
-                        CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_LIGHTNING, default=DEFAULT_ENABLE_LIGHTNING): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_INDOOR, default=DEFAULT_ENABLE_INDOOR): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_SOIL, default=DEFAULT_ENABLE_SOIL): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_SNOW, default=DEFAULT_ENABLE_SNOW): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_WEATHERCLOUD, default=DEFAULT_ENABLE_WEATHERCLOUD
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_PWSWEATHER, default=DEFAULT_ENABLE_PWSWEATHER): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_WOW, default=DEFAULT_ENABLE_WOW): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_AWEKAS, default=DEFAULT_ENABLE_AWEKAS): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_OWM_STATIONS, default=DEFAULT_ENABLE_OWM_STATIONS
-                    ): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_WINDY, default=DEFAULT_ENABLE_WINDY): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_CWOP, default=DEFAULT_ENABLE_CWOP): selector.BooleanSelector(),
-                    vol.Optional(CONF_ENABLE_MQTT, default=DEFAULT_ENABLE_MQTT): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_AUTO_CALIBRATION, default=DEFAULT_ENABLE_AUTO_CALIBRATION
-                    ): selector.BooleanSelector(),
-                    vol.Optional(
-                        CONF_ENABLE_CLIMATE_NORMALS, default=DEFAULT_ENABLE_CLIMATE_NORMALS
+                        CONF_PATTERN_STORM_INTERNET_LIGHTNING,
+                        default=self._data.get(
+                            CONF_PATTERN_STORM_INTERNET_LIGHTNING, DEFAULT_PATTERN_STORM_INTERNET_LIGHTNING
+                        ),
                     ): selector.BooleanSelector(),
                 }
             ),
             last_step=False,
+        )
+
+    async def _features_chain(self):
+        """Route on to the first enabled feature sub-step (or the alerts step)."""
+        # Navigation chain
+        if self._data[CONF_ENABLE_SEA_TEMP]:
+            return await self.async_step_sea_temp()
+        if self._data[CONF_ENABLE_WUNDERGROUND]:
+            return await self.async_step_wunderground()
+        if self._data[CONF_ENABLE_AIR_QUALITY]:
+            return await self.async_step_air_quality()
+        if self._data[CONF_ENABLE_POLLEN]:
+            return await self.async_step_pollen()
+        if self._data[CONF_ENABLE_SOLAR_FORECAST]:
+            return await self.async_step_solar_forecast()
+        if self._data[CONF_ENABLE_VIGICRUES]:
+            return await self.async_step_vigicrues_station()
+        if self._data[CONF_ENABLE_INDOOR]:
+            return await self.async_step_indoor_rooms()
+        if self._data[CONF_ENABLE_WEATHERCLOUD]:
+            return await self.async_step_weathercloud()
+        if self._data[CONF_ENABLE_PWSWEATHER]:
+            return await self.async_step_pwsweather()
+        if self._data[CONF_ENABLE_WOW]:
+            return await self.async_step_wow()
+        if self._data[CONF_ENABLE_AWEKAS]:
+            return await self.async_step_awekas()
+        if self._data[CONF_ENABLE_OWM_STATIONS]:
+            return await self.async_step_owm_stations()
+        if self._data[CONF_ENABLE_WINDY]:
+            return await self.async_step_windy()
+        if self._data[CONF_ENABLE_CWOP]:
+            return await self.async_step_cwop()
+        if self._data[CONF_ENABLE_MQTT]:
+            return await self.async_step_mqtt_config()
+        return await self.async_step_alerts()
+
+    def _features_schema(self) -> vol.Schema:
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_ENABLE_DISPLAY_SENSORS, default=DEFAULT_ENABLE_DISPLAY_SENSORS
+                ): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_FIRE_RISK, default=DEFAULT_ENABLE_FIRE_RISK): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_FOG, default=DEFAULT_ENABLE_FOG): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_THUNDERSTORM, default=DEFAULT_ENABLE_THUNDERSTORM): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_SEA_TEMP, default=DEFAULT_ENABLE_SEA_TEMP): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_WUNDERGROUND, default=DEFAULT_ENABLE_WUNDERGROUND): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_AIR_QUALITY, default=DEFAULT_ENABLE_AIR_QUALITY): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_POLLEN, default=DEFAULT_ENABLE_POLLEN): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_MOON, default=DEFAULT_ENABLE_MOON): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_SOLAR_FORECAST, default=DEFAULT_ENABLE_SOLAR_FORECAST
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_COMFORT_INDICES, default=DEFAULT_ENABLE_COMFORT_INDICES
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_VIGILANCE_METEO, default=DEFAULT_ENABLE_VIGILANCE_METEO
+                ): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_VIGICRUES, default=DEFAULT_ENABLE_VIGICRUES): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_DIAGNOSTICS, default=DEFAULT_ENABLE_DIAGNOSTICS): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_FWI_COMPONENTS, default=DEFAULT_ENABLE_FWI_COMPONENTS
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_ADVANCED_SENSORS, default=DEFAULT_ENABLE_ADVANCED_SENSORS
+                ): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_NOWCAST, default=DEFAULT_ENABLE_NOWCAST): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_NEIGHBOR_QC, default=DEFAULT_ENABLE_NEIGHBOR_QC): selector.BooleanSelector(),
+                # v2.0 feature toggles
+                vol.Optional(CONF_ENABLE_DEGREE_DAYS, default=DEFAULT_ENABLE_DEGREE_DAYS): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_LIGHTNING, default=DEFAULT_ENABLE_LIGHTNING): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_INDOOR, default=DEFAULT_ENABLE_INDOOR): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_SOIL, default=DEFAULT_ENABLE_SOIL): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_SNOW, default=DEFAULT_ENABLE_SNOW): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_WEATHERCLOUD, default=DEFAULT_ENABLE_WEATHERCLOUD): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_PWSWEATHER, default=DEFAULT_ENABLE_PWSWEATHER): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_WOW, default=DEFAULT_ENABLE_WOW): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_AWEKAS, default=DEFAULT_ENABLE_AWEKAS): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_OWM_STATIONS, default=DEFAULT_ENABLE_OWM_STATIONS): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_WINDY, default=DEFAULT_ENABLE_WINDY): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_CWOP, default=DEFAULT_ENABLE_CWOP): selector.BooleanSelector(),
+                vol.Optional(CONF_ENABLE_MQTT, default=DEFAULT_ENABLE_MQTT): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_AUTO_CALIBRATION, default=DEFAULT_ENABLE_AUTO_CALIBRATION
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_CLIMATE_NORMALS, default=DEFAULT_ENABLE_CLIMATE_NORMALS
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_ENABLE_PATTERN_FORECAST, default=DEFAULT_ENABLE_PATTERN_FORECAST
+                ): selector.BooleanSelector(),
+            }
         )
 
     # ------------------------------------------------------------------
@@ -1958,20 +1998,11 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         g = self._get
         if user_input is not None:
             self._opt.update(user_input)
-            # Route through sub-steps for enabled data-source features
-            if user_input.get(CONF_ENABLE_SEA_TEMP):
-                return await self.async_step_sea_temp_opt()
-            if user_input.get(CONF_ENABLE_AIR_QUALITY):
-                return await self.async_step_air_quality_opt()
-            if user_input.get(CONF_ENABLE_POLLEN):
-                return await self.async_step_pollen_opt()
-            if user_input.get(CONF_ENABLE_SOLAR_FORECAST):
-                return await self.async_step_solar_forecast_opt()
-            if user_input.get(CONF_ENABLE_VIGICRUES):
-                return await self.async_step_vigicrues_station_opt()
-            if user_input.get(CONF_ENABLE_INDOOR):
-                return await self.async_step_indoor_rooms_opt()
-            return await self.async_step_upload_services_opt()
+            # v2.11: the internet-lightning question only appears when it can matter
+            merged = {**self.config_entry.data, **self.config_entry.options, **self._opt}
+            if internet_choice_needed(self.hass, merged):
+                return await self.async_step_pattern_forecast_opt()
+            return await self._features_opt_route(user_input)
 
         return self.async_show_form(
             step_id="features_opt",
@@ -2037,6 +2068,14 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                         default=g(CONF_ENABLE_NOWCAST, DEFAULT_ENABLE_NOWCAST),
                     ): selector.BooleanSelector(),
                     vol.Optional(
+                        CONF_ENABLE_NEIGHBOR_QC,
+                        default=g(CONF_ENABLE_NEIGHBOR_QC, DEFAULT_ENABLE_NEIGHBOR_QC),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_ENABLE_PATTERN_FORECAST,
+                        default=g(CONF_ENABLE_PATTERN_FORECAST, DEFAULT_ENABLE_PATTERN_FORECAST),
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
                         CONF_ENABLE_DEGREE_DAYS, default=g(CONF_ENABLE_DEGREE_DAYS, DEFAULT_ENABLE_DEGREE_DAYS)
                     ): selector.BooleanSelector(),
                     vol.Optional(
@@ -2058,6 +2097,43 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_ENABLE_CLIMATE_NORMALS,
                         default=g(CONF_ENABLE_CLIMATE_NORMALS, DEFAULT_ENABLE_CLIMATE_NORMALS),
+                    ): selector.BooleanSelector(),
+                }
+            ),
+            last_step=False,
+        )
+
+    async def _features_opt_route(self, user_input: dict[str, Any]):
+        """Route through sub-steps for enabled data-source features."""
+        if user_input.get(CONF_ENABLE_SEA_TEMP):
+            return await self.async_step_sea_temp_opt()
+        if user_input.get(CONF_ENABLE_AIR_QUALITY):
+            return await self.async_step_air_quality_opt()
+        if user_input.get(CONF_ENABLE_POLLEN):
+            return await self.async_step_pollen_opt()
+        if user_input.get(CONF_ENABLE_SOLAR_FORECAST):
+            return await self.async_step_solar_forecast_opt()
+        if user_input.get(CONF_ENABLE_VIGICRUES):
+            return await self.async_step_vigicrues_station_opt()
+        if user_input.get(CONF_ENABLE_INDOOR):
+            return await self.async_step_indoor_rooms_opt()
+        return await self.async_step_upload_services_opt()
+
+    async def async_step_pattern_forecast_opt(self, user_input: dict[str, Any] | None = None):
+        """Pattern Forecast storm data source (no detector mapped, Blitzortung present)."""
+        if user_input is not None:
+            self._opt.update(user_input)
+            return await self._features_opt_route(self._opt)
+        return self.async_show_form(
+            step_id="pattern_forecast_opt",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_PATTERN_STORM_INTERNET_LIGHTNING,
+                        default=self._opt.get(
+                            CONF_PATTERN_STORM_INTERNET_LIGHTNING,
+                            self._get(CONF_PATTERN_STORM_INTERNET_LIGHTNING, DEFAULT_PATTERN_STORM_INTERNET_LIGHTNING),
+                        ),
                     ): selector.BooleanSelector(),
                 }
             ),

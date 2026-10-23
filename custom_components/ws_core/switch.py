@@ -37,8 +37,10 @@ from .const import (
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
+    CONF_ENABLE_NEIGHBOR_QC,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
+    CONF_ENABLE_PATTERN_FORECAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_SEA_TEMP,
@@ -70,8 +72,10 @@ from .const import (
     DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_MQTT,
+    DEFAULT_ENABLE_NEIGHBOR_QC,
     DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_OWM_STATIONS,
+    DEFAULT_ENABLE_PATTERN_FORECAST,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_SEA_TEMP,
@@ -218,6 +222,30 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_NOWCAST,
         name="Feature: Precipitation Nowcast",
         icon="mdi:weather-pouring",
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_NEIGHBOR_QC,
+        default=DEFAULT_ENABLE_NEIGHBOR_QC,
+        name="Feature: Sensor Sanity Check",
+        icon="mdi:map-check-outline",
+        description=(
+            "Hourly comparison of your temperature, humidity and pressure against Open-Meteo's "
+            "reading for your configured coordinates, to flag broken sensors. Sends your "
+            "coordinates to Open-Meteo. On by default; turn off to stop the request "
+            "(adaptive calibration, if enabled, still uses it)."
+        ),
+    ),
+    WSFeatureDesc(
+        conf_key=CONF_ENABLE_PATTERN_FORECAST,
+        default=DEFAULT_ENABLE_PATTERN_FORECAST,
+        name="Feature: Pattern Forecast",
+        icon="mdi:chart-timeline-variant",
+        description=(
+            "Learns from your station's own history to estimate the chance of rain, frost, "
+            "a hot day, strong gusts and (with a lightning source) thunderstorms over the "
+            "next hours. Runs entirely on this machine. Off by default; forecasts show "
+            "numbers only once enough examples have been seen."
+        ),
     ),
     # v2.0
     WSFeatureDesc(

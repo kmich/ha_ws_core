@@ -28,6 +28,7 @@ from .const import (
     CONF_ENABLE_MOON,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
+    CONF_ENABLE_PATTERN_FORECAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_SEA_TEMP,
@@ -156,6 +157,18 @@ from .const import (
     KEY_OWM_STATIONS_STATUS,
     KEY_OZONE,
     KEY_PACKAGE_STATUS,
+    KEY_PATTERN_FORECAST_SKILL,
+    KEY_PATTERN_FORECAST_STATUS,
+    KEY_PATTERN_FROST_12H,
+    KEY_PATTERN_GUST_3H,
+    KEY_PATTERN_HEAT_24H,
+    KEY_PATTERN_OUTPUTS,
+    KEY_PATTERN_RAIN_1H,
+    KEY_PATTERN_RAIN_3H,
+    KEY_PATTERN_RAIN_6H,
+    KEY_PATTERN_SKILL_ATTRS,
+    KEY_PATTERN_STATUS_ATTRS,
+    KEY_PATTERN_STORM_3H,
     KEY_PEAK_SUN_HOURS,
     KEY_PM2_5,
     KEY_PM10,
@@ -498,10 +511,11 @@ SENSORS: list[WSSensorDescription] = [
         name="WS Neighbor QC Flags",
         icon="mdi:map-check-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda d: len(d.get(KEY_NEIGHBOR_QC) or []),
+        # None when enable_neighbor_qc is off: unknown, not "0 flags, all clear".
+        value_fn=lambda d: None if d.get(KEY_NEIGHBOR_QC) is None else len(d[KEY_NEIGHBOR_QC]),
         attrs_fn=lambda d: {
             "flags": d.get(KEY_NEIGHBOR_QC) or [],
-            "all_clear": len(d.get(KEY_NEIGHBOR_QC) or []) == 0,
+            "all_clear": None if d.get(KEY_NEIGHBOR_QC) is None else len(d[KEY_NEIGHBOR_QC]) == 0,
         },
     ),
     # v2.0 — Temporal spike (σ-based step-change) detection
@@ -2612,6 +2626,65 @@ SENSORS: list[WSSensorDescription] = [
     ),
 ]
 
+# v2.11 - Pattern Forecast (opt-in): learned chance of rain / frost / heat / gust /
+# storm over the next hours. Probability sensors are unknown (not 0%) while their
+# target is still collecting; automations should gate on the ``maturity``
+# attribute being ``skilled``. All share one attribute shape (see PatternRuntime).
+_PATTERN_PROBABILITY_SENSORS: tuple[tuple[str, str, str, str], ...] = (
+    (KEY_PATTERN_RAIN_1H, "rain_1h", "mdi:weather-rainy", "WS Pattern Rain 1 h"),
+    (KEY_PATTERN_RAIN_3H, "rain_3h", "mdi:weather-rainy", "WS Pattern Rain 3 h"),
+    (KEY_PATTERN_RAIN_6H, "rain_6h", "mdi:weather-pouring", "WS Pattern Rain 6 h"),
+    (KEY_PATTERN_FROST_12H, "frost_12h", "mdi:snowflake-alert", "WS Pattern Frost 12 h"),
+    (KEY_PATTERN_HEAT_24H, "heat_24h", "mdi:thermometer-high", "WS Pattern Heat 24 h"),
+    (KEY_PATTERN_GUST_3H, "gust_3h", "mdi:weather-windy", "WS Pattern Gust 3 h"),
+    (KEY_PATTERN_STORM_3H, "storm_3h", "mdi:weather-lightning", "WS Pattern Storm 3 h"),
+)
+
+for _key, _tid, _icon, _name in _PATTERN_PROBABILITY_SENSORS:
+    SENSORS.append(
+        WSSensorDescription(
+            key=_key,
+            translation_key=_key,
+            name=_name,
+            icon=_icon,
+            native_unit="%",
+            state_class=SensorStateClass.MEASUREMENT,
+            suggested_display_precision=0,
+            value_fn=lambda d, _k=_key: d.get(_k),
+            attrs_fn=lambda d, _t=_tid: dict((d.get(KEY_PATTERN_OUTPUTS) or {}).get(_t) or {}),
+        )
+    )
+
+SENSORS.append(
+    WSSensorDescription(
+        key=KEY_PATTERN_FORECAST_STATUS,
+        translation_key="pattern_forecast_status",
+        name="WS Pattern Forecast Status",
+        icon="mdi:brain",
+        device_class=SensorDeviceClass.ENUM,
+        options=["collecting", "learning", "active"],
+        native_unit=None,
+        state_class=None,
+        value_fn=lambda d: d.get(KEY_PATTERN_FORECAST_STATUS),
+        attrs_fn=lambda d: dict(d.get(KEY_PATTERN_STATUS_ATTRS) or {}),
+    )
+)
+SENSORS.append(
+    WSSensorDescription(
+        key=KEY_PATTERN_FORECAST_SKILL,
+        translation_key="pattern_forecast_skill",
+        name="WS Pattern Forecast Skill",
+        icon="mdi:target",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        native_unit=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda d: d.get(KEY_PATTERN_FORECAST_SKILL),
+        attrs_fn=lambda d: {"per_target": (d.get(KEY_PATTERN_SKILL_ATTRS) or {}).get("per_target") or {}},
+    )
+)
+
+
 # Sensor-to-feature-toggle mapping for granular control
 _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # Display sensors
@@ -2771,6 +2844,17 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_MINUTES_UNTIL_DRY: CONF_ENABLE_NOWCAST,
     KEY_NOWCAST_INTENSITY: CONF_ENABLE_NOWCAST,
     KEY_NOWCAST_CONFIDENCE: CONF_ENABLE_NOWCAST,
+    # v2.11 - Pattern Forecast (opt-in). The storm sensor is additionally gated on a storm
+    # data source being available (see sensor.async_setup_entry).
+    KEY_PATTERN_RAIN_1H: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_RAIN_3H: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_RAIN_6H: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_FROST_12H: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_HEAT_24H: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_GUST_3H: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_STORM_3H: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_FORECAST_STATUS: CONF_ENABLE_PATTERN_FORECAST,
+    KEY_PATTERN_FORECAST_SKILL: CONF_ENABLE_PATTERN_FORECAST,
 }
 
 

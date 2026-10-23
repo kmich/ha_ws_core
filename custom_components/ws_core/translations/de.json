@@ -152,11 +152,15 @@
           "enable_mqtt": "MQTT Discovery (alle abgeleiteten Sensoren an MQTT-Broker für Node-RED / externe Verbraucher veröffentlichen)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation from your existing rain rate)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns a bias vs. the regional forecast reference and nudges calibration offsets automatically)",
+          "enable_neighbor_qc": "Sensor-Plausibilitätsprüfung (stündlicher Vergleich mit Open-Meteo, um defekte Sensoren zu erkennen; sendet Ihre Koordinaten)",
+          "enable_pattern_forecast": "Musterprognose (lernt die Muster Ihrer Station und schätzt die Wahrscheinlichkeit für Regen, Frost, einen heißen Tag, starke Böen und Gewitter; läuft lokal)",
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
           "enable_degree_days": "Berechnung von Wachstums-, Heiz- und Kühlgradtagen sowie einer Blattfeuchteschätzung – nützlich für Landwirtschaft und Energieverfolgung.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Standardmäßig aktiv. Vergleicht einmal pro Stunde Temperatur, Luftfeuchtigkeit und Luftdruck mit dem Open-Meteo-Wert für Ihre konfigurierten Koordinaten und listet große Abweichungen in sensor.ws_neighbor_qc_flags auf. Ausschalten beendet die Anfrage. Die adaptive Kalibrierung nutzt sie weiterhin, falls aktiviert.",
+          "enable_pattern_forecast": "Lernt aus der eigenen Historie Ihrer Station und schätzt die Wahrscheinlichkeit für Regen, Frost, einen heißen Tag, starke Böen und (mit einem lokalen Blitzsensor) Gewitter in den nächsten Stunden. Jede Prognose zeigt Werte, sobald genug Beispiele von Ihrer Station vorliegen - oft sofort, wenn Home Assistant bereits Langzeitdaten Ihrer Sensoren hat. Läuft vollständig auf diesem Rechner.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -229,6 +233,17 @@
           "mqtt_state_prefix": "Status-Topic-Präfix (Standard: ws_core)",
           "mqtt_interval_min": "Veröffentlichungsintervall",
           "_go_back": "← Zurück zum vorherigen Schritt"
+        }
+      },
+      "pattern_forecast": {
+        "title": "Musterprognose: Gewitterdaten",
+        "description": "Es ist kein Blitzsensor zugeordnet, aber die Blitzortung-Integration ist installiert. Die Gewitterprognose kann deren Internet-Blitzdaten nutzen.",
+        "data": {
+          "pattern_storm_internet_lightning": "Internet-Blitzdaten (Blitzortung) für die Gewitterprognose verwenden",
+          "_go_back": "← Zurück zum vorherigen Schritt"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Internet-Blitzdaten (Blitzortung) für die Gewitterprognose verwenden. Sie haben keinen Blitzsensor, daher kann die Gewitterprognose nur mit Daten aus dem Blitzortung-Community-Netzwerk arbeiten. Alle anderen Prognosen bleiben zu 100 % lokal. Standardmäßig aus."
         }
       },
       "sea_temp": {
@@ -498,6 +513,8 @@
           "enable_soil": "Bodensensoren (Feuchtigkeit, Temperatur, Bewässerungsbedarf)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns bias, nudges calibration automatically)",
+          "enable_neighbor_qc": "Sensor-Plausibilitätsprüfung (stündlicher Open-Meteo-Vergleich; sendet Ihre Koordinaten)",
+          "enable_pattern_forecast": "Musterprognose (gelernte Wahrscheinlichkeit für Regen, Frost, Hitze, Böen und Gewitter; läuft lokal)",
           "enable_climate_normals": "Historical climate normals (today vs. ~10 years of local history)"
         },
         "data_description": {
@@ -518,6 +535,8 @@
           "enable_advanced_sensors": "Zambretti-Nummer (numerisch), stündliches ET₀, geglättete Windrichtung",
           "enable_nowcast": "Open-Meteo 15-Minuten-Niederschlags-Nowcast: Minuten bis Regen startet/stoppt, Stundengesamtmenge, Intensität. Kein API-Schlüssel",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Standardmäßig aktiv. Vergleicht einmal pro Stunde Temperatur, Luftfeuchtigkeit und Luftdruck mit dem Open-Meteo-Wert für Ihre konfigurierten Koordinaten und listet große Abweichungen in sensor.ws_neighbor_qc_flags auf. Ausschalten beendet die Anfrage. Die adaptive Kalibrierung nutzt sie weiterhin, falls aktiviert.",
+          "enable_pattern_forecast": "Lernt aus der eigenen Historie Ihrer Station und schätzt die Wahrscheinlichkeit für Regen, Frost, einen heißen Tag, starke Böen und (mit einem lokalen Blitzsensor) Gewitter in den nächsten Stunden. Jede Prognose zeigt Werte, sobald genug Beispiele von Ihrer Station vorliegen - oft sofort, wenn Home Assistant bereits Langzeitdaten Ihrer Sensoren hat. Läuft vollständig auf diesem Rechner.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -572,6 +591,16 @@
           "enable_windy": "Windy.com Upload",
           "enable_cwop": "CWOP / APRS Upload",
           "enable_mqtt": "MQTT Discovery Veröffentlichung"
+        }
+      },
+      "pattern_forecast_opt": {
+        "title": "Musterprognose: Gewitterdaten",
+        "description": "Es ist kein Blitzsensor zugeordnet, aber die Blitzortung-Integration ist installiert. Die Gewitterprognose kann deren Internet-Blitzdaten nutzen.",
+        "data": {
+          "pattern_storm_internet_lightning": "Internet-Blitzdaten (Blitzortung) für die Gewitterprognose verwenden"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Internet-Blitzdaten (Blitzortung) für die Gewitterprognose verwenden. Sie haben keinen Blitzsensor, daher kann die Gewitterprognose nur mit Daten aus dem Blitzortung-Community-Netzwerk arbeiten. Alle anderen Prognosen bleiben zu 100 % lokal. Standardmäßig aus."
         }
       },
       "sea_temp_opt": {
@@ -1780,6 +1809,193 @@
       "river_level": {
         "name": "Flusspegel"
       },
+      "pattern_rain_1h": {
+        "name": "Muster Regen 1 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_3h": {
+        "name": "Muster Regen 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_6h": {
+        "name": "Muster Regen 6 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_frost_12h": {
+        "name": "Muster Frost 12 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_heat_24h": {
+        "name": "Muster Hitze 24 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_gust_3h": {
+        "name": "Muster Böen 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h": {
+        "name": "Muster Gewitter 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h_internet": {
+        "name": "Muster Gewitter 3 h (Internet-Blitzdaten)",
+        "state_attributes": {
+          "maturity": {
+            "name": "Reifegrad",
+            "state": {
+              "collecting": "Sammelt Daten",
+              "learning": "Lernt",
+              "skilled": "Zuverlässig",
+              "degraded": "Verschlechtert",
+              "paused": "Pausiert"
+            }
+          },
+          "data_source": {
+            "name": "Datenquelle",
+            "state": {
+              "local": "Lokal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_forecast_status": {
+        "name": "Musterprognose Status",
+        "state": {
+          "collecting": "Sammelt Daten",
+          "learning": "Lernt",
+          "active": "Aktiv"
+        }
+      },
+      "pattern_forecast_skill": {
+        "name": "Musterprognose Treffsicherheit"
+      },
       "rain_next_60min": {
         "name": "Regen nächste 60 min"
       },
@@ -2555,6 +2771,12 @@
       "ws_enable_auto_calibration": {
         "name": "Feature: Adaptive Sensor Calibration"
       },
+      "ws_enable_neighbor_qc": {
+        "name": "Funktion: Sensor-Plausibilitätsprüfung"
+      },
+      "ws_enable_pattern_forecast": {
+        "name": "Funktion: Musterprognose"
+      },
       "ws_enable_climate_normals": {
         "name": "Feature: Historical Climate Normals"
       },
@@ -2721,6 +2943,38 @@
         "pirate_weather": "Pirate Weather (kostenloses Kontingent, API-Schlüssel)",
         "meteo_france": "Météo France (kostenloses Kontingent, API-Schlüssel)",
         "ha_weather_entity": "Home Assistant Wetterentität (keine API-Anfragen)"
+      }
+    },
+    "pattern_factor": {
+      "options": {
+        "afternoon": "Nachmittag",
+        "air_near_saturation": "Luft nahe der Sättigung",
+        "already_cold": "Schon kalt",
+        "calm_wind": "Windstille",
+        "clear_sky": "Klarer Himmel",
+        "cloudy": "Bewölkt",
+        "cooling_fast": "Kühlt schnell ab",
+        "dry_air": "Trockene Luft",
+        "gusty_now": "Böig",
+        "hot_yesterday": "Gestern heiß",
+        "lightning_nearby": "Blitze in der Nähe",
+        "long_dry_spell": "Lange Trockenphase",
+        "long_night": "Lange Nacht voraus",
+        "night": "Nacht",
+        "pressure_falling": "Luftdruck fällt",
+        "pressure_rising": "Luftdruck steigt",
+        "raining_now": "Es regnet gerade",
+        "sunny": "Sonnig",
+        "warm_and_humid": "Warm und feucht",
+        "warm_wind_sector": "Warme Windrichtung",
+        "wet_wind_sector": "Feuchte Windrichtung",
+        "windy_now": "Windig"
+      }
+    },
+    "pattern_effect": {
+      "options": {
+        "raises": "Erhöht die Wahrscheinlichkeit",
+        "lowers": "Senkt die Wahrscheinlichkeit"
       }
     },
     "hemisphere": {

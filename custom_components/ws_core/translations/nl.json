@@ -152,11 +152,15 @@
           "enable_mqtt": "MQTT Discovery herpublicatie (publiceer alle afgeleide sensoren naar MQTT-broker voor Node-RED / externe afnemers)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation from your existing rain rate)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns a bias vs. the regional forecast reference and nudges calibration offsets automatically)",
+          "enable_neighbor_qc": "Sensorcontrole (elk uur vergelijken met Open-Meteo om defecte sensoren te vinden; verstuurt je coördinaten)",
+          "enable_pattern_forecast": "Patroonvoorspelling (leert de patronen van je eigen station om de kans op regen, vorst, een hete dag, zware windstoten en onweer te schatten; draait lokaal)",
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
           "enable_degree_days": "Berekening van groei-, verwarmings- en koelgraaddagen plus een schatting van de bladnatheid, nuttig voor landbouw en energiebeheer.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
+          "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -229,6 +233,17 @@
           "mqtt_state_prefix": "Statustopic-prefix (standaard: ws_core)",
           "mqtt_interval_min": "Publicatieinterval",
           "_go_back": "← Terug naar vorige stap"
+        }
+      },
+      "pattern_forecast": {
+        "title": "Patroonvoorspelling: onweersgegevens",
+        "description": "Er is geen bliksemdetector gekoppeld, maar de Blitzortung-integratie is geïnstalleerd. De onweersvoorspelling kan de bliksemgegevens via internet gebruiken.",
+        "data": {
+          "pattern_storm_internet_lightning": "Bliksemgegevens via internet (Blitzortung) gebruiken voor de onweersvoorspelling",
+          "_go_back": "← Terug naar vorige stap"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Bliksemgegevens via internet (Blitzortung) gebruiken voor de onweersvoorspelling. Je hebt geen bliksemdetector, dus de onweersvoorspelling kan alleen werken met gegevens die van het Blitzortung-gemeenschapsnetwerk worden gedownload. Alle andere voorspellingen blijven 100% lokaal. Standaard uit."
         }
       },
       "sea_temp": {
@@ -498,6 +513,8 @@
           "enable_soil": "Bodemsensoren (vochtigheid, temperatuur, irrigatiebehoefte)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns bias, nudges calibration automatically)",
+          "enable_neighbor_qc": "Sensorcontrole (elk uur vergelijken met Open-Meteo; verstuurt je coördinaten)",
+          "enable_pattern_forecast": "Patroonvoorspelling (geleerde kans op regen, vorst, hitte, windstoten en onweer; draait lokaal)",
           "enable_climate_normals": "Historical climate normals (today vs. ~10 years of local history)"
         },
         "data_description": {
@@ -518,6 +535,8 @@
           "enable_advanced_sensors": "Zambretti-nummer (numerieke vorm), uurlijkse ET₀, afgevlakte windrichting",
           "enable_nowcast": "Open-Meteo 15-minuten neerslag-nowcast: minuten tot regen begint/stopt, totaal volgend uur, intensiteit. Geen API-sleutel",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
+          "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -572,6 +591,16 @@
           "enable_windy": "Windy.com upload",
           "enable_cwop": "CWOP / APRS upload",
           "enable_mqtt": "MQTT Discovery herpublicatie"
+        }
+      },
+      "pattern_forecast_opt": {
+        "title": "Patroonvoorspelling: onweersgegevens",
+        "description": "Er is geen bliksemdetector gekoppeld, maar de Blitzortung-integratie is geïnstalleerd. De onweersvoorspelling kan de bliksemgegevens via internet gebruiken.",
+        "data": {
+          "pattern_storm_internet_lightning": "Bliksemgegevens via internet (Blitzortung) gebruiken voor de onweersvoorspelling"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Bliksemgegevens via internet (Blitzortung) gebruiken voor de onweersvoorspelling. Je hebt geen bliksemdetector, dus de onweersvoorspelling kan alleen werken met gegevens die van het Blitzortung-gemeenschapsnetwerk worden gedownload. Alle andere voorspellingen blijven 100% lokaal. Standaard uit."
         }
       },
       "sea_temp_opt": {
@@ -1747,6 +1776,193 @@
       "river_level": {
         "name": "Rivierpeil"
       },
+      "pattern_rain_1h": {
+        "name": "Patroon regen 1 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_3h": {
+        "name": "Patroon regen 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_6h": {
+        "name": "Patroon regen 6 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_frost_12h": {
+        "name": "Patroon vorst 12 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_heat_24h": {
+        "name": "Patroon hitte 24 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_gust_3h": {
+        "name": "Patroon windstoten 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h": {
+        "name": "Patroon onweer 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h_internet": {
+        "name": "Patroon onweer 3 h (bliksem via internet)",
+        "state_attributes": {
+          "maturity": {
+            "name": "Betrouwbaarheidsniveau",
+            "state": {
+              "collecting": "Gegevens verzamelen",
+              "learning": "Aan het leren",
+              "skilled": "Betrouwbaar",
+              "degraded": "Verslechterd",
+              "paused": "Gepauzeerd"
+            }
+          },
+          "data_source": {
+            "name": "Gegevensbron",
+            "state": {
+              "local": "Lokaal",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_forecast_status": {
+        "name": "Patroonvoorspelling status",
+        "state": {
+          "collecting": "Gegevens verzamelen",
+          "learning": "Aan het leren",
+          "active": "Actief"
+        }
+      },
+      "pattern_forecast_skill": {
+        "name": "Patroonvoorspelling betrouwbaarheid"
+      },
       "rain_next_60min": {
         "name": "Regen komende 60 min"
       },
@@ -2602,6 +2818,12 @@
       "ws_enable_auto_calibration": {
         "name": "Feature: Adaptive Sensor Calibration"
       },
+      "ws_enable_neighbor_qc": {
+        "name": "Functie: Sensorcontrole"
+      },
+      "ws_enable_pattern_forecast": {
+        "name": "Functie: Patroonvoorspelling"
+      },
       "ws_enable_climate_normals": {
         "name": "Feature: Historical Climate Normals"
       },
@@ -2721,6 +2943,38 @@
         "pirate_weather": "Pirate Weather (gratis tier, API-sleutel)",
         "meteo_france": "Météo France (gratis tier, API-sleutel)",
         "ha_weather_entity": "Home Assistant weereentiteit (geen API-aanroepen)"
+      }
+    },
+    "pattern_factor": {
+      "options": {
+        "afternoon": "Middag",
+        "air_near_saturation": "Lucht bijna verzadigd",
+        "already_cold": "Al koud",
+        "calm_wind": "Windstil",
+        "clear_sky": "Heldere hemel",
+        "cloudy": "Bewolkt",
+        "cooling_fast": "Koelt snel af",
+        "dry_air": "Droge lucht",
+        "gusty_now": "Vlagerig",
+        "hot_yesterday": "Gisteren heet",
+        "lightning_nearby": "Bliksem in de buurt",
+        "long_dry_spell": "Lange droge periode",
+        "long_night": "Lange nacht op komst",
+        "night": "Nacht",
+        "pressure_falling": "Luchtdruk daalt",
+        "pressure_rising": "Luchtdruk stijgt",
+        "raining_now": "Het regent nu",
+        "sunny": "Zonnig",
+        "warm_and_humid": "Warm en vochtig",
+        "warm_wind_sector": "Warme windrichting",
+        "wet_wind_sector": "Natte windrichting",
+        "windy_now": "Winderig"
+      }
+    },
+    "pattern_effect": {
+      "options": {
+        "raises": "Verhoogt de kans",
+        "lowers": "Verlaagt de kans"
       }
     },
     "hemisphere": {

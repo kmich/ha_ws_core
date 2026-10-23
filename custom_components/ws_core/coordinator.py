@@ -155,8 +155,10 @@ from .const import (
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
     CONF_ENABLE_MQTT,
+    CONF_ENABLE_NEIGHBOR_QC,
     CONF_ENABLE_NOWCAST,
     CONF_ENABLE_OWM_STATIONS,
+    CONF_ENABLE_PATTERN_FORECAST,
     CONF_ENABLE_POLLEN,
     CONF_ENABLE_PWSWEATHER,
     CONF_ENABLE_SEA_TEMP,
@@ -255,8 +257,10 @@ from .const import (
     DEFAULT_ENABLE_LIGHTNING,
     DEFAULT_ENABLE_MOON,
     DEFAULT_ENABLE_MQTT,
+    DEFAULT_ENABLE_NEIGHBOR_QC,
     DEFAULT_ENABLE_NOWCAST,
     DEFAULT_ENABLE_OWM_STATIONS,
+    DEFAULT_ENABLE_PATTERN_FORECAST,
     DEFAULT_ENABLE_POLLEN,
     DEFAULT_ENABLE_PWSWEATHER,
     DEFAULT_ENABLE_SNOW,
@@ -550,6 +554,7 @@ from .const import (
     LEARNING_SAVE_INTERVAL_S,
     LUX_TO_WM2_FACTOR,
     NOWCAST_STALE_MULTIPLIER,
+    PATTERN_HISTORY_DELAY_S,
     PRESSURE_HISTORY_INTERVAL_MIN,
     PRESSURE_HISTORY_SAMPLES,
     RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK,
@@ -595,6 +600,7 @@ from .const import (
     normalize_indoor_rooms,
 )
 from .models import WsData
+from .pattern_runtime import PatternRuntime
 from .providers import get_provider
 from .uploaders import (
     _redact_secrets,
@@ -1044,6 +1050,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.nowcast_interval_min = int(_get(CONF_NOWCAST_INTERVAL_MIN, DEFAULT_NOWCAST_INTERVAL_MIN))
         self._nowcast_cache: dict[str, Any] | None = None
 
+        # Hourly neighbor-QC fetch (Open-Meteo current conditions). On by default;
+        # see _neighbor_qc_fetch_needed for why auto-calibration also keeps it alive.
+        self.neighbor_qc_enabled = bool(_get(CONF_ENABLE_NEIGHBOR_QC, DEFAULT_ENABLE_NEIGHBOR_QC))
+
+        # v2.11 Pattern Forecast (opt-in): local learning forecaster. All of its logic
+        # lives in PatternRuntime / pattern_forecast.py; the coordinator only hooks it in.
+        self.pattern_enabled = bool(_get(CONF_ENABLE_PATTERN_FORECAST, DEFAULT_ENABLE_PATTERN_FORECAST))
+        self._pattern: PatternRuntime | None = PatternRuntime(self) if self.pattern_enabled else None
+
         # v1.8.4 Suppress HA Repairs notifications (issue #20)
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
 
@@ -1252,6 +1267,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("ws_core: failed to restore history state (starting fresh): %s", err)
 
+        # v2.11 - Pattern Forecast engine (its own store, so a learning-state schema
+        # bump never wipes trained models and vice versa). A missing or corrupt store
+        # starts fresh; async_load_engine never raises.
+        if self._pattern is not None:
+            await self._pattern.async_load(self._pattern.make_store(entry_id))
+            # Learn from past recorder statistics once, after startup has settled
+            # (targets that already learned, or are waiting for a retry, are skipped).
+            self._start_once(self._pattern.async_learn_history, PATTERN_HISTORY_DELAY_S, "ws_core_pattern_history")
+
         # v2.7 - Climate normals table (its own store: infrequently written,
         # ~365 entries, kept separate from the frequently-saved learning blob)
         if self.climate_normals_enabled:
@@ -1315,7 +1339,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._start_periodic(self._async_fetch_nowcast, self.nowcast_interval_min * 60, "ws_core_nowcast_fetch", 20)
         # v2.0: spatial neighbor QC (hourly fetch from Open-Meteo)
         self._neighbor_qc_cache: dict | None = None
-        if has_location:
+        if has_location and self._neighbor_qc_fetch_needed():
             self._start_periodic(self._async_fetch_neighbor_qc, 60 * 60, "ws_core_neighbor_qc_fetch", 60)
         # v2.7 - Climate normals: check daily whether the cached table is stale
         # (CLIMATE_NORMALS_REFRESH_DAYS) rather than re-fetching on a fixed cadence.
@@ -1390,6 +1414,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._history_store is not None:
             with contextlib.suppress(Exception):
                 await self._history_store.async_save(self._dump_history_state())
+        if self._pattern is not None:
+            await self._pattern.async_save()
         # v2.0: remove MQTT Discovery entries on clean shutdown
         if self.mqtt_enabled and self._mqtt_discovery_published:
             from .mqtt_publisher import async_unpublish_discovery
@@ -1400,6 +1426,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._mqtt_discovery_prefix,
                     self.entry_options.get("prefix", "ws"),
                 )
+
+    async def async_reset_pattern_forecast(self) -> None:
+        """Service hook (reset_learning_state, target pattern_forecast)."""
+        if self._pattern is not None:
+            await self._pattern.async_reset()
+            self._start_once(self._pattern.async_learn_history, 5, "ws_core_pattern_history")
 
     @callback
     def _handle_source_change(self, event) -> None:
@@ -2882,12 +2914,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._snow_this_year_cm += new_snow_cm
         data[KEY_SNOW_THIS_YEAR_CM] = round(self._snow_this_year_cm, 1)
 
+    def _neighbor_qc_fetch_needed(self) -> bool:
+        """Whether the hourly neighbor-QC fetch has a consumer.
+
+        The QC flags need it (enable_neighbor_qc, on by default), and so does
+        opt-in adaptive calibration, which uses the same reference sample. With
+        both off, nothing is fetched and the coordinates never leave the machine.
+        """
+        return self.neighbor_qc_enabled or bool(
+            self.entry_options.get(CONF_ENABLE_AUTO_CALIBRATION, DEFAULT_ENABLE_AUTO_CALIBRATION)
+        )
+
     async def _async_fetch_neighbor_qc(self) -> None:
         """Fetch Open-Meteo current weather as a spatial QC reference.  (v2.0)
 
         Compares local station readings against the nearest NWP grid point.
         Flags large deviations (>5°C temperature, >20 hPa pressure, >20% humidity)
         as potential sensor errors. Runs hourly; results cached in coordinator.
+        Only scheduled when _neighbor_qc_fetch_needed() is true.
         """
         lat = self.forecast_lat
         lon = self.forecast_lon
@@ -2996,6 +3040,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _compute_neighbor_qc(self, data: dict) -> None:
         """Compare local readings against cached NWP grid point; populate flags."""
+        if not getattr(self, "neighbor_qc_enabled", DEFAULT_ENABLE_NEIGHBOR_QC):
+            # Switched off: no flags at all (None, not [] - "no check ran" is not "all clear").
+            data[KEY_NEIGHBOR_QC] = None
+            return
         cache = getattr(self, "_neighbor_qc_cache", None)
         flags: list[str] = []
         if cache:
@@ -4036,6 +4084,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self._history_store is not None:
                 with contextlib.suppress(Exception):
                     await self._history_store.async_save(self._dump_history_state())
+            if self._pattern is not None:
+                await self._pattern.async_save()
 
     # ------------------------------------------------------------------
     # v1.7.1 - rolling-window history + accumulator persistence (issue #16)
@@ -4394,6 +4444,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_consistency_checks(data, now)
         self._compute_learning_sensors(data)
         self._compute_conditions_summary(data)
+
+        # v2.11 Pattern Forecast: fed on the 60 s sample tick only (never from
+        # _handle_source_change), issues on the 15-minute marks, reads local sensors only.
+        pattern = getattr(self, "_pattern", None)
+        if pattern is not None:
+            pattern.update(data, now, sample)
 
         # Solar lux factor learning (A4): update on clear days near solar noon
         if sample and lux is not None and self._learning_state.solar_lux_factor:

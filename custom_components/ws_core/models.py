@@ -356,3 +356,16 @@ class WsData(dict):
     data_quality_score: int | None
     neighbor_qc_flags: list[str] | None
     sensor_spike_flags: list[str] | None
+
+    # ------------------------------------------------------------------
+    # Pattern Forecast (v2.11)
+    # ------------------------------------------------------------------
+    pattern_rain_1h: int | None
+    pattern_rain_3h: int | None
+    pattern_rain_6h: int | None
+    pattern_frost_12h: int | None
+    pattern_heat_24h: int | None
+    pattern_gust_3h: int | None
+    pattern_storm_3h: int | None
+    pattern_forecast_status: str | None
+    pattern_forecast_skill: int | None

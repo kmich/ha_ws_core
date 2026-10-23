@@ -988,6 +988,86 @@ class TestEntryOptionsMerge:
         assert KEY_IRRIGATION_NEED in data  # not skipped by the enable_soil gate
 
 
+class TestNeighborQcSwitch:
+    """enable_neighbor_qc: off switch for the hourly Open-Meteo neighbor-QC fetch.
+
+    The fetch must only be scheduled when something consumes it (the QC flags,
+    or opt-in adaptive calibration), and with the switch off the flags sensor
+    must read unknown rather than "0 flags, all clear".
+    """
+
+    def _construct(self, entry_data: dict):
+        from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+
+        with patch.object(DataUpdateCoordinator, "__init__", lambda self, *a, **kw: None):
+            return WSStationCoordinator(MagicMock(), {"entry_id": "abc", **entry_data}, {})
+
+    def _data(self, temp_c=30.0):
+        from custom_components.ws_core.const import KEY_NORM_HUMIDITY, KEY_NORM_PRESSURE_HPA, KEY_NORM_TEMP_C
+
+        return {KEY_NORM_TEMP_C: temp_c, KEY_NORM_HUMIDITY: 50.0, KEY_NORM_PRESSURE_HPA: 1013.0}
+
+    def test_on_by_default(self):
+        coord = self._construct({})
+        assert coord.neighbor_qc_enabled is True
+        assert coord._neighbor_qc_fetch_needed() is True
+
+    def test_switched_off_needs_no_fetch(self):
+        from custom_components.ws_core.const import CONF_ENABLE_NEIGHBOR_QC
+
+        coord = self._construct({CONF_ENABLE_NEIGHBOR_QC: False})
+        assert coord._neighbor_qc_fetch_needed() is False
+
+    def test_auto_calibration_keeps_fetch_alive(self):
+        from custom_components.ws_core.const import CONF_ENABLE_AUTO_CALIBRATION, CONF_ENABLE_NEIGHBOR_QC
+
+        coord = self._construct({CONF_ENABLE_NEIGHBOR_QC: False, CONF_ENABLE_AUTO_CALIBRATION: True})
+        assert coord._neighbor_qc_fetch_needed() is True
+
+    def test_switched_off_reports_no_flags_even_with_cached_reference(self):
+        from custom_components.ws_core.const import (
+            CONF_ENABLE_AUTO_CALIBRATION,
+            CONF_ENABLE_NEIGHBOR_QC,
+            KEY_NEIGHBOR_QC,
+        )
+
+        coord = self._construct({CONF_ENABLE_NEIGHBOR_QC: False, CONF_ENABLE_AUTO_CALIBRATION: True})
+        # Auto-calibration filled the cache with a reference 15°C away from local.
+        coord._neighbor_qc_cache = {"temp_c": 15.0, "humidity": 50.0, "pressure_hpa": 1013.0}
+        data = self._data(temp_c=30.0)
+        coord._compute_neighbor_qc(data)
+        assert data[KEY_NEIGHBOR_QC] is None
+
+    def test_switched_on_still_flags_large_deviation(self):
+        from custom_components.ws_core.const import KEY_NEIGHBOR_QC
+
+        coord = self._construct({})
+        coord._neighbor_qc_cache = {"temp_c": 15.0, "humidity": 50.0, "pressure_hpa": 1013.0}
+        data = self._data(temp_c=30.0)
+        coord._compute_neighbor_qc(data)
+        assert len(data[KEY_NEIGHBOR_QC]) == 1
+        assert data[KEY_NEIGHBOR_QC][0].startswith("temperature:")
+
+    def test_flags_sensor_unknown_when_off_and_zero_when_clear(self):
+        from custom_components.ws_core.const import KEY_NEIGHBOR_QC
+        from custom_components.ws_core.entity_descriptions import SENSORS
+
+        desc = next(s for s in SENSORS if s.key == KEY_NEIGHBOR_QC)
+        assert desc.value_fn({KEY_NEIGHBOR_QC: None}) is None
+        assert desc.attrs_fn({KEY_NEIGHBOR_QC: None})["all_clear"] is None
+        assert desc.value_fn({KEY_NEIGHBOR_QC: []}) == 0
+        assert desc.attrs_fn({KEY_NEIGHBOR_QC: []})["all_clear"] is True
+
+    def test_feature_switch_exists(self):
+        from custom_components.ws_core.const import CONF_ENABLE_NEIGHBOR_QC
+        from custom_components.ws_core.switch import FEATURE_SWITCHES
+
+        desc = next(sw for sw in FEATURE_SWITCHES if sw.conf_key == CONF_ENABLE_NEIGHBOR_QC)
+        assert desc.default is True
+
+
 class TestComputeSnow:
     """_compute_snow (v2.7, opt-in): precipitation phase + estimated snow
     accumulation, integrated locally from the smoothed liquid rain rate.

@@ -253,7 +253,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     SERVICE_RESET_LEARNING_SCHEMA = vol.Schema(
         {
             vol.Optional(ATTR_ENTRY_ID): cv.string,
-            vol.Optional("target", default="all"): vol.In(["all", "solar", "forecast", "streaks"]),
+            vol.Optional("target", default="all"): vol.In(["all", "solar", "forecast", "streaks", "pattern_forecast"]),
         }
     )
     SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
@@ -284,12 +284,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 ls.frost_streak_last_frost_date = ""
             if coord._learning_store is not None:
                 await async_save_learning(coord._learning_store, ls)
+            # v2.11: Pattern Forecast has its own store; "all" includes it. Deletes the
+            # store, returns every target to collecting and re-learns from history.
+            if target in ("all", "pattern_forecast"):
+                await coord.async_reset_pattern_forecast()
             _LOGGER.info("ws_core: learning state reset (target=%s)", target)
 
     async def _export_learning(call: ServiceCall) -> None:
         for coord in _get_targets(call):
             payload = coord._learning_state.to_dict()
             _LOGGER.info("ws_core learning state export: %s", payload)
+            pattern = getattr(coord, "_pattern", None)
+            if pattern is not None:
+                _LOGGER.info("ws_core pattern forecast export: %s", pattern.summary())
 
     if not hass.services.has_service(DOMAIN, SERVICE_RESET_LEARNING):
         hass.services.async_register(

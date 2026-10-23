@@ -104,6 +104,14 @@ Paste individual card definitions into any existing dashboard.
 
 ---
 
+## Pattern Forecast card
+
+The shipped dashboards do not include Pattern Forecast. The
+[Pattern Forecast guide](guides/pattern_forecast.md#a-dashboard-card) has a native
+Markdown card that lists every forecast with its maturity; paste it into any dashboard.
+
+---
+
 ## Keeping dashboards up to date
 
 Dashboards are not auto-updated by HACS. When a new version of ws_core adds entities

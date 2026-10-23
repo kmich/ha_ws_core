@@ -154,6 +154,8 @@
           "enable_cwop": "Envoi vers CWOP / APRS",
           "enable_mqtt": "MQTT (publier les capteurs sur un broker MQTT pour Node-RED / externes)",
           "enable_auto_calibration": "Étalonnage adaptatif du capteur (apprend le biais par rapport à la référence de prévision régionale et ajuste automatiquement les décalages d'étalonnage)",
+          "enable_neighbor_qc": "Contrôle de cohérence des capteurs (comparaison horaire avec Open-Meteo pour repérer les capteurs défaillants ; envoie vos coordonnées)",
+          "enable_pattern_forecast": "Prévision par motifs (apprend les schémas propres à votre station pour estimer la probabilité de pluie, de gel, d'une journée chaude, de fortes rafales et d'orages ; fonctionne en local)",
           "enable_climate_normals": "Historique des normales climatiques (compare la journée d'aujourd'hui à environ 10 ans d'historiques locaux, archives Open-Meteo, sans clé API)"
         },
         "data_description": {
@@ -170,6 +172,8 @@
           "enable_vigilance_meteo": "Récupère la couleur de vigilance et la nature des alertes départementales officielles.",
           "enable_vigicrues": "Remonte les hauteurs d'eau et débits des stations hydrologiques environnantes (Hub'Eau v2).",
           "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer.",
+          "enable_neighbor_qc": "Activé par défaut. Une fois par heure, compare votre température, humidité et pression à la valeur Open-Meteo pour vos coordonnées configurées et liste les écarts importants dans sensor.ws_neighbor_qc_flags. Désactivez-le pour arrêter la requête. L'étalonnage adaptatif, s'il est activé, continue de l'utiliser.",
+          "enable_pattern_forecast": "Apprend de l'historique propre à votre station pour estimer la probabilité de pluie, de gel, d'une journée chaude, de fortes rafales et (avec un détecteur de foudre local) d'orages dans les prochaines heures. Chaque prévision affiche des valeurs dès qu'elle a vu assez d'exemples sur votre station, souvent immédiatement si Home Assistant conserve déjà l'historique à long terme de vos capteurs. Fonctionne entièrement sur cette machine.",
           "enable_diagnostics": "Analyse la cohérence des données, la dérive des capteurs, les normales saisonnières et la fiabilité des prévisions.",
           "enable_fwi_components": "Expose les codes intermédiaires de l'indice incendie (FFMC, DMC, DC, ISI, BUI). Requiert l'indice de risque d'incendie.",
           "enable_advanced_sensors": "Génère les prévisions barométriques Zambretti, l'évapotranspiration horaire (ET₀) et le lissage du vent.",
@@ -250,6 +254,17 @@
           "mqtt_state_prefix": "Préfixe du topic d'état (par défaut : ws_core)",
           "mqtt_interval_min": "Intervalle de publication",
           "_go_back": "← Retour à l'étape précédente"
+        }
+      },
+      "pattern_forecast": {
+        "title": "Prévision par motifs : données d'orage",
+        "description": "Aucun détecteur de foudre n'est associé, mais l'intégration Blitzortung est installée. La prévision d'orage peut utiliser ses données de foudre via internet.",
+        "data": {
+          "pattern_storm_internet_lightning": "Utiliser les données de foudre via internet (Blitzortung) pour la prévision d'orage",
+          "_go_back": "← Retour à l'étape précédente"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Utiliser les données de foudre via internet (Blitzortung) pour la prévision d'orage. Vous n'avez pas de détecteur de foudre : la prévision d'orage ne peut donc fonctionner qu'avec les données téléchargées depuis le réseau communautaire Blitzortung. Toutes les autres prévisions restent 100 % locales. Désactivé par défaut."
         }
       },
       "sea_temp": {
@@ -527,6 +542,8 @@
           "enable_indoor": "Prendre en compte les capteurs intérieurs",
           "enable_soil": "Capteurs de sol (humidité, température, besoin en irrigation)",
           "enable_auto_calibration": "Étalonnage adaptatif du capteur (apprend le biais par rapport à la référence de prévision régionale et ajuste automatiquement les décalages d'étalonnage)",
+          "enable_neighbor_qc": "Contrôle de cohérence des capteurs (comparaison horaire avec Open-Meteo ; envoie vos coordonnées)",
+          "enable_pattern_forecast": "Prévision par motifs (probabilité apprise de pluie, gel, chaleur, rafales et orages ; fonctionne en local)",
           "enable_climate_normals": "Historique des normales climatiques (compare la journée d'aujourd'hui à environ 10 ans d'historiques locaux, archives Open-Meteo, sans clé API)",
           "enable_snow": "Neige (phase de précipitation + accumulation estimée à partir de votre intensité de pluie actuelle)"
         },
@@ -553,7 +570,9 @@
           "enable_soil": "Calcule le besoin en eau des plantes, l'évaporation et suit vos sondes d'humidité du sol.",
           "enable_climate_normals": "Désactivé par défaut. Une requête à l'API d'archives (actualisée mensuellement) génère un tableau des moyennes historiques de températures minimales/maximales et de précipitations pour chaque jour de l'année, de sorte que sensor.ws_temperature_anomaly_normal reflète la journée d'aujourd'hui par rapport à l'historique plutôt que par rapport à la moyenne récente de votre propre station.",
           "enable_snow": "Heuristique, pas une mesure : il n'existe aucun nivomètre indépendant de la station. Estime la phase de précipitation à partir de la température du thermomètre mouillé et l'accumulation de neige à partir de votre intensité de pluie actuelle via un rapport neige/eau liquide dépendant de la température.",
-          "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer."
+          "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer.",
+          "enable_neighbor_qc": "Activé par défaut. Une fois par heure, compare votre température, humidité et pression à la valeur Open-Meteo pour vos coordonnées configurées et liste les écarts importants dans sensor.ws_neighbor_qc_flags. Désactivez-le pour arrêter la requête. L'étalonnage adaptatif, s'il est activé, continue de l'utiliser.",
+          "enable_pattern_forecast": "Apprend de l'historique propre à votre station pour estimer la probabilité de pluie, de gel, d'une journée chaude, de fortes rafales et (avec un détecteur de foudre local) d'orages dans les prochaines heures. Chaque prévision affiche des valeurs dès qu'elle a vu assez d'exemples sur votre station, souvent immédiatement si Home Assistant conserve déjà l'historique à long terme de vos capteurs. Fonctionne entièrement sur cette machine."
         }
       },
       "indoor_rooms_opt": {
@@ -607,6 +626,16 @@
           "enable_cwop": "CWOP / APRS",
           "enable_mqtt": "MQTT"
          }
+      },
+      "pattern_forecast_opt": {
+        "title": "Prévision par motifs : données d'orage",
+        "description": "Aucun détecteur de foudre n'est associé, mais l'intégration Blitzortung est installée. La prévision d'orage peut utiliser ses données de foudre via internet.",
+        "data": {
+          "pattern_storm_internet_lightning": "Utiliser les données de foudre via internet (Blitzortung) pour la prévision d'orage"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Utiliser les données de foudre via internet (Blitzortung) pour la prévision d'orage. Vous n'avez pas de détecteur de foudre : la prévision d'orage ne peut donc fonctionner qu'avec les données téléchargées depuis le réseau communautaire Blitzortung. Toutes les autres prévisions restent 100 % locales. Désactivé par défaut."
+        }
       },
       "sea_temp_opt": {
         "title": "Localisation pour la température de la mer",
@@ -1020,6 +1049,193 @@
       },
       "river_level": {
         "name": "Niveau du cours d'eau"
+      },
+      "pattern_rain_1h": {
+        "name": "Motif pluie 1 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_3h": {
+        "name": "Motif pluie 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_6h": {
+        "name": "Motif pluie 6 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_frost_12h": {
+        "name": "Motif gel 12 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_heat_24h": {
+        "name": "Motif chaleur 24 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_gust_3h": {
+        "name": "Motif rafales 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h": {
+        "name": "Motif orage 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h_internet": {
+        "name": "Motif orage 3 h (foudre via internet)",
+        "state_attributes": {
+          "maturity": {
+            "name": "Maturité",
+            "state": {
+              "collecting": "Collecte de données",
+              "learning": "Apprentissage",
+              "skilled": "Fiable",
+              "degraded": "Dégradé",
+              "paused": "En pause"
+            }
+          },
+          "data_source": {
+            "name": "Source des données",
+            "state": {
+              "local": "Locale",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_forecast_status": {
+        "name": "Prévision par motifs : état",
+        "state": {
+          "collecting": "Collecte de données",
+          "learning": "Apprentissage",
+          "active": "Actif"
+        }
+      },
+      "pattern_forecast_skill": {
+        "name": "Prévision par motifs : fiabilité"
       },
       "rain_next_60min": {
         "name": "Pluie dans l'heure"
@@ -2645,6 +2861,12 @@
       "ws_enable_auto_calibration": {
         "name": "Calibration adaptative des capteurs"
       },
+      "ws_enable_neighbor_qc": {
+        "name": "Contrôle de cohérence des capteurs"
+      },
+      "ws_enable_pattern_forecast": {
+        "name": "Prévision par motifs"
+      },
       "ws_enable_climate_normals": {
         "name": "Normales climatiques historiques"
       },
@@ -2765,6 +2987,38 @@
         "meteo_france": "Météo France (Clé API requise, offre gratuite)",
         "ha_weather_entity": "Entité météo de Home Assistant"
               }
+    },
+    "pattern_factor": {
+      "options": {
+        "afternoon": "Après-midi",
+        "air_near_saturation": "Air proche de la saturation",
+        "already_cold": "Déjà froid",
+        "calm_wind": "Vent calme",
+        "clear_sky": "Ciel dégagé",
+        "cloudy": "Nuageux",
+        "cooling_fast": "Refroidissement rapide",
+        "dry_air": "Air sec",
+        "gusty_now": "Rafales en ce moment",
+        "hot_yesterday": "Chaud hier",
+        "lightning_nearby": "Foudre à proximité",
+        "long_dry_spell": "Longue période sèche",
+        "long_night": "Longue nuit à venir",
+        "night": "Nuit",
+        "pressure_falling": "Pression en baisse",
+        "pressure_rising": "Pression en hausse",
+        "raining_now": "Il pleut en ce moment",
+        "sunny": "Ensoleillé",
+        "warm_and_humid": "Chaud et humide",
+        "warm_wind_sector": "Direction de vent chaude",
+        "wet_wind_sector": "Direction de vent humide",
+        "windy_now": "Venteux en ce moment"
+      }
+    },
+    "pattern_effect": {
+      "options": {
+        "raises": "Augmente la probabilité",
+        "lowers": "Réduit la probabilité"
+      }
     },
     "hemisphere": {
       "options": {

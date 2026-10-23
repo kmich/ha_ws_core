@@ -4,7 +4,10 @@ blueprint:
     Send an alert when the temperature drops near freezing and optionally
     turn off outdoor irrigation valves or switches to prevent frozen or burst pipes.
     Uses the Weather Station Core temperature sensor with configurable
-    threshold and notification target.
+    threshold and notification target. Optionally also acts on the Pattern Forecast
+    frost probability (sensor.ws_pattern_frost_12h) as an early warning, but only while
+    that sensor's maturity attribute is skilled. Leave that input empty for the
+    original behaviour.
   domain: automation
   source_url: https://github.com/kmich/ha_ws_core/blob/main/blueprints/automation/ws_core/freeze_alert.yaml
   input:
@@ -35,6 +38,26 @@ blueprint:
           domain:
             - switch
             - valve
+    pattern_frost_sensor:
+      name: Pattern Forecast frost sensor (optional early warning)
+      description: >-
+        Optional. Pick sensor.ws_pattern_frost_12h to also act before the
+        temperature drops. It only counts while the sensor's maturity attribute
+        is skilled. Leave empty to act on the temperature alone.
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+    pattern_frost_threshold:
+      name: Pattern frost probability threshold
+      description: Chance of frost (%) at or above which the early warning fires
+      default: 50
+      selector:
+        number:
+          min: 10
+          max: 95
+          step: 5
+          unit_of_measurement: "%"
     notify_target:
       name: Notification service
       description: "The notification service to call (e.g. notify.mobile_app_phone)"
@@ -44,6 +67,12 @@ blueprint:
 
 variables:
   irrigation_target: !input irrigation_entity
+  pattern_sensor: !input pattern_frost_sensor
+  pattern_threshold: !input pattern_frost_threshold
+
+trigger_variables:
+  pattern_sensor: !input pattern_frost_sensor
+  pattern_threshold: !input pattern_frost_threshold
 
 trigger:
   - platform: numeric_state
@@ -51,6 +80,16 @@ trigger:
     below: !input threshold
     for:
       minutes: 5
+  # Optional early warning: only ever true when a Pattern Forecast sensor is chosen
+  # AND its maturity is skilled. With the input left empty this never fires.
+  - platform: template
+    value_template: >-
+      {% if pattern_sensor in ['', none] %}false
+      {% else %}
+        {{ states(pattern_sensor) | is_number
+           and states(pattern_sensor) | float(0) >= pattern_threshold | float(50)
+           and state_attr(pattern_sensor, 'maturity') == 'skilled' }}
+      {% endif %}
 
 condition: []
 
@@ -66,5 +105,5 @@ action:
     data:
       title: "Freeze / Frost Warning"
       message: >-
-        Temperature has dropped to {{ states(trigger.entity_id) }}°C.
+        {% if trigger.platform == 'template' %}Early warning: Pattern Forecast gives a {{ states(pattern_sensor) | round(0) }}% chance of frost within the next 12 hours.{% else %}Temperature has dropped to {{ states(trigger.entity_id) }}°C.{% endif %}
         {% if irrigation_target != '' and irrigation_target != none %}Irrigation shut down automatically. {% endif %}Protect sensitive plants and check exposed pipes.

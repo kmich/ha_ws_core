@@ -152,11 +152,15 @@
           "enable_mqtt": "Republishing MQTT Discovery (publikuj wszystkie pochodne czujniki do brokera MQTT dla Node-RED / zewnętrznych odbiorców)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation from your existing rain rate)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns a bias vs. the regional forecast reference and nudges calibration offsets automatically)",
+          "enable_neighbor_qc": "Kontrola poprawności czujników (cogodzinne porównanie z Open-Meteo w celu wykrycia uszkodzonych czujników; wysyła Twoje współrzędne)",
+          "enable_pattern_forecast": "Prognoza wzorców (uczy się wzorców Twojej stacji, aby szacować szansę na deszcz, mróz, upalny dzień, silne porywy i burze; działa lokalnie)",
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
           "enable_degree_days": "Obliczanie stopniodni wzrostu, ogrzewania i chłodzenia oraz szacowanie wilgotności liści, przydatne do rolnictwa i monitorowania energii.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Domyślnie włączona. Raz na godzinę porównuje temperaturę, wilgotność i ciśnienie z wartością Open-Meteo dla skonfigurowanych współrzędnych i wymienia duże różnice w sensor.ws_neighbor_qc_flags. Wyłącz, aby zatrzymać zapytanie. Adaptacyjna kalibracja, jeśli jest włączona, nadal z niego korzysta.",
+          "enable_pattern_forecast": "Uczy się na podstawie własnej historii Twojej stacji, aby oszacować szansę na deszcz, mróz, upalny dzień, silne porywy i (z lokalnym czujnikiem wyładowań) burze w nadchodzących godzinach. Każda prognoza pokazuje wartości, gdy zobaczy wystarczająco dużo przykładów z Twojej stacji - często od razu, jeśli Home Assistant ma już długoterminową historię Twoich czujników. Działa w całości na tym urządzeniu.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -229,6 +233,17 @@
           "mqtt_state_prefix": "Prefiks tematu stanu (domyślnie: ws_core)",
           "mqtt_interval_min": "Interwał publikowania",
           "_go_back": "← Wróć do poprzedniego kroku"
+        }
+      },
+      "pattern_forecast": {
+        "title": "Prognoza wzorców: dane o burzach",
+        "description": "Nie przypisano czujnika wyładowań, ale integracja Blitzortung jest zainstalowana. Prognoza burz może korzystać z jej danych o wyładowaniach z internetu.",
+        "data": {
+          "pattern_storm_internet_lightning": "Użyj danych o wyładowaniach z internetu (Blitzortung) w prognozie burz",
+          "_go_back": "← Wróć do poprzedniego kroku"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Użyj danych o wyładowaniach z internetu (Blitzortung) w prognozie burz. Nie masz czujnika wyładowań, więc prognoza burz może działać tylko na danych pobieranych ze społecznościowej sieci Blitzortung. Wszystkie pozostałe prognozy pozostają w 100% lokalne. Domyślnie wyłączone."
         }
       },
       "sea_temp": {
@@ -498,6 +513,8 @@
           "enable_soil": "Czujniki glebowe (wilgotność, temperatura, potrzeby nawadniania)",
           "enable_snow": "Snow (precipitation phase + estimated accumulation)",
           "enable_auto_calibration": "Adaptive sensor calibration (learns bias, nudges calibration automatically)",
+          "enable_neighbor_qc": "Kontrola poprawności czujników (cogodzinne porównanie z Open-Meteo; wysyła Twoje współrzędne)",
+          "enable_pattern_forecast": "Prognoza wzorców (wyuczona szansa na deszcz, mróz, upał, porywy i burze; działa lokalnie)",
           "enable_climate_normals": "Historical climate normals (today vs. ~10 years of local history)"
         },
         "data_description": {
@@ -518,6 +535,8 @@
           "enable_advanced_sensors": "Numer Zambretti (forma numeryczna), ET₀ godzinowa, wygładzony kierunek wiatru",
           "enable_nowcast": "Nowcast opadów 15-minutowy Open-Meteo: minuty do początku/końca deszczu, suma następnej godziny, intensywność. Bez klucza API",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
+          "enable_neighbor_qc": "Domyślnie włączona. Raz na godzinę porównuje temperaturę, wilgotność i ciśnienie z wartością Open-Meteo dla skonfigurowanych współrzędnych i wymienia duże różnice w sensor.ws_neighbor_qc_flags. Wyłącz, aby zatrzymać zapytanie. Adaptacyjna kalibracja, jeśli jest włączona, nadal z niego korzysta.",
+          "enable_pattern_forecast": "Uczy się na podstawie własnej historii Twojej stacji, aby oszacować szansę na deszcz, mróz, upalny dzień, silne porywy i (z lokalnym czujnikiem wyładowań) burze w nadchodzących godzinach. Każda prognoza pokazuje wartości, gdy zobaczy wystarczająco dużo przykładów z Twojej stacji - często od razu, jeśli Home Assistant ma już długoterminową historię Twoich czujników. Działa w całości na tym urządzeniu.",
           "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
           "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
         }
@@ -572,6 +591,16 @@
           "enable_windy": "Wysyłanie do Windy.com",
           "enable_cwop": "Wysyłanie do CWOP / APRS",
           "enable_mqtt": "Republishing MQTT Discovery"
+        }
+      },
+      "pattern_forecast_opt": {
+        "title": "Prognoza wzorców: dane o burzach",
+        "description": "Nie przypisano czujnika wyładowań, ale integracja Blitzortung jest zainstalowana. Prognoza burz może korzystać z jej danych o wyładowaniach z internetu.",
+        "data": {
+          "pattern_storm_internet_lightning": "Użyj danych o wyładowaniach z internetu (Blitzortung) w prognozie burz"
+        },
+        "data_description": {
+          "pattern_storm_internet_lightning": "Użyj danych o wyładowaniach z internetu (Blitzortung) w prognozie burz. Nie masz czujnika wyładowań, więc prognoza burz może działać tylko na danych pobieranych ze społecznościowej sieci Blitzortung. Wszystkie pozostałe prognozy pozostają w 100% lokalne. Domyślnie wyłączone."
         }
       },
       "sea_temp_opt": {
@@ -1030,6 +1059,193 @@
       },
       "river_level": {
         "name": "Poziom rzeki"
+      },
+      "pattern_rain_1h": {
+        "name": "Wzorzec deszcz 1 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_3h": {
+        "name": "Wzorzec deszcz 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_rain_6h": {
+        "name": "Wzorzec deszcz 6 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_frost_12h": {
+        "name": "Wzorzec mróz 12 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_heat_24h": {
+        "name": "Wzorzec upał 24 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_gust_3h": {
+        "name": "Wzorzec porywy 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h": {
+        "name": "Wzorzec burza 3 h",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_storm_3h_internet": {
+        "name": "Wzorzec burza 3 h (błyskawice z internetu)",
+        "state_attributes": {
+          "maturity": {
+            "name": "Dojrzałość",
+            "state": {
+              "collecting": "Zbieranie danych",
+              "learning": "Uczenie się",
+              "skilled": "Wiarygodna",
+              "degraded": "Pogorszona",
+              "paused": "Wstrzymana"
+            }
+          },
+          "data_source": {
+            "name": "Źródło danych",
+            "state": {
+              "local": "Lokalne",
+              "internet": "Internet"
+            }
+          }
+        }
+      },
+      "pattern_forecast_status": {
+        "name": "Prognoza wzorców: stan",
+        "state": {
+          "collecting": "Zbieranie danych",
+          "learning": "Uczenie się",
+          "active": "Aktywna"
+        }
+      },
+      "pattern_forecast_skill": {
+        "name": "Prognoza wzorców: skuteczność"
       },
       "rain_next_60min": {
         "name": "Deszcz w ciągu 60 min"
@@ -2602,6 +2818,12 @@
       "ws_enable_auto_calibration": {
         "name": "Feature: Adaptive Sensor Calibration"
       },
+      "ws_enable_neighbor_qc": {
+        "name": "Funkcja: Kontrola poprawności czujników"
+      },
+      "ws_enable_pattern_forecast": {
+        "name": "Funkcja: Prognoza wzorców"
+      },
       "ws_enable_climate_normals": {
         "name": "Feature: Historical Climate Normals"
       },
@@ -2721,6 +2943,38 @@
         "pirate_weather": "Pirate Weather (darmowy poziom, klucz API)",
         "meteo_france": "Météo France (darmowy poziom, klucz API)",
         "ha_weather_entity": "Encja pogodowa Home Assistant (bez wywołań API)"
+      }
+    },
+    "pattern_factor": {
+      "options": {
+        "afternoon": "Popołudnie",
+        "air_near_saturation": "Powietrze bliskie nasycenia",
+        "already_cold": "Już zimno",
+        "calm_wind": "Bezwietrznie",
+        "clear_sky": "Bezchmurne niebo",
+        "cloudy": "Pochmurno",
+        "cooling_fast": "Szybkie ochładzanie",
+        "dry_air": "Suche powietrze",
+        "gusty_now": "Porywisto",
+        "hot_yesterday": "Upalnie wczoraj",
+        "lightning_nearby": "Błyskawice w pobliżu",
+        "long_dry_spell": "Długi okres bez opadów",
+        "long_night": "Długa noc przed nami",
+        "night": "Noc",
+        "pressure_falling": "Ciśnienie spada",
+        "pressure_rising": "Ciśnienie rośnie",
+        "raining_now": "Pada deszcz",
+        "sunny": "Słonecznie",
+        "warm_and_humid": "Ciepło i wilgotno",
+        "warm_wind_sector": "Ciepły kierunek wiatru",
+        "wet_wind_sector": "Wilgotny kierunek wiatru",
+        "windy_now": "Wietrznie"
+      }
+    },
+    "pattern_effect": {
+      "options": {
+        "raises": "Zwiększa szansę",
+        "lowers": "Zmniejsza szansę"
       }
     },
     "hemisphere": {

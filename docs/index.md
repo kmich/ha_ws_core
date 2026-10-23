@@ -2,7 +2,7 @@
 
 **Turn your weather station into proactive smart home automations — not just numbers on a dashboard.**
 
-Weather Station Core (`ws_core`) is a Home Assistant custom integration that transforms raw sensor data from any weather station into local predictive intelligence. Predict rain down to the minute, calculate real garden evapotranspiration (ET₀), protect awnings from wind gusts, and predict storms offline — **100% locally on your machine with zero cloud dependencies.**
+Weather Station Core (`ws_core`) is a Home Assistant custom integration that transforms raw sensor data from any weather station into local predictive intelligence. Calculate real garden evapotranspiration (ET₀), protect awnings from wind gusts, get frost and heat-stress warnings, and forecast from your own barometer. **Every derived sensor is computed locally on your machine.** The few features that use internet data (the weather forecast, and opt-in extras like the rain nowcast) are listed in the README's Data & Privacy Disclosure.
 
 [![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
@@ -16,7 +16,7 @@ Weather Station Core (`ws_core`) is a Home Assistant custom integration that tra
 
     ---
 
-    Predict the exact minute rain begins using your physical rain gauge. Alert your phone and close windows/skylights automatically.
+    Get a minutes-until-rain countdown from Open-Meteo's 15-minute precipitation forecast, cross-checked against your physical rain gauge. Alert your phone and close windows/skylights automatically.
 
     [:octicons-arrow-right-24: Read Rain Nowcast Guide](guides/nowcast.md)
 
@@ -28,6 +28,14 @@ Weather Station Core (`ws_core`) is a Home Assistant custom integration that tra
 
     [:octicons-arrow-right-24: Read Irrigation Guide](guides/irrigation.md)
 
+-   :material-chart-timeline-variant:{ .lg .middle } __Learned Chances: Rain, Frost, Heat, Gusts, Storms__
+
+    ---
+
+    Pattern Forecast learns from your own station and scores itself. It gives the chance of rain, frost, a hot day, strong gusts and storms over the next hours, 100% local (the storm forecast can optionally use internet lightning data if you have no detector). It needs time to learn and shows `unknown` until it has earned trust.
+
+    [:octicons-arrow-right-24: Read the Pattern Forecast Guide](guides/pattern_forecast.md)
+
 -   :material-weather-windy:{ .lg .middle } __Home & Property Protection__
 
     ---
@@ -36,7 +44,7 @@ Weather Station Core (`ws_core`) is a Home Assistant custom integration that tra
 
     [:octicons-arrow-right-24: Browse Use Cases](use_cases.md)
 
--   :material-shield-home:{ .lg .middle } __100% Local Resilience__
+-   :material-shield-home:{ .lg .middle } __Local-First Resilience__
 
     ---
 

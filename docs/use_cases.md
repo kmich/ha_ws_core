@@ -168,3 +168,21 @@ action:
     target:
       entity_id: cover.patio_shades
 ```
+
+---
+
+## 12. 🔮 Frost Protection That Warns Before the Temperature Drops (Pattern Forecast)
+
+**The Problem:** A frost alert on the temperature fires when it is already too late to cover the plants.
+
+**The Solution:** Pattern Forecast learns from your own station how clear, calm, dry evenings turn into frost nights, and gives `sensor.ws_pattern_frost_12h`. Gate the automation on its `maturity` attribute being `skilled`, so it only acts once the forecast has proven it beats the station's usual rate. The Frost Alert and Freeze Protection [blueprints](blueprints.md#frost-early-warning) have an optional input for it.
+
+See the [Pattern Forecast guide](guides/pattern_forecast.md#automations) for the full automation.
+
+## 13. 🔮 Rain-Aware Automations Beyond the Next Hour (Pattern Forecast)
+
+**The Problem:** The rain countdown only looks 60 minutes ahead, and a regional "40 % chance" says nothing about your house.
+
+**The Solution:** `sensor.ws_pattern_rain_1h`, `_3h` and `_6h` give the learned chance that your gauge records rain in the next 1, 3 or 6 hours, entirely locally. Close a skylight when the 1 h chance is high, or skip a sprinkler cycle when the 6 h chance is high. Treat `maturity: skilled` as the signal that the number has been earned; `learning` is fine for cheap, reversible actions.
+
+See the [Pattern Forecast guide](guides/pattern_forecast.md#automations) and how it [compares](guides/pattern_forecast.md) with `rain_probability`, `rain_probability_combined` and the nowcast.

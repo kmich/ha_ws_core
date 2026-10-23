@@ -45,6 +45,9 @@ Monitors nearby lightning strikes (e.g. from Ecowitt WH57 or WeatherFlow Tempest
 Monitors outdoor temperatures and the scientific Buck (1981) frost point. Triggers before ice forms, enabling pre-emptive protection of sensitive plants and shutting off outdoor hose bibbs.
 * **Key parameters:** Temperature & Frost Point Sensors, Alert Threshold, Optional Outdoor Valve Switch to Turn Off.
 
+#### Optional early warning from Pattern Forecast {#frost-early-warning}
+Both blueprints have two extra inputs: **Pattern Forecast frost sensor** (pick `sensor.ws_pattern_frost_12h`) and **Pattern frost probability threshold** (default 50 %). When the sensor is chosen, the alert also fires as soon as the probability reaches the threshold, before the temperature actually drops, and **only while that sensor's `maturity` attribute is `skilled`**. The Freeze blueprint also shuts the optional valve in that case. Leave the sensor empty and both blueprints behave exactly as before. See the [Pattern Forecast guide](guides/pattern_forecast.md).
+
 ---
 
 ## Manual Blueprint Import (Alternative)

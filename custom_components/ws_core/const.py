@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.10.1"
+_INTEGRATION_VERSION = "2.11.0"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -696,6 +696,100 @@ DEFAULT_NOWCAST_INTERVAL_MIN = 15
 # cache is older than this many fetch intervals.
 NOWCAST_STALE_MULTIPLIER = 2
 
+# ---------------------------------------------------------------------------
+# v2.11 - Pattern Forecast (local learning forecaster; see docs/specs/pattern_forecast_v1.md)
+# ---------------------------------------------------------------------------
+# Algorithm constants used by the pure engine in pattern_forecast.py. The
+# CONF_/DEFAULT_/KEY_ names for the integration wiring sit further down, next
+# to the other feature toggles.
+PATTERN_SCHEMA_VERSION = 1  # store layout version (payload shape)
+PATTERN_STORE_VERSION = 1  # HA Store version for ws_core_{entry_id}_pattern_forecast
+PATTERN_POOL_ID = "pool-v1"  # feature pool definition; a change resets every model
+PATTERN_ISSUE_INTERVAL_MIN = 15  # forecasts are issued on the :00/:15/:30/:45 marks
+PATTERN_RAIN_THRESHOLD_MM = 0.2  # "measurable rain" floor for the rain label
+PATTERN_STORM_MIN_STRIKES = 2  # strikes within proximity for the storm label
+PATTERN_COVERAGE_MIN = 0.90  # valid readings needed over a window to label it
+PATTERN_TICK_CAP_S = 180.0  # a gap longer than this between ticks is downtime
+PATTERN_DOWNTIME_S = 900.0  # no tick for this long: open windows are discarded (HA was down)
+PATTERN_RAIN_JUMP_CAP_MM = 60.0  # per-tick rain jump that invalidates a window
+PATTERN_STRIKE_JUMP_CAP = 2000.0  # per-tick lightning jump that invalidates a window
+PATTERN_PENDING_MAX = 48  # pending-buffer cap
+PATTERN_BIN_COUNT = 13  # 15-min history bins kept (3 h plus the current one)
+PATTERN_PRESSURE_SLOTS = 97  # 24 h of 15-min pressure samples
+PATTERN_DRY_HOURS_CAP = 48.0
+
+# Online logistic regression
+PATTERN_LEARNING_RATE = 0.15  # AdaGrad base step
+PATTERN_LEARNING_RATE_FLOOR = 0.003  # AdaGrad never goes slower than this, so it keeps adapting to seasons
+PATTERN_L2 = 0.0005  # weight decay (bias excluded)
+PATTERN_GRAD_CLIP = 4.0
+PATTERN_WEIGHT_NORM_MAX = 25.0
+PATTERN_Z_CLIP = 5.0
+PATTERN_P_MIN = 0.001
+PATTERN_P_MAX = 0.999
+PATTERN_CHECKPOINT_INTERVAL_S = 86400.0
+PATTERN_STD_FLOOR = 0.01
+PATTERN_STD_MIN_N = 20  # below this many values a feature standardizes to 0
+PATTERN_STD_WELFORD_N = 672  # ~7 days of 15-min samples, then switch to the slow EMA
+PATTERN_STD_HALF_LIFE_SAMPLES = 2880.0  # ~30 days of 15-min samples
+
+# Scoring and maturity
+PATTERN_BASE_RATE_HALF_LIFE_DAYS = 30.0
+PATTERN_SCORING_WEEKS = 52
+PATTERN_RELIABILITY_BINS = 10
+PATTERN_MIN_DAYS_COLLECTING = 7.0
+PATTERN_MIN_EVENTS_COLLECTING = 5
+PATTERN_SKILLED_MIN_EVENTS = {"rain": 15, "frost": 10, "heat": 10, "gust": 10, "storm": 10}
+PATTERN_SKILLED_BSS_MIN = 0.02
+PATTERN_DEGRADED_WEEKS = 5
+PATTERN_DEGRADED_MIN_EVENTS = 3
+# Episode separation: a new event starts after this many hours without activity
+PATTERN_EVENT_GAP_H = {"rain": 6.0, "gust": 6.0, "storm": 3.0}
+# Starting probability (the station's "usual rate" before any data)
+PATTERN_PRIOR_RATE = {"rain": 0.10, "frost": 0.05, "heat": 0.05, "gust": 0.03, "storm": 0.02}
+
+# Learning from recorder long-term statistics
+PATTERN_HISTORY_DAYS = 365  # how far back the replay reads hourly statistics
+PATTERN_HISTORY_RETRY_S = 7 * 86400.0  # a target that could not replay is retried at most this often
+PATTERN_HISTORY_STD_WEIGHT = 4.0  # an hourly replay sample weighs like four 15-min samples in the EMA
+PATTERN_HISTORY_DELAY_S = 120.0  # wait after startup before reading the recorder
+
+# Feature toggle (off by default: upgrades gain no entities, storage or recorder query)
+CONF_ENABLE_PATTERN_FORECAST = "enable_pattern_forecast"
+DEFAULT_ENABLE_PATTERN_FORECAST = False
+# The one network-fed input: Blitzortung lightning for the storm target only,
+# used only when no hardware detector is mapped. Labelled everywhere it shows.
+CONF_PATTERN_STORM_INTERNET_LIGHTNING = "pattern_storm_internet_lightning"
+DEFAULT_PATTERN_STORM_INTERNET_LIGHTNING = False
+
+# Data keys - probability sensors (percent 0-100, None while collecting or paused)
+KEY_PATTERN_RAIN_1H = "pattern_rain_1h"
+KEY_PATTERN_RAIN_3H = "pattern_rain_3h"
+KEY_PATTERN_RAIN_6H = "pattern_rain_6h"
+KEY_PATTERN_FROST_12H = "pattern_frost_12h"
+KEY_PATTERN_HEAT_24H = "pattern_heat_24h"
+KEY_PATTERN_GUST_3H = "pattern_gust_3h"
+KEY_PATTERN_STORM_3H = "pattern_storm_3h"
+KEY_PATTERN_FORECAST_STATUS = "pattern_forecast_status"  # collecting | learning | active
+KEY_PATTERN_FORECAST_SKILL = "pattern_forecast_skill"  # number of skilled targets
+# target id (pattern_forecast.TARGETS) -> data key
+PATTERN_TARGET_KEYS = {
+    "rain_1h": KEY_PATTERN_RAIN_1H,
+    "rain_3h": KEY_PATTERN_RAIN_3H,
+    "rain_6h": KEY_PATTERN_RAIN_6H,
+    "frost_12h": KEY_PATTERN_FROST_12H,
+    "heat_24h": KEY_PATTERN_HEAT_24H,
+    "gust_3h": KEY_PATTERN_GUST_3H,
+    "storm_3h": KEY_PATTERN_STORM_3H,
+}
+# Hidden payloads the sensors read their attributes from
+KEY_PATTERN_OUTPUTS = "_pattern_outputs"  # target id -> attribute dict
+KEY_PATTERN_STATUS_ATTRS = "_pattern_status_attrs"
+KEY_PATTERN_SKILL_ATTRS = "_pattern_skill_attrs"
+# Storm data source values
+PATTERN_SOURCE_LOCAL = "local"
+PATTERN_SOURCE_INTERNET = "internet"
+
 # Suppress HA Repairs notifications (issue #20)
 CONF_SUPPRESS_NOTIFICATIONS = "suppress_notifications"
 DEFAULT_SUPPRESS_NOTIFICATIONS = False
@@ -968,6 +1062,12 @@ KEY_SNOW_RECORD_DAY_CM = "snow_record_day_cm"  # snowiest single day ever (issue
 KEY_SENSOR_STUCK = "sensor_stuck_flags"  # list of stuck sensor names
 KEY_DATA_QUALITY_SCORE = "data_quality_score"  # 0-100 composite
 KEY_NEIGHBOR_QC = "neighbor_qc_flags"  # list of neighbor-comparison flags
+# Off switch for the hourly neighbor-QC fetch (Open-Meteo current conditions at
+# the configured coordinates). On by default to keep existing behaviour. Opt-in
+# adaptive calibration reuses the same fetch, so the fetch keeps running while
+# that feature is on even with this switch off; only the QC flags stop.
+CONF_ENABLE_NEIGHBOR_QC = "enable_neighbor_qc"
+DEFAULT_ENABLE_NEIGHBOR_QC = True
 KEY_SENSOR_SPIKE = "sensor_spike_flags"  # list of σ-based step-change flags
 
 # Spike detection thresholds (sigma multiplier + minimum samples)

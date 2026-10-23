@@ -69,6 +69,7 @@ nav:
     - Smart Irrigation bridge: guides/smart_irrigation.md
     - Lightning Detection: guides/lightning.md
     - Nowcast: guides/nowcast.md
+    - Pattern Forecast: guides/pattern_forecast.md
   - Migrating from Thermal Comfort: migrating_from_thermal_comfort.md
   - Troubleshooting: troubleshooting.md
   - Contributing: contributing.md
