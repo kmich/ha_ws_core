@@ -554,6 +554,7 @@ from .const import (
     LEARNING_SAVE_INTERVAL_S,
     LUX_TO_WM2_FACTOR,
     NOWCAST_STALE_MULTIPLIER,
+    PATTERN_HISTORY_DELAY_S,
     PRESSURE_HISTORY_INTERVAL_MIN,
     PRESSURE_HISTORY_SAMPLES,
     RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK,
@@ -1271,6 +1272,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # starts fresh; async_load_engine never raises.
         if self._pattern is not None:
             await self._pattern.async_load(self._pattern.make_store(entry_id))
+            # Learn from past recorder statistics once, after startup has settled
+            # (targets that already learned, or are waiting for a retry, are skipped).
+            self._start_once(self._pattern.async_learn_history, PATTERN_HISTORY_DELAY_S, "ws_core_pattern_history")
 
         # v2.7 - Climate normals table (its own store: infrequently written,
         # ~365 entries, kept separate from the frequently-saved learning blob)
@@ -1427,6 +1431,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Service hook (reset_learning_state, target pattern_forecast)."""
         if self._pattern is not None:
             await self._pattern.async_reset()
+            self._start_once(self._pattern.async_learn_history, 5, "ws_core_pattern_history")
 
     @callback
     def _handle_source_change(self, event) -> None:

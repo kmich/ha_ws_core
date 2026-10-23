@@ -37,6 +37,8 @@ from .const import (
     PATTERN_DRY_HOURS_CAP,
     PATTERN_EVENT_GAP_H,
     PATTERN_GRAD_CLIP,
+    PATTERN_HISTORY_RETRY_S,
+    PATTERN_HISTORY_STD_WEIGHT,
     PATTERN_L2,
     PATTERN_LEARNING_RATE,
     PATTERN_LEARNING_RATE_FLOOR,
@@ -286,6 +288,31 @@ class Instant:
     local_hour: float = 12.0
 
 
+@dataclass
+class HourlyHistory:
+    """Hourly long-term statistics prepared for replay (all lists have ``n`` entries).
+
+    Entry ``j`` describes the hour ``[start_ts + j*3600, start_ts + (j+1)*3600)``.
+    ``None`` means the statistic is missing for that hour (never read as zero).
+    Unit conversion, calibration offsets, sea-level reduction and the dew point
+    depression are done by the caller, through the same normalization as live data.
+    """
+
+    start_ts: float
+    n: int
+    mslp: list[float | None]
+    temp: list[float | None]  # hourly mean
+    temp_min: list[float | None]
+    temp_max: list[float | None]
+    dpd: list[float | None]
+    wind: list[float | None]  # hourly mean speed
+    gust: list[float | None]  # hourly max
+    rain: list[float | None]  # mm that fell in the hour
+    strikes: list[float | None]  # lightning strikes in the hour
+    night_frac: list[float | None]  # night fraction of the 12 h after the hour
+    tz_offset: list[float]  # local UTC offset, seconds
+
+
 # ---------------------------------------------------------------------------
 # Small math helpers
 # ---------------------------------------------------------------------------
@@ -311,6 +338,19 @@ def _floats_ok(seq: Any, n: int) -> bool:
 
 def _opt_ok(v: Any) -> bool:
     return v is None or _finite(v)
+
+
+def _episode_step(ep: dict[str, Any], ts: float, amount: float, gap_s: float, min_amount: float) -> bool:
+    """Advance an activity episode; True when this step makes it count as an event."""
+    if ep["ts"] is None or ts - ep["ts"] >= gap_s:
+        ep["amt"] = 0.0
+        ep["counted"] = False
+    ep["ts"] = ts
+    ep["amt"] += amount
+    if not ep["counted"] and ep["amt"] >= min_amount - _EPS:
+        ep["counted"] = True
+        return True
+    return False
 
 
 def _rate_update(state: list, y: float, n_half: float) -> None:
@@ -913,14 +953,7 @@ class PatternEngine:
         self._resolve_due(ts)
 
     def _episode(self, kind: str, ts: float, amount: float, gap_h: float, min_amount: float) -> None:
-        ep = self._episodes[kind]
-        if ep["ts"] is None or ts - ep["ts"] >= gap_h * 3600.0:
-            ep["amt"] = 0.0
-            ep["counted"] = False
-        ep["ts"] = ts
-        ep["amt"] += amount
-        if not ep["counted"] and ep["amt"] >= min_amount - _EPS:
-            ep["counted"] = True
+        if _episode_step(self._episodes[kind], ts, amount, gap_h * 3600.0, min_amount):
             self._count_event(kind, ts)
 
     def _id_event(self, kind: str, ts: float, offset_s: float) -> None:
@@ -1267,6 +1300,216 @@ class PatternEngine:
             m.was_skilled = True
         m.maturity = new
 
+    # -- learning from history (recorder long-term statistics) ----------------
+
+    def targets_needing_replay(self, now_ts: float) -> list[str]:
+        """Active targets that have not learned from history yet (or may retry)."""
+        done = (self.history_learn or {}).get("targets") or {}
+        out = []
+        for tid in self.active_target_ids():
+            entry = done.get(tid)
+            stale = entry is not None and (
+                entry.get("status") != "ok"
+                and now_ts - float(entry.get("attempted_at", 0.0)) >= PATTERN_HISTORY_RETRY_S
+            )
+            if entry is None or stale:
+                out.append(tid)
+        return out
+
+    def std_is_cold(self) -> bool:
+        """True when the standardizer has (almost) no data, so a replay may build it."""
+        return max(self.std.n) < 2 * PATTERN_STD_MIN_N
+
+    def replay(self, hist: HourlyHistory, targets: list[str], update_std: bool) -> dict[str, dict[str, Any]]:
+        """Train the given targets on hourly statistics. Meant for a COPY of the engine.
+
+        Replayed samples train the weights, seed the usual rate and count toward
+        leaving ``collecting`` (``hist_days`` and ``ev_hist``), but they are never
+        scored: skill must be proven on live 15-minute data. Wind direction cannot
+        be averaged across 0/360, so ``wind_u`` / ``wind_v`` train masked; storm
+        labels have no distance filter; short changes come from hourly means.
+        """
+        th = self.thresholds
+        n = hist.n
+        specs = [TARGET_BY_ID[t] for t in targets if t in self.models]
+        masked = frozenset(POOL_INDEX[f] for f in REPLAY_MASKED_FEATURES)
+        report: dict[str, dict[str, Any]] = {
+            s.target_id: {"samples": 0, "events": 0, "first": None, "last": None} for s in specs
+        }
+        kinds = {s.kind for s in specs}
+
+        # ---- events (independent of the forecast samples)
+        eps = {k: {"ts": None, "amt": 0.0, "counted": False} for k in ("rain", "gust", "storm")}
+        ids: dict[str, Any] = {"frost": None, "heat": None}
+        events = dict.fromkeys(kinds, 0)
+        for j in range(n):
+            ts_end = hist.start_ts + (j + 1) * 3600.0
+            off = hist.tz_offset[j]
+            rain, gust, strikes = hist.rain[j], hist.gust[j], hist.strikes[j]
+            if "rain" in kinds and rain is not None and rain > 0:
+                events["rain"] += _episode_step(
+                    eps["rain"], ts_end, rain, PATTERN_EVENT_GAP_H["rain"] * 3600.0, th.rain_mm
+                )
+            if "gust" in kinds and gust is not None and gust >= th.gust_ms:
+                events["gust"] += _episode_step(eps["gust"], ts_end, 1.0, PATTERN_EVENT_GAP_H["gust"] * 3600.0, 1.0)
+            if "storm" in kinds and strikes is not None and strikes > 0:
+                gap = PATTERN_EVENT_GAP_H["storm"] * 3600.0
+                if _episode_step(eps["storm"], ts_end, strikes, gap, PATTERN_STORM_MIN_STRIKES):
+                    events["storm"] += 1
+            if "frost" in kinds and hist.temp_min[j] is not None and hist.temp_min[j] <= th.frost_c:
+                ident = math.floor((ts_end - 1800.0 + off - 43200.0) / 86400.0)
+                if ids["frost"] != ident:
+                    ids["frost"] = ident
+                    events["frost"] += 1
+            if "heat" in kinds and hist.temp_max[j] is not None and hist.temp_max[j] >= th.heat_c:
+                ident = math.floor((ts_end - 1800.0 + off) / 86400.0)
+                if ids["heat"] != ident:
+                    ids["heat"] = ident
+                    events["heat"] += 1
+
+        def diff(a: list[float | None], i: int, b: int) -> float | None:
+            return None if a[i] is None or a[b] is None else a[i] - a[b]
+
+        # ---- samples: one per hour boundary, features from the hours before it
+        last_wet: int | None = None
+        for k in range(1, n + 1):
+            j = k - 1
+            if hist.rain[j] is not None and hist.rain[j] >= 0.1:
+                last_wet = j
+            if k < 25:
+                continue
+            ts = hist.start_ts + k * 3600.0
+            vec: list[float | None] = [None] * N_POOL
+            vec[POOL_INDEX["mslp"]] = hist.mslp[j]
+            dp3 = diff(hist.mslp, j, j - 3)
+            vec[POOL_INDEX["dp_3h"]] = None if dp3 is None else dp3 / 3.0
+            vec[POOL_INDEX["dp_24h"]] = diff(hist.mslp, j, j - 24)
+            vec[POOL_INDEX["temp"]] = hist.temp[j]
+            vec[POOL_INDEX["dpd"]] = hist.dpd[j]
+            vec[POOL_INDEX["dpd_1h"]] = diff(hist.dpd, j, j - 1)
+            vec[POOL_INDEX["t_1h"]] = diff(hist.temp, j, j - 1)
+            vec[POOL_INDEX["t_3h"]] = diff(hist.temp, j, j - 3)
+            highs = [v for v in hist.temp_max[j - 23 : j + 1] if v is not None]
+            lows = [v for v in hist.temp_min[j - 23 : j + 1] if v is not None]
+            vec[POOL_INDEX["t_max_24h"]] = max(highs) if len(highs) >= 20 else None
+            vec[POOL_INDEX["wind_speed"]] = hist.wind[j]
+            vec[POOL_INDEX["gust_1h"]] = hist.gust[j]
+            vec[POOL_INDEX["rain_1h"]] = None if hist.rain[j] is None else math.log1p(max(0.0, hist.rain[j]))
+            dry = (j - last_wet) if last_wet is not None else min(PATTERN_DRY_HOURS_CAP, float(j + 1))
+            vec[POOL_INDEX["dry_hours"]] = math.log1p(min(PATTERN_DRY_HOURS_CAP, float(dry)))
+            vec[POOL_INDEX["cloud_deficit"]] = 0.0
+            vec[POOL_INDEX["solar_ok"]] = 0.0
+            vec[POOL_INDEX["last_day_clearness"]] = 0.0
+            vec[POOL_INDEX["last_day_clearness_ok"]] = 0.0
+            vec[POOL_INDEX["night_frac_12h"]] = hist.night_frac[j]
+            local_hour = ((ts + hist.tz_offset[j]) / 3600.0) % 24.0
+            vec[POOL_INDEX["hour_sin"]] = math.sin(2.0 * math.pi * local_hour / 24.0)
+            vec[POOL_INDEX["hour_cos"]] = math.cos(2.0 * math.pi * local_hour / 24.0)
+            vec[POOL_INDEX["lightning_1h"]] = None if hist.strikes[j] is None else math.log1p(max(0.0, hist.strikes[j]))
+            if update_std:
+                for i, x in enumerate(vec):
+                    if x is not None and i not in masked:
+                        self.std.update(i, float(x), PATTERN_HISTORY_STD_WEIGHT)
+            for spec in specs:
+                m = self.models[spec.target_id]
+                if any(vec[i] is None and i not in masked for i in m.idx):
+                    continue
+                label = self._replay_label(hist, spec, k)
+                if label is None:
+                    continue
+                if spec.kind == "rain":
+                    cond = hist.rain[j] is not None and hist.rain[j] >= th.rain_mm - _EPS
+                elif spec.kind == "frost":
+                    cond = bool(lows) and min(lows) <= th.frost_c
+                elif spec.kind == "heat":
+                    cond = bool(highs) and max(highs) >= th.heat_c
+                elif spec.kind == "gust":
+                    g3 = [v for v in hist.gust[max(0, j - 2) : j + 1] if v is not None]
+                    cond = bool(g3) and max(g3) >= th.gust_ms
+                else:
+                    cond = hist.strikes[j] is not None and hist.strikes[j] > 0
+                y = 1.0 if label else 0.0
+                n_half = PATTERN_BASE_RATE_HALF_LIFE_DAYS * 24.0
+                _rate_update(self.base_rate[spec.target_id], y, n_half)
+                _rate_update(self.cond[spec.target_id][1 if cond else 0], y, n_half)
+                m.train(self.std, vec, y, ts, masked)
+                r = report[spec.target_id]
+                r["samples"] += 1
+                r["first"] = ts if r["first"] is None else r["first"]
+                r["last"] = ts
+        for spec in specs:
+            m = self.models[spec.target_id]
+            r = report[spec.target_id]
+            r["events"] = events.get(spec.kind, 0)
+            m.ev_hist = r["events"]
+            m.hist_days = 0.0 if r["first"] is None else max(0.0, (r["last"] - r["first"]) / 86400.0)
+        return report
+
+    def _replay_label(self, hist: HourlyHistory, spec: TargetSpec, k: int) -> bool | None:
+        """Label of the window of hours k .. k+H-1 (None = not enough data, never "no")."""
+        h = spec.horizon_h
+        if k + h > hist.n:
+            return None
+        th = self.thresholds
+        need = PATTERN_COVERAGE_MIN * h
+        if spec.kind == "rain":
+            ok = [v for v in hist.rain[k : k + h] if v is not None]
+            return None if len(ok) < need else sum(ok) >= th.rain_mm - _EPS
+        if spec.kind == "frost":
+            ok = [v for v in hist.temp_min[k : k + h] if v is not None]
+            return None if len(ok) < need else min(ok) <= th.frost_c
+        if spec.kind == "heat":
+            ok = [v for v in hist.temp_max[k : k + h] if v is not None]
+            return None if len(ok) < need else max(ok) >= th.heat_c
+        if spec.kind == "gust":
+            ok = [v for v in hist.gust[k : k + h] if v is not None]
+            return None if len(ok) < need else max(ok) >= th.gust_ms
+        ok = [v for v in hist.strikes[k : k + h] if v is not None]
+        return None if len(ok) < need else sum(ok) >= PATTERN_STORM_MIN_STRIKES - _EPS
+
+    def adopt_replay(
+        self,
+        trained: PatternEngine,
+        report: dict[str, dict[str, Any]],
+        statuses: dict[str, dict[str, Any]],
+        update_std: bool,
+        now_ts: float,
+    ) -> None:
+        """Swap replay results into the live engine (called on the event loop).
+
+        Only the learned parameters move over; live counters, scoring and pending
+        forecasts of the live engine are kept. ``statuses`` holds the per-target
+        status and reason, including targets that could not replay at all.
+        """
+        for tid, r in report.items():
+            live, src = self.models.get(tid), trained.models.get(tid)
+            if live is None or src is None or r["samples"] == 0:
+                continue
+            live.w, live.g2 = list(src.w), list(src.g2)
+            live.cp_w, live.cp_g2, live.cp_at = list(src.cp_w), list(src.cp_g2), src.cp_at
+            live.n_updates = src.n_updates
+            live.ev_hist, live.hist_days = src.ev_hist, src.hist_days
+            self.base_rate[tid] = list(trained.base_rate[tid])
+            self.cond[tid] = [list(c) for c in trained.cond[tid]]
+        if update_std:
+            self.std = trained.std
+        targets = dict((self.history_learn or {}).get("targets") or {})
+        for tid, st in statuses.items():
+            if tid in self.models:
+                targets[tid] = {**st, "attempted_at": now_ts}
+        oks = [t for t in targets.values() if t.get("status") == "ok"]
+        spans = [r["last"] - r["first"] for r in report.values() if r["first"] is not None]
+        failed = [f"{t}: {v.get('reason')}" for t, v in targets.items() if v.get("status") != "ok"]
+        self.history_learn = {
+            "done_at": now_ts,
+            "span_days": round(max(spans) / 86400.0, 1) if spans else 0.0,
+            "status": "ok" if not failed else ("partial" if oks else "unavailable"),
+            "reason": "; ".join(failed) if failed else None,
+            "targets": targets,
+        }
+        for m in self.models.values():
+            self._update_maturity(m, now_ts)
+
     # -- outputs -------------------------------------------------------------
 
     def target_status(self, tid: str) -> str:
@@ -1497,9 +1740,38 @@ class PatternEngine:
             setattr(eng, key, float(v) if _finite(v) else None)
         ldc = data.get("last_day_clear")
         eng.last_day_clear = [float(ldc[0]), float(ldc[1])] if _floats_ok(ldc, 2) else None
-        hl = data.get("history_learn")
-        eng.history_learn = hl if isinstance(hl, dict) else {}
+        eng.history_learn = cls._clean_history(data.get("history_learn"), loaded)
         return eng
+
+    @staticmethod
+    def _clean_history(hl: Any, loaded: set[str]) -> dict[str, Any]:
+        """Keep only well-formed per-target history entries of models that loaded intact.
+
+        A model that was reset on load (label or mask changed) has to replay again.
+        """
+        if not isinstance(hl, dict) or not hl:
+            return {}
+        raw = hl.get("targets")
+        clean: dict[str, Any] = {}
+        if isinstance(raw, dict):
+            for tid, e in raw.items():
+                if (
+                    tid in loaded
+                    and isinstance(e, dict)
+                    and isinstance(e.get("status"), str)
+                    and _finite(e.get("attempted_at"))
+                    and isinstance(e.get("reason"), (str, type(None)))
+                ):
+                    clean[tid] = dict(e)
+        out: dict[str, Any] = {}
+        for key in ("done_at", "span_days"):
+            if _opt_ok(hl.get(key)):
+                out[key] = hl.get(key)
+        for key in ("status", "reason"):
+            if isinstance(hl.get(key), (str, type(None))):
+                out[key] = hl.get(key)
+        out["targets"] = clean
+        return out
 
     def _load_per_target(self, tid: str, data: dict[str, Any], notes: list[str]) -> bool:
         """Scoring, reliability and rates of a loaded model; reset the model if they are invalid."""

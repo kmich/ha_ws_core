@@ -748,6 +748,12 @@ PATTERN_EVENT_GAP_H = {"rain": 6.0, "gust": 6.0, "storm": 3.0}
 # Starting probability (the station's "usual rate" before any data)
 PATTERN_PRIOR_RATE = {"rain": 0.10, "frost": 0.05, "heat": 0.05, "gust": 0.03, "storm": 0.02}
 
+# Learning from recorder long-term statistics
+PATTERN_HISTORY_DAYS = 365  # how far back the replay reads hourly statistics
+PATTERN_HISTORY_RETRY_S = 7 * 86400.0  # a target that could not replay is retried at most this often
+PATTERN_HISTORY_STD_WEIGHT = 4.0  # an hourly replay sample weighs like four 15-min samples in the EMA
+PATTERN_HISTORY_DELAY_S = 120.0  # wait after startup before reading the recorder
+
 # Feature toggle (off by default: upgrades gain no entities, storage or recorder query)
 CONF_ENABLE_PATTERN_FORECAST = "enable_pattern_forecast"
 DEFAULT_ENABLE_PATTERN_FORECAST = False

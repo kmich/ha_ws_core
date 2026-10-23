@@ -17,12 +17,22 @@ from __future__ import annotations
 import logging
 import math
 from datetime import UTC, datetime
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.util import dt as dt_util
 
-from .algorithms import calculate_clearness_index, night_fraction_ahead
+from .algorithms import (
+    calculate_clearness_index,
+    calculate_dew_point,
+    calculate_sea_level_pressure,
+    night_fraction_ahead,
+)
 from .const import (
+    CONF_CAL_HUMIDITY,
+    CONF_CAL_PRESSURE_HPA,
+    CONF_CAL_TEMP_C,
+    CONF_CAL_WIND_MS,
     CONF_LIGHTNING_PROXIMITY_KM,
     CONF_PATTERN_STORM_INTERNET_LIGHTNING,
     CONF_TEMP_UNIT,
@@ -57,18 +67,28 @@ from .const import (
     KEY_TEMP_LOW_24H,
     KEY_THUNDERSTORM_RISK,
     LUX_TO_WM2_FACTOR,
+    PATTERN_HISTORY_DAYS,
     PATTERN_ISSUE_INTERVAL_MIN,
+    PATTERN_RAIN_JUMP_CAP_MM,
     PATTERN_SOURCE_INTERNET,
     PATTERN_SOURCE_LOCAL,
     PATTERN_STORE_VERSION,
+    PATTERN_STRIKE_JUMP_CAP,
     PATTERN_TARGET_KEYS,
+    SRC_GUST,
+    SRC_HUM,
     SRC_LIGHTNING_COUNT,
     SRC_LIGHTNING_DISTANCE,
     SRC_LUX,
+    SRC_PRESS,
+    SRC_RAIN_TOTAL,
+    SRC_TEMP,
+    SRC_WIND,
 )
 from .pattern_forecast import (
     POOL,
     TARGETS,
+    HourlyHistory,
     Instant,
     Observation,
     PatternEngine,
@@ -87,6 +107,24 @@ _ISSUE_S = PATTERN_ISSUE_INTERVAL_MIN * 60
 _BLITZ_RESCAN_S = 900.0
 _KT_EMA_TICKS = 60.0  # ~1 h of 60 s ticks: "clearness of the last daylight hour"
 
+# Recorder statistics each kind of target needs to replay (inputs of its feature mask and label)
+_HISTORY_NEEDS: dict[str, tuple[str, ...]] = {
+    "rain": ("temp", "hum", "press", "rain"),
+    "frost": ("temp", "hum", "press", "wind", "rain"),
+    "heat": ("temp", "hum", "press", "rain"),
+    "gust": ("temp", "press", "wind", "gust"),
+    "storm": ("temp", "hum", "press", "gust", "rain", "lightning"),
+}
+_HISTORY_SOURCE_KEY = {
+    "temp": SRC_TEMP,
+    "hum": SRC_HUM,
+    "press": SRC_PRESS,
+    "wind": SRC_WIND,
+    "gust": SRC_GUST,
+    "rain": SRC_RAIN_TOTAL,
+}
+_CUMULATIVE_INPUTS = ("rain", "lightning")
+
 # Observation input groups an upstream quality flag can take out
 _FLAG_BY_NAME = {
     "temperature": "temp",
@@ -95,6 +133,13 @@ _FLAG_BY_NAME = {
     "pressure": "press",
     "rain_rate": "rain",
 }
+
+
+def _recorder_instance(hass: Any) -> Any:
+    """The recorder instance (imported lazily: the recorder is only needed for the replay)."""
+    from homeassistant.components.recorder import get_instance
+
+    return get_instance(hass)
 
 
 def _iso(ts: float | None) -> str | None:
@@ -121,7 +166,7 @@ class PatternRuntime:
         self._kt_ema: float | None = None
         self._published: dict[str, Any] = {}
         self._error_logged = False
-        self.history_task: Any = None
+        self._history_running = False
 
     # ------------------------------------------------------------------
     # configuration
@@ -414,7 +459,7 @@ class PatternRuntime:
             skill[tid] = sk
         status_attrs: dict[str, Any] = {
             "per_target": per_target,
-            "history_learn": eng.history_learn.get("targets", {}) if eng.history_learn else {},
+            "history_learn": self._history_attrs(),
             "internet_inputs": eng.internet_inputs(),
             "last_trained_at": _iso(eng.last_trained_at),
             "storm_target": self._storm_target_text(),
@@ -426,6 +471,22 @@ class PatternRuntime:
             "skilled": eng.skilled_count(),
             "status_attrs": status_attrs,
             "skill_attrs": {"per_target": skill},
+        }
+
+    def _history_attrs(self) -> dict[str, Any]:
+        """Learning-from-history result: overall status/span/reason plus one entry per target."""
+        hl = self.engine.history_learn
+        if not hl:
+            return {}
+        return {
+            "status": hl.get("status"),
+            "span_days": hl.get("span_days"),
+            "reason": hl.get("reason"),
+            "done_at": _iso(hl.get("done_at")),
+            "per_target": {
+                tid: {"status": e.get("status"), "reason": e.get("reason"), "samples": e.get("samples", 0)}
+                for tid, e in (hl.get("targets") or {}).items()
+            },
         }
 
     def _storm_target_text(self) -> str:
@@ -450,6 +511,236 @@ class PatternRuntime:
         data[KEY_PATTERN_FORECAST_SKILL] = pub["skilled"]
         data[KEY_PATTERN_STATUS_ATTRS] = pub["status_attrs"]
         data[KEY_PATTERN_SKILL_ATTRS] = pub["skill_attrs"]
+
+    # ------------------------------------------------------------------
+    # learning from history (recorder long-term statistics)
+    # ------------------------------------------------------------------
+
+    def history_entity(self, name: str, ts: float) -> str | None:
+        """Entity whose statistics feed one replay input (None when nothing is mapped)."""
+        if name != "lightning":
+            return self.coord.sources.get(_HISTORY_SOURCE_KEY[name]) or None
+        if self.storm_source == PATTERN_SOURCE_LOCAL:
+            return self.coord.sources.get(SRC_LIGHTNING_COUNT) or None
+        if self.storm_source == PATTERN_SOURCE_INTERNET:
+            return self._blitz_entities(ts).get(SRC_LIGHTNING_COUNT)
+        return None
+
+    def _fetch_statistics(self, entity_ids: set[str], start: datetime, end: datetime) -> tuple[dict, dict]:
+        """Hourly statistics and metadata. Synchronous: runs on the recorder executor."""
+        from homeassistant.components.recorder.statistics import list_statistic_ids, statistics_during_period
+
+        meta = {m["statistic_id"]: m for m in list_statistic_ids(self.coord.hass, statistic_ids=entity_ids)}
+        rows = statistics_during_period(
+            self.coord.hass, start, end, set(meta), "hour", None, {"mean", "min", "max", "sum", "state"}
+        )
+        return meta, rows
+
+    @staticmethod
+    def _row_ts(row: dict) -> float | None:
+        start = row.get("start")
+        if isinstance(start, datetime):
+            return start.timestamp()
+        return float(start) if isinstance(start, (int, float)) else None
+
+    def _series(self, rows: list[dict], start_ts: float, n: int, key: str, convert: Any) -> list[float | None]:
+        out: list[float | None] = [None] * n
+        for row in rows:
+            ts = self._row_ts(row)
+            v = row.get(key)
+            if ts is None or v is None:
+                continue
+            idx = int(round((ts - start_ts) / 3600.0))
+            if 0 <= idx < n and isinstance(v, (int, float)) and math.isfinite(v):
+                out[idx] = convert(float(v))
+        return out
+
+    @staticmethod
+    def _offset_s(ts: float, tz: Any) -> float:
+        off = datetime.fromtimestamp(ts, tz).utcoffset()
+        return 0.0 if off is None else off.total_seconds()
+
+    @staticmethod
+    def _hourly_delta(cum: list[float | None], cap: float) -> list[float | None]:
+        """Per-hour change of a cumulative counter: a decrease is a reset (0), a jump is invalid."""
+        out: list[float | None] = [None] * len(cum)
+        for i in range(1, len(cum)):
+            if cum[i] is None or cum[i - 1] is None:
+                continue
+            d = cum[i] - cum[i - 1]
+            out[i] = 0.0 if d < 0 else (None if d > cap else d)
+        return out
+
+    def build_history(
+        self, plan: dict[str, str | None], meta: dict, rows: dict, start_ts: float, n: int, need_night: bool
+    ) -> HourlyHistory:
+        """Hourly statistics -> HourlyHistory, through the same normalization as live data."""
+        c = self.coord
+        o = c.entry_options
+        cal_t = float(o.get(CONF_CAL_TEMP_C, 0.0))
+        cal_h = float(o.get(CONF_CAL_HUMIDITY, 0.0))
+        cal_p = float(o.get(CONF_CAL_PRESSURE_HPA, 0.0))
+        cal_w = float(o.get(CONF_CAL_WIND_MS, 0.0))
+
+        def unit(name: str) -> str:
+            eid = plan.get(name)
+            return str((meta.get(eid) or {}).get("unit_of_measurement") or "") if eid else ""
+
+        def rws(name: str) -> list[dict]:
+            eid = plan.get(name)
+            return rows.get(eid) or [] if eid else []
+
+        def temp_conv(v: float) -> float:
+            return round(c._to_celsius(v, unit("temp")) + cal_t, 2)
+
+        temp = self._series(rws("temp"), start_ts, n, "mean", temp_conv)
+        tmin = self._series(rws("temp"), start_ts, n, "min", temp_conv)
+        tmax = self._series(rws("temp"), start_ts, n, "max", temp_conv)
+        hum = self._series(rws("hum"), start_ts, n, "mean", lambda v: max(0.0, min(100.0, v + cal_h)))
+        press = self._series(rws("press"), start_ts, n, "mean", lambda v: c._to_hpa(v, unit("press")) + cal_p)
+        wind = self._series(rws("wind"), start_ts, n, "mean", lambda v: max(0.0, c._to_ms(v, unit("wind")) + cal_w))
+        gust = self._series(rws("gust"), start_ts, n, "max", lambda v: max(0.0, c._to_ms(v, unit("gust")) + cal_w))
+
+        def cumulative(name: str, conv: Any) -> list[float | None]:
+            eid = plan.get(name)
+            if not eid:
+                return [None] * n
+            key = "sum" if (meta.get(eid) or {}).get("has_sum") else "state"
+            return self._series(rws(name), start_ts, n, key, conv)
+
+        rain = self._hourly_delta(cumulative("rain", lambda v: c._to_mm(v, unit("rain"))), PATTERN_RAIN_JUMP_CAP_MM)
+        strikes = self._hourly_delta(cumulative("lightning", lambda v: v), PATTERN_STRIKE_JUMP_CAP)
+
+        mslp: list[float | None] = [None] * n
+        dpd: list[float | None] = [None] * n
+        for j in range(n):
+            if temp[j] is not None and press[j] is not None:
+                recent = [v for v in temp[max(0, j - 11) : j + 1] if v is not None]
+                mean_t = sum(recent) / len(recent) if len(recent) >= 6 else None
+                mslp[j] = calculate_sea_level_pressure(press[j], c.elevation_m, temp[j], mean_temp_c=mean_t)
+            if temp[j] is not None and hum[j] is not None:
+                dpd[j] = max(0.0, temp[j] - calculate_dew_point(temp[j], hum[j]))
+
+        tz = dt_util.get_default_time_zone()
+        tz_offset = [self._offset_s(start_ts + (j + 1) * 3600.0, tz) for j in range(n)]
+        night: list[float | None] = [None] * n
+        lat, lon = self._lat_lon()
+        if need_night and lat is not None and lon is not None:
+            for j in range(n):
+                t = datetime.fromtimestamp(start_ts + (j + 1) * 3600.0, UTC)
+                night[j] = night_fraction_ahead(lat, lon, t, hours=12.0, step_min=60)
+        return HourlyHistory(
+            start_ts=start_ts,
+            n=n,
+            mslp=mslp,
+            temp=temp,
+            temp_min=tmin,
+            temp_max=tmax,
+            dpd=dpd,
+            wind=wind,
+            gust=gust,
+            rain=rain,
+            strikes=strikes,
+            night_frac=night,
+            tz_offset=tz_offset,
+        )
+
+    def _history_job(
+        self, snapshot: dict, targets: list[str], plan: dict[str, str | None], update_std: bool, start_ts: float, n: int
+    ) -> dict[str, Any]:
+        """Fetch, normalize and train a COPY of the engine. Runs on the recorder executor."""
+        trainer, _ = PatternEngine.from_dict(snapshot, self.engine.thresholds, self.storm_source, self.fingerprint)
+        ids = {e for e in plan.values() if e}
+        start = datetime.fromtimestamp(start_ts, UTC)
+        end = datetime.fromtimestamp(start_ts + n * 3600.0, UTC)
+        meta, rows = self._fetch_statistics(ids, start, end) if ids else ({}, {})
+
+        statuses: dict[str, dict[str, Any]] = {}
+        replayable: list[str] = []
+        for tid in targets:
+            kind = trainer.models[tid].spec.kind
+            problems = []
+            for name in _HISTORY_NEEDS[kind]:
+                eid = plan.get(name)
+                if not eid:
+                    problems.append(f"no sensor mapped for {name}")
+                elif eid not in meta:
+                    problems.append(f"no statistics for {eid}")
+                elif name in _CUMULATIVE_INPUTS and not (meta[eid].get("has_sum") or rows.get(eid)):
+                    problems.append(f"no cumulative statistics for {eid}")
+            if problems:
+                statuses[tid] = {
+                    "status": "unavailable",
+                    "reason": "history: unavailable (" + "; ".join(problems) + ")",
+                    "samples": 0,
+                    "events": 0,
+                }
+            else:
+                replayable.append(tid)
+        report: dict[str, dict[str, Any]] = {}
+        if replayable:
+            need_night = any(trainer.models[t].spec.kind == "frost" for t in replayable)
+            hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
+            report = trainer.replay(hist, replayable, update_std)
+            for tid in replayable:
+                r = report[tid]
+                if r["samples"] == 0:
+                    statuses[tid] = {
+                        "status": "too_short",
+                        "reason": "history: too short (no complete hours of statistics)",
+                        "samples": 0,
+                        "events": r["events"],
+                    }
+                else:
+                    statuses[tid] = {"status": "ok", "reason": None, "samples": r["samples"], "events": r["events"]}
+        return {"trained": trainer, "report": report, "statuses": statuses}
+
+    async def async_learn_history(self) -> None:
+        """Replay up to a year of recorder statistics into targets that have not learned yet.
+
+        The read and the training run on the recorder executor against a copy of
+        the engine; the result is swapped in here on the event loop. Replayed
+        samples never count toward ``skilled``.
+        """
+        if self._history_running:
+            return
+        eng = self.engine
+        now = dt_util.utcnow()
+        targets = eng.targets_needing_replay(now.timestamp())
+        if not targets:
+            return
+        self._history_running = True
+        try:
+            update_std = eng.std_is_cold()
+            end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
+            n = PATTERN_HISTORY_DAYS * 24
+            start_ts = end_ts - n * 3600.0
+            plan = {
+                name: self.history_entity(name, end_ts)
+                for name in sorted({x for t in targets for x in _HISTORY_NEEDS[eng.models[t].spec.kind]})
+            }
+            job = partial(self._history_job, eng.to_dict(), targets, plan, update_std, start_ts, n)
+            try:
+                result = await _recorder_instance(self.coord.hass).async_add_executor_job(job)
+            except Exception as err:  # noqa: BLE001 - recorder missing, DB error, ...
+                _LOGGER.warning("ws_core pattern forecast: learning from history failed: %s", err)
+                reason = f"history: unavailable (recorder error: {type(err).__name__})"
+                result = {
+                    "trained": eng,
+                    "report": {},
+                    "statuses": {
+                        t: {"status": "unavailable", "reason": reason, "samples": 0, "events": 0} for t in targets
+                    },
+                }
+            eng.adopt_replay(result["trained"], result["report"], result["statuses"], update_std, now.timestamp())
+            self._rebuild_published()
+            _LOGGER.info(
+                "ws_core pattern forecast: learned from history (%s)",
+                {t: s["status"] for t, s in result["statuses"].items()},
+            )
+            await self.async_save()
+        finally:
+            self._history_running = False
 
     # ------------------------------------------------------------------
     # services / diagnostics
