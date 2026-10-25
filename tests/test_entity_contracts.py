@@ -82,7 +82,9 @@ def test_fresh_and_existing_home_assistant_registry_choices():
         entity = WSSensor(MagicMock(), MagicMock(entry_id="contract-test"), description, "ws")
         default_disabler = None if entity.entity_registry_enabled_default else er.RegistryEntryDisabler.INTEGRATION
         saved = registry.async_get_or_create(
-            "sensor", c.DOMAIN, entity.unique_id,
+            "sensor",
+            c.DOMAIN,
+            entity.unique_id,
             suggested_object_id=entity.entity_id.removeprefix("sensor."),
             disabled_by=default_disabler,
         )
@@ -96,7 +98,9 @@ def test_fresh_and_existing_home_assistant_registry_choices():
             new_entity_id=f"sensor.user_{key}",
         )
         again = registry.async_get_or_create(
-            "sensor", c.DOMAIN, entity.unique_id,
+            "sensor",
+            c.DOMAIN,
+            entity.unique_id,
             suggested_object_id=entity.entity_id.removeprefix("sensor."),
             disabled_by=default_disabler,
         )

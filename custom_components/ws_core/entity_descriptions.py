@@ -2877,10 +2877,7 @@ def sensor_selected(key: str, options: dict[str, Any], sources: dict[str, str]) 
     if key in _SOLAR_SOURCE_KEYS:
         return bool(
             sources.get(SRC_SOLAR_RADIATION)
-            or (
-                options.get(CONF_ET0_ILLUMINANCE_FALLBACK, False)
-                and sources.get(SRC_LUX)
-            )
+            or (options.get(CONF_ET0_ILLUMINANCE_FALLBACK, False) and sources.get(SRC_LUX))
         )
     if key in _MEASURED_SOLAR_KEYS:
         return bool(sources.get(SRC_SOLAR_RADIATION))
