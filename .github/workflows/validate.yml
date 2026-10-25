@@ -47,6 +47,17 @@ jobs:
       - run: pip install -r requirements_dev.txt
       - run: pytest tests/ -v --tb=short
 
+  minimum-home-assistant:
+    name: Minimum supported Home Assistant
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "homeassistant==2024.6.0" "pytest>=8,<9" "pytest-socket>=0.7"
+      - run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/test_entity_contracts.py -q
+
   no-bytecode:
     name: No bytecode in repo
     runs-on: ubuntu-latest
