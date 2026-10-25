@@ -153,3 +153,12 @@ referenced in a dashboard update, re-paste the updated YAML from the `dashboards
 directory.
 
 The CHANGELOG notes dashboard changes per version.
+
+## Streamlined dashboard preview
+
+[ws_core_dashboard_preview.yaml](../dashboards/ws_core_dashboard_preview.yaml) is a
+review-only, built-in-card proposal with compact current conditions,
+calendar-labeled rain periods, and separate station, package, and prediction
+readiness. It does not replace the shipped dashboards. Coverage limitations
+and static consumer findings are in [the entity usage and history coverage
+ledger](usage_ledger.md) and [per-entity CSV](entity_usage_ledger.csv).
