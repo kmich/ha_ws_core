@@ -22,13 +22,22 @@ Node-RED flows, API clients, or other external consumers.
 The companion [CSV ledger](entity_usage_ledger.csv) has one row for each of the
 246 concrete IDs recognized by the dashboard validator (the validator's
 dynamic `binary_sensor.ws_{slug}` pattern is excluded), including
-repository reference locations, reference status, a purpose/role summary, and
-an external-use caveat. It scans shipped dashboards, blueprints, scripts,
-documentation, and tests. The table below highlights common examples;
-producer/prerequisite notes describe the integration contract, not whether the
-entity exists in any particular install.
+the default ID, explicit repository references, and reference status. It also
+has columns for registered ID, indirect/dynamic consumers, history value,
+update frequency, and proposed action. It scans shipped dashboards,
+blueprints, scripts, documentation, and tests. The table below highlights
+common examples.
 
-| Entity ID (default prefix) | Producer / prerequisite | Repository consumer | Reference status | History / action |
+The live registered ID is unknown for every row because no Home Assistant
+entity registry was available; a user may have renamed an entity. Role and
+prerequisite fields intentionally state what was not traced at per-entity level
+instead of inferring required inputs from the entity name. History and cadence
+fields give only the supportable entity-domain/coordinator-level description:
+we did not audit each sensor's state class, update trigger, or each install's
+recorder configuration. The proposed action is conservative for all rows and
+is not an assertion that every entity is used.
+
+| Entity ID (default prefix) | Role / prerequisite evidence | Repository consumer | Reference status | History / action |
 |---|---|---|---|---|
 | `sensor.ws_temperature` | Normalized mapped temperature | All dashboard variants; example docs | referenced | Preserve; current observation, history useful |
 | `sensor.ws_humidity` | Normalized mapped humidity | Dashboard variants | referenced | Preserve; current observation |
