@@ -7,7 +7,7 @@ diagnostics, and alert accumulation -- all with mocked HA environment.
 import json
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,6 +25,9 @@ from custom_components.ws_core.const import (
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     KEY_DATA_QUALITY,
+    KEY_LIGHTNING_CLEARANCE_MIN,
+    KEY_LIGHTNING_COUNT_1H,
+    KEY_LIGHTNING_PROXIMITY,
     KEY_NORM_TEMP_C,
     KEY_NORM_WIND_GUST_MS,
     KEY_RAIN_RATE_FILT,
@@ -251,6 +254,30 @@ class TestAlertAccumulation:
         data = self._run_alerts(coord, gust=5.0, rain=0.0, temp=20.0)
         assert data[KEY_ALERT_STATE] == "clear"
         assert data["_active_alerts"] == []
+
+    def test_nearby_lightning_raises_immediate_banner_warning(self):
+        coord, _, _ = _make_coordinator()
+        now = datetime.now(UTC)
+        data = {
+            KEY_LIGHTNING_PROXIMITY: "near",
+            KEY_LIGHTNING_COUNT_1H: 1,
+            KEY_LIGHTNING_CLEARANCE_MIN: 0,
+        }
+        coord._compute_health(data, now, [], [])
+        assert data[KEY_ALERT_STATE] == "warning"
+        assert data["_active_alerts"][0]["type"] == "lightning"
+        assert "lightning" in data[KEY_ALERT_MESSAGE].lower()
+
+    def test_nearby_lightning_warning_lingers_then_clears(self):
+        coord, _, _ = _make_coordinator()
+        now = datetime.now(UTC)
+        coord._lightning_last_near_strike_ts = now - timedelta(minutes=29)
+        data = {KEY_LIGHTNING_PROXIMITY: "clear", KEY_LIGHTNING_COUNT_1H: 1}
+        coord._compute_health(data, now, [], [])
+        assert data[KEY_ALERT_STATE] == "warning"
+
+        coord._compute_health(data, now + timedelta(minutes=2), [], [])
+        assert data[KEY_ALERT_STATE] == "clear"
 
     def test_single_wind_alert(self):
         coord, _, _ = _make_coordinator()
