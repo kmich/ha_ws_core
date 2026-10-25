@@ -1934,10 +1934,10 @@
       "frost_risk": {
         "name": "Frost Risk",
         "state": {
-          "high": "High",
-          "probable": "Probable",
+          "no_risk": "No Risk",
           "unlikely": "Unlikely",
-          "no_risk": "No risk"
+          "probable": "Probable",
+          "high": "High"
         }
       },
       "sensor_drift": {
@@ -2663,15 +2663,6 @@
       },
       "vigicrues_river_flow": {
         "name": "{river} - River Flow"
-      },
-      "frost_risk": {
-        "name": "Frost Risk",
-        "state": {
-          "no_risk": "No Risk",
-          "unlikely": "Unlikely",
-          "probable": "Probable",
-          "high": "High"
-        }
       }
     },
     "select": {
@@ -2960,25 +2951,26 @@
         "afternoon": "Afternoon",
         "air_near_saturation": "Air near saturation",
         "already_cold": "Already cold",
-        "calm_wind": "Calm wind",
+        "calm_last_hour": "Calm during the last hour",
         "clear_sky": "Clear sky",
         "cloudy": "Cloudy",
         "cooling_fast": "Cooling fast",
         "dry_air": "Dry air",
-        "gusty_now": "Gusty now",
-        "hot_yesterday": "Hot yesterday",
-        "lightning_nearby": "Lightning nearby",
+        "gust_in_last_hour": "Strong gust in the last hour",
+        "lightning_in_last_hour": "Lightning in the last hour",
         "long_dry_spell": "Long dry spell",
         "long_night": "Long night ahead",
         "night": "Night",
         "pressure_falling": "Pressure falling",
         "pressure_rising": "Pressure rising",
-        "raining_now": "Raining now",
         "sunny": "Sunny",
         "warm_and_humid": "Warm and humid",
-        "warm_wind_sector": "Warm wind direction",
-        "wet_wind_sector": "Wet wind direction",
-        "windy_now": "Windy now"
+        "windy_last_hour": "Windy during the last hour",
+        "rain_in_last_hour": "Rain in the last hour",
+        "warm_now": "Warm now",
+        "hot_in_last_day": "Hot in the last 24 hours",
+        "clear_recent_daylight": "Clear during recent daylight",
+        "cloudy_recent_daylight": "Cloudy during recent daylight"
       }
     },
     "pattern_effect": {

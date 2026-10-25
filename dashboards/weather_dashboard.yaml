@@ -3992,7 +3992,7 @@ views:
               title: Maturity and why
               content: |
                 {% set t = [('sensor.ws_pattern_rain_1h', 'Rain, 1 h'), ('sensor.ws_pattern_rain_3h', 'Rain, 3 h'), ('sensor.ws_pattern_rain_6h', 'Rain, 6 h'), ('sensor.ws_pattern_frost_12h', 'Frost, 12 h'), ('sensor.ws_pattern_heat_24h', 'Hot day, 24 h'), ('sensor.ws_pattern_gust_3h', 'Strong gust, 3 h'), ('sensor.ws_pattern_storm_3h', 'Thunderstorm, 3 h')] %}
-                | Forecast | Maturity | Why |
+                | Forecast | Maturity | Observed conditions (model effect) |
                 |---|---|---|
                   {% for e, label in t if state_attr(e, 'maturity') %}| {{ label }} | {{ state_attr(e, 'maturity') }} | {% if state_attr(e, 'explanation') or state_attr(e, 'reason') %}{{ state_attr(e, 'explanation') or state_attr(e, 'reason') }}{% elif state_attr(e, 'maturity') == 'collecting' %}Collecting: {{ state_attr(e, 'progress_pct') or 0 }}%{% else %}{% for f in state_attr(e, 'top_factors') or [] %}{{ f.factor | replace('_', ' ') }} ({{ f.effect }}){{ ', ' if not loop.last }}{% endfor %}{% endif %} |
                 {% endfor %}

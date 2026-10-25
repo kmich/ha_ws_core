@@ -164,6 +164,81 @@ class TestLocalFirstContract:
                 rt.update(_data(), now + timedelta(minutes=i), sample=True)
         assert rt.engine.models
 
+    @pytest.mark.parametrize("minute", [1, 8, 14])
+    def test_hydration_publishes_on_next_sample_without_duplicate_issue(self, minute):
+        coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True})
+        rt = coord._pattern
+        now = datetime(2026, 10, 23, 12, minute, tzinfo=UTC)
+        ts = now.timestamp()
+        rt.engine.models["rain_3h"].maturity = "learning"
+        rt.engine.models["rain_3h"].hist_days = 10.0
+        rt.engine.models["rain_3h"].ev_hist = 10
+        rt.engine.seed_bins(
+            [
+                {
+                    "ts": ts - j * 900,
+                    "t": 12.0,
+                    "d": 4.0,
+                    "u": 2.0,
+                    "v": 0.0,
+                    "s": 2.0,
+                    "g": 5.0,
+                    "r": 0.0,
+                    "k": 0.0,
+                    "n": 15,
+                    "sn": 15,
+                }
+                for j in range(1, 5)
+            ]
+        )
+        rt.engine.seed_pressure([[ts - 86400, 1013.0]])
+        rt._recovery_issue_pending = True
+        data = _data()
+        rt.update(data, now, sample=True)
+        assert data[PATTERN_TARGET_KEYS["rain_3h"]] is not None, data[const.KEY_PATTERN_OUTPUTS]["rain_3h"]
+        assert data[const.KEY_PATTERN_OUTPUTS]["rain_3h"].get("reason") is None
+        pending = len(rt.engine.pending)
+        rt.update(_data(), now + timedelta(seconds=30), sample=True)
+        assert len(rt.engine.pending) == pending
+
+    def test_hydration_after_a_bucket_was_issued_recovers_at_next_mark(self):
+        coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True})
+        rt = coord._pattern
+        now = datetime(2026, 10, 23, 12, 8, tzinfo=UTC)
+        ts = now.timestamp()
+        model = rt.engine.models["rain_3h"]
+        model.hist_days = 10.0
+        model.ev_hist = 10
+        model.maturity = "learning"
+        rt.engine.seed_bins(
+            [
+                {
+                    "ts": ts - j * 900,
+                    "t": 12.0,
+                    "d": 4.0,
+                    "u": 2.0,
+                    "v": 0.0,
+                    "s": 2.0,
+                    "g": 5.0,
+                    "r": 0.0,
+                    "k": 0.0,
+                    "n": 15,
+                    "sn": 15,
+                }
+                for j in range(1, 5)
+            ]
+        )
+        rt.engine.seed_pressure([[ts - 86400, 1013.0]])
+        rt._last_bucket = int(ts // 900)
+        rt._recovery_issue_pending = True
+        early = _data()
+        rt.update(early, now, sample=True)
+        assert early[PATTERN_TARGET_KEYS["rain_3h"]] is None
+        recovered = _data()
+        rt.update(recovered, now + timedelta(minutes=7), sample=True)
+        assert recovered[PATTERN_TARGET_KEYS["rain_3h"]] is not None
+        assert len(rt.engine.pending) == 1
+
 
 def _data(**kw):
     d = {

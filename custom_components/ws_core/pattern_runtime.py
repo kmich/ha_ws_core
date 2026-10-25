@@ -14,6 +14,7 @@ data or any other network-fed value.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from datetime import UTC, datetime
@@ -137,6 +138,7 @@ _PERIOD_S = 300.0  # recorder short-term statistics period
 # are this close: a wider spread may straddle north, where an arithmetic mean
 # of degrees is meaningless (350 and 10 average to 180).
 _DIR_MAX_SPREAD_DEG = 90.0
+_RECOVERY_RETRY_S = (60.0, 180.0, 300.0)
 
 # Observation input groups an upstream quality flag can take out
 _FLAG_BY_NAME = {
@@ -181,6 +183,10 @@ class PatternRuntime:
         self._error_logged = False
         self._history_running = False
         self._warm_start: dict[str, Any] = {}
+        self._recent_failed = False
+        self._retry_count = 0
+        self._retry_scheduled = False
+        self._recovery_issue_pending = False
 
     # ------------------------------------------------------------------
     # configuration
@@ -379,9 +385,10 @@ class PatternRuntime:
             self._kt_ema = kt if self._kt_ema is None else self._kt_ema + (kt - self._kt_ema) / _KT_EMA_TICKS
 
         bucket = int(ts // _ISSUE_S)
-        if bucket == self._last_bucket or ts - bucket * _ISSUE_S >= 300.0:
+        if bucket == self._last_bucket or (ts - bucket * _ISSUE_S >= 300.0 and not self._recovery_issue_pending):
             return  # not an issue mark (or this one is already done)
         self._last_bucket = bucket
+        self._recovery_issue_pending = False
         lat, lon = self._lat_lon()
         local = dt_util.as_local(now)
         press_ok = "press" not in flagged
@@ -749,7 +756,9 @@ class PatternRuntime:
             bins = await _recorder_instance(self.coord.hass).async_add_executor_job(partial(self._recent_job, plan, ts))
         except Exception as err:  # noqa: BLE001 - recorder missing or busy: warm up live instead
             _LOGGER.debug("ws_core pattern forecast: no short-term statistics to seed from: %s", err)
+            self._recent_failed = True
             return 0
+        self._recent_failed = False
         wet = [b["ts"] for b in bins if (b.get("r") or 0.0) > 0.0]
         recent = [b for b in bins if ts - b["ts"] < 3300]
         self._warm_start = {
@@ -855,7 +864,9 @@ class PatternRuntime:
         mslp: list[float | None] = [None] * n
         dpd: list[float | None] = [None] * n
         for j in range(n):
-            if temp[j] is not None and press[j] is not None:
+            if press[j] is not None and c.elevation_m == 0.0:
+                mslp[j] = press[j]
+            elif temp[j] is not None and press[j] is not None:
                 recent = [v for v in temp[max(0, j - 11) : j + 1] if v is not None]
                 mean_t = sum(recent) / len(recent) if len(recent) >= 6 else None
                 mslp[j] = calculate_sea_level_pressure(press[j], c.elevation_m, temp[j], mean_temp_c=mean_t)
@@ -948,6 +959,55 @@ class PatternRuntime:
             "last_rain_ts": last_rain_ts,
         }
 
+    async def _async_seed_pressure(self, now: datetime) -> tuple[int, bool]:
+        """Read a bounded pressure window regardless of annual replay eligibility."""
+        end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
+        n = 38
+        plan = {name: self.history_entity(name, end_ts) for name in ("temp", "press")}
+
+        def pressure_job() -> list[list[float]]:
+            ids = {eid for eid in plan.values() if eid}
+            start_ts = end_ts - n * 3600.0
+            meta, rows = (
+                self._fetch_statistics(ids, datetime.fromtimestamp(start_ts, UTC), datetime.fromtimestamp(end_ts, UTC))
+                if ids
+                else ({}, {})
+            )
+            hist = self.build_history(plan, meta, rows, start_ts, n, need_night=False)
+            return PatternEngine.pressure_seed_from_history(hist)
+
+        try:
+            points = await _recorder_instance(self.coord.hass).async_add_executor_job(pressure_job)
+        except Exception as err:  # noqa: BLE001 - a short recorder outage is retried
+            _LOGGER.debug("ws_core pattern forecast: no pressure statistics to seed from: %s", err)
+            self._warm_start["pressure_status"] = "recorder_error"
+            return 0, True
+        seeded = self.engine.seed_pressure(points)
+        self._warm_start["pressure_status"] = "available" if points else "unavailable"
+        self._warm_start["pressure_points_added"] = seeded
+        if seeded:
+            self._recovery_issue_pending = True
+        return seeded, not bool(points)
+
+    def _schedule_recovery_retry(self) -> None:
+        """Retry recorder warm start at most three times; unload cancels the task."""
+        if self._retry_scheduled or self._retry_count >= len(_RECOVERY_RETRY_S):
+            if self._retry_count >= len(_RECOVERY_RETRY_S):
+                self._warm_start["retry_exhausted"] = True
+            return
+        delay = _RECOVERY_RETRY_S[self._retry_count]
+        self._retry_count += 1
+        self._retry_scheduled = True
+
+        async def retry() -> None:
+            try:
+                await asyncio.sleep(delay)
+            finally:
+                self._retry_scheduled = False
+            await self.async_learn_history()
+
+        self.coord._spawn(retry(), "ws_core_pattern_history_recovery")
+
     async def async_learn_history(self) -> None:
         """Warm start from the recorder, then replay a year of statistics where needed.
 
@@ -961,40 +1021,19 @@ class PatternRuntime:
         if self._history_running:
             return
         self._history_running = True
+        retry_needed = False
+        cancelled = False
         try:
             now = dt_util.utcnow()
             bins = await self._async_seed_recent(now)
+            retry_needed = self._recent_failed
             if bins:
                 _LOGGER.info("ws_core pattern forecast: seeded %d recent 15-min history bins from the recorder", bins)
             eng = self.engine
+            seeded, pressure_failed = await self._async_seed_pressure(now)
+            retry_needed = retry_needed or pressure_failed
             targets = eng.targets_needing_replay(now.timestamp())
             if not targets:
-                # Learned weights survive reloads, but pressure points can have
-                # expired or contain gaps. Refresh their short window without
-                # replaying the year or modifying the learned models.
-                end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
-                n = 38  # 26 h of pressure plus 12 h for temperature normalization
-                plan = {name: self.history_entity(name, end_ts) for name in ("temp", "press")}
-
-                def pressure_job() -> list[list[float]]:
-                    ids = {eid for eid in plan.values() if eid}
-                    start_ts = end_ts - n * 3600.0
-                    meta, rows = (
-                        self._fetch_statistics(
-                            ids, datetime.fromtimestamp(start_ts, UTC), datetime.fromtimestamp(end_ts, UTC)
-                        )
-                        if ids
-                        else ({}, {})
-                    )
-                    hist = self.build_history(plan, meta, rows, start_ts, n, need_night=False)
-                    return PatternEngine.pressure_seed_from_history(hist)
-
-                try:
-                    points = await _recorder_instance(self.coord.hass).async_add_executor_job(pressure_job)
-                except Exception as err:  # noqa: BLE001 - keep live history if recorder is unavailable
-                    _LOGGER.debug("ws_core pattern forecast: no pressure statistics to seed from: %s", err)
-                    points = []
-                seeded = eng.seed_pressure(points)
                 self._rebuild_published()
                 if bins or seeded:
                     await self.async_save()
@@ -1012,18 +1051,23 @@ class PatternRuntime:
                 result = await _recorder_instance(self.coord.hass).async_add_executor_job(job)
             except Exception as err:  # noqa: BLE001 - recorder missing, DB error, ...
                 _LOGGER.warning("ws_core pattern forecast: learning from history failed: %s", err)
+                retry_needed = True
                 reason = f"history: unavailable (recorder error: {type(err).__name__})"
                 result = {
                     "trained": eng,
                     "report": {},
                     "statuses": {
-                        t: {"status": "unavailable", "reason": reason, "samples": 0, "events": 0} for t in targets
+                        t: {"status": "unavailable", "reason": reason, "samples": 0, "events": 0, "retryable": True}
+                        for t in targets
                     },
                 }
             eng.adopt_replay(result["trained"], result["report"], result["statuses"], update_std, now.timestamp())
             # The 24 h pressure change needs a reading from a day ago; seed it from the
             # replayed hours so forecasts do not wait a day after being switched on.
-            seeded = eng.seed_pressure(result.get("pressure_seed") or [])
+            replay_seeded = eng.seed_pressure(result.get("pressure_seed") or [])
+            if replay_seeded:
+                self._recovery_issue_pending = True
+            seeded += replay_seeded
             eng.seed_last_rain(result.get("last_rain_ts"))
             self._rebuild_published()
             _LOGGER.info(
@@ -1032,8 +1076,16 @@ class PatternRuntime:
                 seeded,
             )
             await self.async_save()
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
         finally:
             self._history_running = False
+            if not cancelled:
+                if retry_needed:
+                    self._schedule_recovery_retry()
+                else:
+                    self._retry_count = 0
 
     # ------------------------------------------------------------------
     # services / diagnostics

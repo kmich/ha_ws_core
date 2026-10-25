@@ -1388,7 +1388,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 await fn()
             except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("ws_core: %s failed (will retry): %s", name, err)
+                _LOGGER.warning("ws_core: %s failed: %s", name, err)
 
         self._spawn(_once(), name)
 
