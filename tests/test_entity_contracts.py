@@ -1,11 +1,13 @@
 """Entity creation and registration contracts for optional calculations."""
 
+import re
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from custom_components.ws_core import const as c
-from custom_components.ws_core.entity_descriptions import SENSORS
+from custom_components.ws_core.entity_descriptions import SENSORS, sensor_selected
 from custom_components.ws_core.sensor import WSSensor, async_setup_entry
 
 
@@ -91,3 +93,13 @@ def test_fresh_and_existing_home_assistant_registry_choices():
         )
         assert again.entity_id == saved.entity_id
         assert again.disabled_by == override
+
+
+def test_everyday_preview_uses_default_sensor_set():
+    preview = Path("dashboards/ws_core_dashboard_preview.yaml").read_text(encoding="utf-8")
+    referenced = set(re.findall(r"entity:\s*(sensor\.ws_[\w]+)", preview))
+    descriptions = {f"sensor.ws_{WSSensor._slug_for_key(d.key)}": d for d in SENSORS}
+    for entity_id in referenced:
+        description = descriptions[entity_id]
+        assert description.entity_registry_enabled_default, entity_id
+        assert sensor_selected(description.key, {c.CONF_ENABLE_DISPLAY_SENSORS: True}, {}), entity_id
