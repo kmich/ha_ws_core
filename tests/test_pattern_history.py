@@ -263,11 +263,26 @@ class TestReplay:
         coord, rt = make_runtime()
         learn(rt)
         hourly = rt._test_periods.count("hour")
+        updates = {t: m.n_updates for t, m in rt.engine.models.items()}
+        reads = []
+        fetch = rt._fetch_statistics
+
+        def bounded_fetch(ids, start, end, period="hour"):
+            reads.append((set(ids), (end - start).total_seconds(), period))
+            return fetch(ids, start, end, period)
+
+        rt._fetch_statistics = bounded_fetch
         learn(rt)
-        # every target already learned: no second year-long read, only the cheap
-        # 5-minute warm start that runs at every start (2.11.2)
-        assert rt._test_periods.count("hour") == hourly
-        assert rt._test_periods[-1] == "5minute"
+        # Every target already learned: only recent bins and a short pressure
+        # window are refreshed, and model updates remain unchanged.
+        assert rt._test_periods.count("hour") == hourly + 1
+        assert rt._test_periods[-2:] == ["5minute", "hour"]
+        assert reads[-1] == ({"sensor.t", "sensor.p"}, 38 * 3600, "hour")
+        assert {t: m.n_updates for t, m in rt.engine.models.items()} == updates
+        rt.engine.pressure.clear()
+        learn(rt)
+        assert rt.engine.pressure_change_24h(NOW.timestamp(), 1013.0) is not None
+        assert {t: m.n_updates for t, m in rt.engine.models.items()} == updates
 
     def test_live_state_survives_the_swap(self):
         coord, rt = make_runtime()

@@ -34,6 +34,7 @@ def test_missing_temperature_does_not_claim_outside_range():
         c.KEY_NET_RADIATION,
         c.KEY_CLOUD_COVER_PCT,
         c.KEY_CLEARNESS_INDEX,
+        c.KEY_ET0_PM_DAILY_MM,
     ],
 )
 def test_unmapped_solar_has_actionable_reason(key):
@@ -62,6 +63,14 @@ def test_missing_lightning_and_idle_lightning_are_distinct():
     co._blitzortung_sources = {c.SRC_LIGHTNING_DISTANCE: "sensor.distance"}
     assert unknown_status(c.KEY_LIGHTNING_DISTANCE_KM, co, {})["reason"] == "waiting_for_lightning_location"
     assert unknown_status(c.KEY_LIGHTNING_CLEARANCE_MIN, co, {})["reason"] == "no_strike_recorded"
+
+
+def test_daily_pm_explains_completed_day_requirement():
+    co = coord()
+    co.sources[c.SRC_SOLAR_RADIATION] = "sensor.solar"
+    assert unknown_status(c.KEY_ET0_PM_DAILY_MM, co, {})["reason"] == "waiting_for_daily_radiation"
+    co._solar_energy_previous_whm2 = 3000.0
+    assert unknown_status(c.KEY_ET0_PM_DAILY_MM, co, {})["reason"] == "waiting_for_data"
 
 
 def test_entity_merges_reason_and_clears_it_when_value_returns():

@@ -598,7 +598,6 @@ _FACTOR_MAP: dict[str, dict[tuple[str, int], str]] = {
         ("rain_1h", 1): "raining_now",
         ("rain_1h", -1): "long_dry_spell",
         ("dry_hours", 1): "long_dry_spell",
-        ("dry_hours", -1): "raining_now",
         ("cloud_deficit", 1): "cloudy",
         ("cloud_deficit", -1): "clear_sky",
     },

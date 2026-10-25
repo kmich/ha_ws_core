@@ -969,7 +969,34 @@ class PatternRuntime:
             eng = self.engine
             targets = eng.targets_needing_replay(now.timestamp())
             if not targets:
-                if bins:
+                # Learned weights survive reloads, but pressure points can have
+                # expired or contain gaps. Refresh their short window without
+                # replaying the year or modifying the learned models.
+                end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
+                n = 38  # 26 h of pressure plus 12 h for temperature normalization
+                plan = {name: self.history_entity(name, end_ts) for name in ("temp", "press")}
+
+                def pressure_job() -> list[list[float]]:
+                    ids = {eid for eid in plan.values() if eid}
+                    start_ts = end_ts - n * 3600.0
+                    meta, rows = (
+                        self._fetch_statistics(
+                            ids, datetime.fromtimestamp(start_ts, UTC), datetime.fromtimestamp(end_ts, UTC)
+                        )
+                        if ids
+                        else ({}, {})
+                    )
+                    hist = self.build_history(plan, meta, rows, start_ts, n, need_night=False)
+                    return PatternEngine.pressure_seed_from_history(hist)
+
+                try:
+                    points = await _recorder_instance(self.coord.hass).async_add_executor_job(pressure_job)
+                except Exception as err:  # noqa: BLE001 - keep live history if recorder is unavailable
+                    _LOGGER.debug("ws_core pattern forecast: no pressure statistics to seed from: %s", err)
+                    points = []
+                seeded = eng.seed_pressure(points)
+                self._rebuild_published()
+                if bins or seeded:
                     await self.async_save()
                 return
             update_std = eng.std_is_cold()

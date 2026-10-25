@@ -8,6 +8,7 @@ import json
 import math
 import pathlib
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -394,6 +395,17 @@ class TestIssue:
             assert f["effect"] in ("raises", "lowers")
         assert {f["factor"] for f in factors} & {"air_near_saturation", "pressure_falling"}
         assert eng.output("rain_3h")["top_factors"] == factors
+
+    def test_short_dry_spell_does_not_claim_it_is_raining(self):
+        model = SimpleNamespace(
+            spec=SimpleNamespace(kind="rain"),
+            contributions=lambda *_: {"dry_hours": (-1.0, 2.0), "rain_1h": (1.0, 1.0)},
+        )
+        # Below-average dry time is not proof of current rain. Actual rain
+        # observations can still produce the raining-now explanation.
+        assert pf._top_factors(model, None, [], 12.0) == [{"factor": "raining_now", "effect": "raises"}]
+        model.contributions = lambda *_: {"dry_hours": (-1.0, 2.0)}
+        assert pf._top_factors(model, None, [], 12.0) == []
 
     def test_outputs_have_the_documented_shape(self, rain_run):
         _, eng = rain_run
