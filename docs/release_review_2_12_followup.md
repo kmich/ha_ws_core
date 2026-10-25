@@ -36,13 +36,16 @@ change.
 - The streamlined dashboard is a preview. Existing shipped dashboards and
   users' saved dashboards are unchanged. No entity is proposed for disablement.
 
-## Remaining release gates
+## Verification and remaining release gates
 
 - Local verification on the integrated branch: 1,045 tests passed with the
   Home Assistant and asyncio fixture plugins enabled; Ruff lint and format
-  checks passed; all shipped dashboard entity references validated. CI still
-  needs to run on the review branch. The local test environment uses Home Assistant 2025.1.4;
-  the declared minimum 2024.6.0 has not been independently exercised here.
+  checks passed; all shipped dashboard entity references validated.
+- Draft PR CI passed the full 1,045-test suite, lint, HACS validation,
+  hassfest, dashboard validation, version consistency, and bytecode check.
+  A separate job passed 210 entity-contract tests on the declared minimum
+  Home Assistant 2024.6.0. That minimum-version job is a focused compatibility
+  check, not a full lifecycle or live installation test.
 - Inspect the dashboard preview with a fresh registry and verify a supported
   Home Assistant version before making it the default view.
 - After an approved deployment, perform a live smoke check of source health,
