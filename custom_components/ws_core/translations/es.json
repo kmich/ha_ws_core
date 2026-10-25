@@ -758,8 +758,8 @@
       "description": "Se ha aplicado un desplazamiento de calibración de {value} a {field}. Los desplazamientos grandes pueden indicar un fallo del hardware del sensor en lugar de deriva de calibración. Considere reemplazar el sensor."
     },
     "et0_pm_unavailable": {
-      "title": "PM ET₀ unavailable: no solar_radiation source configured",
-      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
+      "title": "PM ET₀ daily measurement unavailable",
+      "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
     }
   },
   "entity": {
