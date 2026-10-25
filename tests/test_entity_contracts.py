@@ -69,10 +69,19 @@ def test_runtime_enabled_default_matches_description(description):
     assert entity.entity_registry_enabled_default == description.entity_registry_enabled_default
 
 
-def test_fresh_and_existing_home_assistant_registry_choices(hass):
+def test_fresh_and_existing_home_assistant_registry_choices(request):
     from homeassistant.helpers import entity_registry as er
 
-    registry = er.async_get(hass)
+    try:
+        hass = request.getfixturevalue("hass")
+    except pytest.FixtureLookupError:
+        # The minimum-version contract job runs without HA's pytest plugin.
+        registry = er.EntityRegistry(MagicMock())
+        registry.entities = er.EntityRegistryItems()
+        registry.deleted_entities = {}
+        registry.async_schedule_save = MagicMock()
+    else:
+        registry = er.async_get(hass)
 
     for key in (c.KEY_FWI_DSR, c.KEY_NORM_TEMP_C):
         description = next(d for d in SENSORS if d.key == key)
