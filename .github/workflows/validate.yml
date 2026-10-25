@@ -49,7 +49,8 @@ jobs:
 
   current-home-assistant:
     name: Home Assistant 2026.10.4
-    runs-on: ubuntu-latest
+    # setup-python's 3.14.2 build is published for 24.04, not 26.04.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
