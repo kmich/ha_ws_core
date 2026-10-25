@@ -69,17 +69,10 @@ def test_runtime_enabled_default_matches_description(description):
     assert entity.entity_registry_enabled_default == description.entity_registry_enabled_default
 
 
-def test_fresh_and_existing_home_assistant_registry_choices():
+def test_fresh_and_existing_home_assistant_registry_choices(hass):
     from homeassistant.helpers import entity_registry as er
 
-    registry = er.EntityRegistry(MagicMock())
-    try:
-        registry.entities = er.EntityRegistryItems()
-    except TypeError:
-        # Home Assistant 2026.10 passes hass into the registry items container.
-        registry.entities = er.EntityRegistryItems(registry.hass)
-    registry.deleted_entities = {}
-    registry.async_schedule_save = MagicMock()
+    registry = er.async_get(hass)
 
     for key in (c.KEY_FWI_DSR, c.KEY_NORM_TEMP_C):
         description = next(d for d in SENSORS if d.key == key)
