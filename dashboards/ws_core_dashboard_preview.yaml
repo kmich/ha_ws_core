@@ -1,8 +1,7 @@
 # Review preview: streamlined everyday view plus explicit diagnostics.
 # Built-in Home Assistant cards only. This is a proposal; it does not replace
 # the existing dashboards or imply that optional entities are enabled. It
-# avoids specialist outputs with historically inconsistent entity defaults;
-# optional diagnostics/prediction cards may still be unavailable if disabled.
+# includes only the default core readings and readiness entities.
 title: Weather Station (preview)
 views:
   - title: Today
@@ -55,19 +54,13 @@ views:
         entities:
           - entity: sensor.ws_station_health
             name: Source and station health
-          - entity: sensor.ws_data_quality_score
-            name: Data quality score
           - entity: binary_sensor.ws_package_ok
             name: Required package inputs available
-          - entity: sensor.ws_pattern_forecast_status
-            name: Pattern forecast maturity
       - type: markdown
         title: Coverage labels
         content: >
           Rain values above are calendar-period accumulators maintained by this
           integration. They are not recorder-history backfills. Record extremes
           and seasonal counters are installation-limited; their exact coverage
-          start and completeness are not exposed yet. Forecast readiness is
-          shown by its own status sensor and must not be inferred from station
-          health or the data-quality score. Optional entities can be unavailable
-          when their feature is not enabled.
+          start and completeness are not exposed yet. Forecast readiness has
+          its own status sensor when Pattern Forecast is selected.
