@@ -179,11 +179,18 @@ def test_old_positive_irradiation_does_not_make_daily_pm():
 def _covered_meta(day="2026-07-01", hours=23.0, radiation_source=ET0_RADIATION_SOURCE_SENSOR):
     seconds = hours * 3600
     return {
-        "schema": 1, "date": day, "energy_whm2": 4800.0,
-        "coverage_s": seconds, "met_coverage_s": seconds,
-        "temp_sum": 20.0 * seconds, "humidity_sum": 55.0 * seconds,
-        "wind_sum": 2.0 * seconds, "temp_min": 14.0, "temp_max": 26.0,
-        "source": radiation_source, "gaps": 0,
+        "schema": 1,
+        "date": day,
+        "energy_whm2": 4800.0,
+        "coverage_s": seconds,
+        "met_coverage_s": seconds,
+        "temp_sum": 20.0 * seconds,
+        "humidity_sum": 55.0 * seconds,
+        "wind_sum": 2.0 * seconds,
+        "temp_min": 14.0,
+        "temp_max": 26.0,
+        "source": radiation_source,
+        "gaps": 0,
     }
 
 
@@ -208,10 +215,13 @@ def test_completed_day_pm_uses_same_period_inputs_and_numerical_reference():
     assert data[KEY_ET0_PM_REASON] == "ok"
 
 
-@pytest.mark.parametrize("hours,reason", [
-    (10.0, "insufficient solar coverage"),
-    (0.0, "insufficient solar coverage"),
-])
+@pytest.mark.parametrize(
+    "hours,reason",
+    [
+        (10.0, "insufficient solar coverage"),
+        (0.0, "insufficient solar coverage"),
+    ],
+)
 def test_partial_or_absent_coverage_rejects_positive_irradiation(hours, reason):
     coord = _pm_coord()
     coord._solar_previous_meta = _covered_meta(hours=hours)
@@ -308,8 +318,9 @@ def test_storage_migration_rejects_legacy_partial_day_and_restores_covered_day()
     assert coord._solar_energy_previous_whm2 == 10.0
     assert coord._solar_previous_meta == {}
 
-    covered = dict(legacy, solar_today_meta=_covered_meta(), solar_last_value=200.0,
-                   solar_last_ts="2026-07-01T23:59:00+00:00")
+    covered = dict(
+        legacy, solar_today_meta=_covered_meta(), solar_last_value=200.0, solar_last_ts="2026-07-01T23:59:00+00:00"
+    )
     restarted = _full_coord()
     with _at(at):
         restarted._restore_history_state(covered)
