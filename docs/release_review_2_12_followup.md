@@ -1,8 +1,7 @@
-# 2.12 follow-up: review and migration notes
+# 2.13.0 release review and migration notes
 
-This document describes the local review branch based on 2.12.0. It is a
-release candidate for review, not a published release or a live installation
-change.
+This document describes the 2.13.0 changes built on 2.12.0. Publishing the
+release does not install it on a Home Assistant instance or change live state.
 
 ## Correctness and entity contract
 

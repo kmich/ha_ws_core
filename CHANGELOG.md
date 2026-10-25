@@ -2,6 +2,25 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.0] - 2026-10-25
+
+### Added
+
+- **Clearer station health.** Configuration readiness, source availability, and model readiness are reported separately. Required mappings, stale readings, and diagnostic flags now affect the public health and quality results.
+- **Daily solar and ET₀ coverage.** Solar energy records identify their period and observed coverage. Daily Penman–Monteith ET₀ uses a completed local day with enough same-day radiation and weather observations; missing inputs remain unknown rather than becoming zero.
+- **Entity usage and dashboard review.** A repository usage ledger maps 246 entities, and a streamlined dashboard preview offers an everyday view. The preview does not replace saved or shipped dashboards.
+
+### Fixed
+
+- **Forecast explanations and recovery.** Physical factors describe observed conditions and their time windows. Pressure history hydration and bounded recorder retries help forecasts resume after startup or recorder interruptions.
+- **Feature prerequisites and fresh-install defaults.** Solar, irrigation, and Fire Weather Index entities are selected with consistent prerequisites. Primary Fire Risk is enabled for new registrations when selected; specialist entities remain optional. Existing entity IDs, names, and registry choices are preserved.
+
+### Compatibility and migration
+
+- Validated against Home Assistant 2026.10.4, the declared minimum Home Assistant 2024.6.0 entity contract, HACS, and hassfest.
+- Existing solar totals remain available, but totals recorded before coverage tracking cannot establish a complete day for daily ET₀. Daily ET₀ becomes available after a sufficiently covered new day.
+- Broad historical coverage backfill is deferred pending verification of recorder retention, units, resets, and overlapping periods. See the [release review](docs/release_review_2_12_followup.md).
+
 ## [2.12.0] - 2026-10-23
 
 ### Added
