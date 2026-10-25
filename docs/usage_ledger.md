@@ -78,6 +78,12 @@ and documentation examples. Examples are not evidence that the author's own
 installation uses them. The inventory cannot enumerate per-room entities or
 all dynamically named river entities, and it doesn't know user-renamed IDs.
 
+For 191 static sensor rows, producer and feature selection are mapped from the
+sensor descriptions. Calculation-specific input requirements are listed where
+the implementation has a distinct source contract (solar, irrigation, FWI, and
+Pattern Forecast). Other rows state when exact inputs were not traced; they
+must not be treated as proof that a mapped source is sufficient.
+
 ## Scope result and decision
 
 The CSV is a repository-scoped inventory, not a universal usage verdict, and no
