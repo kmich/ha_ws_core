@@ -45,6 +45,15 @@ def test_fwi_components_can_be_selected_without_primary_fire_entities():
     assert c.KEY_FIRE_RISK_SCORE not in keys
 
 
+def test_primary_fwi_is_enabled_by_default_when_fire_risk_selected():
+    keys = _created_keys(options={c.CONF_ENABLE_FIRE_RISK: True})
+    assert c.KEY_FWI in keys
+    primary = next(d for d in SENSORS if d.key == c.KEY_FWI)
+    assert primary.entity_registry_enabled_default
+    specialist = next(d for d in SENSORS if d.key == c.KEY_FWI_DSR)
+    assert not specialist.entity_registry_enabled_default
+
+
 def test_solar_and_irrigation_metrics_do_not_depend_on_comfort_group():
     keys = _created_keys(sources={c.SRC_SOLAR_RADIATION: "sensor.solar"})
     assert c.KEY_SOLAR_ENERGY_TODAY_WHM2 in keys
@@ -68,7 +77,7 @@ def test_fresh_and_existing_home_assistant_registry_choices():
     registry.deleted_entities = {}
     registry.async_schedule_save = MagicMock()
 
-    for key in (c.KEY_FWI, c.KEY_NORM_TEMP_C):
+    for key in (c.KEY_FWI_DSR, c.KEY_NORM_TEMP_C):
         description = next(d for d in SENSORS if d.key == key)
         entity = WSSensor(MagicMock(), MagicMock(entry_id="contract-test"), description, "ws")
         default_disabler = None if entity.entity_registry_enabled_default else er.RegistryEntryDisabler.INTEGRATION

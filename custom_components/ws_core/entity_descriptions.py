@@ -1741,7 +1741,7 @@ SENSORS: list[WSSensorDescription] = [
         },
     ),
     # =========================================================================
-    # v1.3.0 - Canadian FWI components (all disabled by default)
+    # v1.3.0 - Canadian FWI components; primary FWI follows Fire Risk selection.
     # =========================================================================
     WSSensorDescription(
         key=KEY_FWI_FFMC,
@@ -1805,7 +1805,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:fire-circle",
         native_unit=None,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
+        entity_registry_enabled_default=True,
         attrs_fn=lambda d: {
             "isi": d.get(KEY_FWI_ISI),
             "bui": d.get(KEY_FWI_BUI),

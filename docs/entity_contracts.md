@@ -20,8 +20,9 @@ user's enabled/disabled choice.
 
 ## Newly registered entity defaults
 
-The 35 existing `entity_registry_enabled_default=False` declarations are retained
-as the intended specialist default set. They cover extra thermodynamic and comfort
+The existing `entity_registry_enabled_default=False` declarations were reviewed.
+The primary FWI is enabled on new registrations when Fire Risk is selected;
+the other 34 remain the specialist default set. They cover extra thermodynamic and comfort
 indices, wind/solar/agro diagnostics, FWI details, air pollutant details, and
 Pattern Forecast skill. The primary temperature, humidity, pressure, rain, and
 forecast readings retain their declared enabled defaults. This change makes the
