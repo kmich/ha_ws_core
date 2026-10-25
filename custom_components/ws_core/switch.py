@@ -209,6 +209,7 @@ FEATURE_SWITCHES: tuple[WSFeatureDesc, ...] = (
         default=DEFAULT_ENABLE_FWI_COMPONENTS,
         name="Feature: FWI Components",
         icon="mdi:fire-circle",
+        description="Calculates the five Canadian FWI intermediate codes; works independently of the primary Fire Risk display switch.",
     ),
     WSFeatureDesc(
         conf_key=CONF_ENABLE_ADVANCED_SENSORS,

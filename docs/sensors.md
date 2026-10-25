@@ -188,7 +188,7 @@ peak sun hours, and net radiation also require a solar radiation sensor.
 | `sensor.ws_ffdi` | ≥ 0 | McArthur Fire Danger Index (Australia) |
 | `sensor.ws_ffwi` | ≥ 0 | Fosberg Fire Weather Index (US/global) |
 
-FWI sub-components (`enable_fwi_components`, requires fire risk enabled):
+FWI sub-components (`enable_fwi_components`) run the FWI calculation even when the primary fire risk display is off:
 
 | Entity ID | Scale | Description |
 |---|---|---|
