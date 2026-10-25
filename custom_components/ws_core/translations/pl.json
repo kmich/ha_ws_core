@@ -758,8 +758,8 @@
       "description": "Offset kalibracji wynoszący {value} został zastosowany do {field}. Duże offsety mogą wskazywać na awarię sprzętową czujnika, a nie dryf kalibracji. Rozważ wymianę czujnika."
     },
     "et0_pm_unavailable": {
-      "title": "PM ET₀ unavailable: no solar_radiation source configured",
-      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
+      "title": "PM ET₀ daily measurement unavailable",
+      "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
     }
   },
   "entity": {
@@ -2951,25 +2951,26 @@
         "afternoon": "Popołudnie",
         "air_near_saturation": "Powietrze bliskie nasycenia",
         "already_cold": "Już zimno",
-        "calm_wind": "Bezwietrznie",
+        "calm_last_hour": "Spokojny wiatr w ostatniej godzinie",
         "clear_sky": "Bezchmurne niebo",
         "cloudy": "Pochmurno",
         "cooling_fast": "Szybkie ochładzanie",
         "dry_air": "Suche powietrze",
-        "gusty_now": "Porywisto",
-        "hot_yesterday": "Upalnie wczoraj",
-        "lightning_nearby": "Błyskawice w pobliżu",
+        "gust_in_last_hour": "Silny podmuch w ostatniej godzinie",
+        "lightning_in_last_hour": "Wyładowania w ostatniej godzinie",
         "long_dry_spell": "Długi okres bez opadów",
         "long_night": "Długa noc przed nami",
         "night": "Noc",
         "pressure_falling": "Ciśnienie spada",
         "pressure_rising": "Ciśnienie rośnie",
-        "raining_now": "Pada deszcz",
         "sunny": "Słonecznie",
         "warm_and_humid": "Ciepło i wilgotno",
-        "warm_wind_sector": "Ciepły kierunek wiatru",
-        "wet_wind_sector": "Wilgotny kierunek wiatru",
-        "windy_now": "Wietrznie"
+        "windy_last_hour": "Wietrznie w ostatniej godzinie",
+        "rain_in_last_hour": "Deszcz w ostatniej godzinie",
+        "warm_now": "Teraz ciepło",
+        "hot_in_last_day": "Gorąco w ostatnich 24 godzinach",
+        "clear_recent_daylight": "Bezchmurnie podczas niedawnego dnia",
+        "cloudy_recent_daylight": "Pochmurno podczas niedawnego dnia"
       }
     },
     "pattern_effect": {

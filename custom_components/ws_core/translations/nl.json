@@ -758,8 +758,8 @@
       "description": "Een kalibratie-offset van {value} is toegepast op {field}. Grote offsets kunnen wijzen op een hardwaredefect van de sensor in plaats van kalibratiedrift. Overweeg de sensor te vervangen."
     },
     "et0_pm_unavailable": {
-      "title": "PM ET₀ unavailable: no solar_radiation source configured",
-      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
+      "title": "PM ET₀ daily measurement unavailable",
+      "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
     }
   },
   "entity": {
@@ -2951,25 +2951,26 @@
         "afternoon": "Middag",
         "air_near_saturation": "Lucht bijna verzadigd",
         "already_cold": "Al koud",
-        "calm_wind": "Windstil",
+        "calm_last_hour": "Rustige wind in het afgelopen uur",
         "clear_sky": "Heldere hemel",
         "cloudy": "Bewolkt",
         "cooling_fast": "Koelt snel af",
         "dry_air": "Droge lucht",
-        "gusty_now": "Vlagerig",
-        "hot_yesterday": "Gisteren heet",
-        "lightning_nearby": "Bliksem in de buurt",
+        "gust_in_last_hour": "Sterke windvlaag in het afgelopen uur",
+        "lightning_in_last_hour": "Bliksem in het afgelopen uur",
         "long_dry_spell": "Lange droge periode",
         "long_night": "Lange nacht op komst",
         "night": "Nacht",
         "pressure_falling": "Luchtdruk daalt",
         "pressure_rising": "Luchtdruk stijgt",
-        "raining_now": "Het regent nu",
         "sunny": "Zonnig",
         "warm_and_humid": "Warm en vochtig",
-        "warm_wind_sector": "Warme windrichting",
-        "wet_wind_sector": "Natte windrichting",
-        "windy_now": "Winderig"
+        "windy_last_hour": "Winderig in het afgelopen uur",
+        "rain_in_last_hour": "Regen in het afgelopen uur",
+        "warm_now": "Nu warm",
+        "hot_in_last_day": "Warm in de afgelopen 24 uur",
+        "clear_recent_daylight": "Helder tijdens recent daglicht",
+        "cloudy_recent_daylight": "Bewolkt tijdens recent daglicht"
       }
     },
     "pattern_effect": {

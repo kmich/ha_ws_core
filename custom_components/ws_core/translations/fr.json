@@ -792,8 +792,8 @@
       "description": "Un décalage d'étalonnage de {value} a été appliqué à {field}. Les décalages importants peuvent indiquer une panne matérielle du capteur plutôt qu'une simple dérive d'étalonnage. Envisagez de remplacer le capteur."
     },
     "et0_pm_unavailable": {
-      "title": "ET₀ PM indisponible : aucune source de rayonnement solaire configurée",
-      "description": "Les prévisions solaires sont activées, le capteur ET₀ Penman-Monteith devrait donc être disponible, mais n'apparaît pas car aucune source de rayonnement solaire n'est mappée dans les sources de cette intégration. Mappez un capteur de rayonnement solaire (pyranomètre) ou activez le repli basé sur l'éclairement dans les options si vous possédez un capteur de lux (moins précis, étiqueté comme estimation)."
+      "title": "Mesure ET₀ PM quotidienne indisponible",
+      "description": "La source de rayonnement configurée ne permet pas un calcul fiable pour la journée locale complète : {reason}. Vérifiez la disponibilité du rayonnement, de la température, de l'humidité et du vent pendant toute la journée."
     }
   },
   "entity": {
@@ -2994,25 +2994,26 @@
         "afternoon": "Après-midi",
         "air_near_saturation": "Air proche de la saturation",
         "already_cold": "Déjà froid",
-        "calm_wind": "Vent calme",
+        "calm_last_hour": "Vent calme pendant la dernière heure",
         "clear_sky": "Ciel dégagé",
         "cloudy": "Nuageux",
         "cooling_fast": "Refroidissement rapide",
         "dry_air": "Air sec",
-        "gusty_now": "Rafales en ce moment",
-        "hot_yesterday": "Chaud hier",
-        "lightning_nearby": "Foudre à proximité",
+        "gust_in_last_hour": "Forte rafale pendant la dernière heure",
+        "hot_in_last_day": "Chaud au cours des dernières 24 heures",
+        "lightning_in_last_hour": "Éclairs pendant la dernière heure",
         "long_dry_spell": "Longue période sèche",
         "long_night": "Longue nuit à venir",
         "night": "Nuit",
         "pressure_falling": "Pression en baisse",
         "pressure_rising": "Pression en hausse",
-        "raining_now": "Il pleut en ce moment",
+        "rain_in_last_hour": "Pluie au cours de la dernière heure",
         "sunny": "Ensoleillé",
         "warm_and_humid": "Chaud et humide",
-        "warm_wind_sector": "Direction de vent chaude",
-        "wet_wind_sector": "Direction de vent humide",
-        "windy_now": "Venteux en ce moment"
+        "clear_recent_daylight": "Ciel dégagé récemment en journée",
+        "warm_now": "Chaud actuellement",
+        "cloudy_recent_daylight": "Ciel nuageux récemment en journée",
+        "windy_last_hour": "Venteux pendant la dernière heure"
       }
     },
     "pattern_effect": {

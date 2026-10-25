@@ -580,99 +580,106 @@ MATURITY_STATES = ("collecting", "learning", "skilled", "degraded")
 # Explanation: deterministic factor keys
 # ---------------------------------------------------------------------------
 
-# (feature, sign of z) -> factor key, per target kind. A factor is only
-# reported when its condition is actually present (the sign matches), so
-# "clear_sky: lowers" always reads true.
-_FACTOR_MAP: dict[str, dict[tuple[str, int], str]] = {
-    "rain": {
-        ("dp_3h", -1): "pressure_falling",
-        ("dp_3h", 1): "pressure_rising",
-        ("dp_24h", -1): "pressure_falling",
-        ("dp_24h", 1): "pressure_rising",
-        ("dpd", -1): "air_near_saturation",
-        ("dpd", 1): "dry_air",
-        ("dpd_1h", -1): "air_near_saturation",
-        ("dpd_1h", 1): "dry_air",
-        ("wind_u", 0): "wet_wind_sector",
-        ("wind_v", 0): "wet_wind_sector",
-        ("rain_1h", 1): "raining_now",
-        ("rain_1h", -1): "long_dry_spell",
-        ("dry_hours", 1): "long_dry_spell",
-        ("dry_hours", -1): "raining_now",
-        ("cloud_deficit", 1): "cloudy",
-        ("cloud_deficit", -1): "clear_sky",
-    },
-    "frost": {
-        ("dp_3h", -1): "pressure_falling",
-        ("dp_3h", 1): "pressure_rising",
-        ("dp_24h", -1): "pressure_falling",
-        ("dp_24h", 1): "pressure_rising",
-        ("temp", -1): "already_cold",
-        ("dpd", 1): "dry_air",
-        ("dpd", -1): "air_near_saturation",
-        ("t_1h", -1): "cooling_fast",
-        ("t_3h", -1): "cooling_fast",
-        ("wind_speed", -1): "calm_wind",
-        ("wind_speed", 1): "windy_now",
-        ("rain_1h", 1): "raining_now",
-        ("last_day_clearness", 1): "clear_sky",
-        ("last_day_clearness", -1): "cloudy",
-        ("night_frac_12h", 1): "long_night",
-    },
-    "heat": {
-        ("dp_24h", -1): "pressure_falling",
-        ("dp_24h", 1): "pressure_rising",
-        ("temp", 1): "hot_yesterday",
-        ("t_max_24h", 1): "hot_yesterday",
-        ("dpd", 1): "dry_air",
-        ("dpd", -1): "air_near_saturation",
-        ("wind_u", 0): "warm_wind_sector",
-        ("wind_v", 0): "warm_wind_sector",
-        ("dry_hours", 1): "long_dry_spell",
-        ("cloud_deficit", -1): "sunny",
-        ("cloud_deficit", 1): "cloudy",
-    },
-    "gust": {
-        ("dp_3h", -1): "pressure_falling",
-        ("dp_3h", 1): "pressure_rising",
-        ("dp_24h", -1): "pressure_falling",
-        ("dp_24h", 1): "pressure_rising",
-        ("t_1h", -1): "cooling_fast",
-        ("wind_u", 0): "windy_now",
-        ("wind_v", 0): "windy_now",
-        ("wind_speed", 1): "windy_now",
-        ("wind_speed", -1): "calm_wind",
-        ("gust_1h", 1): "gusty_now",
-        ("gust_1h", -1): "calm_wind",
-    },
-    "storm": {
-        ("dp_3h", -1): "pressure_falling",
-        ("dp_3h", 1): "pressure_rising",
-        ("temp", 1): "warm_and_humid",
-        ("dpd", -1): "warm_and_humid",
-        ("dpd", 1): "dry_air",
-        ("dpd_1h", -1): "air_near_saturation",
-        ("t_1h", -1): "cooling_fast",
-        ("gust_1h", 1): "gusty_now",
-        ("rain_1h", 1): "raining_now",
-        ("cloud_deficit", 1): "cloudy",
-        ("cloud_deficit", -1): "clear_sky",
-        ("lightning_1h", 1): "lightning_nearby",
-    },
-}
-
+# Public condition keys. Each is emitted only after a raw-value check below.
 FACTOR_KEYS: tuple[str, ...] = tuple(
-    sorted({k for m in _FACTOR_MAP.values() for k in m.values()} | {"afternoon", "night"})
+    sorted(
+        {
+            "afternoon",
+            "night",
+            "pressure_falling",
+            "pressure_rising",
+            "air_near_saturation",
+            "dry_air",
+            "already_cold",
+            "warm_now",
+            "warm_and_humid",
+            "cooling_fast",
+            "hot_in_last_day",
+            "calm_last_hour",
+            "windy_last_hour",
+            "gust_in_last_hour",
+            "rain_in_last_hour",
+            "long_dry_spell",
+            "clear_sky",
+            "sunny",
+            "cloudy",
+            "clear_recent_daylight",
+            "cloudy_recent_daylight",
+            "long_night",
+            "lightning_in_last_hour",
+        }
+    )
 )
+
+
+def _physical_factor(kind: str, name: str, value: float | None, feat: list[float | None]) -> str | None:
+    """Describe a raw observation, never the sign of its standardized model input."""
+    if value is None:
+        return None
+    if name in ("dp_3h", "dp_24h"):
+        return "pressure_falling" if value < 0 else "pressure_rising" if value > 0 else None
+    if name == "dpd":
+        if value <= 2.0:
+            return "air_near_saturation"
+        if value >= 5.0:
+            return "dry_air"
+        return None
+    if name == "dpd_1h":
+        # Its change does not establish the current distance from saturation.
+        return None
+    if name == "temp":
+        if kind == "frost" and value <= 5.0:
+            return "already_cold"
+        if kind == "heat" and value >= 25.0:
+            return "warm_now"
+        if kind == "storm":
+            dpd = feat[POOL_INDEX["dpd"]]
+            if value >= 20.0 and dpd is not None and dpd <= 3.0:
+                return "warm_and_humid"
+        return None
+    if name == "t_1h":
+        return "cooling_fast" if value <= -1.0 else None
+    if name == "t_3h":
+        return "cooling_fast" if value <= -3.0 else None
+    if name == "t_max_24h":
+        return "hot_in_last_day" if value >= 30.0 else None
+    if name == "wind_speed":
+        if value <= 1.0:
+            return "calm_last_hour"
+        if value >= 5.0:
+            return "windy_last_hour"
+        return None
+    if name == "gust_1h":
+        return "gust_in_last_hour" if value >= 10.0 else None
+    if name == "rain_1h":
+        return "rain_in_last_hour" if value > 0.0 else None
+    if name == "dry_hours":
+        return "long_dry_spell" if value >= math.log1p(6.0) else None
+    if name == "cloud_deficit":
+        if not feat[POOL_INDEX["solar_ok"]]:
+            return None
+        if value <= 0.25:
+            return "sunny" if kind == "heat" else "clear_sky"
+        return "cloudy" if value >= 0.7 else None
+    if name == "last_day_clearness":
+        if not feat[POOL_INDEX["last_day_clearness_ok"]]:
+            return None
+        if value >= 0.7:
+            return "clear_recent_daylight"
+        return "cloudy_recent_daylight" if value <= 0.3 else None
+    if name == "night_frac_12h":
+        return "long_night" if value >= 0.6 else None
+    if name == "lightning_1h":
+        return "lightning_in_last_hour" if value > 0.0 else None
+    return None
 
 
 def _top_factors(
     model: ModelState, std: Standardizer, feat: list[float | None], local_hour: float
 ) -> list[dict[str, str]]:
     contrib = model.contributions(std, feat)
-    kmap = _FACTOR_MAP[model.spec.kind]
     totals: dict[str, float] = {}
-    for name, (z, c) in contrib.items():
+    for name, (_z, c) in contrib.items():
         if name in ("hour_sin", "hour_cos"):
             key = (
                 "afternoon"
@@ -682,8 +689,8 @@ def _top_factors(
                 else None
             )
         else:
-            sign = 0 if (name, 0) in kmap else (1 if z > 0 else -1 if z < 0 else None)
-            key = kmap.get((name, sign)) if sign is not None else None
+            value = feat[POOL_INDEX[name]] if len(feat) > POOL_INDEX[name] else None
+            key = _physical_factor(model.spec.kind, name, value, feat)
         if key is None:
             continue
         totals[key] = totals.get(key, 0.0) + c
@@ -1412,7 +1419,8 @@ class PatternEngine:
                 entry is not None
                 and entry.get("status") != "ok"
                 and (
-                    now_ts - float(entry.get("attempted_at", 0.0)) >= PATTERN_HISTORY_RETRY_S
+                    entry.get("retryable") is True
+                    or now_ts - float(entry.get("attempted_at", 0.0)) >= PATTERN_HISTORY_RETRY_S
                     or (float(entry["method"]) if _finite(entry.get("method")) else 1.0) < PATTERN_HISTORY_METHOD
                 )
             )

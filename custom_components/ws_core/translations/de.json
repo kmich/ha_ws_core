@@ -758,8 +758,8 @@
       "description": "Ein Kalibrierungsoffset von {value} wurde auf {field} angewendet. Große Offsets können auf einen Hardware-Defekt des Sensors hinweisen und nicht nur auf Kalibrierungsdrift. Erwäge den Sensor zu ersetzen."
     },
     "et0_pm_unavailable": {
-      "title": "PM ET₀ unavailable: no solar_radiation source configured",
-      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
+      "title": "PM ET₀ daily measurement unavailable",
+      "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
     }
   },
   "entity": {
@@ -2951,25 +2951,26 @@
         "afternoon": "Nachmittag",
         "air_near_saturation": "Luft nahe der Sättigung",
         "already_cold": "Schon kalt",
-        "calm_wind": "Windstille",
+        "calm_last_hour": "Ruhiger Wind in der letzten Stunde",
         "clear_sky": "Klarer Himmel",
         "cloudy": "Bewölkt",
         "cooling_fast": "Kühlt schnell ab",
         "dry_air": "Trockene Luft",
-        "gusty_now": "Böig",
-        "hot_yesterday": "Gestern heiß",
-        "lightning_nearby": "Blitze in der Nähe",
+        "gust_in_last_hour": "Starke Böe in der letzten Stunde",
+        "lightning_in_last_hour": "Blitze in der letzten Stunde",
         "long_dry_spell": "Lange Trockenphase",
         "long_night": "Lange Nacht voraus",
         "night": "Nacht",
         "pressure_falling": "Luftdruck fällt",
         "pressure_rising": "Luftdruck steigt",
-        "raining_now": "Es regnet gerade",
         "sunny": "Sonnig",
         "warm_and_humid": "Warm und feucht",
-        "warm_wind_sector": "Warme Windrichtung",
-        "wet_wind_sector": "Feuchte Windrichtung",
-        "windy_now": "Windig"
+        "windy_last_hour": "Windig in der letzten Stunde",
+        "rain_in_last_hour": "Regen in der letzten Stunde",
+        "warm_now": "Jetzt warm",
+        "hot_in_last_day": "Heiß in den letzten 24 Stunden",
+        "clear_recent_daylight": "Klar bei jüngstem Tageslicht",
+        "cloudy_recent_daylight": "Bewölkt bei jüngstem Tageslicht"
       }
     },
     "pattern_effect": {

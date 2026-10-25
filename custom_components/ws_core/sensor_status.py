@@ -32,7 +32,7 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         else:
             reason = "waiting_for_daylight_or_radiation"
             explanation = "Requires valid solar radiation and the sun at least 5° above the horizon."
-    elif key in (c.KEY_SOLAR_ENERGY_TODAY_WHM2, c.KEY_PEAK_SUN_HOURS, c.KEY_NET_RADIATION):
+    elif key in (c.KEY_SOLAR_ENERGY_TODAY_WHM2, c.KEY_PEAK_SUN_HOURS, c.KEY_NET_RADIATION, c.KEY_ET0_PM_DAILY_MM):
         estimated = getattr(coord, "et0_illuminance_fallback", False) and coord.sources.get(c.SRC_LUX)
         if not (coord.sources.get(c.SRC_SOLAR_RADIATION) or estimated):
             reason = "missing_solar_radiation"
@@ -40,6 +40,9 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
                 "Map solar radiation, or enable the optional illuminance fallback with a mapped lux sensor "
                 "for an approximate solar-energy/ET₀ calculation."
             )
+        elif key == c.KEY_ET0_PM_DAILY_MM and not getattr(coord, "_solar_energy_previous_whm2", 0.0):
+            reason = "waiting_for_daily_radiation"
+            explanation = "Waiting for a completed day's solar irradiation to calculate daily Penman–Monteith ET₀."
     elif key in (c.KEY_MINUTES_UNTIL_RAIN, c.KEY_MINUTES_UNTIL_DRY):
         cache = getattr(coord, "_nowcast_cache", None)
         if not getattr(coord, "nowcast_enabled", False):

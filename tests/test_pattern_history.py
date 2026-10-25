@@ -123,6 +123,9 @@ class FakeRecorder:
 
 def make_runtime(options: dict | None = None, stats=None, sources: dict | None = None, stats5=None):
     coord, table = make_coord({CONF_ENABLE_PATTERN_FORECAST: True, **(options or {})}, sources or SOURCES)
+    # The mock HA executor does not run background tasks; close retries unless
+    # an individual test replaces this hook to exercise their scheduling.
+    coord._spawn = lambda coro, name: coro.close()
     rt = coord._pattern
     meta, rows = stats if stats is not None else year_of_statistics()
     meta5, rows5 = stats5 if stats5 is not None else ({}, {})
@@ -263,11 +266,26 @@ class TestReplay:
         coord, rt = make_runtime()
         learn(rt)
         hourly = rt._test_periods.count("hour")
+        updates = {t: m.n_updates for t, m in rt.engine.models.items()}
+        reads = []
+        fetch = rt._fetch_statistics
+
+        def bounded_fetch(ids, start, end, period="hour"):
+            reads.append((set(ids), (end - start).total_seconds(), period))
+            return fetch(ids, start, end, period)
+
+        rt._fetch_statistics = bounded_fetch
         learn(rt)
-        # every target already learned: no second year-long read, only the cheap
-        # 5-minute warm start that runs at every start (2.11.2)
-        assert rt._test_periods.count("hour") == hourly
-        assert rt._test_periods[-1] == "5minute"
+        # Every target already learned: only recent bins and a short pressure
+        # window are refreshed, and model updates remain unchanged.
+        assert rt._test_periods.count("hour") == hourly + 1
+        assert rt._test_periods[-2:] == ["5minute", "hour"]
+        assert reads[-1] == ({"sensor.t", "sensor.p"}, 38 * 3600, "hour")
+        assert {t: m.n_updates for t, m in rt.engine.models.items()} == updates
+        rt.engine.pressure.clear()
+        learn(rt)
+        assert rt.engine.pressure_change_24h(NOW.timestamp(), 1013.0) is not None
+        assert {t: m.n_updates for t, m in rt.engine.models.items()} == updates
 
     def test_live_state_survives_the_swap(self):
         coord, rt = make_runtime()
@@ -369,7 +387,7 @@ class TestAvailability:
         learn(rt)
         assert "no cumulative statistics for sensor.r" in rt.engine.history_learn["targets"]["rain_3h"]["reason"]
 
-    def test_recorder_failure_is_reported_and_retried_only_after_a_week(self):
+    def test_recorder_failure_is_reported_and_remains_immediately_retryable(self):
         class Broken:
             async def async_add_executor_job(self, fn, *args):
                 raise OSError("database is locked")
@@ -380,7 +398,7 @@ class TestAvailability:
         assert all(v["status"] == "unavailable" and "recorder error" in v["reason"] for v in t.values())
         assert all(m.n_updates == 0 for m in rt.engine.models.values())
         now = NOW.timestamp()
-        assert rt.engine.targets_needing_replay(now + 3600) == []
+        assert set(rt.engine.targets_needing_replay(now + 3600)) == set(rt.engine.models)
         assert set(rt.engine.targets_needing_replay(now + PATTERN_HISTORY_RETRY_S + 10)) == set(rt.engine.models)
 
     def test_recorder_not_running_never_raises(self):
@@ -689,6 +707,181 @@ class TestReplayMethodRetry:
 
 
 class TestPressureSeed:
+    @staticmethod
+    def _warm_runtime():
+        start = NOW.timestamp() - 38 * 3600
+        rows = {
+            "sensor.t": [{"start": start + j * 3600, "mean": 20.0} for j in range(38)],
+            "sensor.p": [{"start": start + j * 3600, "mean": 1013.0} for j in range(38)],
+        }
+        meta = {
+            eid: {"statistic_id": eid, "unit_of_measurement": unit, "has_mean": True, "has_sum": False}
+            for eid, unit in (("sensor.t", "°C"), ("sensor.p", "hPa"))
+        }
+        coord, rt = make_runtime(stats=(meta, rows))
+        rt.engine.history_learn = {
+            "targets": {
+                tid: {"status": "ok", "method": PATTERN_HISTORY_METHOD, "attempted_at": NOW.timestamp()}
+                for tid in rt.engine.active_target_ids()
+            }
+        }
+        return coord, rt
+
+    def test_pressure_warm_start_is_independent_of_partial_target_replay(self):
+        coord, rt = self._warm_runtime()
+        rt.engine.history_learn["targets"].pop("rain_3h")
+        updates = {t: m.n_updates for t, m in rt.engine.models.items() if t != "rain_3h"}
+        reads = []
+        fetch = rt._fetch_statistics
+
+        def spy(ids, start, end, period="hour"):
+            reads.append(((end - start).total_seconds(), set(ids), period))
+            return fetch(ids, start, end, period)
+
+        rt._fetch_statistics = spy
+        rt._history_job = lambda *args: {
+            "trained": rt.engine,
+            "report": {},
+            "statuses": {
+                "rain_3h": {"status": "unavailable", "reason": "no annual history", "samples": 0, "events": 0}
+            },
+        }
+        learn(rt)
+        assert (38 * 3600, {"sensor.t", "sensor.p"}, "hour") in reads
+        assert rt.engine.pressure_change_24h(NOW.timestamp(), 1013.0) is not None
+        assert {t: m.n_updates for t, m in rt.engine.models.items() if t != "rain_3h"} == updates
+
+    def test_recorder_failure_schedules_bounded_retry(self):
+        coord, rt = self._warm_runtime()
+        fetch = rt._fetch_statistics
+        attempts = 0
+        scheduled = []
+        coord._spawn = lambda coro, name: scheduled.append(coro)
+
+        def flaky(ids, start, end, period="hour"):
+            nonlocal attempts
+            if period == "hour" and (end - start).total_seconds() == 38 * 3600 and attempts == 0:
+                attempts += 1
+                raise RuntimeError("recorder temporarily unavailable")
+            return fetch(ids, start, end, period)
+
+        rt._fetch_statistics = flaky
+
+        async def run():
+            with (
+                patch.object(pattern_runtime.dt_util, "utcnow", return_value=NOW),
+                patch.object(pattern_runtime, "_recorder_instance", return_value=FakeRecorder()),
+            ):
+                await rt.async_learn_history()
+                assert len(scheduled) == 1
+                with patch.object(pattern_runtime.asyncio, "sleep", return_value=None):
+                    await scheduled.pop()
+
+        asyncio.run(run())
+        assert attempts == 1
+        assert rt.engine.pressure_change_24h(NOW.timestamp(), 1013.0) is not None
+        assert not scheduled
+
+    def test_failed_annual_replay_retries_without_training_cooldown(self):
+        coord, rt = self._warm_runtime()
+        rt.engine.history_learn["targets"].pop("rain_3h")
+        before = {tid: list(m.w) for tid, m in rt.engine.models.items()}
+        attempts = 0
+        scheduled = []
+        coord._spawn = lambda coro, name: scheduled.append(coro)
+
+        def flaky_replay(*args):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise OSError("recorder busy")
+            return {
+                "trained": rt.engine,
+                "report": {},
+                "statuses": {"rain_3h": {"status": "ok", "reason": None, "samples": 0, "events": 0}},
+            }
+
+        rt._history_job = flaky_replay
+
+        async def run():
+            with (
+                patch.object(pattern_runtime.dt_util, "utcnow", return_value=NOW),
+                patch.object(pattern_runtime, "_recorder_instance", return_value=FakeRecorder()),
+            ):
+                await rt.async_learn_history()
+                assert rt.engine.history_learn["targets"]["rain_3h"]["retryable"] is True
+                assert len(scheduled) == 1
+                with patch.object(pattern_runtime.asyncio, "sleep", return_value=None):
+                    await scheduled.pop()
+
+        asyncio.run(run())
+        assert attempts == 2
+        assert rt.engine.history_learn["targets"]["rain_3h"]["status"] == "ok"
+        assert not scheduled
+        assert {tid: list(m.w) for tid, m in rt.engine.models.items()} == before
+
+    def test_sea_level_pressure_recovery_without_temperature_statistics(self):
+        coord, rt = self._warm_runtime()
+        fetch = rt._fetch_statistics
+
+        def pressure_only(ids, start, end, period="hour"):
+            meta, rows = fetch(ids, start, end, period)
+            if period == "hour":
+                meta.pop("sensor.t", None)
+                rows.pop("sensor.t", None)
+            return meta, rows
+
+        rt._fetch_statistics = pressure_only
+        learn(rt)
+        assert rt.engine.pressure_change_24h(NOW.timestamp(), 1013.0) is not None
+
+    def test_missing_pressure_history_reports_unavailable_and_retries_are_bounded(self):
+        coord, rt = self._warm_runtime()
+        rt._fetch_statistics = lambda ids, start, end, period="hour": ({}, {})
+        learn(rt)
+        assert rt._warm_start["pressure_status"] == "unavailable"
+        assert rt.engine.pressure_change_24h(NOW.timestamp(), 1013.0) is None
+        for _ in range(5):
+            rt._retry_scheduled = False  # simulate each delayed attempt finishing
+            rt._schedule_recovery_retry()
+        assert rt._retry_count == len(pattern_runtime._RECOVERY_RETRY_S)
+        assert rt._warm_start["retry_exhausted"] is True
+
+    def test_unload_cancellation_during_read_does_not_schedule_retry_or_change_weights(self):
+        coord, rt = self._warm_runtime()
+        scheduled = []
+        coord._spawn = lambda coro, name: scheduled.append(coro)
+        before = {tid: list(m.w) for tid, m in rt.engine.models.items()}
+
+        async def run():
+            started = asyncio.Event()
+            hold = asyncio.Event()
+
+            class SlowRecorder:
+                async def async_add_executor_job(self, fn):
+                    started.set()
+                    await hold.wait()
+                    return fn()
+
+            async def recent(now):
+                return 0
+
+            rt._async_seed_recent = recent
+            with (
+                patch.object(pattern_runtime.dt_util, "utcnow", return_value=NOW),
+                patch.object(pattern_runtime, "_recorder_instance", return_value=SlowRecorder()),
+            ):
+                task = asyncio.create_task(rt.async_learn_history())
+                await started.wait()
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+
+        asyncio.run(run())
+        assert not scheduled
+        assert not rt._history_running
+        assert {tid: list(m.w) for tid, m in rt.engine.models.items()} == before
+
     def test_replay_seeds_a_day_of_pressure(self, learned):
         coord, rt = learned
         eng = rt.engine

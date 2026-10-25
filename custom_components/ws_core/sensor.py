@@ -230,6 +230,7 @@ from .entity_descriptions import (
     _WIND_FACTORS,
     SENSORS,
     WSSensorDescription,
+    sensor_selected,
 )
 from .sensor_status import unknown_status
 
@@ -259,8 +260,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     pattern = getattr(coordinator, "_pattern", None)
     filtered: list[WSSensorDescription] = []
     for desc in SENSORS:
-        toggle_key = _FEATURE_TOGGLE_MAP.get(desc.key)
-        if toggle_key is not None and not opts.get(toggle_key, False):
+        if not sensor_selected(desc.key, opts, coordinator.sources):
             continue
         if desc.key == KEY_PATTERN_STORM_3H:
             # Pattern Forecast storm target: needs a mapped local lightning detector or
@@ -469,14 +469,13 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         KEY_PEAK_SUN_HOURS,
     }
 
-    # v1.6.2: _DISABLED_BY_DEFAULT removed. Previously-disabled sensors are now
-    # gated by opt-in feature toggles (enable_diagnostics, enable_fwi_components,
-    # enable_advanced_sensors) via _FEATURE_TOGGLE_MAP, so they are created and
-    # working when their group is enabled rather than created in a dead state.
+    # Description defaults apply only when HA creates a new registry entry.
+    # The entity registry retains existing user enable/disable and rename choices.
 
     def __init__(self, coordinator, entry: ConfigEntry, desc: WSSensorDescription, prefix: str):
         super().__init__(coordinator)
         self._desc = desc
+        self._attr_entity_registry_enabled_default = desc.entity_registry_enabled_default
         self._entry = entry
         self._prefix = prefix
         self._restored_value: Any = None  # populated by async_added_to_hass for restore-capable sensors

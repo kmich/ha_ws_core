@@ -8,6 +8,7 @@ import json
 import math
 import pathlib
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -394,6 +395,83 @@ class TestIssue:
             assert f["effect"] in ("raises", "lowers")
         assert {f["factor"] for f in factors} & {"air_near_saturation", "pressure_falling"}
         assert eng.output("rain_3h")["top_factors"] == factors
+
+    def test_short_dry_spell_does_not_claim_it_is_raining(self):
+        model = SimpleNamespace(
+            spec=SimpleNamespace(kind="rain"),
+            contributions=lambda *_: {"dry_hours": (-1.0, 2.0), "rain_1h": (1.0, 1.0)},
+        )
+        # Below-average dry time is not proof of rain now. A last-hour total
+        # only establishes rain during that window.
+        feat = [None] * pf.N_POOL
+        feat[pf.POOL_INDEX["rain_1h"]] = 0.5
+        assert pf._top_factors(model, None, feat, 12.0) == [{"factor": "rain_in_last_hour", "effect": "raises"}]
+        model.contributions = lambda *_: {"dry_hours": (-1.0, 2.0)}
+        assert pf._top_factors(model, None, feat, 12.0) == []
+
+    def test_factor_labels_follow_raw_values_after_real_standardization(self):
+        """A z-score describes deviation from normal, not physical direction."""
+        std = pf.Standardizer()
+        i = pf.POOL_INDEX["dp_3h"]
+        for value in (-3.0, -2.0, -1.0) * 20:
+            std.update(i, value)
+        model = pf.ModelState(next(t for t in pf.TARGETS if t.target_id == "rain_3h"), "test")
+        model.w[model.idx.index(i) + 1] = 1.0
+        feat = [None] * pf.N_POOL
+        feat[i] = -0.5  # falling, but above the learned mean
+        assert pf._top_factors(model, std, feat, 12.0) == [{"factor": "pressure_falling", "effect": "raises"}]
+        feat[i] = -3.5  # rising label must not appear just because z is negative
+        assert pf._top_factors(model, std, feat, 12.0) == [{"factor": "pressure_falling", "effect": "lowers"}]
+
+    def test_recent_rain_daylight_and_calm_labels_are_factual(self):
+        std = pf.Standardizer()
+        model = pf.ModelState(next(t for t in pf.TARGETS if t.target_id == "rain_3h"), "test")
+        feat = [None] * pf.N_POOL
+        for name, values, raw in (
+            ("rain_1h", (0.0, 0.2, 0.4), 0.1),
+            ("cloud_deficit", (0.2, 0.4, 0.6), 0.1),
+            ("wind_u", (-2.0, 0.0, 2.0), 0.2),
+        ):
+            i = pf.POOL_INDEX[name]
+            for value in values * 20:
+                std.update(i, value)
+            model.w[model.idx.index(i) + 1] = 1.0
+            feat[i] = raw
+        feat[pf.POOL_INDEX["solar_ok"]] = 0.0
+        factors = pf._top_factors(model, std, feat, 12.0)
+        keys = {f["factor"] for f in factors}
+        assert "rain_in_last_hour" in keys
+        assert "raining_now" not in keys
+        assert "clear_sky" not in keys
+        assert "wet_wind_sector" not in keys
+
+    def test_rising_below_average_and_warm_below_average_are_not_relabelled(self):
+        std = pf.Standardizer()
+        model = pf.ModelState(next(t for t in pf.TARGETS if t.target_id == "heat_24h"), "test")
+        feat = [None] * pf.N_POOL
+        for name, values, raw in (
+            ("dp_24h", (2.0, 3.0, 4.0), 1.0),
+            ("temp", (33.0, 35.0, 37.0), 27.0),
+        ):
+            i = pf.POOL_INDEX[name]
+            for value in values * 20:
+                std.update(i, value)
+            model.w[model.idx.index(i) + 1] = 1.0
+            feat[i] = raw
+        factors = pf._top_factors(model, std, feat, 12.0)
+        assert {f["factor"] for f in factors} == {"pressure_rising", "warm_now"}
+        assert all(f["effect"] == "lowers" for f in factors)
+
+    def test_calm_wind_above_its_learned_average_stays_calm(self):
+        std = pf.Standardizer()
+        i = pf.POOL_INDEX["wind_speed"]
+        for value in (0.0, 0.1, 0.2) * 20:
+            std.update(i, value)
+        model = pf.ModelState(next(t for t in pf.TARGETS if t.target_id == "frost_12h"), "test")
+        model.w[model.idx.index(i) + 1] = 1.0
+        feat = [None] * pf.N_POOL
+        feat[i] = 0.5
+        assert pf._top_factors(model, std, feat, 23.0)[0] == {"factor": "calm_last_hour", "effect": "raises"}
 
     def test_outputs_have_the_documented_shape(self, rain_run):
         _, eng = rain_run

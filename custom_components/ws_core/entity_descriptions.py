@@ -41,6 +41,7 @@ from .const import (
     CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
     CONF_ENABLE_WUNDERGROUND,
+    CONF_ET0_ILLUMINANCE_FALLBACK,
     KEY_ABSOLUTE_HUMIDITY,
     KEY_AIR_DENSITY,
     KEY_ALERT_MESSAGE,
@@ -268,6 +269,8 @@ from .const import (
     KEY_WU_STATUS,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
+    SRC_LUX,
+    SRC_SOLAR_RADIATION,
     UNIT_PRESSURE_HPA,
     UNIT_RAIN_MM,
     UNIT_TEMP_C,
@@ -544,6 +547,10 @@ SENSORS: list[WSSensorDescription] = [
             "quality_flags": len(d.get(KEY_SENSOR_QUALITY_FLAGS) or []),
             "stuck_flags": len(d.get(KEY_SENSOR_STUCK) or []),
             "spike_flags": len(d.get(KEY_SENSOR_SPIKE) or []),
+            "quality_reason": d.get(KEY_DATA_QUALITY),
+            "configuration_ready": d.get("configuration_ready"),
+            "source_healthy": d.get("source_healthy"),
+            "model_ready": d.get("model_ready"),
         },
     ),
     WSSensorDescription(
@@ -1423,6 +1430,10 @@ SENSORS: list[WSSensorDescription] = [
             "color": d.get("_health_color"),
             "battery_pct": d.get(KEY_BATTERY_PCT),
             "data_quality": d.get(KEY_DATA_QUALITY),
+            "configuration_ready": d.get("configuration_ready"),
+            "source_healthy": d.get("source_healthy"),
+            "model_ready": d.get("model_ready"),
+            "model_readiness_reason": d.get("model_readiness_reason"),
         },
     ),
     WSSensorDescription(
@@ -1730,7 +1741,7 @@ SENSORS: list[WSSensorDescription] = [
         },
     ),
     # =========================================================================
-    # v1.3.0 - Canadian FWI components (all disabled by default)
+    # v1.3.0 - Canadian FWI components; primary FWI follows Fire Risk selection.
     # =========================================================================
     WSSensorDescription(
         key=KEY_FWI_FFMC,
@@ -1794,7 +1805,7 @@ SENSORS: list[WSSensorDescription] = [
         icon="mdi:fire-circle",
         native_unit=None,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_registry_enabled_default=False,
+        entity_registry_enabled_default=True,
         attrs_fn=lambda d: {
             "isi": d.get(KEY_FWI_ISI),
             "bui": d.get(KEY_FWI_BUI),
@@ -2224,6 +2235,9 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "hargreaves_et0": d.get(KEY_ET0_DAILY_MM),
             "radiation_source": d.get(KEY_ET0_PM_RADIATION_SOURCE),
+            "period": d.get("et0_pm_period"),
+            "reason": d.get("et0_pm_reason"),
+            "coverage": d.get("et0_pm_coverage"),
         },
     ),
     # v2.0 — Irrigation water deficit (ET₀ − rain today)
@@ -2695,9 +2709,8 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_PRESSURE_TREND_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_HEALTH_DISPLAY: CONF_ENABLE_DISPLAY_SENSORS,
     KEY_FORECAST_TILES: CONF_ENABLE_DISPLAY_SENSORS,
-    # Risk sensors (fire). FWI composite + DSR are primary outputs (with fire
-    # risk); the 5 intermediate codes are gated separately (v1.6.2) and need
-    # fire risk enabled to produce data.
+    # Risk sensors (fire). FWI composite + DSR follow the primary Fire Risk
+    # switch. Selecting intermediate codes runs the FWI calculation separately.
     KEY_FIRE_RISK_SCORE: CONF_ENABLE_FIRE_RISK,
     KEY_FWI: CONF_ENABLE_FIRE_RISK,
     KEY_FWI_DSR: CONF_ENABLE_FIRE_RISK,
@@ -2722,10 +2735,9 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # Moon  (v0.8.0)
     KEY_MOON_DISPLAY: CONF_ENABLE_MOON,
     KEY_MOON_ILLUMINATION_PCT: CONF_ENABLE_MOON,
-    # Solar forecast  (v0.9.0)
+    # Remote PV forecast only. Local ET₀ has its own configured radiation source.
     KEY_SOLAR_FORECAST_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
     KEY_SOLAR_FORECAST_TOMORROW_KWH: CONF_ENABLE_SOLAR_FORECAST,
-    KEY_ET0_PM_DAILY_MM: CONF_ENABLE_SOLAR_FORECAST,
     # v1.2.0 - optional new sensors
     KEY_FOG_PROBABILITY: CONF_ENABLE_FOG,
     KEY_THUNDERSTORM_RISK: CONF_ENABLE_THUNDERSTORM,
@@ -2744,8 +2756,6 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_WIND_RUN_KM: CONF_ENABLE_COMFORT_INDICES,
     KEY_CHILL_HOURS_TODAY: CONF_ENABLE_COMFORT_INDICES,
     KEY_CHILL_HOURS_SEASON: CONF_ENABLE_COMFORT_INDICES,
-    KEY_CLEARNESS_INDEX: CONF_ENABLE_COMFORT_INDICES,
-    KEY_CLOUD_COVER_PCT: CONF_ENABLE_COMFORT_INDICES,
     # v2.0 - comfort indices additions
     KEY_AIR_DENSITY: CONF_ENABLE_COMFORT_INDICES,
     KEY_SPECIFIC_HUMIDITY: CONF_ENABLE_COMFORT_INDICES,
@@ -2803,12 +2813,7 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     KEY_GDD_TODAY_V2: CONF_ENABLE_DEGREE_DAYS,
     KEY_GDD_SEASON_V2: CONF_ENABLE_DEGREE_DAYS,
     KEY_LEAF_WETNESS: CONF_ENABLE_DEGREE_DAYS,
-    # v2.0 - solar energy (comfort indices group, needs solar radiation sensor)
-    KEY_SOLAR_ENERGY_TODAY_WHM2: CONF_ENABLE_COMFORT_INDICES,
-    KEY_MAX_SOLAR_RADIATION: CONF_ENABLE_COMFORT_INDICES,
-    KEY_PEAK_SUN_HOURS: CONF_ENABLE_COMFORT_INDICES,
-    KEY_IRRIGATION_DEFICIT: CONF_ENABLE_COMFORT_INDICES,
-    KEY_NET_RADIATION: CONF_ENABLE_COMFORT_INDICES,
+    # Solar and irrigation metrics have source/calculation prerequisites below.
     KEY_WIND_RUN_MONTH_KM: CONF_ENABLE_COMFORT_INDICES,
     # v1.6.0 French regional
     KEY_VIGILANCE_MAX_LEVEL: CONF_ENABLE_VIGILANCE_METEO,
@@ -2858,10 +2863,33 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
 }
 
 
+# A small catalog for the local solar family. Creation depends on a configured
+# source, while temporary source outages leave the entity and its registry
+# choices intact. Remote PV forecast remains governed by its own feature toggle.
+_SOLAR_SOURCE_KEYS = frozenset(
+    (KEY_ET0_PM_DAILY_MM, KEY_SOLAR_ENERGY_TODAY_WHM2, KEY_PEAK_SUN_HOURS, KEY_NET_RADIATION)
+)
+_MEASURED_SOLAR_KEYS = frozenset((KEY_CLEARNESS_INDEX, KEY_CLOUD_COVER_PCT))
+
+
+def sensor_selected(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
+    """Whether a configured entity family should be instantiated."""
+    if key in _SOLAR_SOURCE_KEYS:
+        return bool(
+            sources.get(SRC_SOLAR_RADIATION)
+            or (options.get(CONF_ET0_ILLUMINANCE_FALLBACK, False) and sources.get(SRC_LUX))
+        )
+    if key in _MEASURED_SOLAR_KEYS:
+        return bool(sources.get(SRC_SOLAR_RADIATION))
+    toggle = _FEATURE_TOGGLE_MAP.get(key)
+    return toggle is None or bool(options.get(toggle, False))
+
+
 __all__ = [
     "SENSORS",
     "WSSensorDescription",
     "_FEATURE_TOGGLE_MAP",
+    "sensor_selected",
     "_WIND_FACTORS",
     "_PRESSURE_FACTORS",
     "_DISTANCE_FACTORS",

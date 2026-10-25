@@ -54,8 +54,10 @@ Van Wagner (1987) standard start values, and they self-correct within a few days
 | `sensor.ws_fwi` | Fire Weather Index — intensity of a spreading fire |
 | `sensor.ws_fwi_dsr` | Daily Severity Rating — operational difficulty of fire control |
 
-The sub-components (FFMC, DMC, DC, ISI, BUI) are enabled separately via `enable_fwi_components`
-to reduce entity count if you only need the composite FWI and DSR.
+The sub-components (FFMC, DMC, DC, ISI, BUI) are selected separately via
+`enable_fwi_components`. This runs the FWI calculation even if the primary
+Fire Risk display is off. The composite FWI and DSR entities require the
+primary Fire Risk switch.
 
 ### Display scale
 

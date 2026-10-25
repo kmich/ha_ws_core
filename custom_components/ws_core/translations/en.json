@@ -136,7 +136,7 @@
           "enable_vigilance_meteo": "Meteo Vigilance alerts (France, no API key)",
           "enable_vigicrues": "Vigicrues river level (France, no API key)",
           "enable_diagnostics": "Station diagnostics (sensor drift, consistency, quality flags, forecast skill/agreement, solar lux factor, 30-day climatology)",
-          "enable_fwi_components": "FWI components (FFMC, DMC, DC, ISI, BUI - requires Fire Risk enabled)",
+          "enable_fwi_components": "FWI components (FFMC, DMC, DC, ISI, BUI)",
           "enable_advanced_sensors": "Advanced/derived sensors (Zambretti number, ET₀ hourly, smoothed wind direction)",
           "enable_nowcast": "Precipitation nowcast (minutes until rain starts/stops, via Open-Meteo, no API key)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
@@ -504,7 +504,7 @@
           "enable_vigilance_meteo": "Meteo Vigilance alerts (France, no API key)",
           "enable_vigicrues": "Vigicrues river level (France, no API key)",
           "enable_diagnostics": "Station diagnostics (drift, consistency, quality, forecast skill)",
-          "enable_fwi_components": "FWI components (needs Fire Risk)",
+          "enable_fwi_components": "FWI components (independent calculation)",
           "enable_advanced_sensors": "Advanced/derived sensors",
           "enable_nowcast": "Precipitation nowcast (minutes to rain)",
           "enable_degree_days": "Degree days (HDD, CDD, GDD) and leaf wetness",
@@ -531,7 +531,7 @@
           "enable_vigilance_meteo": "Enables Meteo-France departmental weather alerts (Vigilance Meteo)",
           "enable_vigicrues": "Enables nearest river level from Vigicrues (Hub'Eau v2)",
           "enable_diagnostics": "Sensor drift, cross-sensor consistency, quality flags, forecast skill/agreement, solar lux factor, 30-day climatology",
-          "enable_fwi_components": "FWI intermediate codes (FFMC/DMC/DC/ISI/BUI). Requires Fire Risk enabled to produce data",
+          "enable_fwi_components": "FWI intermediate codes (FFMC/DMC/DC/ISI/BUI). Selecting this runs the FWI calculation even when the primary Fire Risk display is off",
           "enable_advanced_sensors": "Zambretti number (numeric form), hourly ET₀, smoothed wind direction",
           "enable_nowcast": "Open-Meteo 15-minute precipitation nowcast: minutes until rain starts/stops, next-hour total, intensity. No API key",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
@@ -758,8 +758,8 @@
       "description": "A calibration offset of {value} was applied to {field}. Large offsets may indicate sensor hardware failure rather than calibration drift. Consider replacing the sensor."
     },
     "et0_pm_unavailable": {
-      "title": "PM ET₀ unavailable: no solar_radiation source configured",
-      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
+      "title": "PM ET₀ daily measurement unavailable",
+      "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
     }
   },
   "entity": {
@@ -1934,10 +1934,10 @@
       "frost_risk": {
         "name": "Frost Risk",
         "state": {
-          "high": "High",
-          "probable": "Probable",
+          "no_risk": "No Risk",
           "unlikely": "Unlikely",
-          "no_risk": "No risk"
+          "probable": "Probable",
+          "high": "High"
         }
       },
       "sensor_drift": {
@@ -2663,15 +2663,6 @@
       },
       "vigicrues_river_flow": {
         "name": "{river} - River Flow"
-      },
-      "frost_risk": {
-        "name": "Frost Risk",
-        "state": {
-          "no_risk": "No Risk",
-          "unlikely": "Unlikely",
-          "probable": "Probable",
-          "high": "High"
-        }
       }
     },
     "select": {
@@ -2960,25 +2951,26 @@
         "afternoon": "Afternoon",
         "air_near_saturation": "Air near saturation",
         "already_cold": "Already cold",
-        "calm_wind": "Calm wind",
+        "calm_last_hour": "Calm during the last hour",
         "clear_sky": "Clear sky",
         "cloudy": "Cloudy",
         "cooling_fast": "Cooling fast",
         "dry_air": "Dry air",
-        "gusty_now": "Gusty now",
-        "hot_yesterday": "Hot yesterday",
-        "lightning_nearby": "Lightning nearby",
+        "gust_in_last_hour": "Strong gust in the last hour",
+        "lightning_in_last_hour": "Lightning in the last hour",
         "long_dry_spell": "Long dry spell",
         "long_night": "Long night ahead",
         "night": "Night",
         "pressure_falling": "Pressure falling",
         "pressure_rising": "Pressure rising",
-        "raining_now": "Raining now",
         "sunny": "Sunny",
         "warm_and_humid": "Warm and humid",
-        "warm_wind_sector": "Warm wind direction",
-        "wet_wind_sector": "Wet wind direction",
-        "windy_now": "Windy now"
+        "windy_last_hour": "Windy during the last hour",
+        "rain_in_last_hour": "Rain in the last hour",
+        "warm_now": "Warm now",
+        "hot_in_last_day": "Hot in the last 24 hours",
+        "clear_recent_daylight": "Clear during recent daylight",
+        "cloudy_recent_daylight": "Cloudy during recent daylight"
       }
     },
     "pattern_effect": {

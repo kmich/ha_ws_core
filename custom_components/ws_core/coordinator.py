@@ -30,7 +30,7 @@ import math
 import pathlib as _pathlib
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import aiohttp
@@ -151,6 +151,7 @@ from .const import (
     # v0.6.0 new
     # v0.5.0 new
     CONF_ENABLE_FOG,
+    CONF_ENABLE_FWI_COMPONENTS,
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_LIGHTNING,
     CONF_ENABLE_MOON,
@@ -364,8 +365,11 @@ from .const import (
     KEY_DRY_STREAK_RECORD,
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
+    KEY_ET0_PM_COVERAGE,
     KEY_ET0_PM_DAILY_MM,
+    KEY_ET0_PM_PERIOD,
     KEY_ET0_PM_RADIATION_SOURCE,
+    KEY_ET0_PM_REASON,
     KEY_FEELS_LIKE_C,
     KEY_FFDI,
     KEY_FFWI,
@@ -580,6 +584,7 @@ from .const import (
     SRC_RAIN_YEAR,
     SRC_SOIL_MOISTURE,
     SRC_SOIL_TEMP,
+    SRC_SOLAR_RADIATION,
     SRC_TEMP,
     SRC_UV,
     SRC_WIND,
@@ -889,7 +894,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._gdd_season_key: str = ""
 
         # v0.3.0: Fire risk score (kept; opt-in via wizard)
-        self.fire_risk_enabled = bool(_get(CONF_ENABLE_FIRE_RISK, DEFAULT_ENABLE_FIRE_RISK))
+        self.fire_risk_enabled = bool(
+            _get(CONF_ENABLE_FIRE_RISK, DEFAULT_ENABLE_FIRE_RISK) or _get(CONF_ENABLE_FWI_COMPONENTS, False)
+        )
 
         # Rain today - resets at local midnight
         self._rain_today_mm: float = 0.0
@@ -1081,6 +1088,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._solar_energy_previous_whm2: float = 0.0
         self._solar_energy_previous_date: str = ""
         self._solar_energy_last_ts: Any = None
+        # Versioned coverage/meteorology metadata. Legacy energy totals are
+        # retained for display, but cannot certify a completed PM input day.
+        self._solar_today_meta: dict[str, Any] = {}
+        self._solar_previous_meta: dict[str, Any] = {}
+        self._solar_last_value: float | None = None
 
         # v2.0 Wind direction history for dominant direction + variability (24h)
         self._wind_dir_history_24h: deque = deque()
@@ -1376,7 +1388,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 await fn()
             except Exception as err:  # noqa: BLE001
-                _LOGGER.warning("ws_core: %s failed (will retry): %s", name, err)
+                _LOGGER.warning("ws_core: %s failed: %s", name, err)
 
         self._spawn(_once(), name)
 
@@ -2642,7 +2654,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_ffdi_danger"] = ffdi_danger_level(ffdi_val)
             data[KEY_FFWI] = calculate_ffwi(float(tc), float(rh), float(wind_ms))
 
-    def _compute_et0(self, data: dict, now: Any) -> None:
+    def _compute_et0(self, data: dict, now: Any, sample: bool = True) -> None:
         """Calculate ET₀ (reference evapotranspiration) via Hargreaves-Samani.  (v0.6.0)
 
         Requires: today's temp high/low from 24h stats + location.
@@ -2650,11 +2662,20 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         lat = self.forecast_lat
         if lat is None:
+            self._compute_solar_energy(data, now, None, sample)
             return
         try:
             lat_f = float(lat)
         except (TypeError, ValueError):
+            self._compute_solar_energy(data, now, None, sample)
             return
+
+        # Clear-sky radiation and measured irradiation do not depend on the
+        # Hargreaves temperature range, which is absent at startup or on a
+        # constant-temperature day.
+        max_solar = calculate_max_solar_radiation(lat_f, dt_util.as_local(now).timetuple().tm_yday, self.elevation_m)
+        data[KEY_MAX_SOLAR_RADIATION] = max_solar
+        self._compute_solar_energy(data, now, max_solar, sample)
 
         t_max = data.get(KEY_TEMP_HIGH_24H)
         t_min = data.get(KEY_TEMP_LOW_24H)
@@ -2666,7 +2687,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # the diurnal temperature curve.
         t_mean = (float(t_max) + float(t_min)) / 2.0
 
-        doy = now.timetuple().tm_yday
+        doy = dt_util.as_local(now).timetuple().tm_yday
         et0_daily = et0_hargreaves(
             t_max_c=float(t_max),
             t_min_c=float(t_min),
@@ -2677,45 +2698,104 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_ET0_DAILY_MM] = et0_daily
         data[KEY_ET0_HOURLY_MM] = et0_hourly_estimate(et0_daily, self._local_solar_hour(now))
 
-        # v2.0 Max theoretical (clear-sky) solar radiation
-        doy = now.timetuple().tm_yday
-        max_solar = calculate_max_solar_radiation(lat_f, doy, self.elevation_m)
-        data[KEY_MAX_SOLAR_RADIATION] = max_solar
-
         # v2.0 Irrigation water deficit (ET₀ − today's rain)
         rain_today = data.get("_rain_today_mm", 0.0) or 0.0
         data[KEY_IRRIGATION_DEFICIT] = calculate_irrigation_deficit(float(et0_daily), float(rain_today))
 
-        # v2.0 Solar energy accumulation (Wh/m²) — requires solar radiation sensor,
-        # or an illuminance-derived estimate when CONF_ET0_ILLUMINANCE_FALLBACK is on.
-        # This feeds the Penman-Monteith ET₀ daily mean below.
-        solar_rad = self._get_solar_radiation_for_et0()
-        if solar_rad is not None:
-            now_local = dt_util.now()
-            solar_date = now_local.strftime("%Y-%m-%d")
-            if solar_date != self._solar_energy_date:
-                # Snapshot only a genuinely completed previous calendar day.
-                # If HA was down for longer, do not mislabel stale partial
-                # irradiation as "yesterday".
-                yesterday = (now_local - timedelta(days=1)).strftime("%Y-%m-%d")
-                if self._solar_energy_date == yesterday:
-                    self._solar_energy_previous_whm2 = self._solar_energy_today_whm2
-                    self._solar_energy_previous_date = self._solar_energy_date
-                elif self._solar_energy_previous_date != yesterday:
-                    self._solar_energy_previous_whm2 = 0.0
-                    self._solar_energy_previous_date = ""
-                self._solar_energy_today_whm2 = 0.0
-                self._solar_energy_date = solar_date
-                self._solar_energy_last_ts = None
+    def _compute_solar_energy(self, data: dict, now: Any, max_solar: float | None, sample: bool) -> None:
+        """Accumulate observed intervals and matching daily weather inputs."""
+        now_local = dt_util.as_local(now)
+        solar_date = now_local.date().isoformat()
+        yesterday = (now_local.date() - timedelta(days=1)).isoformat()
+        if not sample and solar_date != self._solar_energy_date:
+            # Source-change republish must not roll a day or consume a sample.
+            # The next 60-second tick performs the rollover.
+            return
+        if solar_date != self._solar_energy_date:
+            if self._solar_energy_date == yesterday:
+                self._solar_previous_meta = dict(getattr(self, "_solar_today_meta", {}))
+                self._solar_energy_previous_whm2 = self._solar_energy_today_whm2
+                self._solar_energy_previous_date = yesterday
+            elif self._solar_energy_previous_date != yesterday:
+                self._solar_previous_meta = {}
+                self._solar_energy_previous_whm2 = 0.0
+                self._solar_energy_previous_date = ""
+            self._solar_energy_today_whm2 = 0.0
+            self._solar_energy_date = solar_date
+            self._solar_today_meta = {
+                "schema": 1,
+                "date": solar_date,
+                "energy_whm2": 0.0,
+                "coverage_s": 0.0,
+                "met_coverage_s": 0.0,
+                "temp_sum": 0.0,
+                "humidity_sum": 0.0,
+                "wind_sum": 0.0,
+                "temp_min": None,
+                "temp_max": None,
+                "source": None,
+                "gaps": 0,
+            }
+            self._solar_energy_last_ts = None
+            self._solar_last_value = None
+        if sample and not getattr(self, "_solar_today_meta", None):
+            self._solar_today_meta = {
+                "schema": 1,
+                "date": solar_date,
+                "energy_whm2": 0.0,
+                "coverage_s": 0.0,
+                "met_coverage_s": 0.0,
+                "temp_sum": 0.0,
+                "humidity_sum": 0.0,
+                "wind_sum": 0.0,
+                "temp_min": None,
+                "temp_max": None,
+                "source": None,
+                "gaps": 0,
+            }
+
+        solar_rad = self._get_solar_radiation_for_et0(now)
+        if sample and (solar_rad is None or solar_rad < 0):
+            # An outage breaks the interval; old energy is never extrapolated.
+            self._solar_energy_last_ts = None
+            self._solar_last_value = None
+        elif sample:
+            meta = self._solar_today_meta
+            source = self._solar_radiation_source
+            if meta.get("source") is None:
+                meta["source"] = source
+            elif meta["source"] != source:
+                meta["source"] = "mixed"
             if self._solar_energy_last_ts is not None:
-                dt_h = (now_local - self._solar_energy_last_ts).total_seconds() / 3600.0
-                if 0 < dt_h < 2:  # guard against stale readings or restarts
-                    self._solar_energy_today_whm2 += float(solar_rad) * dt_h
-            self._solar_energy_last_ts = now_local
+                elapsed_s = (now - self._solar_energy_last_ts).total_seconds()
+                if 0 < elapsed_s <= 300 and dt_util.as_local(self._solar_energy_last_ts).date() == now_local.date():
+                    previous = self._solar_last_value if self._solar_last_value is not None else solar_rad
+                    increment = (float(previous) + solar_rad) / 2 * elapsed_s / 3600
+                    self._solar_energy_today_whm2 += increment
+                    meta["energy_whm2"] = float(meta.get("energy_whm2", 0.0)) + increment
+                    meta["coverage_s"] += elapsed_s
+                    tc = data.get(KEY_NORM_TEMP_C)
+                    rh = data.get(KEY_NORM_HUMIDITY)
+                    ws = data.get(KEY_NORM_WIND_SPEED_MS)
+                    if tc is not None and rh is not None and ws is not None:
+                        meta["met_coverage_s"] += elapsed_s
+                        meta["temp_sum"] += float(tc) * elapsed_s
+                        meta["humidity_sum"] += float(rh) * elapsed_s
+                        meta["wind_sum"] += float(ws) * elapsed_s
+                        meta["temp_min"] = (
+                            min(float(tc), meta["temp_min"]) if meta["temp_min"] is not None else float(tc)
+                        )
+                        meta["temp_max"] = (
+                            max(float(tc), meta["temp_max"]) if meta["temp_max"] is not None else float(tc)
+                        )
+                elif elapsed_s > 300:
+                    meta["gaps"] += 1
+            self._solar_energy_last_ts = now
+            self._solar_last_value = float(solar_rad)
+
+        if solar_rad is not None and solar_rad >= 0:
             data[KEY_SOLAR_ENERGY_TODAY_WHM2] = round(self._solar_energy_today_whm2, 0)
             data[KEY_PEAK_SUN_HOURS] = round(self._solar_energy_today_whm2 / 1000.0, 2)
-
-            # v2.0 Net radiation (FAO-56) — needs temp + humidity
             tc_now = data.get(KEY_NORM_TEMP_C)
             rh_now = data.get(KEY_NORM_HUMIDITY)
             if tc_now is not None and rh_now is not None:
@@ -3241,13 +3321,26 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         existing_flags = data.get(KEY_SENSOR_QUALITY_FLAGS) or []
         score -= min(40, len(existing_flags) * 10)  # range/consistency flags
         score -= min(30, len(stuck_flags) * 15)  # stuck sensors
-        existing_drift = data.get(KEY_SENSOR_DRIFT_FLAGS) or []
-        score -= min(20, len(existing_drift) * 10)  # drift
+        drift_details = data.get("_drift_details") or []
+        score -= min(20, len(drift_details) * 10)  # actual drifting sensors, not the status string
+        consistency_details = data.get("_consistency_details") or []
+        score -= min(20, len(consistency_details) * 10)
         neighbor_flags = data.get(KEY_NEIGHBOR_QC) or []
         score -= min(20, len(neighbor_flags) * 10)  # spatial neighbor QC
         score -= min(15, len(spike_flags) * 8)  # temporal spikes
-        if data.get(KEY_PACKAGE_STATUS) not in (None, "ok"):
-            score -= 10
+        missing_required = [k for k in REQUIRED_SOURCES if not self.sources.get(k)]
+        unavailable_required = [
+            k for k in REQUIRED_SOURCES if self.sources.get(k) and self._num(self.hass, self.sources[k]) is None
+        ]
+        stale_sources = [
+            k
+            for k in STALENESS_CHECK_SOURCES
+            if self.sources.get(k)
+            and (state := self.hass.states.get(self.sources[k])) is not None
+            and (now - state.last_updated).total_seconds() > self.staleness_s
+        ]
+        score -= min(70, (len(missing_required) + len(unavailable_required)) * 15)
+        score -= min(30, len(stale_sources) * 10)
         data[KEY_DATA_QUALITY_SCORE] = max(0, min(100, score))
 
     def _discover_blitzortung(self) -> None:
@@ -3354,17 +3447,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if (now - st.last_updated).total_seconds() > self.staleness_s:
                 stale.append(k)
 
-        n_unavailable = len(missing_entities)
-        n_healthy = len(self.sources) - n_unavailable - len(stale)
-
+        unavailable = [
+            k for k in REQUIRED_SOURCES if self.sources.get(k) and self._num(self.hass, self.sources[k]) is None
+        ]
+        valid_required = len(REQUIRED_SOURCES) - len(missing) - len(unavailable)
         station_health = (
-            "offline"
-            if n_unavailable >= 3
-            else "online"
-            if n_healthy >= len(REQUIRED_SOURCES)
-            else "degraded"
-            if n_healthy >= 1
-            else "stale"
+            "offline" if valid_required == 0 else "degraded" if missing or unavailable or stale else "online"
         )
         health_color = {
             "online": "rgba(74,222,128,0.8)",
@@ -3376,23 +3464,48 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_HEALTH_DISPLAY] = station_health
         data["_health_color"] = health_color
 
-        ok = not missing and not missing_entities
+        data["configuration_ready"] = not missing
+        data["source_healthy"] = not missing and not unavailable and not stale
+        data["_stale_sources"] = stale
+        model_inputs = (KEY_NORM_TEMP_C, KEY_NORM_HUMIDITY, KEY_NORM_PRESSURE_HPA, KEY_NORM_WIND_SPEED_MS)
+        data["model_ready"] = data["source_healthy"] and all(data.get(key) is not None for key in model_inputs)
+        data["model_readiness_reason"] = "ok" if data["model_ready"] else "source readings missing or stale"
+        ok = data["source_healthy"]
         parts: list[str] = []
         if missing:
             parts.append("Missing mappings: " + ", ".join(missing))
         if missing_entities:
             parts.append("Entities not found: " + ", ".join(missing_entities))
+        invalid = [k for k in unavailable if k not in missing_entities]
+        if invalid:
+            parts.append("Unavailable readings: " + ", ".join(invalid))
         if stale:
             parts.append("Stale: " + ", ".join(stale))
         data[KEY_PACKAGE_OK] = bool(ok)
         data[KEY_PACKAGE_STATUS] = " | ".join(parts) if parts else "ok"
 
-        if missing or missing_entities:
-            dq = "ERROR: Weather station not configured (missing sources)"
-        elif stale:
-            dq = f"WARN: Stale data from {', '.join(stale)}"
-        else:
-            dq = "ok"
+        quality_reasons = []
+        if missing:
+            quality_reasons.append("missing mappings: " + ", ".join(missing))
+        if unavailable:
+            quality_reasons.append("unavailable readings: " + ", ".join(unavailable))
+        if stale:
+            quality_reasons.append("stale readings: " + ", ".join(stale))
+        if data.get("_drift_details"):
+            quality_reasons.append("sensor drift")
+        if data.get("_consistency_details"):
+            quality_reasons.append("cross-sensor inconsistency")
+        if data.get(KEY_SENSOR_STUCK):
+            quality_reasons.append("stuck sensor")
+        if data.get(KEY_SENSOR_QUALITY_FLAGS):
+            quality_reasons.append("sensor quality flags")
+        if data.get(KEY_SENSOR_SPIKE):
+            quality_reasons.append("sensor spike")
+        dq = (
+            ("ERROR: " if missing or unavailable else "WARN: ") + "; ".join(quality_reasons)
+            if quality_reasons
+            else "ok"
+        )
         data[KEY_DATA_QUALITY] = dq
 
         # Configurable alerts with hysteresis to prevent chatty automations
@@ -3559,16 +3672,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else:
                     ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("sensor_drift_detected"))
 
-                # PM ET₀ silently never appears when enable_solar_forecast is on but
-                # no solar_radiation source is mapped and the illuminance fallback
-                # (CONF_ET0_ILLUMINANCE_FALLBACK) isn't compensating for it.
-                from .const import SRC_SOLAR_RADIATION
-
+                # PM readiness follows its own configured measurement source,
+                # independent of the optional PV forecast service.
                 et0_pm_blocked = (
-                    self.solar_forecast_enabled
-                    and self.forecast_lat is not None
-                    and not self.sources.get(SRC_SOLAR_RADIATION)
-                    and data.get(KEY_ET0_PM_DAILY_MM) is None
+                    self.forecast_lat is not None
+                    and bool(
+                        self.sources.get(SRC_SOLAR_RADIATION)
+                        or (self.et0_illuminance_fallback and self.sources.get(SRC_LUX))
+                    )
+                    and data.get(KEY_ET0_PM_REASON) not in (None, "ok", "awaiting completed previous day")
                 )
                 if et0_pm_blocked:
                     ir.async_create_issue(
@@ -3578,6 +3690,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         is_fixable=False,
                         severity=ir.IssueSeverity.WARNING,
                         translation_key="et0_pm_unavailable",
+                        translation_placeholders={"reason": str(data.get(KEY_ET0_PM_REASON))},
                     )
                 else:
                     ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("et0_pm_unavailable"))
@@ -4174,6 +4287,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Last completed day, used as the FAO-56 daily mean radiation input.
             "solar_energy_previous_whm2": self._solar_energy_previous_whm2,
             "solar_energy_previous_date": self._solar_energy_previous_date,
+            "solar_today_meta": getattr(self, "_solar_today_meta", {}),
+            "solar_previous_meta": getattr(self, "_solar_previous_meta", {}),
+            "solar_last_value": getattr(self, "_solar_last_value", None),
+            "solar_last_ts": self._solar_energy_last_ts.isoformat()
+            if getattr(self, "_solar_energy_last_ts", None)
+            else None,
             # v2.7 - snow accumulation (opt-in)
             "snow_today_cm": self._snow_today_cm,
             "snow_today_date": self._snow_today_date,
@@ -4184,6 +4303,21 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "snowiest_day_cm": self._snowiest_day_cm,
             "snowiest_day_date": self._snowiest_day_date,
         }
+
+    @staticmethod
+    def _valid_solar_meta(meta: Any, expected_date: str) -> bool:
+        """Reject old or corrupt coverage records before using persisted sums."""
+        if not isinstance(meta, dict) or meta.get("schema") != 1 or meta.get("date") != expected_date:
+            return False
+        for key in ("energy_whm2", "coverage_s", "met_coverage_s", "temp_sum", "humidity_sum", "wind_sum"):
+            value = meta.get(key)
+            if not isinstance(value, (int, float)) or not math.isfinite(value):
+                return False
+        for key in ("temp_min", "temp_max"):
+            value = meta.get(key)
+            if value is not None and (not isinstance(value, (int, float)) or not math.isfinite(value)):
+                return False
+        return meta["energy_whm2"] >= 0 and meta["coverage_s"] >= 0 and meta["met_coverage_s"] >= 0
 
     def _restore_history_state(self, data: dict[str, Any]) -> None:
         """Rehydrate rolling-window deques and daily accumulators on startup.
@@ -4355,15 +4489,31 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if data.get("solar_energy_date") == today:
             self._solar_energy_today_whm2 = float(data.get("solar_energy_today_whm2") or 0.0)
             self._solar_energy_date = today
+            meta = data.get("solar_today_meta")
+            if self._valid_solar_meta(meta, today):
+                self._solar_today_meta = dict(meta)
+                last_value = data.get("solar_last_value")
+                if isinstance(last_value, (int, float)) and math.isfinite(last_value) and last_value >= 0:
+                    self._solar_last_value = float(last_value)
+                    with contextlib.suppress(ValueError, TypeError):
+                        last_ts = datetime.fromisoformat(data.get("solar_last_ts"))
+                        if last_ts.tzinfo is not None:
+                            self._solar_energy_last_ts = last_ts
 
         if data.get("solar_energy_previous_date") == yesterday:
             self._solar_energy_previous_whm2 = float(data.get("solar_energy_previous_whm2") or 0.0)
             self._solar_energy_previous_date = yesterday
+            meta = data.get("solar_previous_meta")
+            if self._valid_solar_meta(meta, yesterday):
+                self._solar_previous_meta = dict(meta)
         elif data.get("solar_energy_date") == yesterday:
             # A restart after midnight may encounter a store written before the
             # old day rolled over in memory. Promote that completed accumulation.
             self._solar_energy_previous_whm2 = float(data.get("solar_energy_today_whm2") or 0.0)
             self._solar_energy_previous_date = yesterday
+            meta = data.get("solar_today_meta")
+            if self._valid_solar_meta(meta, yesterday):
+                self._solar_previous_meta = dict(meta)
 
         # v2.7 - snow accumulation: restore only within the same period,
         # mirroring the rain day/month/year restore above.
@@ -4421,13 +4571,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # v0.3.0: removed _compute_activity_scores (laundry, running, stargazing)
         # v0.3.0: removed _compute_degree_days (HDD/CDD)
         self._compute_fire_weather(data, tc, rh, wind_ms)
-        self._compute_et0(data, now)
+        self._compute_et0(data, now, sample)
+        self._compute_daily_pm(data, now)
         self._compute_degree_days(data, now, tc, dew_c, rh, sample)
         self._compute_lightning(data, now)
         self._compute_indoor(data)
         self._compute_soil(data)
         self._compute_snow(data, now)
         self._compute_neighbor_qc(data)
+        self._compute_drift_detection(data, now, sample)
+        self._compute_consistency_checks(data, now)
         self._compute_data_quality_score(data, now, sample)
         self._compute_health(data, now, missing, missing_entities, sample)
 
@@ -4440,8 +4593,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_streaks(data, now)
         self._compute_climatology(data)
         self._compute_climate_normal_anomaly(data, tc, data.get("_rain_today_mm"))
-        self._compute_drift_detection(data, now, sample)
-        self._compute_consistency_checks(data, now)
         self._compute_learning_sensors(data)
         self._compute_conditions_summary(data)
 
@@ -4627,38 +4778,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_FORECAST_TOMORROW_KWH] = sol.get("tomorrow_kwh")
             data[KEY_SOLAR_FORECAST_STATUS] = sol.get("status", "OK")
 
-        # Penman-Monteith ET₀ requires *daily mean* shortwave radiation.
-        # The mapped solar sensor is instantaneous W/m², so feeding it directly
-        # into FAO-56 makes ET₀ track the solar curve and can overestimate by
-        # several times at noon. Use the last completed day's measured
-        # irradiation (Wh/m²) / 24 h instead (issue #152).
-        if self.forecast_lat is not None:
-            tc = data.get(KEY_NORM_TEMP_C)
-            rh = data.get(KEY_NORM_HUMIDITY)
-            ws = data.get(KEY_NORM_WIND_SPEED_MS)
-            solar_daily_mean_wm2 = (
-                self._solar_energy_previous_whm2 / 24.0 if self._solar_energy_previous_whm2 > 0.0 else None
-            )
-            if tc is not None and rh is not None and ws is not None and solar_daily_mean_wm2 is not None:
-                high = data.get(KEY_TEMP_HIGH_24H)
-                high = tc if high is None else high
-                low = data.get(KEY_TEMP_LOW_24H)
-                low = tc if low is None else low
-                doy = dt_util.now().timetuple().tm_yday
-                et0_pm = et0_penman_monteith(
-                    temp_mean_c=(float(high) + float(low)) / 2.0,
-                    temp_max_c=float(high),
-                    temp_min_c=float(low),
-                    humidity=float(rh),
-                    wind_speed_ms=float(ws),
-                    solar_radiation_wm2=float(solar_daily_mean_wm2),
-                    elevation_m=self.elevation_m,
-                    day_of_year=doy,
-                    latitude_deg=float(self.forecast_lat),
-                )
-                data[KEY_ET0_PM_DAILY_MM] = et0_pm
-                data[KEY_ET0_PM_RADIATION_SOURCE] = self._solar_radiation_source or ET0_RADIATION_SOURCE_SENSOR
-
         # --- v1.5.0 wind run, chill hours, clearness index ---
         if self.comfort_indices_enabled:
             self._compute_wind_run(data, now)
@@ -4671,6 +4790,60 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._fire_ws_events(data)
 
         return data
+
+    def _compute_daily_pm(self, data: dict, now: Any) -> None:
+        """Publish FAO-56 PM only for one covered local calendar day."""
+        if self.forecast_lat is None:
+            data[KEY_ET0_PM_REASON] = "location not configured"
+            return
+        if not self.sources.get(SRC_SOLAR_RADIATION) and not (
+            self.et0_illuminance_fallback and self.sources.get(SRC_LUX)
+        ):
+            data[KEY_ET0_PM_REASON] = "solar radiation source not configured"
+            return
+        local_now = dt_util.as_local(now)
+        yesterday_date = local_now.date() - timedelta(days=1)
+        yesterday = yesterday_date.isoformat()
+        if self._solar_energy_previous_date != yesterday:
+            data[KEY_ET0_PM_REASON] = (
+                "stale stored irradiation" if self._solar_energy_previous_date else "awaiting completed previous day"
+            )
+            return
+        meta = getattr(self, "_solar_previous_meta", {})
+        data[KEY_ET0_PM_PERIOD] = yesterday
+        if not self._valid_solar_meta(meta, yesterday):
+            data[KEY_ET0_PM_REASON] = "legacy irradiation has no coverage evidence"
+            return
+        start = datetime.combine(yesterday_date, datetime.min.time(), tzinfo=local_now.tzinfo)
+        day_seconds = ((start + timedelta(days=1)).astimezone(UTC) - start.astimezone(UTC)).total_seconds()
+        coverage = float(meta.get("coverage_s", 0.0)) / day_seconds
+        data[KEY_ET0_PM_COVERAGE] = round(min(1.0, coverage), 3)
+        if coverage < 0.95:
+            data[KEY_ET0_PM_REASON] = "insufficient solar coverage"
+            return
+        met_coverage = float(meta.get("met_coverage_s", 0.0))
+        if met_coverage / day_seconds < 0.95 or meta.get("temp_min") is None or meta.get("temp_max") is None:
+            data[KEY_ET0_PM_REASON] = "insufficient same-day temperature, humidity or wind coverage"
+            return
+        if meta.get("source") not in (ET0_RADIATION_SOURCE_SENSOR, ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE):
+            data[KEY_ET0_PM_REASON] = "mixed or unknown radiation source"
+            return
+        # Wh/m² / 24 h converts *total daily energy* to the fixed 24-hour
+        # mean expected by the algorithm, including 23/25-hour DST dates.
+        et0_pm = et0_penman_monteith(
+            temp_mean_c=float(meta["temp_sum"]) / met_coverage,
+            temp_max_c=float(meta["temp_max"]),
+            temp_min_c=float(meta["temp_min"]),
+            humidity=float(meta["humidity_sum"]) / met_coverage,
+            wind_speed_ms=float(meta["wind_sum"]) / met_coverage,
+            solar_radiation_wm2=float(meta["energy_whm2"]) / 24.0,
+            elevation_m=self.elevation_m,
+            day_of_year=yesterday_date.timetuple().tm_yday,
+            latitude_deg=float(self.forecast_lat),
+        )
+        data[KEY_ET0_PM_DAILY_MM] = et0_pm
+        data[KEY_ET0_PM_RADIATION_SOURCE] = meta["source"]
+        data[KEY_ET0_PM_REASON] = "ok"
 
     def _fire_ws_events(self, data: dict) -> None:
         """Notify event entities of transitions detected in this compute cycle."""
@@ -5146,7 +5319,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
         return self._num(self.hass, eid)
 
-    def _get_solar_radiation_for_et0(self) -> float | None:
+    def _get_solar_radiation_for_et0(self, now: datetime | None = None) -> float | None:
         """Solar radiation feeding the Penman-Monteith ET0 daily-energy accumulator.
 
         Prefers the real solar_radiation sensor. When none is mapped and
@@ -5159,9 +5332,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         from .const import SRC_SOLAR_RADIATION
 
+        def _fresh_value(eid: str) -> float | None:
+            state = self.hass.states.get(eid)
+            if state is None:
+                return None
+            reported = getattr(state, "last_reported", None)
+            if not isinstance(reported, datetime):
+                reported = getattr(state, "last_updated", None)
+            if now is not None and isinstance(reported, datetime):
+                age_s = (now - reported).total_seconds()
+                if age_s > self.staleness_s:
+                    return None
+            return self._num(self.hass, eid)
+
         eid = self.sources.get(SRC_SOLAR_RADIATION)
         if eid:
-            val = self._num(self.hass, eid)
+            val = _fresh_value(eid)
             if val is not None:
                 self._solar_radiation_source = ET0_RADIATION_SOURCE_SENSOR
                 return val
@@ -5169,7 +5355,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.et0_illuminance_fallback:
             lux_eid = self.sources.get(SRC_LUX)
             if lux_eid:
-                lux = self._num(self.hass, lux_eid)
+                lux = _fresh_value(lux_eid)
                 if lux is not None:
                     self._solar_radiation_source = ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE
                     return float(lux) * LUX_TO_WM2_FACTOR

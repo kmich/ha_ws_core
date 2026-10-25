@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.12.0"
+_INTEGRATION_VERSION = "2.13.0"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -484,6 +484,9 @@ KEY_SOLAR_FORECAST_TOMORROW_KWH = "solar_forecast_tomorrow_kwh"
 KEY_SOLAR_FORECAST_STATUS = "solar_forecast_status"
 KEY_ET0_PM_DAILY_MM = "et0_pm_daily_mm"  # Penman-Monteith (when solar available)
 KEY_ET0_PM_RADIATION_SOURCE = "et0_pm_radiation_source"  # "sensor" or "illuminance_estimate"
+KEY_ET0_PM_PERIOD = "et0_pm_period"  # completed local calendar date
+KEY_ET0_PM_REASON = "et0_pm_reason"  # precise reason while unavailable
+KEY_ET0_PM_COVERAGE = "et0_pm_coverage"  # fraction of completed day observed
 
 # ---------------------------------------------------------------------------
 # v1.2.0 - Self-learning, new met sensors, station intelligence, climatology

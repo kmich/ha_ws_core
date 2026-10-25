@@ -47,6 +47,35 @@ jobs:
       - run: pip install -r requirements_dev.txt
       - run: pytest tests/ -v --tb=short
 
+  current-home-assistant:
+    name: Home Assistant 2026.10.4
+    # setup-python's 3.14.2 build is published for 24.04, not 26.04.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.2"
+      # The test fixture package pins HA 2026.10.3 until its next release.
+      # Install its fixture dependencies first, then test the 2026.10.4 patch.
+      - run: pip install -r requirements_dev.txt "homeassistant==2026.10.3"
+      - run: pip install --no-deps --upgrade "homeassistant==2026.10.4"
+      - name: Confirm tested Home Assistant version
+        run: python -c "from homeassistant.const import __version__; assert __version__ == '2026.10.4', __version__"
+      - run: pytest tests/ -v --tb=short
+
+  minimum-home-assistant:
+    name: Minimum supported Home Assistant
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # HA 2024.6's ACME stack imports ComparableX509, removed in josepy 2.
+      - run: pip install "homeassistant==2024.6.0" "josepy<2" "pytest>=8,<9" "pytest-socket>=0.7"
+      - run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/test_entity_contracts.py -q
+
   no-bytecode:
     name: No bytecode in repo
     runs-on: ubuntu-latest
@@ -77,9 +106,12 @@ jobs:
           manifest = json.loads((root / "custom_components/ws_core/manifest.json").read_text())
           v = manifest["version"]
           pyproject = (root / "pyproject.toml").read_text()
+          const = (root / "custom_components/ws_core/const.py").read_text()
           errors = []
           if f'version = "{v}"' not in pyproject:
               errors.append(f"pyproject.toml does not embed version {v!r}")
+          if f'_INTEGRATION_VERSION = "{v}"' not in const:
+              errors.append(f"const.py does not embed version {v!r}")
           # diagnostics.py reads the version from manifest.json at runtime (it does
           # not embed a literal), so there is nothing to grep there -- the runtime
           # behaviour is covered by tests/test_integration.py::test_diagnostics_version.
@@ -87,7 +119,7 @@ jobs:
               for e in errors:
                   print("ERROR:", e)
               sys.exit(1)
-          print(f"OK: version {v!r} consistent across manifest.json and pyproject.toml")
+          print(f"OK: version {v!r} consistent across manifest.json, pyproject.toml and const.py")
           PY
 
   entity-validator:

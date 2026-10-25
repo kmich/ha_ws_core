@@ -758,8 +758,8 @@
       "description": "Um deslocamento de calibração de {value} foi aplicado a {field}. Deslocamentos elevados podem indicar falha de hardware do sensor em vez de deriva de calibração. Considere substituir o sensor."
     },
     "et0_pm_unavailable": {
-      "title": "PM ET₀ unavailable: no solar_radiation source configured",
-      "description": "Solar forecast is enabled, so the ET₀ Penman-Monteith sensor should be available, but it never appears because no solar_radiation source is mapped in this integration's sources. Either map a solar radiation (pyranometer) sensor, or enable the illuminance-based fallback in the options flow if you have a lux sensor (less accurate, tagged as an estimate)."
+      "title": "PM ET₀ daily measurement unavailable",
+      "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
     }
   },
   "entity": {
@@ -2951,25 +2951,26 @@
         "afternoon": "Tarde",
         "air_near_saturation": "Ar perto da saturação",
         "already_cold": "Já está frio",
-        "calm_wind": "Vento calmo",
+        "calm_last_hour": "Vento calmo na última hora",
         "clear_sky": "Céu limpo",
         "cloudy": "Nublado",
         "cooling_fast": "Arrefecimento rápido",
         "dry_air": "Ar seco",
-        "gusty_now": "Rajadas neste momento",
-        "hot_yesterday": "Calor ontem",
-        "lightning_nearby": "Raios nas proximidades",
+        "gust_in_last_hour": "Rajada forte na última hora",
+        "lightning_in_last_hour": "Relâmpagos na última hora",
         "long_dry_spell": "Longo período seco",
         "long_night": "Noite longa pela frente",
         "night": "Noite",
         "pressure_falling": "Pressão a descer",
         "pressure_rising": "Pressão a subir",
-        "raining_now": "A chover neste momento",
         "sunny": "Soalheiro",
         "warm_and_humid": "Quente e húmido",
-        "warm_wind_sector": "Direção do vento quente",
-        "wet_wind_sector": "Direção do vento húmeda",
-        "windy_now": "Ventoso neste momento"
+        "windy_last_hour": "Ventoso na última hora",
+        "rain_in_last_hour": "Chuva na última hora",
+        "warm_now": "Quente agora",
+        "hot_in_last_day": "Calor nas últimas 24 horas",
+        "clear_recent_daylight": "Céu limpo durante a luz do dia recente",
+        "cloudy_recent_daylight": "Nublado durante a luz do dia recente"
       }
     },
     "pattern_effect": {

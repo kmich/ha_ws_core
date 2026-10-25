@@ -1381,7 +1381,7 @@ class TestSolarRadiationForEt0:
 
 
 class TestEt0PmUnavailableIssue:
-    def _run(self, solar_forecast_enabled, forecast_lat, sources, et0_present):
+    def _run(self, solar_forecast_enabled, forecast_lat, sources, et0_present, reason=None):
         coord = _make_coordinator()
         coord.solar_forecast_enabled = solar_forecast_enabled
         coord.forecast_lat = forecast_lat
@@ -1390,6 +1390,8 @@ class TestEt0PmUnavailableIssue:
         from custom_components.ws_core.const import KEY_ET0_PM_DAILY_MM
 
         data = {KEY_ET0_PM_DAILY_MM: 3.2} if et0_present else {}
+        if reason is not None:
+            data["et0_pm_reason"] = reason
         now = datetime.now(UTC)
         with (
             patch("custom_components.ws_core.coordinator.ir.async_create_issue") as mock_create,
@@ -1398,25 +1400,26 @@ class TestEt0PmUnavailableIssue:
             coord._compute_health(data, now, missing=[], missing_entities=[])
         return mock_create, mock_delete
 
-    def test_issue_created_when_solar_forecast_on_but_no_source(self):
+    def test_pv_forecast_without_pm_source_does_not_create_issue(self):
         mock_create, _ = self._run(solar_forecast_enabled=True, forecast_lat=37.9, sources={}, et0_present=False)
         keys = [c.args[2] for c in mock_create.call_args_list]
-        assert any(k.startswith("et0_pm_unavailable") for k in keys)
+        assert not any(k.startswith("et0_pm_unavailable") for k in keys)
 
     def test_no_issue_when_solar_forecast_disabled(self):
         mock_create, _ = self._run(solar_forecast_enabled=False, forecast_lat=37.9, sources={}, et0_present=False)
         keys = [c.args[2] for c in mock_create.call_args_list]
         assert not any(k.startswith("et0_pm_unavailable") for k in keys)
 
-    def test_no_issue_when_source_configured(self):
+    def test_issue_when_configured_source_has_insufficient_coverage(self):
         mock_create, _ = self._run(
-            solar_forecast_enabled=True,
+            solar_forecast_enabled=False,
             forecast_lat=37.9,
             sources={SRC_SOLAR_RADIATION: "sensor.solar"},
             et0_present=False,
+            reason="insufficient solar coverage",
         )
         keys = [c.args[2] for c in mock_create.call_args_list]
-        assert not any(k.startswith("et0_pm_unavailable") for k in keys)
+        assert any(k.startswith("et0_pm_unavailable") for k in keys)
 
     def test_no_issue_when_et0_already_computed(self):
         mock_create, _ = self._run(solar_forecast_enabled=True, forecast_lat=37.9, sources={}, et0_present=True)

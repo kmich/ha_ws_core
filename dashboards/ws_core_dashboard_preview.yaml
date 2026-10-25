@@ -1,0 +1,66 @@
+# Review preview: streamlined everyday view plus explicit diagnostics.
+# Built-in Home Assistant cards only. This is a proposal; it does not replace
+# the existing dashboards or imply that optional entities are enabled. It
+# includes only the default core readings and readiness entities.
+title: Weather Station (preview)
+views:
+  - title: Today
+    path: today-preview
+    icon: mdi:weather-partly-cloudy
+    cards:
+      - type: entities
+        title: Current conditions
+        entities:
+          - entity: sensor.ws_temperature
+            name: Temperature
+          - entity: sensor.ws_feels_like
+            name: Feels like
+          - entity: sensor.ws_humidity
+            name: Humidity
+          - entity: sensor.ws_dew_point
+            name: Dew point
+          - entity: sensor.ws_wind_speed
+            name: Wind
+          - entity: sensor.ws_wind_gust
+            name: Gust
+          - entity: sensor.ws_rain_rate
+            name: Rain rate
+      - type: weather-forecast
+        entity: weather.ws
+        show_current: false
+        show_forecast: true
+        forecast_type: hourly
+      - type: entities
+        title: Rain — calendar periods
+        entities:
+          - entity: sensor.ws_rain_today_mm
+            name: Today (calendar day)
+          - entity: sensor.ws_rain_this_week
+            name: This week (calendar week)
+          - entity: sensor.ws_rain_this_month
+            name: This month (calendar month)
+      - type: history-graph
+        title: Recent readings (last 24 hours)
+        hours_to_show: 24
+        entities:
+          - entity: sensor.ws_temperature
+            name: Temperature
+          - entity: sensor.ws_humidity
+            name: Humidity
+          - entity: sensor.ws_rain_rate
+            name: Rain rate
+      - type: entities
+        title: Station readiness
+        entities:
+          - entity: sensor.ws_station_health
+            name: Source and station health
+          - entity: binary_sensor.ws_package_ok
+            name: Required package inputs available
+      - type: markdown
+        title: Coverage labels
+        content: >
+          Rain values above are calendar-period accumulators maintained by this
+          integration. They are not recorder-history backfills. Record extremes
+          and seasonal counters are installation-limited; their exact coverage
+          start and completeness are not exposed yet. Forecast readiness has
+          its own status sensor when Pattern Forecast is selected.
