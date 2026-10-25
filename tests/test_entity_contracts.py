@@ -73,7 +73,11 @@ def test_fresh_and_existing_home_assistant_registry_choices():
     from homeassistant.helpers import entity_registry as er
 
     registry = er.EntityRegistry(MagicMock())
-    registry.entities = er.EntityRegistryItems()
+    try:
+        registry.entities = er.EntityRegistryItems()
+    except TypeError:
+        # Home Assistant 2026.10 passes hass into the registry items container.
+        registry.entities = er.EntityRegistryItems(registry.hass)
     registry.deleted_entities = {}
     registry.async_schedule_save = MagicMock()
 

@@ -740,7 +740,7 @@ class TestDeviceRegistrySetup:
             result = await async_setup_entry(hass, entry)
             assert result is True
 
-        updated_device = dev_reg.async_get_device(identifiers={(DOMAIN, entry_id)})
+        updated_device = next(device for device in dev_reg.devices.values() if (DOMAIN, entry_id) in device.identifiers)
         assert updated_device is not None
         assert updated_device.sw_version == "2.10.1"
         assert isinstance(updated_device.sw_version, str)
@@ -791,6 +791,6 @@ class TestDeviceRegistrySetup:
             result = await async_setup_entry(hass, entry)
             assert result is True
 
-        device = dev_reg.async_get_device(identifiers={(DOMAIN, entry_id)})
+        device = next(device for device in dev_reg.devices.values() if (DOMAIN, entry_id) in device.identifiers)
         assert device is not None
         assert device.sw_version == "unknown"
