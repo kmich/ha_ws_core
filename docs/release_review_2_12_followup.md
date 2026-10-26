@@ -58,5 +58,5 @@ release does not install it on a Home Assistant instance or change live state.
   Node-RED, and external clients remain outside the repository usage scan.
 
 The [entity contract](entity_contracts.md), [usage and coverage ledger](usage_ledger.md),
-and [dashboard preview](../dashboards/ws_core_dashboard_preview.yaml) provide
+and [dashboard preview](https://github.com/kmich/ha_ws_core/blob/main/dashboards/ws_core_dashboard_preview.yaml) provide
 the review evidence and the proposed everyday presentation.

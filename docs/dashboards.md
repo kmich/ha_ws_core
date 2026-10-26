@@ -156,7 +156,7 @@ The CHANGELOG notes dashboard changes per version.
 
 ## Streamlined dashboard preview
 
-[ws_core_dashboard_preview.yaml](../dashboards/ws_core_dashboard_preview.yaml) is a
+[ws_core_dashboard_preview.yaml](https://github.com/kmich/ha_ws_core/blob/main/dashboards/ws_core_dashboard_preview.yaml) is a
 review-only, built-in-card proposal with compact current conditions,
 calendar-labeled rain periods, and station and package readiness using the
 default entity set. Pattern Forecast has its own optional status card and is
