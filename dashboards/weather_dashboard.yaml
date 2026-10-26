@@ -57,7 +57,7 @@ views:
             show_state: false
             icon: >
               [[[
-                const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                const near = states['sensor.ws_lightning_proximity']?.state === 'near' && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0;
                 const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
                 if (near && (isNaN(clearance) || clearance < 30)) return 'mdi:weather-lightning';
                 if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'mdi:weather-pouring';
@@ -65,7 +65,7 @@ views:
               ]]]
             name: >
               [[[
-                const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                const near = states['sensor.ws_lightning_proximity']?.state === 'near' && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0;
                 const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
                 const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
                 if (near && (isNaN(clearance) || clearance < 30)) {
@@ -80,7 +80,7 @@ views:
               card:
                 - display: >
                     [[[ 
-                      const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                      const near = states['sensor.ws_lightning_proximity']?.state === 'near' && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0;
                       const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
                       if (near && (isNaN(clearance) || clearance < 30)) return 'block';
                       if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'block';
@@ -91,7 +91,7 @@ views:
                     ]]]
                 - background: >
                     [[[ 
-                      const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                      const near = states['sensor.ws_lightning_proximity']?.state === 'near' && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0;
                       const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
                       if (near && (isNaN(clearance) || clearance < 30)) return 'linear-gradient(90deg, #991b1b 0%, #dc2626 50%, #991b1b 100%)';
                       if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'linear-gradient(90deg, #9a3412 0%, #ea580c 50%, #9a3412 100%)';
@@ -348,7 +348,10 @@ views:
                         const cond = condEntity?.state || 'sunny';
                         const isDay = states['sun.sun']?.state === 'above_horizon';
                         const rainRate = parseFloat(states['sensor.ws_rain_rate']?.state);
-                        const lightningNear = states['sensor.ws_lightning_proximity']?.state === 'near';
+                        const lightningClearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
+                        const lightningNear = states['sensor.ws_lightning_proximity']?.state === 'near'
+                          && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0
+                          && (isNaN(lightningClearance) || lightningClearance < 30);
                         const scene = lightningNear ? 'thunderstorm' : rainRate >= 10 ? 'heavy-rain' : rainRate > 0.5 ? 'rainy' : cond;
                         let bgImage = scene === cond ? condEntity?.attributes?.background_image : null;
 
@@ -1499,19 +1502,25 @@ views:
               - sensor.ws_alert_state
               - sensor.ws_lightning_proximity
               - sensor.ws_lightning_distance
+              - sensor.ws_lightning_count_1h
+              - sensor.ws_lightning_clearance
               - sensor.ws_rain_rate
             show_icon: true
             show_name: true
             show_state: false
             icon: >
               [[[
-                if (states['sensor.ws_lightning_proximity']?.state === 'near') return 'mdi:weather-lightning';
+                const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
+                if (states['sensor.ws_lightning_proximity']?.state === 'near' && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0 && (isNaN(clearance) || clearance < 30)) return 'mdi:weather-lightning';
                 if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'mdi:weather-pouring';
                 return entity?.attributes?.icon || 'mdi:alert-circle';
               ]]]
             name: >
               [[[
-                const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
+                const near = states['sensor.ws_lightning_proximity']?.state === 'near'
+                  && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0
+                  && (isNaN(clearance) || clearance < 30);
                 const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
                 const distance = parseFloat(states['sensor.ws_lightning_distance']?.state);
                 if (near) return 'LIGHTNING NEARBY — stay indoors' + (isNaN(distance) ? '' : ' · ' + distance.toFixed(1) + ' km') + (rain >= 10 ? ' · Heavy rain ' + rain.toFixed(1) + ' mm/h' : '');
@@ -1522,13 +1531,17 @@ views:
               card:
                 - display: >
                     [[[
-                      const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                      const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
+                      const near = states['sensor.ws_lightning_proximity']?.state === 'near'
+                        && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0
+                        && (isNaN(clearance) || clearance < 30);
                       const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
                       return near || rain >= 10 || ['warning', 'advisory'].includes(entity?.state) ? 'block' : 'none';
                     ]]]
                 - background: >
                     [[[
-                      if (states['sensor.ws_lightning_proximity']?.state === 'near') return 'linear-gradient(90deg, #991b1b, #dc2626)';
+                      const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
+                      if (states['sensor.ws_lightning_proximity']?.state === 'near' && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0 && (isNaN(clearance) || clearance < 30)) return 'linear-gradient(90deg, #991b1b, #dc2626)';
                       if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'linear-gradient(90deg, #9a3412, #ea580c)';
                       return 'linear-gradient(90deg, #b45309, #d97706)';
                     ]]]
@@ -1608,6 +1621,8 @@ views:
                   - sensor.ws_current_condition
                   - sensor.ws_rain_rate
                   - sensor.ws_lightning_proximity
+                  - sensor.ws_lightning_count_1h
+                  - sensor.ws_lightning_clearance
                   - sun.sun
                 show_name: false
                 show_state: false
@@ -1620,7 +1635,10 @@ views:
                       // Keep the background current while the Advanced view is open.
                       try {
                         const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
-                        const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                        const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
+                        const near = states['sensor.ws_lightning_proximity']?.state === 'near'
+                          && parseInt(states['sensor.ws_lightning_count_1h']?.state, 10) > 0
+                          && (isNaN(clearance) || clearance < 30);
                         const day = states['sun.sun']?.state === 'above_horizon';
                         const condition = states['sensor.ws_current_condition']?.state || '';
                         const scene = near ? 'thunderstorm' : rain >= 10 ? 'heavy-rain' : rain > 0.5 ? 'rainy' : condition;
