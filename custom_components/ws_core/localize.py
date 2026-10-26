@@ -35,12 +35,14 @@ _ALERT: dict[str, dict[str, str]] = {
         "wind": "Extreme wind: {v} m/s",
         "rain": "Heavy rain: {v} mm/h",
         "freeze": "Freeze risk: {v}°C",
+        "lightning": "Lightning detected nearby — stay indoors",
         "clear": "All clear",
     },
     "fr": {
         "wind": "Vent extrême : {v} m/s",
         "rain": "Pluie forte : {v} mm/h",
         "freeze": "Risque de gel : {v}°C",
+        "lightning": "Foudre détectée à proximité — restez à l'intérieur",
         "clear": "Tout est normal",
     },
 }

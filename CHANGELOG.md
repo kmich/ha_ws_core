@@ -2,6 +2,15 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.1] - 2026-10-25
+
+### Fixed
+
+- Nearby lightning now raises the existing dashboard alert state immediately and keeps the warning for 30 minutes after the last nearby strike. Wind, rain and freeze alerts continue to use their established thresholds.
+- The enhanced Weather dashboard banner responds directly to lightning proximity, and the Pattern Forecast card displays missing-input explanations. Existing saved dashboards still require the corresponding card update; the Weather v2 dashboard on this installation was updated directly.
+- Heavy rain now uses a 10 mm/h default alert threshold, matching the condition classifier. The dashboard banner also reacts directly to heavy rain, and its background selects rain or thunderstorm scenes from live rain and lightning readings.
+- Observed nearby lightning raises Thunderstorm Risk to high even when cool nighttime surface readings alone produce a low score.
+
 ## [2.13.0] - 2026-10-25
 
 ### Added

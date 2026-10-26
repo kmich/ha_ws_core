@@ -862,6 +862,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._lightning_count_history_1h: deque = deque()
         self._lightning_last_count: float | None = None
         self._lightning_last_strike_ts: Any = None  # timestamp of last detected increase
+        self._lightning_last_near_strike_ts: Any = None
         # Entities from the Blitzortung HA integration, used as fallback when no physical sensor is mapped
         self._blitzortung_sources: dict[str, str] = {}
         if self.lightning_enabled:
@@ -3411,6 +3412,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 delta = float(count_raw) - float(self._lightning_last_count)
                 if delta > 0:
                     self._lightning_last_strike_ts = now
+                    if dist_raw is not None and float(dist_raw) <= self._lightning_proximity_km:
+                        self._lightning_last_near_strike_ts = now
                     # Record each delta as (now, delta) in the 1h window
                     self._append_and_prune_24h(self._lightning_count_history_1h, now, delta)
             self._lightning_last_count = float(count_raw)
@@ -3546,6 +3549,27 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "color": "rgba(147,197,253,0.9)",
             }
 
+        # A detected nearby strike is an immediate hazard. Keep the dashboard
+        # warning visible for 30 minutes after the last nearby strike, even if
+        # the detector's latest distance later changes to a farther strike.
+        last_near = getattr(self, "_lightning_last_near_strike_ts", None)
+        recent_near = last_near is not None and 0 <= (now - last_near).total_seconds() < 1800
+        # After an integration reload the in-memory timestamp is gone. A live
+        # near reading with a recent strike still needs to raise the banner.
+        if not recent_near and data.get(KEY_LIGHTNING_PROXIMITY) == "near":
+            clearance = data.get(KEY_LIGHTNING_CLEARANCE_MIN)
+            recent_near = (
+                (data.get(KEY_LIGHTNING_COUNT_1H) or 0) > 0 and clearance is not None and float(clearance) < 30
+            )
+        if recent_near:
+            raw_triggers["lightning"] = {
+                "type": "lightning",
+                "severity": "warning",
+                "message": localize.alert(lang, "lightning"),
+                "icon": "mdi:weather-lightning",
+                "color": "rgba(220,38,38,0.95)",
+            }
+
         # Apply hysteresis: alert fires after ALERT_DEBOUNCE_ON_TICKS consecutive
         # ticks above threshold and clears after ALERT_DEBOUNCE_OFF_TICKS consecutive
         # ticks below threshold.  This prevents chatty automations from sensor noise.
@@ -3560,6 +3584,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._alert_debounce_raw[alert_type] = 0
                 if self._alert_debounce_clear[alert_type] >= ALERT_DEBOUNCE_OFF_TICKS:
                     self._alert_active[alert_type] = False
+
+        # Never delay a lightning warning behind the wind/rain debounce.
+        self._alert_active["lightning"] = "lightning" in raw_triggers
 
         active_alerts: list[dict] = [
             info for alert_type, info in raw_triggers.items() if self._alert_active.get(alert_type, False)
@@ -3756,11 +3783,26 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 lux_1h_ago=float(self._lux_1h_ago) if self._lux_1h_ago is not None else None,
                 is_day=is_day,
             )
+            # A surface proxy can be zero during a cool nighttime storm.
+            # Observed nearby strikes take precedence over that estimate.
+            last_near = getattr(self, "_lightning_last_near_strike_ts", None)
+            recent_near = last_near is not None and 0 <= (now - last_near).total_seconds() < 1800
+            if not recent_near and data.get(KEY_LIGHTNING_PROXIMITY) == "near":
+                clearance = data.get(KEY_LIGHTNING_CLEARANCE_MIN)
+                recent_near = (
+                    (data.get(KEY_LIGHTNING_COUNT_1H) or 0) > 0 and clearance is not None and float(clearance) < 30
+                )
+            if recent_near:
+                idx = max(idx, 90)
+                level = "high"
+                factors.insert(0, "Nearby lightning observed in the past 30 minutes")
             data[KEY_THUNDERSTORM_RISK] = idx
             data["_thunderstorm_level"] = level
             data["_thunderstorm_factors"] = factors
             data["_thunderstorm_caveat"] = (
-                "Surface proxy only. No upper-air data. Many false positives possible on hot/humid days."
+                "Nearby lightning is observed; remaining factors are surface estimates."
+                if recent_near
+                else "Surface proxy only. No upper-air data. Many false positives possible on hot/humid days."
             )
 
     # ------------------------------------------------------------------

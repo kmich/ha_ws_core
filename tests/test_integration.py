@@ -7,7 +7,7 @@ diagnostics, and alert accumulation -- all with mocked HA environment.
 import json
 import os
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,10 +25,14 @@ from custom_components.ws_core.const import (
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     KEY_DATA_QUALITY,
+    KEY_LIGHTNING_CLEARANCE_MIN,
+    KEY_LIGHTNING_COUNT_1H,
+    KEY_LIGHTNING_PROXIMITY,
     KEY_NORM_TEMP_C,
     KEY_NORM_WIND_GUST_MS,
     KEY_RAIN_RATE_FILT,
     KEY_SENSOR_QUALITY_FLAGS,
+    KEY_THUNDERSTORM_RISK,
     SRC_GUST,
     SRC_HUM,
     SRC_PRESS,
@@ -251,6 +255,56 @@ class TestAlertAccumulation:
         data = self._run_alerts(coord, gust=5.0, rain=0.0, temp=20.0)
         assert data[KEY_ALERT_STATE] == "clear"
         assert data["_active_alerts"] == []
+
+    def test_nearby_lightning_raises_immediate_banner_warning(self):
+        coord, _, _ = _make_coordinator()
+        now = datetime.now(UTC)
+        data = {
+            KEY_LIGHTNING_PROXIMITY: "near",
+            KEY_LIGHTNING_COUNT_1H: 1,
+            KEY_LIGHTNING_CLEARANCE_MIN: 0,
+        }
+        coord._compute_health(data, now, [], [])
+        assert data[KEY_ALERT_STATE] == "warning"
+        assert data["_active_alerts"][0]["type"] == "lightning"
+        assert "lightning" in data[KEY_ALERT_MESSAGE].lower()
+
+    def test_nearby_lightning_warning_lingers_then_clears(self):
+        coord, _, _ = _make_coordinator()
+        now = datetime.now(UTC)
+        coord._lightning_last_near_strike_ts = now - timedelta(minutes=29)
+        data = {KEY_LIGHTNING_PROXIMITY: "clear", KEY_LIGHTNING_COUNT_1H: 1}
+        coord._compute_health(data, now, [], [])
+        assert data[KEY_ALERT_STATE] == "warning"
+
+        coord._compute_health(data, now + timedelta(minutes=2), [], [])
+        assert data[KEY_ALERT_STATE] == "clear"
+
+    def test_heavy_rain_triggers_default_alert(self):
+        coord, _, _ = _make_coordinator()
+        data = {KEY_RAIN_RATE_FILT: 12.6}
+        for _ in range(3):
+            coord._compute_health(data, datetime.now(UTC), [], [])
+        assert data[KEY_ALERT_STATE] == "warning"
+        assert data["_active_alerts"][0]["type"] == "rain"
+
+    def test_observed_lightning_overrides_cool_night_surface_score(self):
+        coord, _, states = _make_coordinator()
+        states["sun.sun"].state = "below_horizon"
+        coord.fog_enabled = False
+        coord.thunderstorm_enabled = True
+        coord._lux_1h_ts = None
+        coord._wind_ms_1h_ts = None
+        coord._lux_1h_ago = None
+        coord._wind_ms_1h_ago = None
+        coord._lightning_last_near_strike_ts = datetime.now(UTC)
+        data = {KEY_LIGHTNING_PROXIMITY: "near", KEY_LIGHTNING_COUNT_1H: 105}
+
+        coord._compute_fog_and_thunderstorm(data, datetime.now(UTC), 17.8, 15.6, 0.9, 12.6)
+
+        assert data[KEY_THUNDERSTORM_RISK] >= 90
+        assert data["_thunderstorm_level"] == "high"
+        assert "Nearby lightning observed" in data["_thunderstorm_factors"][0]
 
     def test_single_wind_alert(self):
         coord, _, _ = _make_coordinator()
