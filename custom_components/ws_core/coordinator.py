@@ -3559,9 +3559,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not recent_near and data.get(KEY_LIGHTNING_PROXIMITY) == "near":
             clearance = data.get(KEY_LIGHTNING_CLEARANCE_MIN)
             recent_near = (
-                (data.get(KEY_LIGHTNING_COUNT_1H) or 0) > 0
-                and clearance is not None
-                and float(clearance) < 30
+                (data.get(KEY_LIGHTNING_COUNT_1H) or 0) > 0 and clearance is not None and float(clearance) < 30
             )
         if recent_near:
             raw_triggers["lightning"] = {
@@ -3785,11 +3783,26 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 lux_1h_ago=float(self._lux_1h_ago) if self._lux_1h_ago is not None else None,
                 is_day=is_day,
             )
+            # A surface proxy can be zero during a cool nighttime storm.
+            # Observed nearby strikes take precedence over that estimate.
+            last_near = getattr(self, "_lightning_last_near_strike_ts", None)
+            recent_near = last_near is not None and 0 <= (now - last_near).total_seconds() < 1800
+            if not recent_near and data.get(KEY_LIGHTNING_PROXIMITY) == "near":
+                clearance = data.get(KEY_LIGHTNING_CLEARANCE_MIN)
+                recent_near = (
+                    (data.get(KEY_LIGHTNING_COUNT_1H) or 0) > 0 and clearance is not None and float(clearance) < 30
+                )
+            if recent_near:
+                idx = max(idx, 90)
+                level = "high"
+                factors.insert(0, "Nearby lightning observed in the past 30 minutes")
             data[KEY_THUNDERSTORM_RISK] = idx
             data["_thunderstorm_level"] = level
             data["_thunderstorm_factors"] = factors
             data["_thunderstorm_caveat"] = (
-                "Surface proxy only. No upper-air data. Many false positives possible on hot/humid days."
+                "Nearby lightning is observed; remaining factors are surface estimates."
+                if recent_near
+                else "Surface proxy only. No upper-air data. Many false positives possible on hot/humid days."
             )
 
     # ------------------------------------------------------------------

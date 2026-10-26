@@ -51,6 +51,7 @@ views:
               - sensor.ws_lightning_distance
               - sensor.ws_lightning_count_1h
               - sensor.ws_lightning_clearance
+              - sensor.ws_rain_rate
             show_icon: true
             show_name: true
             show_state: false
@@ -59,17 +60,20 @@ views:
                 const near = states['sensor.ws_lightning_proximity']?.state === 'near';
                 const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
                 if (near && (isNaN(clearance) || clearance < 30)) return 'mdi:weather-lightning';
+                if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'mdi:weather-pouring';
                 return entity?.attributes?.icon || 'mdi:alert-circle';
               ]]]
             name: >
               [[[
                 const near = states['sensor.ws_lightning_proximity']?.state === 'near';
                 const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
+                const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
                 if (near && (isNaN(clearance) || clearance < 30)) {
                   const distance = parseFloat(states['sensor.ws_lightning_distance']?.state);
                   const count = parseInt(states['sensor.ws_lightning_count_1h']?.state, 10);
-                  return 'LIGHTNING NEARBY — stay indoors' + (isNaN(distance) ? '' : ' · ' + distance.toFixed(1) + ' km') + (isNaN(count) ? '' : ' · ' + count + ' strikes in 1 h');
+                  return 'LIGHTNING NEARBY — stay indoors' + (isNaN(distance) ? '' : ' · ' + distance.toFixed(1) + ' km') + (isNaN(count) ? '' : ' · ' + count + ' strikes in 1 h') + (rain >= 10 ? ' · Heavy rain ' + rain.toFixed(1) + ' mm/h' : '');
                 }
+                if (rain >= 10) return 'HEAVY RAIN — ' + rain.toFixed(1) + ' mm/h';
                 return entity?.attributes?.message || 'Alert';
               ]]]
             styles:
@@ -79,6 +83,7 @@ views:
                       const near = states['sensor.ws_lightning_proximity']?.state === 'near';
                       const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
                       if (near && (isNaN(clearance) || clearance < 30)) return 'block';
+                      if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'block';
                       const s = (entity?.state || '').toString().trim().toLowerCase();
                       const msg = (entity?.attributes?.message || '').toString().trim().toLowerCase();
                       if (!s || ['clear','unknown','unavailable','none'].includes(s) || msg === 'all clear') return 'none';
@@ -89,6 +94,7 @@ views:
                       const near = states['sensor.ws_lightning_proximity']?.state === 'near';
                       const clearance = parseFloat(states['sensor.ws_lightning_clearance']?.state);
                       if (near && (isNaN(clearance) || clearance < 30)) return 'linear-gradient(90deg, #991b1b 0%, #dc2626 50%, #991b1b 100%)';
+                      if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'linear-gradient(90deg, #9a3412 0%, #ea580c 50%, #9a3412 100%)';
                       const c = entity?.attributes?.color;
                       return c ? 'linear-gradient(90deg, ' + c + ' 0%, ' + c + ' 50%, ' + c + ' 100%)' : 'linear-gradient(90deg, #b91c1c 0%, #ef4444 50%, #b91c1c 100%)';
                     ]]]
@@ -307,6 +313,8 @@ views:
                 triggers_update:
                   - sensor.ws_station_health
                   - sensor.ws_current_condition
+                  - sensor.ws_rain_rate
+                  - sensor.ws_lightning_proximity
                   - sensor.ws_pressure_trend
                   - sensor.ws_feels_like
                   - sensor.ws_rain_probability_combined
@@ -337,9 +345,12 @@ views:
                         window._weatherBgLast = Date.now();
 
                         const condEntity = states['sensor.ws_current_condition'];
-                        let bgImage = condEntity?.attributes?.background_image;
                         const cond = condEntity?.state || 'sunny';
                         const isDay = states['sun.sun']?.state === 'above_horizon';
+                        const rainRate = parseFloat(states['sensor.ws_rain_rate']?.state);
+                        const lightningNear = states['sensor.ws_lightning_proximity']?.state === 'near';
+                        const scene = lightningNear ? 'thunderstorm' : rainRate >= 10 ? 'heavy-rain' : rainRate > 0.5 ? 'rainy' : cond;
+                        let bgImage = scene === cond ? condEntity?.attributes?.background_image : null;
 
                         if (!bgImage || bgImage === 'None' || (typeof bgImage === 'string' && bgImage.includes('None')) || bgImage === 'unknown') {
                           const basePath = states['input_text.weather_background_path']?.state || '/local/weather';
@@ -349,20 +360,22 @@ views:
                             'overcast': 'overcast-day.jpg',
                             'partly-cloudy': 'partly-cloudy-day.jpg',
                             'rainy': isDay ? 'rainy-day.jpg' : 'rainy-night.jpg',
+                            'heavy-rain': isDay ? 'rainy-day.jpg' : 'rainy-night.jpg',
                             'drizzle': 'drizzle.jpg',
                             'thunderstorm': isDay ? 'thunderstorm-day.jpg' : 'thunderstorm-night.jpg',
                             'clear-night': 'clear-night.jpg',
+                            'overcast-night': 'cloudy-day.jpg',
                             'foggy': isDay ? 'fog-day.jpg' : 'fog-night.jpg',
                             'fog': isDay ? 'fog-day.jpg' : 'fog-night.jpg',
                             'windy': isDay ? 'windy-day.jpg' : 'windy-night.jpg',
                             'sunrise': 'sunrise.jpg',
                             'sunset': 'sunset.jpg'
                           };
-                          bgImage = `${basePath}/${fallbackMap[cond] || (isDay ? 'sunny-day.jpg' : 'clear-night.jpg')}`;
+                          bgImage = `${basePath}/${fallbackMap[scene] || (isDay ? 'sunny-day.jpg' : 'cloudy-day.jpg')}`;
                         }
 
                         let extraFilter = '';
-                        if (['stormy', 'rainy', 'drizzle', 'thunderstorm', 'heavy-rain'].includes(cond)) {
+                        if (['stormy', 'rainy', 'drizzle', 'thunderstorm', 'heavy-rain'].includes(scene)) {
                           extraFilter = 'brightness(0.55) contrast(1.1)';
                         }
 
@@ -487,6 +500,9 @@ views:
                           };
                           img.onerror = () => {
                             console.error('Failed to load weather background:', bgImage);
+                            div.style.backgroundImage = ['rainy', 'heavy-rain', 'thunderstorm'].includes(scene)
+                              ? 'linear-gradient(145deg, #101827 0%, #18283a 50%, #111827 100%)'
+                              : 'none';
                             div.style.backgroundColor = '#1a1d24';
                           };
                           img.src = bgImage;
@@ -1477,6 +1493,55 @@ views:
               padding: 0 !important;
             }
         cards:
+          - type: custom:button-card
+            entity: sensor.ws_alert_state
+            triggers_update:
+              - sensor.ws_alert_state
+              - sensor.ws_lightning_proximity
+              - sensor.ws_lightning_distance
+              - sensor.ws_rain_rate
+            show_icon: true
+            show_name: true
+            show_state: false
+            icon: >
+              [[[
+                if (states['sensor.ws_lightning_proximity']?.state === 'near') return 'mdi:weather-lightning';
+                if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'mdi:weather-pouring';
+                return entity?.attributes?.icon || 'mdi:alert-circle';
+              ]]]
+            name: >
+              [[[
+                const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
+                const distance = parseFloat(states['sensor.ws_lightning_distance']?.state);
+                if (near) return 'LIGHTNING NEARBY — stay indoors' + (isNaN(distance) ? '' : ' · ' + distance.toFixed(1) + ' km') + (rain >= 10 ? ' · Heavy rain ' + rain.toFixed(1) + ' mm/h' : '');
+                if (rain >= 10) return 'HEAVY RAIN — ' + rain.toFixed(1) + ' mm/h';
+                return entity?.attributes?.message || 'Weather alert';
+              ]]]
+            styles:
+              card:
+                - display: >
+                    [[[
+                      const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                      const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
+                      return near || rain >= 10 || ['warning', 'advisory'].includes(entity?.state) ? 'block' : 'none';
+                    ]]]
+                - background: >
+                    [[[
+                      if (states['sensor.ws_lightning_proximity']?.state === 'near') return 'linear-gradient(90deg, #991b1b, #dc2626)';
+                      if (parseFloat(states['sensor.ws_rain_rate']?.state) >= 10) return 'linear-gradient(90deg, #9a3412, #ea580c)';
+                      return 'linear-gradient(90deg, #b45309, #d97706)';
+                    ]]]
+                - color: white
+                - border-radius: 10px
+                - padding: 8px 12px
+              icon:
+                - color: white
+                - width: 18px
+              name:
+                - justify-self: start
+                - font-size: 12px
+                - font-weight: 700
           - type: horizontal-stack
             card_mod:
               style: |
@@ -1540,6 +1605,10 @@ views:
                   - sensor.ws_battery
                   - sensor.ws_wu_upload_status
                   - switch.ws_enable_wunderground
+                  - sensor.ws_current_condition
+                  - sensor.ws_rain_rate
+                  - sensor.ws_lightning_proximity
+                  - sun.sun
                 show_name: false
                 show_state: false
                 show_icon: false
@@ -1548,6 +1617,38 @@ views:
                 custom_fields:
                   content: |
                     [[[
+                      // Keep the background current while the Advanced view is open.
+                      try {
+                        const rain = parseFloat(states['sensor.ws_rain_rate']?.state);
+                        const near = states['sensor.ws_lightning_proximity']?.state === 'near';
+                        const day = states['sun.sun']?.state === 'above_horizon';
+                        const condition = states['sensor.ws_current_condition']?.state || '';
+                        const scene = near ? 'thunderstorm' : rain >= 10 ? 'heavy-rain' : rain > 0.5 ? 'rainy' : condition;
+                        const file = scene === 'thunderstorm' ? (day ? 'thunderstorm-day.jpg' : 'thunderstorm-night.jpg')
+                          : ['heavy-rain', 'rainy'].includes(scene) ? (day ? 'rainy-day.jpg' : 'rainy-night.jpg')
+                          : scene === 'clear-night' ? 'clear-night.jpg' : 'cloudy-day.jpg';
+                        const base = states['input_text.weather_background_path']?.state || '/local/weather';
+                        if (!window._weatherBgDiv) {
+                          const bg = document.createElement('div');
+                          bg.id = 'weather-bg';
+                          bg.style.cssText = 'position:fixed;inset:0;z-index:-1;pointer-events:none;background-size:cover;background-position:center;opacity:1;';
+                          document.body.appendChild(bg);
+                          window._weatherBgDiv = bg;
+                        }
+                        const bg = window._weatherBgDiv;
+                        bg.style.opacity = '1';
+                        const path = `${base}/${file}`;
+                        if (bg.dataset.scenePath !== path) {
+                          bg.dataset.scenePath = path;
+                          const image = new Image();
+                          image.onload = () => { if (bg.dataset.scenePath === path) bg.style.backgroundImage = `url("${path}")`; };
+                          image.onerror = () => {
+                            if (bg.dataset.scenePath === path) bg.style.backgroundImage = 'linear-gradient(145deg, #101827, #18283a, #111827)';
+                          };
+                          image.src = path;
+                        }
+                      } catch (e) { console.error('Advanced weather background error:', e); }
+
                       const health = (entity && entity.state) || 'Unknown';
                       const h = health.toString().toLowerCase();
                       const healthColor = h === 'online' ? '#4ade80' : h === 'degraded' ? '#fbbf24' : h === 'stale' ? '#fb923c' : '#ef4444';

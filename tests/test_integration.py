@@ -32,6 +32,7 @@ from custom_components.ws_core.const import (
     KEY_NORM_WIND_GUST_MS,
     KEY_RAIN_RATE_FILT,
     KEY_SENSOR_QUALITY_FLAGS,
+    KEY_THUNDERSTORM_RISK,
     SRC_GUST,
     SRC_HUM,
     SRC_PRESS,
@@ -278,6 +279,32 @@ class TestAlertAccumulation:
 
         coord._compute_health(data, now + timedelta(minutes=2), [], [])
         assert data[KEY_ALERT_STATE] == "clear"
+
+    def test_heavy_rain_triggers_default_alert(self):
+        coord, _, _ = _make_coordinator()
+        data = {KEY_RAIN_RATE_FILT: 12.6}
+        for _ in range(3):
+            coord._compute_health(data, datetime.now(UTC), [], [])
+        assert data[KEY_ALERT_STATE] == "warning"
+        assert data["_active_alerts"][0]["type"] == "rain"
+
+    def test_observed_lightning_overrides_cool_night_surface_score(self):
+        coord, _, states = _make_coordinator()
+        states["sun.sun"].state = "below_horizon"
+        coord.fog_enabled = False
+        coord.thunderstorm_enabled = True
+        coord._lux_1h_ts = None
+        coord._wind_ms_1h_ts = None
+        coord._lux_1h_ago = None
+        coord._wind_ms_1h_ago = None
+        coord._lightning_last_near_strike_ts = datetime.now(UTC)
+        data = {KEY_LIGHTNING_PROXIMITY: "near", KEY_LIGHTNING_COUNT_1H: 105}
+
+        coord._compute_fog_and_thunderstorm(data, datetime.now(UTC), 17.8, 15.6, 0.9, 12.6)
+
+        assert data[KEY_THUNDERSTORM_RISK] >= 90
+        assert data["_thunderstorm_level"] == "high"
+        assert "Nearby lightning observed" in data["_thunderstorm_factors"][0]
 
     def test_single_wind_alert(self):
         coord, _, _ = _make_coordinator()
