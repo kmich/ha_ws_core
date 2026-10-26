@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.13.1"
+_INTEGRATION_VERSION = "2.13.2"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -1084,6 +1084,7 @@ FWI_OBSERVATION_HOUR = 12
 
 SPIKE_SIGMA_THRESHOLD = 3.0  # flag a reading > 3σ from rolling mean
 SPIKE_MIN_SAMPLES = 12  # need at least this many samples to compute σ
+SPIKE_MIN_STEP = {"temp": 1.0, "humidity": 5.0, "pressure": 2.0}  # minimum abrupt change in native units
 
 # Stuck-value detection: a reading is "stuck" when it has not moved by more
 # than the tolerance for the whole duration. Time-based rather than

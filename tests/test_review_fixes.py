@@ -27,6 +27,7 @@ from custom_components.ws_core.const import (
     KEY_NORM_WIND_GUST_MS,
     KEY_RAIN_ACCUM_24H,
     KEY_RAIN_TODAY_MM,
+    KEY_SENSOR_SPIKE,
     KEY_SENSOR_STUCK,
     KEY_SOIL_MOISTURE,
     SRC_TEMP,
@@ -80,6 +81,40 @@ class TestStuckDetection:
         for i in range(0, 10 * 60, 10):
             data = self._cycle(coord, i, 10.0 + i * 0.01, 100.0, 1000.0 + i * 0.01)
         assert data[KEY_SENSOR_STUCK] == []
+
+
+# ---------------------------------------------------------------------------
+# Spike detection must distinguish small fluctuations from abrupt sensor jumps
+# ---------------------------------------------------------------------------
+
+
+class TestSpikeDetection:
+    @staticmethod
+    def _cycle(coord, minute: int, temp: float) -> dict:
+        data = {KEY_NORM_TEMP_C: temp}
+        coord._compute_data_quality_score(data, T0 + timedelta(minutes=minute))
+        return data
+
+    def test_small_change_after_stable_readings_is_not_a_spike(self):
+        coord = _make_coordinator()
+        for minute in range(12):
+            self._cycle(coord, minute, 16.6 + (minute % 2) * 0.02)
+        data = self._cycle(coord, 12, 16.9)
+        assert data[KEY_SENSOR_SPIKE] == []
+
+    def test_large_jump_after_stable_readings_is_a_spike(self):
+        coord = _make_coordinator()
+        for minute in range(12):
+            self._cycle(coord, minute, 16.6)
+        data = self._cycle(coord, 12, 19.6)
+        assert len(data[KEY_SENSOR_SPIKE]) == 1
+        assert "temp" in data[KEY_SENSOR_SPIKE][0]
+
+    def test_gradual_trend_is_not_a_spike(self):
+        coord = _make_coordinator()
+        for minute in range(20):
+            data = self._cycle(coord, minute, 16.0 + minute * 0.2)
+        assert data[KEY_SENSOR_SPIKE] == []
 
 
 # ---------------------------------------------------------------------------

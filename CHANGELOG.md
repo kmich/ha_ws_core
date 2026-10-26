@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.2] - 2026-10-26
+
+### Fixed
+
+- Data Quality no longer warns about tiny temperature, humidity or pressure changes just because recent readings were nearly constant. Spike detection now requires a meaningful sudden step as well as a statistical outlier; large abrupt jumps still trigger the warning.
+
 ## [2.13.1] - 2026-10-25
 
 ### Fixed

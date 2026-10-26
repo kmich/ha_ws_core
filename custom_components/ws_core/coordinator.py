@@ -567,6 +567,7 @@ from .const import (
     RAIN_RATE_WINDOW_H,
     REQUIRED_SOURCES,
     SPIKE_MIN_SAMPLES,
+    SPIKE_MIN_STEP,
     SPIKE_SIGMA_THRESHOLD,
     SRC_BATTERY,
     SRC_DEW_POINT,
@@ -3281,7 +3282,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         data[KEY_SENSOR_STUCK] = stuck_flags
 
-        # Temporal spike detection: flag readings > Nσ from the rolling mean.
+        # Require both a statistical outlier and a meaningful jump from the last reading.
         spike_flags: list[str] = []
         for label, data_key in (
             ("temp", KEY_NORM_TEMP_C),
@@ -3295,9 +3296,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     mean = sum(hist) / len(hist)
                     variance = sum((x - mean) ** 2 for x in hist) / len(hist)
                     sigma = variance**0.5
-                    if sigma > 1e-6 and abs(float(curr) - mean) > SPIKE_SIGMA_THRESHOLD * sigma:
+                    deviation = abs(float(curr) - mean)
+                    step = abs(float(curr) - hist[-1])
+                    if step >= SPIKE_MIN_STEP[label] and deviation > max(
+                        SPIKE_SIGMA_THRESHOLD * sigma, SPIKE_MIN_STEP[label]
+                    ):
                         spike_flags.append(
-                            f"{label}: {float(curr):.1f} is {abs(float(curr) - mean) / sigma:.1f}σ from mean {mean:.1f}"
+                            f"{label}: {float(curr):.1f} jumped {step:.1f} from {hist[-1]:.1f} "
+                            f"({deviation / sigma:.1f}σ from mean {mean:.1f})"
+                            if sigma > 1e-6
+                            else f"{label}: {float(curr):.1f} jumped {step:.1f} from {hist[-1]:.1f}"
                         )
                 # Append after the test so the current spike doesn't poison the window
                 if sample:
