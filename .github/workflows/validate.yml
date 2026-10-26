@@ -133,3 +133,14 @@ jobs:
       - run: pip install pyyaml
       - name: Validate dashboard entity references
         run: python scripts/validate_dashboard_entities.py
+
+  docs:
+    name: Docs strict build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mkdocs-material
+      - run: mkdocs build --strict
