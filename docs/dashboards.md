@@ -10,7 +10,7 @@ pasting into the raw configuration editor.
 | [`weather_dashboard.yaml`](#enhanced-dashboard-weather_dashboardyaml) | Rich, animated two-page dashboard (Weather + Advanced) | `button-card` and six others |
 | [`ws_core_dashboard.yaml`](#v20-full-dashboard-ws_core_dashboardyaml) | Six-view dashboard covering every sensor group | `mushroom`, `mini-graph-card` |
 | [`ws_core_dashboard_mobile.yaml`](#v20-mobile-dashboard-ws_core_dashboard_mobileyaml) | Single-column phone layout | `mushroom`, `mini-graph-card` |
-| [`ws_core_bubble_dashboard.yaml`](#bubble-card-dashboard-ws_core_bubble_dashboardyaml) | Mobile-first dashboard with pop-ups and a bottom bar | Bubble Card v3.2.0+ |
+| [`ws_core_bubble_dashboard.yaml`](#bubble-card-dashboard-ws_core_bubble_dashboardyaml) | Mobile-first dashboard in one centred column, with pop-ups and a bottom bar | Bubble Card v3.2.0+ |
 | [`ws_core_gauge_presets.yaml`](#gauge-presets-ws_core_gauge_presetsyaml) | Not a dashboard: gauge cards to paste into your own | none |
 
 ---
@@ -104,9 +104,16 @@ including the **Recent Weather Events** logbook card.
 
 Mobile-first dashboard built on [Bubble Card](https://github.com/Clooos/Bubble-Card).
 It's a single centred column on every screen, phone-sized even on a desktop.
+
+| Main page | Forecast pop-up |
+|---|---|
+| ![Bubble dashboard main page](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/bubble_dashboard.png) | ![Bubble dashboard Forecast pop-up](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/bubble_forecast_popup.png) |
+
+*Shown on a Shelly WS90 with Station Diagnostics and Pattern Forecast on.*
+
 One page with a banner for any active weather advisory or warning, summary buttons
-grouped into Now (temperature, rain, wind), Outlook (local outlook and the provider
-forecast) and Garden and station. Tap a button, or use the bottom bar, to open its pop-up:
+grouped into Now (temperature, rain, wind), Outlook (local outlook, adaptive rain chance and the
+provider forecast) and Garden and station. Tap a button, or use the bottom bar, to open its pop-up:
 
 | Pop-up | Shows |
 |---|---|

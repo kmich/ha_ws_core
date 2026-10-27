@@ -88,5 +88,5 @@ If your weather station is connected to Home Assistant, `ws_core` can use it. Su
 
 * **[3-Minute Quickstart](quickstart.md):** Step-by-step installation via HACS with auto-discovery.
 * **[Blueprints](blueprints.md):** 1-click importable automations for rain alerts, wind protection, and irrigation skips.
-* **[Dashboards](dashboards.md):** Drop-in Lovelace dashboards (Vanilla HA cards & Mushroom card versions).
+* **[Dashboards](dashboards.md):** Drop-in Lovelace dashboards: native cards only, Mushroom, an animated Enhanced dashboard and a mobile-first Bubble Card dashboard.
 * **[Sensor Reference](sensors.md):** Complete catalog of all 170+ available derived sensors and feature groups.

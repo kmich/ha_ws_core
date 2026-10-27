@@ -304,7 +304,9 @@ condition:
 
 ## A dashboard card
 
-A native Markdown card that lists every forecast with its maturity:
+The Enhanced Weather and Bubble dashboards in `dashboards/` already show every forecast
+with its maturity and the reason behind it. For any other dashboard, this native Markdown
+card lists every forecast with its maturity:
 
 ```yaml
 type: markdown

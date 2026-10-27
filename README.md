@@ -70,6 +70,7 @@ Your smart home shouldn't stop working when your internet connection goes down.
 
 | Station Brand | Supported Models / Integrations | What `ws_core` Uses |
 |---|---|---|
+| **Shelly** | Shelly WS90 all-in-one station via the Shelly integration (the maintainer's own test station) | Temperature, humidity, pressure, wind, gust, direction, rain total, UV, illuminance, battery |
 | **Ecowitt / Ambient Weather** | GW-series, WS90, Wittboy, WH57 lightning, soil, and rain gauges | Outdoor temp, humidity, absolute pressure, wind, rain, lux/solar, lightning |
 | **WeatherFlow Tempest** | Tempest Home Assistant integration & local UDP / MQTT | Air temp, station pressure, wind speed/gust, rain, UV, illuminance |
 | **Davis Instruments** | WeatherLink IP, Vantage Pro2, Vantage Vue | Classic PWS measurements, rain year, bar absolute |
@@ -135,8 +136,14 @@ In the `dashboards/` directory, you'll find five dashboards and a set of gauge c
 | **Enhanced** (`weather_dashboard.yaml`) | Animated two-page Weather + Advanced dashboard, with the Pattern Forecast section | `button-card` and six others |
 | **Full** (`ws_core_dashboard.yaml`) | Six views covering every sensor group | `mushroom`, `mini-graph-card` |
 | **Mobile** (`ws_core_dashboard_mobile.yaml`) | Single-column phone layout | `mushroom`, `mini-graph-card` |
-| **Bubble** (`ws_core_bubble_dashboard.yaml`) | Mobile-first, with pop-ups and a bottom bar | Bubble Card v3.2.0+ |
+| **Bubble** (`ws_core_bubble_dashboard.yaml`) | One centred column on any screen: alert banner, summary buttons, pop-ups with the details and what the integration is learning, and a bottom bar | Bubble Card v3.2.0+ |
 | **Gauge presets** (`ws_core_gauge_presets.yaml`) | Not a dashboard: 13 gauge cards to paste into your own | none |
+
+The Bubble dashboard on the maintainer's Shelly WS90: the main page, and the Forecast pop-up with the adaptive rain chance and Pattern Forecast.
+
+| Main page | Forecast pop-up |
+|---|---|
+| ![Bubble dashboard main page](screenshots/bubble_dashboard.png) | ![Bubble dashboard Forecast pop-up](screenshots/bubble_forecast_popup.png) |
 
 See the [Dashboards guide](https://kmich.github.io/ha_ws_core/dashboards/) for what each one shows and how to install it.
 
@@ -148,6 +155,8 @@ Behind the friendly sensors, `ws_core` runs rigorous, peer-reviewed meteorologic
 
 * **🌧️ Nowcast Ground-Truth Blending:** Blends Open-Meteo's 15-minute precipitation forecast with your physical rain gauge (70% gauge / 30% forecast for the next 15 minutes, 50/50 for the 15 after) for sharper rain start times.
 * **🔮 Pattern Forecast (opt-in):** Learns from your own station to estimate the *chance* of rain (1/3/6 h), frost, a hot day, strong gusts and thunderstorms over windows of hours. These are probabilities, not a countdown, and not a regional forecast. It needs time to learn, shows `unknown` until it has enough examples (often right away if Home Assistant already has long-term statistics of your sensors), and scores itself so you can gate automations on `maturity: skilled`. 100% local; the only exception is an optional, labelled setting that lets the storm forecast use Blitzortung internet lightning data if you have no detector. See the [guide](https://kmich.github.io/ha_ws_core/guides/pattern_forecast/) and the [method](https://kmich.github.io/ha_ws_core/science/#pattern-forecast).
+* **🧠 Self-Learning Rain Chance:** `sensor.ws_rain_probability_combined` blends your station's local rain model with Open-Meteo, and keeps a rolling 90-day accuracy score (Brier score) for each so the more accurate source gets more weight. With Station Diagnostics on, `sensor.ws_forecast_blend_weight_local` shows the weight your station currently has.
+* **🎛️ Adaptive Sensor Calibration (opt-in):** Learns a slow bias estimate for temperature, humidity and pressure against a regional reference and, once confident (about 10 days), nudges your calibration offsets by a small, bounded amount at most once a day. Turn it off or edit the offsets by hand at any time. Its state is `sensor.ws_auto_calibration`.
 * **🌿 Plant Health & Agricultural Spraying:** Computes **Delta-T** spray window suitability (know the exact window to spray fertilizer without evaporation or drift), **VPD** (Vapor Pressure Deficit) for greenhouses, and **Leaf Wetness** to detect fungal risks.
 * **⚡ Energy & HVAC Load Optimization:** Tracks **Heating Degree Days (HDD)** and **Cooling Degree Days (CDD)** to forecast heat pump and air conditioning demand and automate pre-cooling with solar energy.
 * **🌍 10-Year Climate Normals (ERA5):** Compares today's temperature and rain against a 10-year historical baseline for your exact coordinates (`sensor.ws_temp_anomaly_normal`).

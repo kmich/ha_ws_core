@@ -11,7 +11,7 @@ the default `ws` prefix — if you used a different prefix, replace `ws` through
 | `weather_dashboard.yaml` | Rich animated two-page dashboard (Weather + Advanced), including the opt-in Pattern Forecast section. | `button-card`, `mini-graph-card`, `stack-in-card`, `config-template-card`, `windrose-card`, `card-mod`, `kiosk-mode` |
 | `ws_core_dashboard.yaml` | **v2.0** full 6-view dashboard: Now / Charts / Advanced / Records / Diagnostics / Indoor. Covers core, comfort, fire, agro, solar, upload status, data quality and events. | `mushroom`, `mini-graph-card` |
 | `ws_core_dashboard_mobile.yaml` | **v2.0** single-column, touch-optimised layout for phones (HA Sections). | `mushroom`, `mini-graph-card` |
-| `ws_core_bubble_dashboard.yaml` | **v2.13.4** mobile-first dashboard: alert banner, summary buttons, six pop-ups (Temperature / Rain / Wind / Forecast with Pattern Forecast / Garden & Air / Station) and a bottom bar. | Bubble Card **v3.2.0+** |
+| `ws_core_bubble_dashboard.yaml` | **v2.13.4** mobile-first dashboard in one centred column: alert banner, summary buttons, the adaptive rain chance and what the integration is learning, six pop-ups (Temperature / Rain / Wind / Forecast with Pattern Forecast / Garden & Air / Station) and a bottom bar. | Bubble Card **v3.2.0+** |
 | `ws_core_gauge_presets.yaml` | **v2.0** drop-in gauge cards with sensible severity bands for 13 common sensors. Not a dashboard: copy individual cards into any view. | none (built-in `gauge` card) |
 
 ## Installation
