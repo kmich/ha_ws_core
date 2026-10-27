@@ -8,6 +8,11 @@ All notable changes to Weather Station Core are documented here.
 
 - The adaptive rain chance now scores the forecast provider on the same 6-hour window as your station. Each window used to compare the local model against the provider's daily precipitation probability, so the two weren't answering the same question. The provider side is now its highest hourly probability over those 6 hours, with the daily probability as a fallback for providers that give no hourly ones, such as Met.no. Learned weights carry over: older windows keep counting until 10 windows have been scored the new way, about two and a half days. The published Brier scores use the same windows as the weights.
 
+### Changed
+
+- Bubble Card dashboard: an optional weather background, like the Enhanced dashboard's. A photo of the current scene (nearby lightning, heavy rain, rain, then the current condition, with day and night versions) shows behind the page, tinted toward your theme so text stays readable. It uses the same photos as the Enhanced dashboard, from `/config/www/weather` or `input_text.weather_background_path`; without them the page keeps your theme's background. It needs only Bubble Card.
+- Enhanced dashboard: the pool tile is labelled "Pool".
+
 ## [2.13.4] - 2026-10-27
 
 ### Fixed

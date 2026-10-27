@@ -231,3 +231,37 @@ def test_bubble_main_page_is_one_column():
     assert view.get("max_columns") == 1
     bar = _top_level_cards(view)[-1]
     assert bar.get("width_desktop"), "Six bottom-bar buttons don't fit Bubble Card's 540px desktop default"
+
+
+def test_bubble_mentions_only_known_entities():
+    """Entity ids inside the background template's JavaScript aren't seen by the validator; check them here."""
+    import re
+
+    from scripts.validate_dashboard_entities import build_known_entities
+
+    known = build_known_entities("ws")
+    text = BUBBLE_DASHBOARD.read_text(encoding="utf-8")
+    mentioned = set(re.findall(r"\b(?:sensor|binary_sensor|switch|input_text|weather|sun)\.[a-z0-9_]+", text))
+    assert mentioned - known == set()
+
+
+def test_bubble_background_template_has_a_photo_for_every_condition():
+    """Every current-condition state maps to a photo, and every photo is listed in the file's header."""
+    import json
+    import re
+
+    text = BUBBLE_DASHBOARD.read_text(encoding="utf-8")
+    config = yaml.safe_load(text)
+    styles = config["views"][0]["sections"][0]["cards"][1]["cards"][0]["styles"]
+    assert "`" not in styles, "Backticks would end Bubble Card's template early"
+    en = json.loads((ROOT / "custom_components/ws_core/translations/en.json").read_text(encoding="utf-8"))
+    states = set(en["entity"]["sensor"]["current_condition"]["state"])
+    mapping = styles[styles.index("const file = {") : styles.index("}[scene]")]
+    mapped = set(re.findall(r"'?([a-z-]+)'?\s*:", mapping))
+    # Snow, sleet, ice and temperature-only states fall back to the cloudy or night photo.
+    fallback = {"snow-accumulation", "snowy", "sleet", "icy-conditions", "cold"}
+    assert states - mapped - fallback == set()
+    photos = set(re.findall(r"'([a-z]+(?:-[a-z]+)*)'", mapping)) - states
+    header = text.split("##############################################################################")[1]
+    for photo in photos | {"cloudy-day", "clear-night"}:
+        assert photo in header, f"{photo}.jpg is used but not listed in the header"

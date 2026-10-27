@@ -133,6 +133,22 @@ provider forecast) and Garden and station. Tap a button, or use the bottom bar, 
 Cards for opt-in features only appear when that feature's switch is on, so nothing
 shows *unavailable* for features you haven't enabled.
 
+**Weather background (optional).** Like the Enhanced dashboard, the page can show a
+photo of the current weather behind the cards. The scene follows nearby lightning,
+heavy rain (10 mm/h or more), rain (over 0.5 mm/h), then the current condition, with
+day and night versions. The photo is tinted toward your theme's background so the
+text stays readable in light and dark themes. Put these JPEG files in
+`/config/www/weather` (served as `/local/weather`), or set
+`input_text.weather_background_path` to another folder under `/local`:
+
+`sunny-day`, `partly-cloudy-day`, `cloudy-day`, `overcast-day`, `clear-night`,
+`sunrise`, `sunset`, `drizzle`, `rainy-day`, `rainy-night`, `thunderstorm-day`,
+`thunderstorm-night`, `fog-day`, `fog-night`, `windy-day`, `windy-night`
+
+Without the photos the page keeps your theme's background. The background is drawn
+by a template on the first section heading, using Bubble Card's `styles` option, and
+is hidden when you switch to another dashboard.
+
 **HACS frontend dependencies required:** Bubble Card **v3.2.0 or later**. The pop-ups use
 the standalone format introduced in v3.2.0. Everything else is a built-in card.
 

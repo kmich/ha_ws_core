@@ -22,6 +22,16 @@
 # diagnostics) only appear when that feature's switch is on. Cards for
 # readings your station may not have (battery, internet-lightning storm
 # forecast) only appear once the entity reports a value.
+#
+# Weather background (optional): a photo of the current scene behind the page,
+# chosen like the Enhanced dashboard's (nearby lightning, heavy rain, rain,
+# then the current condition, with day and night versions). Put these JPEGs in
+# /config/www/weather, or set input_text.weather_background_path to another
+# folder under /local:
+#   sunny-day, partly-cloudy-day, cloudy-day, overcast-day, clear-night,
+#   sunrise, sunset, drizzle, rainy-day, rainy-night, thunderstorm-day,
+#   thunderstorm-night, fog-day, fog-night, windy-day, windy-night
+# Without the photos the page keeps your theme's background.
 ##############################################################################
 
 title: Weather (Bubble)
@@ -60,6 +70,73 @@ views:
                 card_type: separator
                 name: Now
                 icon: mdi:weather-partly-cloudy
+                # Bubble Card runs this template to draw the weather background.
+                styles: |
+                  ${(() => {
+                    /* Weather background: a photo for the current scene behind the whole page,
+                       tinted toward the theme's background so text stays readable in light and
+                       dark themes. Photos are read from input_text.weather_background_path, or
+                       /local/weather (that is /config/www/weather). Missing photos leave the
+                       theme's background as it is. Hidden when you leave this dashboard. */
+                    const s = hass.states;
+                    const v = (e) => (s[e] ? s[e].state : undefined);
+                    const day = v('sun.sun') !== 'below_horizon';
+                    const dn = (d, n) => (day ? d : n);
+                    const rain = parseFloat(v('sensor.ws_rain_rate')) || 0;
+                    const clearance = parseFloat(v('sensor.ws_lightning_clearance'));
+                    const near = v('sensor.ws_lightning_proximity') === 'near'
+                      && parseInt(v('sensor.ws_lightning_count_1h'), 10) > 0
+                      && (isNaN(clearance) || clearance < 30);
+                    const scene = near ? 'thunderstorm' : rain >= 10 ? 'heavy-rain' : rain > 0.5 ? 'rainy'
+                      : (v('sensor.ws_current_condition') || '');
+                    const storm = dn('thunderstorm-day', 'thunderstorm-night');
+                    const wet = dn('rainy-day', 'rainy-night');
+                    const fog = dn('fog-day', 'fog-night');
+                    const file = {
+                      sunny: 'sunny-day', hot: 'sunny-day', 'partly-cloudy': 'partly-cloudy-day',
+                      cloudy: 'cloudy-day', overcast: 'overcast-day', 'clear-night': 'clear-night',
+                      'overcast-night': 'fog-night', sunrise: 'sunrise', sunset: 'sunset', 'golden-hour': 'sunset',
+                      'clearing-after-rain': dn('partly-cloudy-day', 'clear-night'),
+                      fog: fog, 'misty-morning': fog, sandstorm: fog, 'african-dust': fog,
+                      drizzle: 'drizzle', rainy: wet, 'heavy-rain': wet,
+                      'pre-storm': storm, thunderstorm: storm, 'severe-storm': storm, hurricane: storm,
+                      windy: dn('windy-day', 'windy-night'), 'windy-night': 'windy-night'
+                    }[scene] || dn('cloudy-day', 'clear-night');
+                    const url = (v('input_text.weather_background_path') || '/local/weather') + '/' + file + '.jpg';
+                    const tint = 'color-mix(in srgb, var(--primary-background-color) 55%, transparent)';
+                    let bg = window.__wsBubbleBg;
+                    if (!bg) {
+                      bg = document.createElement('div');
+                      bg.style.cssText = 'position:fixed;inset:0;z-index:-1;pointer-events:none;'
+                        + 'background-size:cover;background-position:center;transition:opacity 1s;opacity:0';
+                      document.body.appendChild(bg);
+                      bg.sync = () => {
+                        bg.style.opacity = bg.dataset.ok && location.pathname.split('/')[1] === bg.dataset.home ? '1' : '0';
+                      };
+                      window.addEventListener('location-changed', () => setTimeout(bg.sync, 0));
+                      window.addEventListener('popstate', bg.sync);
+                      window.__wsBubbleBg = bg;
+                    }
+                    bg.dataset.home = location.pathname.split('/')[1];
+                    if (bg.dataset.url !== url) {
+                      bg.dataset.url = url;
+                      const img = new Image();
+                      img.onload = () => {
+                        if (bg.dataset.url !== url) return;
+                        bg.style.backgroundImage = 'linear-gradient(' + tint + ', ' + tint + '), url("' + url + '")';
+                        bg.dataset.ok = '1';
+                        bg.sync();
+                      };
+                      img.onerror = () => {
+                        if (bg.dataset.url !== url) return;
+                        delete bg.dataset.ok;
+                        bg.sync();
+                      };
+                      img.src = url;
+                    }
+                    bg.sync();
+                    return '';
+                  })()}
               - type: custom:bubble-card
                 card_type: button
                 button_type: state
