@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.3] - 2026-10-27
+
+### Fixed
+
+- Data Quality no longer reports a sensor spike for the first reading after a temperature, humidity or pressure sensor comes back from being unavailable. Spike history now restarts after a gap instead of comparing against the last reading from before the outage.
+
 ## [2.13.2] - 2026-10-26
 
 ### Fixed

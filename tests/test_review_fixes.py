@@ -116,6 +116,15 @@ class TestSpikeDetection:
             data = self._cycle(coord, minute, 16.0 + minute * 0.2)
         assert data[KEY_SENSOR_SPIKE] == []
 
+    def test_first_reading_after_outage_is_not_a_spike(self):
+        coord = _make_coordinator()
+        for minute in range(15):
+            self._cycle(coord, minute, 12.0 + (minute % 2) * 0.1)
+        for minute in range(15, 75):
+            coord._compute_data_quality_score({}, T0 + timedelta(minutes=minute))
+        data = self._cycle(coord, 75, 14.0)
+        assert data[KEY_SENSOR_SPIKE] == []
+
 
 # ---------------------------------------------------------------------------
 # Degree-day seasons

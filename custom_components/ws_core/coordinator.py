@@ -3291,6 +3291,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ):
             curr = data.get(data_key)
             hist = self._spike_history.get(label)
+            if curr is None and hist is not None:
+                # Drop stale history so the first reading after an outage isn't a "jump"
+                hist.clear()
             if curr is not None and hist is not None:
                 if len(hist) >= SPIKE_MIN_SAMPLES:
                     mean = sum(hist) / len(hist)
