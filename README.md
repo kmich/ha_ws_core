@@ -87,7 +87,13 @@ The `dashboards/` folder has five dashboards and a set of gauge cards. Paste one
 | **Bubble** (`ws_core_bubble_dashboard.yaml`) | One centred column on any screen, with pop-ups, an alert banner and the learning stats | Bubble Card 3.2.0+ |
 | **Gauge presets** (`ws_core_gauge_presets.yaml`) | 13 gauge cards to add to your own dashboard | none |
 
-The Bubble dashboard on a Shelly WS90:
+The Enhanced dashboard on a Shelly WS90, Weather page and Advanced page:
+
+![Enhanced dashboard Weather page: current readings, 5-day outlook and a temperature and humidity chart](screenshots/weather_dashboard.png)
+
+![Enhanced dashboard Advanced page: hazards, temperature, wind, pressure and rain detail cards](screenshots/weather_dashboard_advanced.png)
+
+The Bubble dashboard on the same station:
 
 | Main page | Forecast pop-up |
 |---|---|

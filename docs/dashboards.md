@@ -48,6 +48,12 @@ event entities.
 
 Rich visual layout with colored tiles, animations, and custom card types.
 
+![Enhanced dashboard Weather page](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/weather_dashboard.png)
+
+![Enhanced dashboard Advanced page](https://raw.githubusercontent.com/kmich/ha_ws_core/main/screenshots/weather_dashboard_advanced.png)
+
+*The Weather and Advanced pages on a Shelly WS90.*
+
 **HACS frontend dependencies required:**
 
 | Integration | HACS type |
