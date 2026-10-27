@@ -139,9 +139,9 @@ views:
                     name: Pressure trend
                     icon: mdi:trending-up
                     show_state: true
-                  - entity: sensor.ws_sea_level_pressure
-                    name: Pressure
-                    icon: mdi:gauge
+                  - entity: sensor.ws_rain_probability_combined
+                    name: Rain chance
+                    icon: mdi:umbrella
                     show_state: true
                 button_action:
                   tap_action:
@@ -565,6 +565,48 @@ views:
                   name: Fog probability
                   icon: mdi:weather-fog
                   show_state: true
+              # Adaptive rain chance: blends your station's local model with
+              # Open-Meteo, weighted by which has been more accurate lately.
+              - type: custom:bubble-card
+                card_type: separator
+                name: Rain chance (adaptive)
+                icon: mdi:umbrella
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_probability_combined
+                name: Chance of rain
+                icon: mdi:umbrella
+                show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_diagnostics
+                    state: "on"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_forecast_blend_weight_local
+                      name: Weight on your station
+                      icon: mdi:scale-balance
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_forecast_brier_local
+                      name: Local model error (lower is better)
+                      icon: mdi:target
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_forecast_brier_api
+                      name: Open-Meteo error (lower is better)
+                      icon: mdi:target-variant
+                      show_state: true
               - type: conditional
                 conditions:
                   - condition: state
@@ -584,6 +626,21 @@ views:
                       name: Status
                       icon: mdi:school-outline
                       show_state: true
+                    # The skill sensor is disabled by default; it shows once
+                    # you enable it in the entity settings.
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_forecast_skill
+                          state_not: unavailable
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_forecast_skill
+                        name: Skill vs the usual rate
+                        icon: mdi:chart-line
+                        show_state: true
                     - type: custom:bubble-card
                       card_type: button
                       button_type: state
@@ -820,6 +877,19 @@ views:
                   entity: sensor.ws_battery
                   name: Battery
                   icon: mdi:battery
+                  show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_auto_calibration
+                    state: "on"
+                card:
+                  type: custom:bubble-card
+                  card_type: button
+                  button_type: state
+                  entity: sensor.ws_auto_calibration
+                  name: Adaptive calibration
+                  icon: mdi:tune-vertical
                   show_state: true
               - type: conditional
                 conditions:

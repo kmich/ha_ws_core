@@ -113,9 +113,9 @@ forecast) and Garden and station. Tap a button, or use the bottom bar, to open i
 | Temperature | 24 h high/low and graph, feels like, dew and frost point, UTCI and WBGT (comfort indices) |
 | Rain | Rate, heaviest rate in 24 h, days since rain, totals (hour to year), nowcast until rain and until dry, Pattern Forecast rain chances |
 | Wind | Gust, Beaufort and direction now; strongest gust, dominant direction and graph for 24 h |
-| Forecast | Zambretti text, pressure trend and sea-level pressure, thunderstorm and fog risk, Pattern Forecast frost / heat / gust / thunderstorm with a maturity-and-why table, hourly forecast |
+| Forecast | Zambretti text, pressure trend and sea-level pressure, thunderstorm and fog risk, adaptive rain chance with its learned weight and error scores (station diagnostics), Pattern Forecast frost / heat / gust / thunderstorm and skill with a maturity-and-why table, hourly forecast |
 | Garden & Air | ET₀, water deficit, VPD (comfort indices), UV, solar forecast, air quality, pollen, fire risk |
-| Station | Alert level and message, sensor package, battery (if your station reports one), data quality score and stuck sensors (station diagnostics) |
+| Station | Alert level and message, sensor package, battery (if your station reports one), adaptive calibration, data quality score and stuck sensors (station diagnostics) |
 
 Cards for opt-in features only appear when that feature's switch is on, so nothing
 shows *unavailable* for features you haven't enabled.
