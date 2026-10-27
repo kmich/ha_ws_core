@@ -317,6 +317,37 @@ Quality — the Air Quality Index (AQI).*
 
 ---
 
+### Adaptive Rain Blend {#rain-blend}
+
+`sensor.ws_rain_probability_combined` blends the local rain index
+(`sensor.ws_rain_probability`) with the forecast provider's precipitation probability,
+and learns how much to trust each from how they have scored at your station.
+
+- **Windows.** Every 6 hours a window opens and records both probabilities. The
+  provider side is the highest hourly precipitation probability over the same 6 hours.
+  Consecutive hours are strongly correlated, so treating them as independent events
+  (`1 - prod(1 - p_h)`) would overstate the chance; providers build their daily
+  probability the same way. If fewer than half the hours have a probability (Met.no,
+  for example, gives none), today's daily probability is used instead.
+- **Outcome.** The window counts as wet if the filtered rain rate goes above 0.1 mm/h at
+  any point in it.
+- **Score.** Each source gets a Brier score, `mean((p - y)^2)`, over the last 90 days,
+  once at least 10 windows have closed.
+- **Weight.** Each source's weight is its share of `1 - B`:
+  `w_local = (1 - B_local) / ((1 - B_local) + (1 - B_provider))`. This moves gently: a
+  source has to be clearly and persistently worse before it loses much of its weight.
+  With fewer than 10 windows the blend uses a fixed time-of-day weight.
+- **Blended value.** The published combined probability applies those weights to the
+  local index and the provider's daily probability for today.
+
+Before 2.13.5 the provider side was scored with its daily probability against the
+6-hour window, so the two sources weren't answering the same question. Each window
+now records which basis it used. Once 10 windows use the hourly basis, only those are
+scored; until then, older windows still count, so learned weights carry over instead of
+resetting.
+
+---
+
 ## Pattern Forecast {#pattern-forecast}
 
 Pattern Forecast is the one part of `ws_core` that learns. It estimates the probability

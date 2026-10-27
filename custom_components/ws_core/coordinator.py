@@ -1134,6 +1134,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._skill_window_start: Any = None
         self._skill_window_local_prob: float | None = None
         self._skill_window_api_prob: float | None = None
+        self._skill_window_api_basis: str | None = None
         self._skill_window_rain_seen: bool = False
 
         # v1.2.0 Lux / wind 1-h history for thunderstorm index
@@ -4154,11 +4155,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         from .learning_state import brier_score as _bs
         from .learning_state import compute_blend_weights as _bw
+        from .learning_state import scoring_outcomes as _scored
 
         outcomes = self._learning_state.forecast_outcomes
         if len(outcomes) >= 10:
-            bs_local = _bs(outcomes, "local_prob")
-            bs_api = _bs(outcomes, "openmeteo_prob")
+            # Same windows as the blend weights, so the published scores explain them
+            scored = _scored(outcomes)
+            bs_local = _bs(scored, "local_prob")
+            bs_api = _bs(scored, "openmeteo_prob")
             wl, wa = _bw(outcomes)
             # Skill relative to naive climatology (~0.25 Brier for 50% events)
             skill_score = round(max(0.0, 1.0 - (((bs_local or 0.25) + (bs_api or 0.25)) / 2) / 0.25), 3)
@@ -4167,7 +4171,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_forecast_skill_bs_openmeteo"] = bs_api
             data["_forecast_blend_local"] = wl
             data["_forecast_blend_openmeteo"] = wa
-            data["_forecast_skill_n_outcomes"] = len(outcomes)
+            data["_forecast_skill_n_outcomes"] = len(scored)
             # Individual sensor keys (Task A)
             data[KEY_FORECAST_BRIER_LOCAL] = bs_local
             data[KEY_FORECAST_BRIER_API] = bs_api
@@ -4200,18 +4204,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _update_forecast_skill_window(self, data: dict, now: Any) -> None:
         """Track rolling 6-hour forecast outcomes for Brier skill scoring (A3)."""
-        from .learning_state import record_forecast_outcome
+        from .learning_state import api_rain_prob_for_window, record_forecast_outcome
 
         # Start a new window if none active
         if self._skill_window_start is None:
             self._skill_window_start = now
             self._skill_window_local_prob = data.get(KEY_RAIN_PROBABILITY)
-            fc = getattr(self, "_forecast_cache", None)
-            self._skill_window_api_prob = None
-            if fc and fc.get("daily"):
-                pp = (fc["daily"][0] or {}).get("precip_prob")
-                if pp is not None:
-                    self._skill_window_api_prob = float(pp)
+            # Score the provider on the same 6 h as the local model (hourly times are local)
+            self._skill_window_api_prob, self._skill_window_api_basis = api_rain_prob_for_window(
+                getattr(self, "_forecast_cache", None), dt_util.as_local(now).strftime("%Y-%m-%dT%H")
+            )
             self._skill_window_rain_seen = False
             return
 
@@ -4228,6 +4230,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 local_prob=self._skill_window_local_prob,
                 openmeteo_prob=self._skill_window_api_prob,
                 rained=self._skill_window_rain_seen,
+                api_basis=self._skill_window_api_basis,
             )
             # Reset for next window
             self._skill_window_start = None

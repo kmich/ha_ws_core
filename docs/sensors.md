@@ -341,7 +341,7 @@ Via Open-Meteo Marine API (free, no API key).
 | `sensor.ws_rain_anomaly_30d` | Today's rain vs 30-day rolling daily average |
 | `sensor.ws_frost_risk` | Frost risk diagnostic (`no_risk`, `unlikely`, `probable`, `high`) |
 | `sensor.ws_forecast_brier_local` | Brier score for local sensor model (lower is better; requires ≥10 outcomes) |
-| `sensor.ws_forecast_brier_api` | Brier score for NWP API model |
+| `sensor.ws_forecast_brier_api` | Brier score for the forecast provider, scored on its highest hourly probability over each 6-hour window ([method](science.md#rain-blend)) |
 | `sensor.ws_forecast_blend_weight_local` | Current learned weight (%) of the local model in the blended probability |
 | `sensor.ws_temp_anomaly_90d` | Temperature anomaly (°C) — recent 30d mean vs 90d seasonal baseline (requires ≥60 days of data) |
 | `sensor.ws_rain_anomaly_90d` | Precipitation anomaly (mm/d) — recent 30d mean vs 90d seasonal baseline |

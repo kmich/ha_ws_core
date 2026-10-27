@@ -147,6 +147,58 @@ def update_ema(current: float | None, new_value: float, alpha: float = EMA_ALPHA
 # ---------------------------------------------------------------------------
 
 BRIER_WINDOW_DAYS = 90
+SKILL_WINDOW_HOURS = 6
+MIN_SCORED_OUTCOMES = 10
+
+# Which provider probability an outcome window was scored against.
+API_BASIS_HOURLY = "hourly_6h"  # highest hourly chance over the same 6 h window
+API_BASIS_DAILY = "daily"  # today's daily chance (fallback; all windows before 2.13.5)
+
+
+def api_rain_prob_for_window(
+    forecast: dict | None, now_local_hour: str, hours: int = SKILL_WINDOW_HOURS
+) -> tuple[float | None, str | None]:
+    """Provider rain chance for the next ``hours``, and the basis it came from.
+
+    Takes the highest hourly precipitation probability from the current local
+    hour (``YYYY-MM-DDTHH``) onwards. Consecutive hours are strongly correlated,
+    so combining them as independent events (1 - prod(1 - p)) would overstate
+    the chance; providers build their daily probability the same way, as the
+    maximum of the hourly ones. Falls back to today's daily probability when
+    fewer than half of the hours have a value.
+    """
+    forecast = forecast or {}
+    probs: list[float] = []
+    slots = 0
+    for item in forecast.get("hourly") or []:
+        if str((item or {}).get("datetime") or "")[:13] < now_local_hour:
+            continue
+        slots += 1
+        pp = item.get("precip_prob")
+        if pp is not None:
+            probs.append(float(pp))
+        if slots >= hours:
+            break
+    if probs and len(probs) * 2 >= hours:
+        return max(probs), API_BASIS_HOURLY
+    daily = forecast.get("daily") or []
+    pp = (daily[0] or {}).get("precip_prob") if daily else None
+    if pp is not None:
+        return float(pp), API_BASIS_DAILY
+    return None, None
+
+
+def scoring_outcomes(outcomes: list) -> list:
+    """The outcome windows the Brier scores and blend weights are computed from.
+
+    Before 2.13.5 the provider side was its daily probability, scored against a
+    6-hour window. Once enough windows use the 6-hour hourly probability, only
+    those are scored, so both sources answer the same question on the same
+    windows. Until then every window counts, so learned weights carry over
+    instead of dropping back to 50/50.
+    """
+    hourly = [o for o in outcomes if o.get("api_basis") == API_BASIS_HOURLY]
+    return hourly if len(hourly) >= MIN_SCORED_OUTCOMES else outcomes
 
 
 def _prune_old_outcomes(outcomes: list) -> list:
@@ -174,13 +226,14 @@ def brier_score(outcomes: list, source_key: str) -> float | None:
             scores.append((float(prob) / 100.0 - outcome) ** 2)
         except (KeyError, ValueError, TypeError):
             continue
-    if len(scores) < 10:
+    if len(scores) < MIN_SCORED_OUTCOMES:
         return None
     return round(sum(scores) / len(scores), 4)
 
 
 def compute_blend_weights(outcomes: list) -> tuple[float, float]:
     """Softmax-derived blend weights from Brier scores; lower BS → higher weight."""
+    outcomes = scoring_outcomes(outcomes)
     bs_local = brier_score(outcomes, "local_prob")
     bs_api = brier_score(outcomes, "openmeteo_prob")
     if bs_local is None or bs_api is None:
@@ -197,7 +250,11 @@ def compute_blend_weights(outcomes: list) -> tuple[float, float]:
 
 
 def record_forecast_outcome(
-    state: LearningState, local_prob: float | None, openmeteo_prob: float | None, rained: bool
+    state: LearningState,
+    local_prob: float | None,
+    openmeteo_prob: float | None,
+    rained: bool,
+    api_basis: str | None = None,
 ) -> None:
     """Append a verified 6h outcome window and update blend weights."""
     state.forecast_outcomes.append(
@@ -206,6 +263,7 @@ def record_forecast_outcome(
             "outcome": 1 if rained else 0,
             "local_prob": local_prob,
             "openmeteo_prob": openmeteo_prob,
+            "api_basis": api_basis,
         }
     )
     state.forecast_outcomes = _prune_old_outcomes(state.forecast_outcomes)

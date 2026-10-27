@@ -113,9 +113,11 @@ this order of trust for the near term:
    precipitation nowcast sensors blend your rain gauge into the first two Open-Meteo
    15-minute buckets (see [Nowcast](guides/nowcast.md)).
 2. **Rain probability:** a local barometric/wind heuristic is blended with the provider
-   precipitation probability. When at least ten verified outcomes exist, the blend weight
-   is learned from each source's rolling 90-day Brier score; otherwise a fixed
-   time-of-day weight is used.
+   precipitation probability. When at least ten verified 6-hour outcomes exist, the blend
+   weight is learned from each source's rolling 90-day Brier score; otherwise a fixed
+   time-of-day weight is used. The provider is scored on its highest hourly
+   probability over the same 6 hours, or its daily probability when it gives no hourly
+   ones. See the [method](science.md#rain-blend).
 3. **Forecast agreement:** `sensor.ws_forecast_agreement` compares the local Zambretti
    outlook against the provider probability and reports `aligned` / `diverging` /
    `conflict`, so a disagreement is surfaced rather than hidden.

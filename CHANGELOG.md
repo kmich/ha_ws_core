@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.5] - 2026-10-27
+
+### Fixed
+
+- The adaptive rain chance now scores the forecast provider on the same 6-hour window as your station. Each window used to compare the local model against the provider's daily precipitation probability, so the two weren't answering the same question. The provider side is now its highest hourly probability over those 6 hours, with the daily probability as a fallback for providers that give no hourly ones, such as Met.no. Learned weights carry over: older windows keep counting until 10 windows have been scored the new way, about two and a half days. The published Brier scores use the same windows as the weights.
+
 ## [2.13.4] - 2026-10-27
 
 ### Fixed
