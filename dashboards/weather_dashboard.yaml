@@ -945,7 +945,7 @@ views:
                             ${fmt(t)}<span style="font-size:clamp(14px,2vw,18px); color:rgba(255,255,255,0.4);">°C</span>
                           </div>
                           <div style="font-size:clamp(11px,1.8vw,13px); font-weight:500; color:${color};">${comfort}</div>
-                          <div style="font-size:clamp(9px,1.5vw,11px); color:rgba(255,255,255,0.4); margin-top:2px;">Lagonissi Pool</div>
+                          <div style="font-size:clamp(9px,1.5vw,11px); color:rgba(255,255,255,0.4); margin-top:2px;">Pool</div>
                           <div style="width:75%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; margin-top:14px; overflow:hidden;">
                             <div style="height:100%; width:${isNaN(t) ? 0 : Math.min(Math.max((t-15)/25*100,0),100)}%; background:linear-gradient(90deg,#3B82F6,#06B6D4,#10B981,#F59E0B,#EF4444); border-radius:3px;"></div>
                           </div>
