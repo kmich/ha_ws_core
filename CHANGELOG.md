@@ -2,6 +2,18 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.4] - 2026-10-27
+
+### Fixed
+
+- Bubble Card dashboard: Vapour pressure deficit, Data quality score and Stuck sensors no longer show "Entity not found" when Comfort Indices or Station Diagnostics are off. They now appear only when their feature switch is on, and Battery appears only on stations that report one, such as the Shelly WS90.
+- The dashboard entity validator now recognises `switch.ws_enable_diagnostics`.
+
+### Changed
+
+- Bubble Card dashboard: an active weather advisory or warning now shows as a banner at the top of the page. The main page is grouped into Now, Outlook, and Garden and station, with a Station button showing station health and alerts.
+- Bubble Card dashboard: pop-up headers show their headline value. Rain adds this week's total, the heaviest rate in 24 hours and the nowcast time until dry. Wind is split into Now and Last 24 hours. Forecast shows the Zambretti text in full and adds the Pattern Forecast thunderstorm chance on stations with a lightning source. Station shows the alert message.
+
 ## [2.13.3] - 2026-10-27
 
 ### Fixed

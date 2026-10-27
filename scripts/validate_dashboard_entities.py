@@ -47,7 +47,9 @@ def _switch_entity_ids(prefix: str = "ws") -> set[str]:
     conf_keys = set(re.findall(r"CONF_ENABLE_\w+", switch_py))
     ids: set[str] = set()
     for const_name in conf_keys:
-        m = re.search(rf'^{const_name}\s*=\s*"([^"]+)"', const_py, re.MULTILINE)
+        # Also matches a value wrapped in parentheses over several lines, e.g.
+        # CONF_ENABLE_DIAGNOSTICS = (\n    "enable_diagnostics"  # comment\n)
+        m = re.search(rf'^{const_name}\s*=\s*\(?\s*"([^"]+)"', const_py, re.MULTILINE)
         if m:
             ids.add(f"switch.{prefix}_{m.group(1)}")
     ids.add(f"switch.{prefix}_enable_animations")

@@ -165,3 +165,51 @@ def test_bubble_bottom_bar_is_last_card_in_view():
             continue
         assert len(stacks) == 1, "One bottom bar per view"
         assert cards[-1] is stacks[0], "The bottom bar must be the last top-level card in the view"
+
+
+def test_validator_knows_parenthesized_switch_constants():
+    """CONF_ENABLE_DIAGNOSTICS is wrapped in parentheses in const.py; its switch must still be known."""
+    from scripts.validate_dashboard_entities import build_known_entities
+
+    assert "switch.ws_enable_diagnostics" in build_known_entities("ws")
+
+
+def _gate_violations(node, gates, toggles, out):
+    """Entity refs to toggle-gated sensors that no enclosing conditional guards."""
+    if isinstance(node, list):
+        for item in node:
+            _gate_violations(item, gates, toggles, out)
+    elif isinstance(node, dict):
+        if node.get("type") == "conditional":
+            guards = gates | {c.get("entity") for c in node.get("conditions", [])}
+            _gate_violations(node.get("card"), guards, toggles, out)
+            return
+        entity = node.get("entity")
+        if isinstance(entity, str) and entity in toggles:
+            switch = f"switch.ws_{toggles[entity]}"
+            if switch not in gates and entity not in gates:
+                out.append(f"{entity} needs a conditional on {switch}")
+        for value in node.values():
+            _gate_violations(value, gates, toggles, out)
+    return out
+
+
+def test_bubble_gated_sensors_sit_behind_their_switch():
+    """A sensor that only exists with a feature switch on must not show 'Entity not found' when it's off."""
+    from custom_components.ws_core import const
+    from custom_components.ws_core.entity_descriptions import _FEATURE_TOGGLE_MAP, SENSORS
+    from custom_components.ws_core.sensor import WSSensor
+
+    # Features that are on by default (display sensors) may be shown unguarded.
+    default_on = {
+        getattr(const, name)
+        for name in dir(const)
+        if name.startswith("CONF_ENABLE_") and getattr(const, f"DEFAULT_{name[5:]}", False) is True
+    }
+    toggles = {
+        f"sensor.ws_{WSSensor._slug_for_key(d.key)}": _FEATURE_TOGGLE_MAP[d.key]
+        for d in SENSORS
+        if d.key in _FEATURE_TOGGLE_MAP and _FEATURE_TOGGLE_MAP[d.key] not in default_on
+    }
+    config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
+    assert _gate_violations(config, set(), toggles, []) == []

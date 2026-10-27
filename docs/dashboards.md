@@ -103,17 +103,18 @@ including the **Recent Weather Events** logbook card.
 ## Bubble Card Dashboard (`ws_core_bubble_dashboard.yaml`)
 
 Mobile-first dashboard built on [Bubble Card](https://github.com/Clooos/Bubble-Card).
-One page of summary buttons (temperature, rain, wind, outlook, garden) plus the
-provider forecast. Tap a button, or use the bottom bar, to open its pop-up:
+One page with a banner for any active weather advisory or warning, summary buttons
+grouped into Now (temperature, rain, wind), Outlook (local outlook and the provider
+forecast) and Garden and station. Tap a button, or use the bottom bar, to open its pop-up:
 
 | Pop-up | Shows |
 |---|---|
 | Temperature | 24 h high/low and graph, feels like, dew and frost point, UTCI and WBGT (comfort indices) |
-| Rain | Totals, days since rain, nowcast countdown, Pattern Forecast rain chances |
-| Wind | Gust, strongest gust in 24 h, Beaufort, direction, 24 h graph |
-| Forecast | Pressure trend and sea-level pressure, Pattern Forecast frost / heat / gust with a maturity-and-why table, thunderstorm and fog risk, hourly forecast |
-| Garden & Air | ET₀, water deficit, VPD, UV, solar forecast, air quality, pollen, fire risk |
-| Station | Data quality, sensor package, battery, stuck sensors, alerts |
+| Rain | Rate, heaviest rate in 24 h, days since rain, totals (hour to year), nowcast until rain and until dry, Pattern Forecast rain chances |
+| Wind | Gust, Beaufort and direction now; strongest gust, dominant direction and graph for 24 h |
+| Forecast | Zambretti text, pressure trend and sea-level pressure, thunderstorm and fog risk, Pattern Forecast frost / heat / gust / thunderstorm with a maturity-and-why table, hourly forecast |
+| Garden & Air | ET₀, water deficit, VPD (comfort indices), UV, solar forecast, air quality, pollen, fire risk |
+| Station | Alert level and message, sensor package, battery (if your station reports one), data quality score and stuck sensors (station diagnostics) |
 
 Cards for opt-in features only appear when that feature's switch is on, so nothing
 shows *unavailable* for features you haven't enabled.
