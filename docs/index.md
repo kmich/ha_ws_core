@@ -4,7 +4,7 @@ Weather Station Core (`ws_core`) is a Home Assistant integration for personal we
 
 Derived values are calculated inside Home Assistant. By default ws_core also fetches a weather forecast and runs an hourly sanity check against Open-Meteo; both can be turned off, and every other internet feature is opt-in. The [data and privacy table](https://github.com/kmich/ha_ws_core#data-and-privacy) in the README lists them all.
 
-[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
+[![Open Weather Station Core in HACS on your Home Assistant.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
 ---
 

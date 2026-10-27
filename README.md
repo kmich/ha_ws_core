@@ -10,7 +10,7 @@ A Home Assistant integration for personal weather stations. It reads the tempera
 
 Derived values are calculated inside Home Assistant. By default ws_core also fetches a weather forecast and runs an hourly sanity check against Open-Meteo; both can be turned off, and every other internet feature is opt-in. The [data and privacy table](#data-and-privacy) lists them all.
 
-[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
+[![Open Weather Station Core in HACS on your Home Assistant.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
 ![Station sensors go into ws_core, which runs inside Home Assistant and produces sensors, a weather entity, blueprints and dashboards](screenshots/architecture_flow.svg)
 
@@ -65,7 +65,7 @@ The [hardware mapping guide](docs/hardware_mapping.md) covers each brand in deta
 
 ## Installation
 
-1. In HACS, open the menu (top right), choose **Custom repositories**, add `https://github.com/kmich/ha_ws_core` as an **Integration**, then download **Weather Station Core** and restart Home Assistant. The button above does the first step for you.
+1. In HACS, search for **Weather Station Core**, download it and restart Home Assistant. The button above opens it in HACS for you.
 2. Go to **Settings → Devices & Services → Add Integration** and search for **Weather Station Core**.
 3. Check the entities it suggests for your station and submit.
 
@@ -161,7 +161,7 @@ Values that depend on it report <code>unavailable</code> or <code>unknown</code>
 - Bugs and feature requests: [GitHub Issues](https://github.com/kmich/ha_ws_core/issues)
 - Documentation: [kmich.github.io/ha_ws_core](https://kmich.github.io/ha_ws_core/)
 
-[hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
+[hacs-badge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge
 [hacs-url]: https://github.com/hacs/integration
 [release-badge]: https://img.shields.io/github/v/release/kmich/ha_ws_core?style=for-the-badge
 [release-url]: https://github.com/kmich/ha_ws_core/releases

@@ -609,7 +609,7 @@ Contributions are welcome. Open an issue first to discuss what you'd like to cha
 
 ---
 
-[hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg
+[hacs-badge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg
 [hacs-url]: https://github.com/hacs/integration
 [release-badge]: https://img.shields.io/github/v/release/kmich/ha_ws_core
 [release-url]: https://github.com/kmich/ha_ws_core/releases
