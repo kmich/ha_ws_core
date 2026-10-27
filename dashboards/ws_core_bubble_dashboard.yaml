@@ -1,10 +1,11 @@
 ##############################################################################
 # Weather Station Core - Bubble Card Dashboard  (v2.13.4)
 #
-# A mobile-first dashboard built on Bubble Card. One page with an alert banner,
-# the current readings, the outlook and the station state; tap any button, or
-# use the bottom bar, to open a pop-up with the details: Temperature, Rain,
-# Wind, Forecast (including Pattern Forecast), Garden & Air and Station.
+# A mobile-first dashboard built on Bubble Card, laid out as one centred column
+# on every screen. One page with an alert banner, the current readings, the
+# outlook and the station state; tap any button, or use the bottom bar, to open
+# a pop-up with the details: Temperature, Rain, Wind, Forecast (including
+# Pattern Forecast), Garden & Air and Station.
 #
 # Installation:
 #   1. Settings -> Dashboards -> Add Dashboard -> "New dashboard from scratch"
@@ -28,834 +29,847 @@ views:
   - title: Weather
     path: weather
     icon: mdi:weather-partly-cloudy
-    cards:
-      # -----------------------------------------------------------------------
+    # One centred column: phone-sized on every screen, so a desktop doesn't
+    # spread the short main page across several near-empty columns.
+    type: sections
+    max_columns: 1
+    sections:
+      # ---------------------------------------------------------------------
       # Main page. Alerts first, then the current readings, the outlook and
       # the station. Each button opens its pop-up.
-      # -----------------------------------------------------------------------
-      - type: conditional
-        conditions:
-          - condition: state
-            entity: sensor.ws_alert_state
-            state:
-              - advisory
-              - warning
-        card:
-          type: markdown
-          content: >-
-            <ha-alert alert-type="{{ 'error' if is_state('sensor.ws_alert_state', 'warning') else 'warning' }}"
-            title="{{ 'Weather warning' if is_state('sensor.ws_alert_state', 'warning') else 'Weather advisory' }}">
-            {{ states('sensor.ws_alert_message') }}</ha-alert>
-
-      - type: custom:bubble-card
-        card_type: separator
-        name: Now
-        icon: mdi:weather-partly-cloudy
-
-      - type: custom:bubble-card
-        card_type: button
-        button_type: state
-        entity: sensor.ws_temperature
-        name: Temperature
-        icon: mdi:thermometer
-        show_state: true
-        sub_button:
-          - entity: sensor.ws_feels_like
-            name: Feels like
-            icon: mdi:thermometer-lines
-            show_state: true
-          - entity: sensor.ws_humidity
-            name: Humidity
-            icon: mdi:water-percent
-            show_state: true
-        button_action:
-          tap_action:
-            action: navigate
-            navigation_path: "#ws-temperature"
-
-      - type: custom:bubble-card
-        card_type: button
-        button_type: state
-        entity: sensor.ws_rain_today_mm
-        name: Rain today
-        icon: mdi:weather-pouring
-        show_state: true
-        sub_button:
-          - entity: sensor.ws_rain_rate
-            name: Rate
-            icon: mdi:weather-rainy
-            show_state: true
-          - entity: sensor.ws_rain_last_24h
-            name: Last 24 h
-            icon: mdi:history
-            show_state: true
-        button_action:
-          tap_action:
-            action: navigate
-            navigation_path: "#ws-rain"
-
-      - type: custom:bubble-card
-        card_type: button
-        button_type: state
-        entity: sensor.ws_wind_speed
-        name: Wind
-        icon: mdi:weather-windy
-        show_state: true
-        sub_button:
-          - entity: sensor.ws_wind_gust
-            name: Gust
-            icon: mdi:weather-windy-variant
-            show_state: true
-          - entity: sensor.ws_wind_direction
-            name: Direction
-            icon: mdi:compass-outline
-            show_state: true
-        button_action:
-          tap_action:
-            action: navigate
-            navigation_path: "#ws-wind"
-
-      - type: custom:bubble-card
-        card_type: separator
-        name: Outlook
-        icon: mdi:crystal-ball
-
-      - type: custom:bubble-card
-        card_type: button
-        button_type: state
-        entity: sensor.ws_zambretti_forecast
-        name: Local outlook
-        icon: mdi:crystal-ball
-        show_state: true
-        sub_button:
-          - entity: sensor.ws_pressure_trend
-            name: Pressure trend
-            icon: mdi:trending-up
-            show_state: true
-          - entity: sensor.ws_sea_level_pressure
-            name: Pressure
-            icon: mdi:gauge
-            show_state: true
-        button_action:
-          tap_action:
-            action: navigate
-            navigation_path: "#ws-forecast"
-
-      - type: weather-forecast
-        entity: weather.ws
-        forecast_type: daily
-        show_current: false
-        show_forecast: true
-
-      - type: custom:bubble-card
-        card_type: separator
-        name: Garden and station
-        icon: mdi:sprout
-
-      - type: custom:bubble-card
-        card_type: button
-        button_type: state
-        entity: sensor.ws_et0_daily
-        name: Garden
-        icon: mdi:sprout
-        show_state: true
-        sub_button:
-          - entity: sensor.ws_uv_index
-            name: UV
-            icon: mdi:sun-wireless
-            show_state: true
-          - entity: sensor.ws_irrigation_deficit
-            name: Water deficit
-            icon: mdi:water-minus
-            show_state: true
-        button_action:
-          tap_action:
-            action: navigate
-            navigation_path: "#ws-garden"
-
-      - type: custom:bubble-card
-        card_type: button
-        button_type: state
-        entity: sensor.ws_station_health
-        name: Station
-        icon: mdi:access-point
-        show_state: true
-        sub_button:
-          - entity: sensor.ws_alert_state
-            name: Alerts
-            icon: mdi:alert-outline
-            show_state: true
-        button_action:
-          tap_action:
-            action: navigate
-            navigation_path: "#ws-station"
-
-      # -----------------------------------------------------------------------
-      # Pop-up: Temperature and comfort
-      # -----------------------------------------------------------------------
-      - type: custom:bubble-card
-        card_type: pop-up
-        hash: "#ws-temperature"
-        name: Temperature
-        icon: mdi:thermometer
-        entity: sensor.ws_temperature
-        show_state: true
+      # ---------------------------------------------------------------------
+      - type: grid
         cards:
-          - type: custom:bubble-card
-            card_type: separator
-            name: Last 24 hours
-            icon: mdi:clock-outline
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_temperature_high_24h
-            name: High
-            icon: mdi:thermometer-chevron-up
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_temperature_low_24h
-            name: Low
-            icon: mdi:thermometer-chevron-down
-            show_state: true
-          - type: history-graph
-            hours_to_show: 24
-            entities:
-              - entity: sensor.ws_temperature
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.ws_alert_state
+                state:
+                  - advisory
+                  - warning
+            card:
+              type: markdown
+              content: >-
+                <ha-alert alert-type="{{ 'error' if is_state('sensor.ws_alert_state', 'warning') else 'warning' }}"
+                title="{{ 'Weather warning' if is_state('sensor.ws_alert_state', 'warning') else 'Weather advisory' }}">
+                {{ states('sensor.ws_alert_message') }}</ha-alert>
+
+          - type: vertical-stack
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Now
+                icon: mdi:weather-partly-cloudy
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_temperature
                 name: Temperature
-              - entity: sensor.ws_dew_point
-                name: Dew point
-          - type: custom:bubble-card
-            card_type: separator
-            name: How it feels
-            icon: mdi:account-outline
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_feels_like
-            name: Feels like
-            icon: mdi:thermometer-lines
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_humidity
-            name: Humidity
-            icon: mdi:water-percent
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_dew_point
-            name: Dew point
-            icon: mdi:water-thermometer
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_frost_point
-            name: Frost point
-            icon: mdi:snowflake-thermometer
-            show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_comfort_indices
-                state: "on"
-            card:
-              type: vertical-stack
-              cards:
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_utci
-                  name: UTCI (heat stress)
-                  icon: mdi:human-handsup
-                  show_state: true
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_wbgt
-                  name: WBGT (outdoor work and sport)
-                  icon: mdi:run
-                  show_state: true
-
-      # -----------------------------------------------------------------------
-      # Pop-up: Rain
-      # -----------------------------------------------------------------------
-      - type: custom:bubble-card
-        card_type: pop-up
-        hash: "#ws-rain"
-        name: Rain today
-        icon: mdi:weather-pouring
-        entity: sensor.ws_rain_today_mm
-        show_state: true
-        cards:
-          - type: custom:bubble-card
-            card_type: separator
-            name: Now
-            icon: mdi:weather-rainy
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_rain_rate
-            name: Rain rate
-            icon: mdi:weather-rainy
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_rain_rate_max_24h
-            name: Heaviest rate, 24 h
-            icon: mdi:weather-pouring
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_dry_streak_days
-            name: Days since rain
-            icon: mdi:weather-sunny-off
-            show_state: true
-          - type: custom:bubble-card
-            card_type: separator
-            name: Totals
-            icon: mdi:cup-water
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_rain_last_1h
-            name: Last hour
-            icon: mdi:clock-outline
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_rain_last_24h
-            name: Last 24 hours
-            icon: mdi:history
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_rain_this_week
-            name: This week
-            icon: mdi:calendar-week
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_rain_this_month
-            name: This month
-            icon: mdi:calendar-month
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_rain_this_year
-            name: This year
-            icon: mdi:calendar
-            show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_nowcast
-                state: "on"
-            card:
-              type: vertical-stack
-              cards:
-                - type: custom:bubble-card
-                  card_type: separator
-                  name: Nowcast (Open-Meteo)
-                  icon: mdi:radar
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_minutes_until_rain
-                  name: Minutes until rain
-                  icon: mdi:timer-sand
-                  show_state: true
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_minutes_until_dry
-                  name: Minutes until dry
-                  icon: mdi:timer-sand-complete
-                  show_state: true
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_rain_next_60min
-                  name: Next 60 minutes
-                  icon: mdi:weather-rainy
-                  show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_pattern_forecast
-                state: "on"
-            card:
-              type: vertical-stack
-              cards:
-                - type: custom:bubble-card
-                  card_type: separator
-                  name: Pattern Forecast (local)
-                  icon: mdi:chart-bell-curve-cumulative
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_pattern_rain_1h
-                  name: Chance of rain, 1 h
-                  icon: mdi:umbrella-outline
-                  show_state: true
-                  show_attribute: true
-                  attribute: maturity
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_pattern_rain_3h
-                  name: Chance of rain, 3 h
-                  icon: mdi:umbrella
-                  show_state: true
-                  show_attribute: true
-                  attribute: maturity
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_pattern_rain_6h
-                  name: Chance of rain, 6 h
-                  icon: mdi:umbrella-closed
-                  show_state: true
-                  show_attribute: true
-                  attribute: maturity
-
-      # -----------------------------------------------------------------------
-      # Pop-up: Wind
-      # -----------------------------------------------------------------------
-      - type: custom:bubble-card
-        card_type: pop-up
-        hash: "#ws-wind"
-        name: Wind
-        icon: mdi:weather-windy
-        entity: sensor.ws_wind_speed
-        show_state: true
-        cards:
-          - type: custom:bubble-card
-            card_type: separator
-            name: Now
-            icon: mdi:weather-windy
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_wind_gust
-            name: Gust
-            icon: mdi:weather-windy-variant
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_wind_beaufort
-            name: Beaufort
-            icon: mdi:sail-boat
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_wind_direction
-            name: Direction
-            icon: mdi:compass-outline
-            show_state: true
-          - type: custom:bubble-card
-            card_type: separator
-            name: Last 24 hours
-            icon: mdi:clock-outline
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_wind_gust_max_24h
-            name: Strongest gust
-            icon: mdi:weather-tornado
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_dominant_wind_direction
-            name: Dominant direction
-            icon: mdi:compass-rose
-            show_state: true
-          - type: history-graph
-            hours_to_show: 24
-            entities:
-              - entity: sensor.ws_wind_speed
-                name: Wind
-              - entity: sensor.ws_wind_gust
-                name: Gust
-
-      # -----------------------------------------------------------------------
-      # Pop-up: Forecast (Zambretti, provider forecast, Pattern Forecast)
-      # -----------------------------------------------------------------------
-      - type: custom:bubble-card
-        card_type: pop-up
-        hash: "#ws-forecast"
-        name: Forecast
-        icon: mdi:crystal-ball
-        entity: sensor.ws_pressure_trend
-        show_state: true
-        cards:
-          - type: custom:bubble-card
-            card_type: separator
-            name: Local outlook
-            icon: mdi:crystal-ball
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_zambretti_forecast
-            name: Zambretti forecast
-            icon: mdi:crystal-ball
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_pressure_trend
-            name: Pressure trend
-            icon: mdi:trending-up
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_sea_level_pressure
-            name: Sea-level pressure
-            icon: mdi:gauge
-            show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_thunderstorm_risk
-                state: "on"
-            card:
-              type: custom:bubble-card
-              card_type: button
-              button_type: state
-              entity: sensor.ws_thunderstorm_risk
-              name: Thunderstorm risk
-              icon: mdi:weather-lightning
-              show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_fog
-                state: "on"
-            card:
-              type: custom:bubble-card
-              card_type: button
-              button_type: state
-              entity: sensor.ws_fog_probability
-              name: Fog probability
-              icon: mdi:weather-fog
-              show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_pattern_forecast
-                state: "on"
-            card:
-              type: vertical-stack
-              cards:
-                - type: custom:bubble-card
-                  card_type: separator
-                  name: Pattern Forecast (local)
-                  icon: mdi:chart-bell-curve-cumulative
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_pattern_forecast_status
-                  name: Status
-                  icon: mdi:school-outline
-                  show_state: true
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_pattern_frost_12h
-                  name: Chance of frost, 12 h
-                  icon: mdi:snowflake
-                  show_state: true
-                  show_attribute: true
-                  attribute: maturity
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_pattern_heat_24h
-                  name: Chance of a hot day, 24 h
-                  icon: mdi:sun-thermometer
-                  show_state: true
-                  show_attribute: true
-                  attribute: maturity
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_pattern_gust_3h
-                  name: Chance of a strong gust, 3 h
-                  icon: mdi:weather-windy
-                  show_state: true
-                  show_attribute: true
-                  attribute: maturity
-                # The storm forecast only exists with a lightning source, so
-                # hide it until the entity reports a value.
-                - type: conditional
-                  conditions:
-                    - condition: state
-                      entity: sensor.ws_pattern_storm_3h
-                      state_not: unavailable
-                  card:
-                    type: custom:bubble-card
-                    card_type: button
-                    button_type: state
-                    entity: sensor.ws_pattern_storm_3h
-                    name: Chance of a thunderstorm, 3 h
-                    icon: mdi:weather-lightning-rainy
+                icon: mdi:thermometer
+                show_state: true
+                sub_button:
+                  - entity: sensor.ws_feels_like
+                    name: Feels like
+                    icon: mdi:thermometer-lines
                     show_state: true
-                    show_attribute: true
-                    attribute: maturity
-                - type: markdown
-                  title: Maturity and why
-                  content: |
-                    {% set t = [('sensor.ws_pattern_rain_1h', 'Rain, 1 h'), ('sensor.ws_pattern_rain_3h', 'Rain, 3 h'), ('sensor.ws_pattern_rain_6h', 'Rain, 6 h'), ('sensor.ws_pattern_frost_12h', 'Frost, 12 h'), ('sensor.ws_pattern_heat_24h', 'Hot day, 24 h'), ('sensor.ws_pattern_gust_3h', 'Strong gust, 3 h'), ('sensor.ws_pattern_storm_3h', 'Thunderstorm, 3 h')] %}
-                    | Forecast | Chance | Maturity | Observed conditions (model effect) |
-                    |---|---|---|---|
-                    {% for e, label in t if state_attr(e, 'maturity') %}| {{ label }} | {{ (states(e) ~ ' %') if states(e) not in ['unknown', 'unavailable'] else '-' }} | {{ state_attr(e, 'maturity') }} | {% if state_attr(e, 'explanation') or state_attr(e, 'reason') %}{{ state_attr(e, 'explanation') or state_attr(e, 'reason') }}{% elif state_attr(e, 'maturity') == 'collecting' %}Collecting: {{ state_attr(e, 'progress_pct') or 0 }}%{% else %}{% for f in state_attr(e, 'top_factors') or [] %}{{ f.factor | replace('_', ' ') }} ({{ f.effect }}){{ ', ' if not loop.last }}{% endfor %}{% endif %} |
-                    {% endfor %}
+                  - entity: sensor.ws_humidity
+                    name: Humidity
+                    icon: mdi:water-percent
+                    show_state: true
+                button_action:
+                  tap_action:
+                    action: navigate
+                    navigation_path: "#ws-temperature"
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_today_mm
+                name: Rain today
+                icon: mdi:weather-pouring
+                show_state: true
+                sub_button:
+                  - entity: sensor.ws_rain_rate
+                    name: Rate
+                    icon: mdi:weather-rainy
+                    show_state: true
+                  - entity: sensor.ws_rain_last_24h
+                    name: Last 24 h
+                    icon: mdi:history
+                    show_state: true
+                button_action:
+                  tap_action:
+                    action: navigate
+                    navigation_path: "#ws-rain"
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_wind_speed
+                name: Wind
+                icon: mdi:weather-windy
+                show_state: true
+                sub_button:
+                  - entity: sensor.ws_wind_gust
+                    name: Gust
+                    icon: mdi:weather-windy-variant
+                    show_state: true
+                  - entity: sensor.ws_wind_direction
+                    name: Direction
+                    icon: mdi:compass-outline
+                    show_state: true
+                button_action:
+                  tap_action:
+                    action: navigate
+                    navigation_path: "#ws-wind"
 
-                    Use a forecast in automations once its maturity is **skilled**.
-          - type: custom:bubble-card
-            card_type: separator
-            name: Next hours
-            icon: mdi:clock-outline
-          - type: weather-forecast
-            entity: weather.ws
-            forecast_type: hourly
-            show_current: false
-            show_forecast: true
+          - type: vertical-stack
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Outlook
+                icon: mdi:crystal-ball
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_zambretti_forecast
+                name: Local outlook
+                icon: mdi:crystal-ball
+                show_state: true
+                sub_button:
+                  - entity: sensor.ws_pressure_trend
+                    name: Pressure trend
+                    icon: mdi:trending-up
+                    show_state: true
+                  - entity: sensor.ws_sea_level_pressure
+                    name: Pressure
+                    icon: mdi:gauge
+                    show_state: true
+                button_action:
+                  tap_action:
+                    action: navigate
+                    navigation_path: "#ws-forecast"
+              - type: weather-forecast
+                entity: weather.ws
+                forecast_type: daily
+                show_current: false
+                show_forecast: true
 
-      # -----------------------------------------------------------------------
-      # Pop-up: Garden and air
-      # -----------------------------------------------------------------------
-      - type: custom:bubble-card
-        card_type: pop-up
-        hash: "#ws-garden"
-        name: Garden & Air
-        icon: mdi:sprout
-        entity: sensor.ws_et0_daily
-        show_state: true
+          - type: vertical-stack
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Garden and station
+                icon: mdi:sprout
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_et0_daily
+                name: Garden
+                icon: mdi:sprout
+                show_state: true
+                sub_button:
+                  - entity: sensor.ws_uv_index
+                    name: UV
+                    icon: mdi:sun-wireless
+                    show_state: true
+                  - entity: sensor.ws_irrigation_deficit
+                    name: Water deficit
+                    icon: mdi:water-minus
+                    show_state: true
+                button_action:
+                  tap_action:
+                    action: navigate
+                    navigation_path: "#ws-garden"
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_station_health
+                name: Station
+                icon: mdi:access-point
+                show_state: true
+                sub_button:
+                  - entity: sensor.ws_alert_state
+                    name: Alerts
+                    icon: mdi:alert-outline
+                    show_state: true
+                button_action:
+                  tap_action:
+                    action: navigate
+                    navigation_path: "#ws-station"
+
+      # ---------------------------------------------------------------------
+      # Pop-ups (hidden until opened) and the bottom bar. Bubble Card requires
+      # the bar to be the last card of the view's last section.
+      # ---------------------------------------------------------------------
+      - type: grid
         cards:
+          # -------------------------------------------------------------------
+          # Pop-up: Temperature and comfort
+          # -------------------------------------------------------------------
           - type: custom:bubble-card
-            card_type: separator
-            name: Irrigation
-            icon: mdi:sprinkler-variant
+            card_type: pop-up
+            hash: "#ws-temperature"
+            name: Temperature
+            icon: mdi:thermometer
+            entity: sensor.ws_temperature
+            show_state: true
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Last 24 hours
+                icon: mdi:clock-outline
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_temperature_high_24h
+                name: High
+                icon: mdi:thermometer-chevron-up
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_temperature_low_24h
+                name: Low
+                icon: mdi:thermometer-chevron-down
+                show_state: true
+              - type: history-graph
+                hours_to_show: 24
+                entities:
+                  - entity: sensor.ws_temperature
+                    name: Temperature
+                  - entity: sensor.ws_dew_point
+                    name: Dew point
+              - type: custom:bubble-card
+                card_type: separator
+                name: How it feels
+                icon: mdi:account-outline
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_feels_like
+                name: Feels like
+                icon: mdi:thermometer-lines
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_humidity
+                name: Humidity
+                icon: mdi:water-percent
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_dew_point
+                name: Dew point
+                icon: mdi:water-thermometer
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_frost_point
+                name: Frost point
+                icon: mdi:snowflake-thermometer
+                show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_comfort_indices
+                    state: "on"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_utci
+                      name: UTCI (heat stress)
+                      icon: mdi:human-handsup
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_wbgt
+                      name: WBGT (outdoor work and sport)
+                      icon: mdi:run
+                      show_state: true
+
+          # -------------------------------------------------------------------
+          # Pop-up: Rain
+          # -------------------------------------------------------------------
           - type: custom:bubble-card
-            card_type: button
-            button_type: state
+            card_type: pop-up
+            hash: "#ws-rain"
+            name: Rain today
+            icon: mdi:weather-pouring
+            entity: sensor.ws_rain_today_mm
+            show_state: true
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Now
+                icon: mdi:weather-rainy
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_rate
+                name: Rain rate
+                icon: mdi:weather-rainy
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_rate_max_24h
+                name: Heaviest rate, 24 h
+                icon: mdi:weather-pouring
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_dry_streak_days
+                name: Days since rain
+                icon: mdi:weather-sunny-off
+                show_state: true
+              - type: custom:bubble-card
+                card_type: separator
+                name: Totals
+                icon: mdi:cup-water
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_last_1h
+                name: Last hour
+                icon: mdi:clock-outline
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_last_24h
+                name: Last 24 hours
+                icon: mdi:history
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_this_week
+                name: This week
+                icon: mdi:calendar-week
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_this_month
+                name: This month
+                icon: mdi:calendar-month
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_rain_this_year
+                name: This year
+                icon: mdi:calendar
+                show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_nowcast
+                    state: "on"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:bubble-card
+                      card_type: separator
+                      name: Nowcast (Open-Meteo)
+                      icon: mdi:radar
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_minutes_until_rain
+                      name: Minutes until rain
+                      icon: mdi:timer-sand
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_minutes_until_dry
+                      name: Minutes until dry
+                      icon: mdi:timer-sand-complete
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_rain_next_60min
+                      name: Next 60 minutes
+                      icon: mdi:weather-rainy
+                      show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_pattern_forecast
+                    state: "on"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:bubble-card
+                      card_type: separator
+                      name: Pattern Forecast (local)
+                      icon: mdi:chart-bell-curve-cumulative
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pattern_rain_1h
+                      name: Chance of rain, 1 h
+                      icon: mdi:umbrella-outline
+                      show_state: true
+                      show_attribute: true
+                      attribute: maturity
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pattern_rain_3h
+                      name: Chance of rain, 3 h
+                      icon: mdi:umbrella
+                      show_state: true
+                      show_attribute: true
+                      attribute: maturity
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pattern_rain_6h
+                      name: Chance of rain, 6 h
+                      icon: mdi:umbrella-closed
+                      show_state: true
+                      show_attribute: true
+                      attribute: maturity
+
+          # -------------------------------------------------------------------
+          # Pop-up: Wind
+          # -------------------------------------------------------------------
+          - type: custom:bubble-card
+            card_type: pop-up
+            hash: "#ws-wind"
+            name: Wind
+            icon: mdi:weather-windy
+            entity: sensor.ws_wind_speed
+            show_state: true
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Now
+                icon: mdi:weather-windy
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_wind_gust
+                name: Gust
+                icon: mdi:weather-windy-variant
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_wind_beaufort
+                name: Beaufort
+                icon: mdi:sail-boat
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_wind_direction
+                name: Direction
+                icon: mdi:compass-outline
+                show_state: true
+              - type: custom:bubble-card
+                card_type: separator
+                name: Last 24 hours
+                icon: mdi:clock-outline
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_wind_gust_max_24h
+                name: Strongest gust
+                icon: mdi:weather-tornado
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_dominant_wind_direction
+                name: Dominant direction
+                icon: mdi:compass-rose
+                show_state: true
+              - type: history-graph
+                hours_to_show: 24
+                entities:
+                  - entity: sensor.ws_wind_speed
+                    name: Wind
+                  - entity: sensor.ws_wind_gust
+                    name: Gust
+
+          # -------------------------------------------------------------------
+          # Pop-up: Forecast (Zambretti, provider forecast, Pattern Forecast)
+          # -------------------------------------------------------------------
+          - type: custom:bubble-card
+            card_type: pop-up
+            hash: "#ws-forecast"
+            name: Forecast
+            icon: mdi:crystal-ball
+            entity: sensor.ws_pressure_trend
+            show_state: true
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Local outlook
+                icon: mdi:crystal-ball
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_zambretti_forecast
+                name: Zambretti forecast
+                icon: mdi:crystal-ball
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_pressure_trend
+                name: Pressure trend
+                icon: mdi:trending-up
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_sea_level_pressure
+                name: Sea-level pressure
+                icon: mdi:gauge
+                show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_thunderstorm_risk
+                    state: "on"
+                card:
+                  type: custom:bubble-card
+                  card_type: button
+                  button_type: state
+                  entity: sensor.ws_thunderstorm_risk
+                  name: Thunderstorm risk
+                  icon: mdi:weather-lightning
+                  show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_fog
+                    state: "on"
+                card:
+                  type: custom:bubble-card
+                  card_type: button
+                  button_type: state
+                  entity: sensor.ws_fog_probability
+                  name: Fog probability
+                  icon: mdi:weather-fog
+                  show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_pattern_forecast
+                    state: "on"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:bubble-card
+                      card_type: separator
+                      name: Pattern Forecast (local)
+                      icon: mdi:chart-bell-curve-cumulative
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pattern_forecast_status
+                      name: Status
+                      icon: mdi:school-outline
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pattern_frost_12h
+                      name: Chance of frost, 12 h
+                      icon: mdi:snowflake
+                      show_state: true
+                      show_attribute: true
+                      attribute: maturity
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pattern_heat_24h
+                      name: Chance of a hot day, 24 h
+                      icon: mdi:sun-thermometer
+                      show_state: true
+                      show_attribute: true
+                      attribute: maturity
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pattern_gust_3h
+                      name: Chance of a strong gust, 3 h
+                      icon: mdi:weather-windy
+                      show_state: true
+                      show_attribute: true
+                      attribute: maturity
+                    # The storm forecast only exists with a lightning source, so
+                    # hide it until the entity reports a value.
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_storm_3h
+                          state_not: unavailable
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_storm_3h
+                        name: Chance of a thunderstorm, 3 h
+                        icon: mdi:weather-lightning-rainy
+                        show_state: true
+                        show_attribute: true
+                        attribute: maturity
+                    - type: markdown
+                      title: Maturity and why
+                      content: |
+                        {% set t = [('sensor.ws_pattern_rain_1h', 'Rain, 1 h'), ('sensor.ws_pattern_rain_3h', 'Rain, 3 h'), ('sensor.ws_pattern_rain_6h', 'Rain, 6 h'), ('sensor.ws_pattern_frost_12h', 'Frost, 12 h'), ('sensor.ws_pattern_heat_24h', 'Hot day, 24 h'), ('sensor.ws_pattern_gust_3h', 'Strong gust, 3 h'), ('sensor.ws_pattern_storm_3h', 'Thunderstorm, 3 h')] %}
+                        | Forecast | Chance | Maturity | Observed conditions (model effect) |
+                        |---|---|---|---|
+                        {% for e, label in t if state_attr(e, 'maturity') %}| {{ label }} | {{ (states(e) ~ ' %') if states(e) not in ['unknown', 'unavailable'] else '-' }} | {{ state_attr(e, 'maturity') }} | {% if state_attr(e, 'explanation') or state_attr(e, 'reason') %}{{ state_attr(e, 'explanation') or state_attr(e, 'reason') }}{% elif state_attr(e, 'maturity') == 'collecting' %}Collecting: {{ state_attr(e, 'progress_pct') or 0 }}%{% else %}{% for f in state_attr(e, 'top_factors') or [] %}{{ f.factor | replace('_', ' ') }} ({{ f.effect }}){{ ', ' if not loop.last }}{% endfor %}{% endif %} |
+                        {% endfor %}
+
+                        Use a forecast in automations once its maturity is **skilled**.
+              - type: custom:bubble-card
+                card_type: separator
+                name: Next hours
+                icon: mdi:clock-outline
+              - type: weather-forecast
+                entity: weather.ws
+                forecast_type: hourly
+                show_current: false
+                show_forecast: true
+
+          # -------------------------------------------------------------------
+          # Pop-up: Garden and air
+          # -------------------------------------------------------------------
+          - type: custom:bubble-card
+            card_type: pop-up
+            hash: "#ws-garden"
+            name: Garden & Air
+            icon: mdi:sprout
             entity: sensor.ws_et0_daily
-            name: Evapotranspiration (ET0) today
-            icon: mdi:water-sync
             show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_irrigation_deficit
-            name: Water deficit
-            icon: mdi:water-minus
-            show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_comfort_indices
-                state: "on"
-            card:
-              type: custom:bubble-card
-              card_type: button
-              button_type: state
-              entity: sensor.ws_vpd
-              name: Vapour pressure deficit
-              icon: mdi:leaf
-              show_state: true
-          - type: custom:bubble-card
-            card_type: separator
-            name: Sun
-            icon: mdi:white-balance-sunny
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_uv_index
-            name: UV index
-            icon: mdi:sun-wireless
-            show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_solar_forecast
-                state: "on"
-            card:
-              type: custom:bubble-card
-              card_type: button
-              button_type: state
-              entity: sensor.ws_solar_forecast_today
-              name: Solar forecast today
-              icon: mdi:solar-power
-              show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_air_quality
-                state: "on"
-            card:
-              type: vertical-stack
-              cards:
-                - type: custom:bubble-card
-                  card_type: separator
-                  name: Air quality
-                  icon: mdi:air-filter
-                - type: custom:bubble-card
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Irrigation
+                icon: mdi:sprinkler-variant
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_et0_daily
+                name: Evapotranspiration (ET0) today
+                icon: mdi:water-sync
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_irrigation_deficit
+                name: Water deficit
+                icon: mdi:water-minus
+                show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_comfort_indices
+                    state: "on"
+                card:
+                  type: custom:bubble-card
                   card_type: button
                   button_type: state
-                  entity: sensor.ws_air_quality_index
-                  name: Air quality index
-                  icon: mdi:air-filter
+                  entity: sensor.ws_vpd
+                  name: Vapour pressure deficit
+                  icon: mdi:leaf
                   show_state: true
-                - type: custom:bubble-card
+              - type: custom:bubble-card
+                card_type: separator
+                name: Sun
+                icon: mdi:white-balance-sunny
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_uv_index
+                name: UV index
+                icon: mdi:sun-wireless
+                show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_solar_forecast
+                    state: "on"
+                card:
+                  type: custom:bubble-card
                   card_type: button
                   button_type: state
-                  entity: sensor.ws_pm2_5
-                  name: PM2.5
-                  icon: mdi:molecule
+                  entity: sensor.ws_solar_forecast_today
+                  name: Solar forecast today
+                  icon: mdi:solar-power
                   show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_pollen
-                state: "on"
-            card:
-              type: custom:bubble-card
-              card_type: button
-              button_type: state
-              entity: sensor.ws_pollen_level
-              name: Pollen
-              icon: mdi:flower-pollen
-              show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_fire_risk_score
-                state: "on"
-            card:
-              type: custom:bubble-card
-              card_type: button
-              button_type: state
-              entity: sensor.ws_fire_risk_score
-              name: Fire risk
-              icon: mdi:fire-alert
-              show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_air_quality
+                    state: "on"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:bubble-card
+                      card_type: separator
+                      name: Air quality
+                      icon: mdi:air-filter
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_air_quality_index
+                      name: Air quality index
+                      icon: mdi:air-filter
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_pm2_5
+                      name: PM2.5
+                      icon: mdi:molecule
+                      show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_pollen
+                    state: "on"
+                card:
+                  type: custom:bubble-card
+                  card_type: button
+                  button_type: state
+                  entity: sensor.ws_pollen_level
+                  name: Pollen
+                  icon: mdi:flower-pollen
+                  show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_fire_risk_score
+                    state: "on"
+                card:
+                  type: custom:bubble-card
+                  card_type: button
+                  button_type: state
+                  entity: sensor.ws_fire_risk_score
+                  name: Fire risk
+                  icon: mdi:fire-alert
+                  show_state: true
 
-      # -----------------------------------------------------------------------
-      # Pop-up: Station health
-      # -----------------------------------------------------------------------
-      - type: custom:bubble-card
-        card_type: pop-up
-        hash: "#ws-station"
-        name: Station
-        icon: mdi:access-point
-        entity: sensor.ws_station_health
-        show_state: true
-        cards:
+          # -------------------------------------------------------------------
+          # Pop-up: Station health
+          # -------------------------------------------------------------------
           - type: custom:bubble-card
-            card_type: separator
-            name: Alerts
-            icon: mdi:alert-outline
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_alert_state
-            name: Alert level
-            icon: mdi:alert-outline
-            show_state: true
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_alert_message
-            name: Message
-            icon: mdi:message-alert-outline
-            show_state: true
-          - type: custom:bubble-card
-            card_type: separator
-            name: Hardware
+            card_type: pop-up
+            hash: "#ws-station"
+            name: Station
             icon: mdi:access-point
-          - type: custom:bubble-card
-            card_type: button
-            button_type: state
-            entity: sensor.ws_package_status
-            name: Sensor package
-            icon: mdi:package-variant-closed
+            entity: sensor.ws_station_health
             show_state: true
-          # Only stations that report a battery level (the Shelly WS90 does).
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: sensor.ws_battery
-                state_not: unavailable
-            card:
-              type: custom:bubble-card
-              card_type: button
-              button_type: state
-              entity: sensor.ws_battery
-              name: Battery
-              icon: mdi:battery
-              show_state: true
-          - type: conditional
-            conditions:
-              - condition: state
-                entity: switch.ws_enable_diagnostics
-                state: "on"
-            card:
-              type: vertical-stack
-              cards:
-                - type: custom:bubble-card
-                  card_type: separator
-                  name: Data quality
-                  icon: mdi:check-decagram-outline
-                - type: custom:bubble-card
+            cards:
+              - type: custom:bubble-card
+                card_type: separator
+                name: Alerts
+                icon: mdi:alert-outline
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_alert_state
+                name: Alert level
+                icon: mdi:alert-outline
+                show_state: true
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_alert_message
+                name: Message
+                icon: mdi:message-alert-outline
+                show_state: true
+              - type: custom:bubble-card
+                card_type: separator
+                name: Hardware
+                icon: mdi:access-point
+              - type: custom:bubble-card
+                card_type: button
+                button_type: state
+                entity: sensor.ws_package_status
+                name: Sensor package
+                icon: mdi:package-variant-closed
+                show_state: true
+              # Only stations that report a battery level (the Shelly WS90 does).
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: sensor.ws_battery
+                    state_not: unavailable
+                card:
+                  type: custom:bubble-card
                   card_type: button
                   button_type: state
-                  entity: sensor.ws_data_quality_score
-                  name: Data quality score
-                  icon: mdi:check-decagram-outline
+                  entity: sensor.ws_battery
+                  name: Battery
+                  icon: mdi:battery
                   show_state: true
-                - type: custom:bubble-card
-                  card_type: button
-                  button_type: state
-                  entity: sensor.ws_sensor_stuck
-                  name: Stuck sensors
-                  icon: mdi:alert-octagon-outline
-                  show_state: true
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: switch.ws_enable_diagnostics
+                    state: "on"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:bubble-card
+                      card_type: separator
+                      name: Data quality
+                      icon: mdi:check-decagram-outline
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_data_quality_score
+                      name: Data quality score
+                      icon: mdi:check-decagram-outline
+                      show_state: true
+                    - type: custom:bubble-card
+                      card_type: button
+                      button_type: state
+                      entity: sensor.ws_sensor_stuck
+                      name: Stuck sensors
+                      icon: mdi:alert-octagon-outline
+                      show_state: true
 
-      # -----------------------------------------------------------------------
-      # Bottom bar. Bubble Card requires it to be the last card in the view.
-      # -----------------------------------------------------------------------
-      - type: custom:bubble-card
-        card_type: horizontal-buttons-stack
-        1_name: Temp
-        1_icon: mdi:thermometer
-        1_link: "#ws-temperature"
-        2_name: Rain
-        2_icon: mdi:weather-pouring
-        2_link: "#ws-rain"
-        3_name: Wind
-        3_icon: mdi:weather-windy
-        3_link: "#ws-wind"
-        4_name: Forecast
-        4_icon: mdi:crystal-ball
-        4_link: "#ws-forecast"
-        5_name: Garden
-        5_icon: mdi:sprout
-        5_link: "#ws-garden"
-        6_name: Station
-        6_icon: mdi:access-point
-        6_link: "#ws-station"
+          # -------------------------------------------------------------------
+          # Bottom bar. Bubble Card requires it to be the last card.
+          # -------------------------------------------------------------------
+          - type: custom:bubble-card
+            card_type: horizontal-buttons-stack
+            # Bubble Card caps the bar at 540px on desktop, which clips six buttons.
+            width_desktop: 760px
+            1_name: Temp
+            1_icon: mdi:thermometer
+            1_link: "#ws-temperature"
+            2_name: Rain
+            2_icon: mdi:weather-pouring
+            2_link: "#ws-rain"
+            3_name: Wind
+            3_icon: mdi:weather-windy
+            3_link: "#ws-wind"
+            4_name: Forecast
+            4_icon: mdi:crystal-ball
+            4_link: "#ws-forecast"
+            5_name: Garden
+            5_icon: mdi:sprout
+            5_link: "#ws-garden"
+            6_name: Station
+            6_icon: mdi:access-point
+            6_link: "#ws-station"

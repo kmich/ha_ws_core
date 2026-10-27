@@ -131,6 +131,13 @@ def _bubble_links(node, out=None):
     return out
 
 
+def _top_level_cards(view):
+    """A view's own cards: `cards` for masonry views, each section's cards for sections views."""
+    if view.get("type") == "sections":
+        return [card for section in view.get("sections", []) for card in section.get("cards", [])]
+    return view.get("cards", [])
+
+
 def test_bubble_popups_use_standalone_format():
     """Bubble Card v3.2+ pop-ups hold their content in `cards`, not a vertical-stack wrapper."""
     config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
@@ -139,7 +146,7 @@ def test_bubble_popups_use_standalone_format():
     for popup in popups:
         assert popup.get("cards"), f"Pop-up {popup.get('hash')} has no cards"
     for view in config["views"]:
-        for card in view.get("cards", []):
+        for card in _top_level_cards(view):
             if card.get("type") == "vertical-stack":
                 first = (card.get("cards") or [{}])[0]
                 assert first.get("card_type") != "pop-up", "Pop-up uses the old vertical-stack wrapper"
@@ -159,7 +166,8 @@ def test_bubble_bottom_bar_is_last_card_in_view():
     """Bubble Card requires the horizontal-buttons-stack to be the view's last card, outside any stack."""
     config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
     for view in config["views"]:
-        cards = view.get("cards", [])
+        cards = _top_level_cards(view)
+        assert cards, f"View {view.get('path')} has no cards"
         stacks = [c for c in _bubble_cards(cards) if c.get("card_type") == "horizontal-buttons-stack"]
         if not stacks:
             continue
@@ -213,3 +221,13 @@ def test_bubble_gated_sensors_sit_behind_their_switch():
     }
     config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
     assert _gate_violations(config, set(), toggles, []) == []
+
+
+def test_bubble_main_page_is_one_column():
+    """A one-column sections view keeps the short main page from spreading thin on a desktop."""
+    config = yaml.safe_load(BUBBLE_DASHBOARD.read_text(encoding="utf-8"))
+    view = config["views"][0]
+    assert view.get("type") == "sections"
+    assert view.get("max_columns") == 1
+    bar = _top_level_cards(view)[-1]
+    assert bar.get("width_desktop"), "Six bottom-bar buttons don't fit Bubble Card's 540px desktop default"

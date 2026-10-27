@@ -103,6 +103,7 @@ including the **Recent Weather Events** logbook card.
 ## Bubble Card Dashboard (`ws_core_bubble_dashboard.yaml`)
 
 Mobile-first dashboard built on [Bubble Card](https://github.com/Clooos/Bubble-Card).
+It's a single centred column on every screen, phone-sized even on a desktop.
 One page with a banner for any active weather advisory or warning, summary buttons
 grouped into Now (temperature, rain, wind), Outlook (local outlook and the provider
 forecast) and Garden and station. Tap a button, or use the bottom bar, to open its pop-up:

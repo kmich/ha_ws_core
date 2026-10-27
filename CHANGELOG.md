@@ -13,6 +13,7 @@ All notable changes to Weather Station Core are documented here.
 
 - Bubble Card dashboard: an active weather advisory or warning now shows as a banner at the top of the page. The main page is grouped into Now, Outlook, and Garden and station, with a Station button showing station health and alerts.
 - Bubble Card dashboard: pop-up headers show their headline value. Rain adds this week's total, the heaviest rate in 24 hours and the nowcast time until dry. Wind is split into Now and Last 24 hours. Forecast shows the Zambretti text in full and adds the Pattern Forecast thunderstorm chance on stations with a lightning source. Station shows the alert message.
+- Bubble Card dashboard: the page is now a single centred column on every screen, so a desktop no longer spreads the short main page across several mostly empty columns. The bottom bar is wide enough on desktop to show all six buttons; before, Bubble Card's 540px default cut off Garden and Station.
 
 ## [2.13.3] - 2026-10-27
 
