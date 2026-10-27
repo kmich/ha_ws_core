@@ -14,6 +14,17 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 ![Station sensors go into ws_core, which runs inside Home Assistant and produces sensors, a weather entity, blueprints and dashboards](screenshots/architecture_flow.svg)
 
+## What's new
+
+- **Forecasts that learn from your own station.** Pattern Forecast gives the chance of rain, frost, a hot day, strong gusts and thunderstorms over the next hours. It now learns from the history Home Assistant already has, so it can show numbers minutes after you switch it on instead of weeks later.
+- **A rain chance that keeps score.** Your station's rain estimate and the forecast provider's are checked against your gauge every 6 hours, and whichever has been more accurate at your location gets more say. In 2.13.5 both are scored on the same 6-hour window, so the comparison is fair.
+- **Sensors that explain themselves.** When a value can't be calculated, the sensor tells you why (a missing source, a formula that doesn't apply right now, or a model still collecting data) instead of a bare `unknown`.
+- **Faster storm warnings.** Nearby lightning raises the alert straight away and keeps it for 30 minutes after the last strike, and heavy rain alerts start at 10 mm/h.
+- **A new phone-friendly dashboard.** The Bubble Card dashboard puts the current weather, the outlook and the station on one screen, with pop-ups for the details and an optional photo of the current weather behind it. [Screenshots below](#dashboards).
+- **Clearer station health** and fewer false "sensor spike" warnings.
+
+The [changelog](CHANGELOG.md) has every change.
+
 ## What it does
 
 **Rain.** A rain rate filtered from your gauge's running total, totals from the last hour to the year, days since rain and an adaptive rain chance (see [below](#forecasts-that-learn)). The opt-in precipitation nowcast combines Open-Meteo's 15-minute forecast with your gauge for `sensor.ws_minutes_until_rain` and `sensor.ws_minutes_until_dry`.
@@ -93,7 +104,7 @@ The Enhanced dashboard on a Shelly WS90, Weather page and Advanced page:
 
 ![Enhanced dashboard Advanced page: hazards, temperature, wind, pressure and rain detail cards](screenshots/weather_dashboard_advanced.png)
 
-The Bubble dashboard on the same station:
+The Bubble dashboard on the same station, with the weather background on:
 
 | Main page | Forecast pop-up |
 |---|---|
