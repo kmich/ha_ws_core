@@ -1,8 +1,8 @@
 # Weather Station Core
 
-**Turn your weather station into proactive smart home automations — not just numbers on a dashboard.**
+Weather Station Core (`ws_core`) is a Home Assistant integration for personal weather stations. It reads the temperature, humidity, pressure, wind and rain sensors your station already provides and calculates the things you'd actually automate on: frost point, heat stress, evapotranspiration for irrigation, fire danger, a barometric outlook, and short-term rain, frost and gust chances learned from your own station's history.
 
-Weather Station Core (`ws_core`) is a Home Assistant custom integration that transforms raw sensor data from any weather station into local predictive intelligence. Calculate real garden evapotranspiration (ET₀), protect awnings from wind gusts, get frost and heat-stress warnings, and forecast from your own barometer. **Every derived sensor is computed locally on your machine.** The few features that use internet data (the weather forecast, and opt-in extras like the rain nowcast) are listed in the README's Data & Privacy Disclosure.
+Derived values are calculated inside Home Assistant. By default ws_core also fetches a weather forecast and runs an hourly sanity check against Open-Meteo; both can be turned off, and every other internet feature is opt-in. The [data and privacy table](https://github.com/kmich/ha_ws_core#data-and-privacy) in the README lists them all.
 
 [![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
