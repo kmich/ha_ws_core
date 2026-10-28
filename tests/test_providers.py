@@ -88,3 +88,65 @@ async def test_met_no_provider_fetch():
     assert result["provider"] == "met_no"
     assert "daily" in result
     assert "hourly" in result
+
+
+def _ha_entity_hass(attributes: dict, daily: list[dict], hourly: list[dict]) -> MagicMock:
+    hass = MagicMock()
+    state = MagicMock()
+    state.attributes = attributes
+    hass.states.get.return_value = state
+
+    async def _call(domain, service, data, blocking, return_response):
+        forecast = daily if data["type"] == "daily" else hourly
+        return {data["entity_id"]: {"forecast": forecast}}
+
+    hass.services.async_call = AsyncMock(side_effect=_call)
+    return hass
+
+
+@pytest.mark.asyncio
+async def test_ha_entity_provider_converts_imperial_source():
+    """A °F/mph/in source entity is converted to the metric contract (issue #174)."""
+    hass = _ha_entity_hass(
+        {"temperature_unit": "°F", "wind_speed_unit": "mph", "precipitation_unit": "in"},
+        [
+            {
+                "datetime": "2026-10-28T12:00:00+00:00",
+                "temperature": 66,
+                "templow": 39,
+                "precipitation": 1.0,
+                "wind_speed": 10,
+                "wind_gust_speed": 20,
+            }
+        ],
+        [{"datetime": "2026-10-28T12:00:00+00:00", "temperature": 32, "dew_point": 23, "wind_speed": 0}],
+    )
+    result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.pirateweather")
+
+    day = result["daily"][0]
+    assert day["tmax_c"] == pytest.approx(18.89, abs=0.01)
+    assert day["tmin_c"] == pytest.approx(3.89, abs=0.01)
+    assert day["precip_mm"] == pytest.approx(25.4)
+    assert day["wind_kmh"] == pytest.approx(16.09, abs=0.01)
+    assert day["gust_kmh"] == pytest.approx(32.19, abs=0.01)
+
+    hour = result["hourly"][0]
+    assert hour["temp_c"] == pytest.approx(0.0)
+    assert hour["dewpoint_c"] == pytest.approx(-5.0)
+    assert hour["wind_kmh"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_ha_entity_provider_metric_source_keeps_zero_values():
+    """Metric values pass through, and 0 is not dropped as falsy."""
+    hass = _ha_entity_hass(
+        {"temperature_unit": "°C", "wind_speed_unit": "km/h", "precipitation_unit": "mm"},
+        [{"datetime": "2026-10-28T12:00:00+00:00", "temperature": 12.5, "templow": 0, "precipitation": 0}],
+        [],
+    )
+    result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.home")
+
+    day = result["daily"][0]
+    assert day["tmax_c"] == 12.5
+    assert day["tmin_c"] == 0.0
+    assert day["precip_mm"] == 0.0
