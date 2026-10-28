@@ -79,7 +79,7 @@ required. Contributed by @Benjamin45590.
 ## Home Assistant weather entity
 
 Uses any existing `weather.*` entity already integrated into Home Assistant. No
-external network call is made — forecast data comes from the existing HA integration.
+external network call is made; forecast data comes from the existing HA integration.
 
 This is useful if you already have Met.no, OpenWeatherMap, or another HA weather
 integration set up and do not want ws_core to make its own API calls.
@@ -89,6 +89,13 @@ the provider, then pick the entity from the dropdown.
 
 Uses the `weather.get_forecasts` service (HA 2024.2+) with fallback to the `forecast`
 attribute on older installations.
+
+The entity can use any units. Home Assistant hands out its forecast in the units
+the entity displays (for example °F, mph and inches on an imperial install), and
+ws_core converts them from the entity's `temperature_unit`, `wind_speed_unit` and
+`precipitation_unit` attributes. Before 2.13.7 the values were read as °C, km/h and
+mm, so an imperial entity's forecast was converted twice (a 66 °F high showed as
+151 °F).
 
 ---
 
