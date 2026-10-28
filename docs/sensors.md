@@ -245,6 +245,8 @@ Indoor rooms are configured under **Configure → Indoor Rooms**, where each roo
 | `sensor.ws_gdd_season` | °C·day | Season-to-date GDD |
 | `sensor.ws_leaf_wetness` | — | `wet` / `dry` |
 
+Degree days are shown in °F·day when the temperature unit is °F (1 °C·day = 1.8 °F·day). The base temperatures stay 18 °C (64.4 °F) for heating and cooling and 10 °C (50 °F) for growing.
+
 Seasons run 1 January - 31 December. Each completed day's total is added to its
 season at local midnight (including a day that ended while Home Assistant was stopped),
 and all three season totals reset on 1 January.

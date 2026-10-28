@@ -171,3 +171,52 @@ async def test_weather_forecast_daily_and_hourly(mock_config_entry, mock_coordin
     assert len(hourly) == 1
     assert hourly[0]["temperature"] is not None
     assert hourly[0]["wind_speed"] is not None
+
+
+def _sync_weather_units(entity, options, explicit):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    entity.coordinator.explicit_units = MagicMock(return_value=explicit)
+    entity.hass = MagicMock()
+    entity.registry_entry = SimpleNamespace(options=options)
+    reg = MagicMock()
+    with (
+        patch("homeassistant.helpers.entity_registry.async_get", return_value=reg),
+        patch.object(WSStationWeather, "async_registry_entry_updated"),
+    ):
+        entity._async_sync_registry_units()
+    return {c.args[1]: c.args[2] for c in reg.async_update_entity_options.call_args_list}
+
+
+def test_weather_units_follow_ws_core_choice(mock_config_entry, mock_coordinator):
+    """Imperial chosen in ws_core shows the weather entity in °F, not the HA default."""
+    entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+    writes = _sync_weather_units(entity, {}, {"temperature": "°F", "wind": "mph"})
+    assert writes["weather"] == {"temperature_unit": "°F", "wind_speed_unit": "mph"}
+    assert writes[DOMAIN] == {"weather_units": {"temperature_unit": "°F", "wind_speed_unit": "mph"}}
+
+
+def test_weather_units_keep_user_choice_and_drop_ours(mock_config_entry, mock_coordinator):
+    entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+    options = {
+        # temperature set by the user in HA, wind written earlier by ws_core
+        "weather": {"temperature_unit": "°C", "wind_speed_unit": "mph"},
+        DOMAIN: {"weather_units": {"wind_speed_unit": "mph"}},
+    }
+    # Back to full auto: ws_core removes only its own value.
+    writes = _sync_weather_units(entity, options, {})
+    assert writes["weather"] == {"temperature_unit": "°C"}
+    assert writes[DOMAIN] == {"weather_units": {}}
+
+    # Imperial again: the user's °C stays.
+    writes = _sync_weather_units(entity, options, {"temperature": "°F", "wind": "km/h"})
+    assert writes["weather"] == {"temperature_unit": "°C", "wind_speed_unit": "km/h"}
+    assert writes[DOMAIN] == {"weather_units": {"wind_speed_unit": "km/h"}}
+
+
+def test_weather_units_no_write_when_unchanged(mock_config_entry, mock_coordinator):
+    entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+    assert _sync_weather_units(entity, {}, {}) == {}
+    options = {"weather": {"pressure_unit": "inHg"}, DOMAIN: {"weather_units": {"pressure_unit": "inHg"}}}
+    assert _sync_weather_units(entity, options, {"pressure": "inHg"}) == {}

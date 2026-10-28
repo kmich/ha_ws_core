@@ -105,6 +105,12 @@ def _make_coordinator(**overrides):
     coord.entry_options = {}
     coord.sources = SOURCES
     coord.units_mode = "auto"
+    coord._temp_unit_conf = "auto"
+    coord._wind_unit_conf = "auto"
+    coord._pressure_unit_conf = "auto"
+    coord._rain_unit_conf = "auto"
+    coord._distance_unit_conf = "auto"
+    coord._altitude_unit_conf = "auto"
     coord.elevation_m = 50.0
     coord.hemisphere = "northern"
     coord.climate_region = "mediterranean"

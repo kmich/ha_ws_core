@@ -25,16 +25,20 @@ from custom_components.ws_core.const import (
     ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE,
     ET0_RADIATION_SOURCE_SENSOR,
     KEY_ALERT_STATE,
+    KEY_CONDITIONS_SUMMARY,
     KEY_DATA_QUALITY,
     KEY_DEW_POINT_C,
     KEY_FEELS_LIKE_C,
     KEY_FROST_POINT_C,
     KEY_HEALTH_DISPLAY,
+    KEY_NORM_TEMP_C,
     KEY_NORM_WIND_GUST_MS,
+    KEY_NORM_WIND_SPEED_MS,
     KEY_NOWCAST_STALE,
     KEY_PACKAGE_OK,
     KEY_RAIN_EXPECTED_1H,
     KEY_RAIN_EXPECTED_SOURCE,
+    KEY_RAIN_RATE_FILT,
     KEY_RAIN_THIS_MONTH_MM,
     KEY_RAIN_THIS_YEAR_MM,
     KEY_SEA_LEVEL_PRESSURE_HPA,
@@ -148,6 +152,12 @@ def _make_coordinator(
     coord.entry_options = {}
     coord.sources = sources
     coord.units_mode = "auto"
+    coord._temp_unit_conf = "auto"
+    coord._wind_unit_conf = "auto"
+    coord._pressure_unit_conf = "auto"
+    coord._rain_unit_conf = "auto"
+    coord._distance_unit_conf = "auto"
+    coord._altitude_unit_conf = "auto"
     coord.elevation_m = elevation
     coord.hemisphere = "northern"
     coord.climate_region = "mediterranean"
@@ -710,6 +720,67 @@ class TestValidateReadings:
 
         flags = WSStationCoordinator._validate_readings(None, None, None, None, None, None)
         assert flags == []
+
+    def test_station_pressure_at_altitude_not_flagged(self):
+        """Station pressure at 2195 m (~784 hPa) is normal, not out of range."""
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+
+        flags = WSStationCoordinator._validate_readings(10.0, 50.0, 783.9, 1.0, 2.0, 0.0, 2195.0)
+        assert not any("pressure" in f for f in flags)
+
+    def test_station_pressure_range_scales_with_elevation(self):
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+
+        # The same reading at sea level is far below any real pressure.
+        flags = WSStationCoordinator._validate_readings(10.0, 50.0, 783.9, 1.0, 2.0, 0.0, 0.0)
+        assert any("pressure" in f for f in flags)
+        # A sea-level value fed in at 2195 m is above the station's range.
+        flags = WSStationCoordinator._validate_readings(10.0, 50.0, 1016.0, 1.0, 2.0, 0.0, 2195.0)
+        assert any("pressure" in f for f in flags)
+
+
+class TestDisplayUnits:
+    """Free-text strings follow the configured units, not hardcoded metric."""
+
+    def test_temp_unit_resolution(self):
+        coord = _make_coordinator()
+        assert coord.temp_unit == "°C"
+        coord._temp_unit_conf = "F"
+        assert coord.temp_unit == "°F"
+        coord._temp_unit_conf = "auto"
+        coord.units_mode = "imperial"
+        assert coord.temp_unit == "°F"
+
+    def test_explicit_units_skip_full_auto(self):
+        coord = _make_coordinator()
+        assert coord.explicit_units() == {}
+        coord._wind_unit_conf = "km/h"
+        assert coord.explicit_units() == {"wind": "km/h"}
+        coord.units_mode = "imperial"
+        units = coord.explicit_units()
+        assert units["temperature"] == "°F"
+        assert units["pressure"] == "inHg"
+        assert units["wind"] == "km/h"
+
+    def test_conditions_summary_in_imperial(self):
+        coord = _make_coordinator()
+        coord.units_mode = "imperial"
+        coord.hass.config.language = "en"
+        data = {
+            KEY_NORM_TEMP_C: 20.0,
+            KEY_FEELS_LIKE_C: 25.0,
+            KEY_NORM_WIND_SPEED_MS: 4.4704,
+            KEY_NORM_WIND_GUST_MS: 8.9408,
+            KEY_RAIN_RATE_FILT: 25.4,
+        }
+        coord._compute_conditions_summary(data)
+        summary = data[KEY_CONDITIONS_SUMMARY]
+        assert summary.startswith("68.0°F")
+        assert "feels like 77.0°F" in summary
+        assert "1.00 in/h rain" in summary
+        assert "10 mph" in summary
+        assert "gusting 20" in summary
+        assert "°C" not in summary and "m/s" not in summary
 
 
 # ---------------------------------------------------------------------------

@@ -134,3 +134,101 @@ def test_added_to_hass_does_not_revert_user_rename():
     # The old behaviour force-renamed the entity back to sensor.ws_temperature.
     reg.async_update_entity.assert_not_called()
     assert s.entity_id == "sensor.my_outdoor_temperature"
+
+
+def _make_sensor(key, **units):
+    from unittest.mock import MagicMock
+
+    from custom_components.ws_core.sensor import SENSORS, WSSensor
+
+    desc = next(s for s in SENSORS if s.key == key)
+    coord = MagicMock()
+    coord.temp_unit = units.get("temp", "°C")
+    coord.wind_unit = units.get("wind", "m/s")
+    entry = MagicMock()
+    entry.entry_id = "entry_1"
+    return WSSensor(coord, entry, desc, "ws")
+
+
+def test_temperature_suggests_the_ws_core_unit():
+    """HA must show °F when ws_core is set to °F, even on a metric HA system."""
+    from custom_components.ws_core.const import KEY_NORM_TEMP_C
+
+    s = _make_sensor(KEY_NORM_TEMP_C, temp="°F")
+    assert s.native_unit_of_measurement == "°C"
+    assert s.suggested_unit_of_measurement == "°F"
+
+
+def test_unit_group_suggests_its_native_unit():
+    """Without a suggestion HA converted m/s to the unit system's mph or km/h."""
+    from custom_components.ws_core.const import KEY_NORM_WIND_SPEED_MS
+
+    s = _make_sensor(KEY_NORM_WIND_SPEED_MS, wind="m/s")
+    assert s.native_unit_of_measurement == "m/s"
+    assert s.suggested_unit_of_measurement == "m/s"
+
+
+def test_degree_days_follow_the_temperature_unit():
+    from custom_components.ws_core.const import KEY_HDD_TODAY_MM
+
+    s = _make_sensor(KEY_HDD_TODAY_MM, temp="°F")
+    s.coordinator.data = {KEY_HDD_TODAY_MM: 10.0}
+    assert s.native_unit_of_measurement == "°F·d"
+    assert s.native_value == 18.0
+
+    c = _make_sensor(KEY_HDD_TODAY_MM, temp="°C")
+    c.coordinator.data = {KEY_HDD_TODAY_MM: 10.0}
+    assert c.native_unit_of_measurement == "°C·d"
+    assert c.native_value == 10.0
+
+
+def test_temperature_difference_has_no_fahrenheit_offset():
+    """A +2 °C anomaly is +3.6 °F, not the 35.6 °F an absolute conversion gives."""
+    from custom_components.ws_core.const import KEY_TEMP_ANOMALY_30D
+
+    s = _make_sensor(KEY_TEMP_ANOMALY_30D, temp="°F")
+    s.coordinator.data = {KEY_TEMP_ANOMALY_30D: 2.0}
+    assert s.device_class is None
+    assert s.native_unit_of_measurement == "°F"
+    assert s.native_value == 3.6
+
+
+def _sync_registry_unit(sensor, options, shown_unit):
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock, PropertyMock, patch
+
+    from custom_components.ws_core.sensor import WSSensor
+
+    sensor.hass = MagicMock()
+    sensor.registry_entry = SimpleNamespace(options=options)
+    reg = MagicMock()
+    with (
+        patch("homeassistant.helpers.entity_registry.async_get", return_value=reg),
+        patch.object(WSSensor, "unit_of_measurement", new_callable=PropertyMock, return_value=shown_unit),
+        patch.object(WSSensor, "async_registry_entry_updated"),
+    ):
+        sensor._async_sync_registry_unit()
+    return reg
+
+
+def test_registry_unit_updated_when_ws_core_unit_changes():
+    """An entity registered while ws_core used mph keeps mph until told otherwise."""
+    from custom_components.ws_core.const import KEY_NORM_WIND_SPEED_MS
+
+    s = _make_sensor(KEY_NORM_WIND_SPEED_MS, wind="m/s")
+    reg = _sync_registry_unit(s, {"sensor.private": {"suggested_unit_of_measurement": "mph"}}, "mph")
+    reg.async_update_entity_options.assert_called_once_with(
+        s.entity_id, "sensor.private", {"suggested_unit_of_measurement": "m/s"}
+    )
+
+
+def test_registry_unit_left_alone_when_already_right_or_user_set():
+    from custom_components.ws_core.const import KEY_NORM_WIND_SPEED_MS
+
+    s = _make_sensor(KEY_NORM_WIND_SPEED_MS, wind="m/s")
+    reg = _sync_registry_unit(s, {}, "m/s")
+    reg.async_update_entity_options.assert_not_called()
+
+    # A unit picked in HA's entity settings always wins.
+    reg = _sync_registry_unit(s, {"sensor": {"unit_of_measurement": "km/h"}}, "km/h")
+    reg.async_update_entity_options.assert_not_called()

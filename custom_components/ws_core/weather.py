@@ -19,6 +19,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -45,6 +46,15 @@ from .const import (
 # Nowcast taper: local sensor weight for hours 0, 1, 2 of the hourly forecast.
 # By hour 3 the NWP model is fully trusted (weight 0.0).
 _NOWCAST_LOCAL_WEIGHTS = [0.7, 0.4, 0.2]
+
+# Weather-entity registry option per unit kind from coordinator.explicit_units().
+_WEATHER_UNIT_OPTIONS = {
+    "temperature": "temperature_unit",
+    "pressure": "pressure_unit",
+    "wind": "wind_speed_unit",
+    "rain": "precipitation_unit",
+    "distance": "visibility_unit",
+}
 
 
 def _nowcast_blend(local_val: float | None, api_val: float | None, local_w: float) -> float | None:
@@ -110,6 +120,43 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
     @property
     def device_info(self):
         return {"identifiers": {(DOMAIN, self._entry.entry_id)}}
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self._async_sync_registry_units()
+
+    @callback
+    def _async_sync_registry_units(self) -> None:
+        """Show the weather entity in the units chosen in ws_core.
+
+        A weather entity displays the HA unit system's units unless its registry
+        options name others, and those options are also where HA's entity
+        settings save the user's own choice. ws_core remembers what it wrote
+        under its own key and only ever replaces those values.
+        """
+        entry = self.registry_entry
+        if entry is None:
+            return
+        want = {_WEATHER_UNIT_OPTIONS[k]: u for k, u in self.coordinator.explicit_units().items()}
+        current = dict(entry.options.get("weather", {}))
+        ours = dict(entry.options.get(DOMAIN, {}))
+        applied = dict(ours.get("weather_units", {}))
+        new = dict(current)
+        for key in set(want) | set(applied):
+            if key in current and current[key] != applied.get(key):
+                continue  # chosen by the user in HA
+            if key in want:
+                new[key] = want[key]
+            else:
+                new.pop(key, None)
+        new_applied = {k: v for k, v in want.items() if new.get(k) == v}
+        if new == current and new_applied == applied:
+            return
+        registry = er.async_get(self.hass)
+        registry.async_update_entity_options(self.entity_id, "weather", new)
+        ours["weather_units"] = new_applied
+        self.registry_entry = registry.async_update_entity_options(self.entity_id, DOMAIN, ours)
+        self.async_registry_entry_updated()
 
     @callback
     def _handle_coordinator_update(self) -> None:

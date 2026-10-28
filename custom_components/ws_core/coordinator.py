@@ -35,6 +35,7 @@ from typing import Any
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
@@ -211,6 +212,7 @@ from .const import (
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_SUPPRESS_NOTIFICATIONS,
+    CONF_TEMP_UNIT,
     CONF_THRESH_FREEZE_C,
     CONF_THRESH_HEAT_DAY_C,
     CONF_THRESH_RAIN_RATE_MMPH,
@@ -298,6 +300,7 @@ from .const import (
     DEFAULT_SOLAR_PEAK_KW,
     DEFAULT_STALENESS_S,
     DEFAULT_SUPPRESS_NOTIFICATIONS,
+    DEFAULT_TEMP_UNIT,
     DEFAULT_THRESH_FREEZE_C,
     DEFAULT_THRESH_HEAT_DAY_C,
     DEFAULT_THRESH_RAIN_RATE_MMPH,
@@ -751,6 +754,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return self.entry_options.get(key, entry_data.get(key, default))
 
         self.units_mode = str(_get(CONF_UNITS_MODE, "auto"))
+        self._temp_unit_conf = str(_get(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT))
         self._wind_unit_conf = str(_get(CONF_WIND_UNIT, DEFAULT_WIND_UNIT))
         self._pressure_unit_conf = str(_get(CONF_PRESSURE_UNIT, DEFAULT_PRESSURE_UNIT))
         self._rain_unit_conf = str(_get(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT))
@@ -1214,6 +1218,49 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return imperial_unit if self._is_imperial() else metric_unit
 
     @property
+    def temp_unit(self) -> str:
+        """Display unit for temperatures and temperature differences."""
+        conf = {"C": UnitOfTemperature.CELSIUS, "F": UnitOfTemperature.FAHRENHEIT}.get(self._temp_unit_conf, "auto")
+        return self._resolve_unit(conf, UnitOfTemperature.CELSIUS, UnitOfTemperature.FAHRENHEIT)
+
+    def explicit_units(self) -> dict[str, str]:
+        """Units the user chose in ws_core, by kind.
+
+        A kind left on "auto" while the units mode is also "auto" is omitted:
+        it follows the HA unit system, which HA applies by itself.
+        """
+        mode_auto = (self.units_mode or "auto").lower() == "auto"
+        kinds = (
+            ("temperature", self._temp_unit_conf, self.temp_unit),
+            ("pressure", self._pressure_unit_conf, self.pressure_unit),
+            ("wind", self._wind_unit_conf, self.wind_unit),
+            ("rain", self._rain_unit_conf, self.rain_unit),
+            ("distance", self._distance_unit_conf, self.distance_unit),
+        )
+        return {kind: unit for kind, conf, unit in kinds if conf != "auto" or not mode_auto}
+
+    def _fmt_temp(self, c: float, digits: int = 1) -> str:
+        """Format a Celsius value in the configured temperature unit."""
+        if self.temp_unit == UnitOfTemperature.FAHRENHEIT:
+            return f"{float(c) * 9.0 / 5.0 + 32.0:.{digits}f}{UnitOfTemperature.FAHRENHEIT}"
+        return f"{float(c):.{digits}f}{UnitOfTemperature.CELSIUS}"
+
+    def _fmt_wind(self, ms: float, digits: int = 1, with_unit: bool = True) -> str:
+        """Format an m/s value in the configured wind unit."""
+        from .entity_descriptions import _WIND_FACTORS
+
+        unit = self.wind_unit
+        text = f"{float(ms) * _WIND_FACTORS.get(unit, 1.0):.{digits}f}"
+        return f"{text} {unit}" if with_unit else text
+
+    def _fmt_rain_rate(self, mmph: float) -> str:
+        """Format a mm/h value in the configured rain-rate unit."""
+        unit = self.rain_rate_unit
+        if unit == "in/h":
+            return f"{float(mmph) / 25.4:.2f} {unit}"
+        return f"{float(mmph):.1f} {unit}"
+
+    @property
     def wind_unit(self) -> str:
         return self._resolve_unit(self._wind_unit_conf, "m/s", "mph")
 
@@ -1646,13 +1693,20 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         wind_ms: float | None,
         gust_ms: float | None,
         dew_c: float | None,
+        elevation_m: float = 0.0,
     ) -> list[str]:
         flags: list[str] = []
         if tc is not None and not (VALID_TEMP_MIN_C <= tc <= VALID_TEMP_MAX_C):
             flags.append(f"temperature {tc:.1f}\u00b0C outside physical range")
         if rh is not None and not (VALID_HUMIDITY_MIN <= rh <= VALID_HUMIDITY_MAX):
             flags.append(f"humidity {rh:.0f}% outside valid range")
-        if pressure_hpa is not None and not (VALID_PRESSURE_MIN_HPA <= pressure_hpa <= VALID_PRESSURE_MAX_HPA):
+        # The source is station pressure, so the sea-level limits are scaled
+        # down to the station's elevation (ISA barometric ratio). At 2195 m the
+        # valid window is ~666-831 hPa instead of 870-1085.
+        ratio = (1.0 - 2.25577e-5 * min(float(elevation_m or 0.0), 9000.0)) ** 5.25588
+        p_min = VALID_PRESSURE_MIN_HPA * ratio
+        p_max = VALID_PRESSURE_MAX_HPA * ratio
+        if pressure_hpa is not None and not (p_min <= pressure_hpa <= p_max):
             flags.append(f"pressure {pressure_hpa:.1f} hPa outside physical range")
         if tc is not None and dew_c is not None and dew_c > tc + 0.5:
             flags.append("dew point exceeds temperature (check humidity sensor)")
@@ -1802,7 +1856,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Display strings
         if tc is not None:
-            data[KEY_TEMP_DISPLAY] = f"{float(tc):.1f}\u00b0C"
+            data[KEY_TEMP_DISPLAY] = self._fmt_temp(tc)
             # bar_percent: map temperature onto a -20°C…+40°C scale (0-100%)
             _t = float(tc)
             _pct = max(0.0, min(100.0, (_t - (-20.0)) / 60.0 * 100.0))
@@ -3540,7 +3594,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_triggers["wind"] = {
                 "type": "wind",
                 "severity": "warning",
-                "message": localize.alert(lang, "wind", v=f"{float(gust_ms):.1f}"),
+                "message": localize.alert(lang, "wind", v=self._fmt_wind(gust_ms)),
                 "icon": "mdi:weather-windy",
                 "color": "rgba(239,68,68,0.9)",
             }
@@ -3548,7 +3602,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_triggers["rain"] = {
                 "type": "rain",
                 "severity": "warning",
-                "message": localize.alert(lang, "rain", v=f"{float(rain_rate):.1f}"),
+                "message": localize.alert(lang, "rain", v=self._fmt_rain_rate(rain_rate)),
                 "icon": "mdi:weather-pouring",
                 "color": "rgba(59,130,246,0.9)",
             }
@@ -3556,7 +3610,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_triggers["freeze"] = {
                 "type": "freeze",
                 "severity": "advisory",
-                "message": localize.alert(lang, "freeze", v=f"{float(tc):.1f}"),
+                "message": localize.alert(lang, "freeze", v=self._fmt_temp(tc)),
                 "icon": "mdi:snowflake-alert",
                 "color": "rgba(147,197,253,0.9)",
             }
@@ -4119,22 +4173,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         zambretti = data.get(KEY_ZAMBRETTI_FORECAST)
 
         if tc is not None:
-            parts.append(f"{float(tc):.1f}°C")
+            parts.append(self._fmt_temp(tc))
             if feels is not None and abs(float(feels) - float(tc)) >= 2.0:
-                parts.append(localize.summary(lang, "feels_like", v=f"{float(feels):.1f}"))
+                parts.append(localize.summary(lang, "feels_like", v=self._fmt_temp(feels)))
 
         if float(rain_rate) > 0:
-            parts.append(localize.summary(lang, "rain", v=f"{float(rain_rate):.1f}"))
+            parts.append(localize.summary(lang, "rain", v=self._fmt_rain_rate(rain_rate)))
         elif zambretti and zambretti not in ("Settled fine", "Fine", "Becoming fine"):
             # Only include forecast if it's not obviously sunny
             pass  # zambretti already in forecast_tiles
 
         if wind_ms is not None and float(wind_ms) >= 1.0:
-            wind_str = f"{float(wind_ms):.0f} m/s"
+            wind_str = self._fmt_wind(wind_ms, 0)
             if wind_dir:
                 wind_str += f" {wind_dir}"
             if gust_ms is not None and float(gust_ms) >= float(wind_ms) * 1.5 and float(gust_ms) >= 5.0:
-                wind_str += " " + localize.summary(lang, "gusting", v=f"{float(gust_ms):.0f}")
+                wind_str += " " + localize.summary(lang, "gusting", v=self._fmt_wind(gust_ms, 0, with_unit=False))
             parts.append(wind_str)
 
         if humidity is not None:
@@ -4620,7 +4674,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._compute_rain_probability(data, mslp, trend_3h, rh)
         self._compute_forecast_agreement(data)
 
-        flags = self._validate_readings(tc, rh, pressure_hpa, wind_ms, gust_ms, dew_c)
+        flags = self._validate_readings(tc, rh, pressure_hpa, wind_ms, gust_ms, dew_c, self.elevation_m)
         data[KEY_SENSOR_QUALITY_FLAGS] = flags
 
         self._compute_condition(data, tc, rh, wind_ms, gust_ms, rain_rate, dew_c, lux, uv)

@@ -19,12 +19,12 @@ from custom_components.ws_core.const import (
 
 class TestLocalize:
     def test_french_summary_and_alert(self):
-        assert localize.summary("fr", "feels_like", v="20.0") == "ressenti 20.0°C"
+        assert localize.summary("fr", "feels_like", v="20.0°C") == "ressenti 20.0°C"
         assert localize.alert("fr", "clear") == "Tout est normal"
 
     def test_english_default(self):
         assert localize.summary("en", "no_data") == "No data"
-        assert localize.alert("en", "freeze", v="-1.0") == "Freeze risk: -1.0°C"
+        assert localize.alert("en", "freeze", v="-1.0°C") == "Freeze risk: -1.0°C"
 
     def test_unknown_language_falls_back_to_english(self):
         # German is not provided -> English fallback, no KeyError.

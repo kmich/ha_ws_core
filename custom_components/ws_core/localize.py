@@ -11,37 +11,38 @@ Add a new language by adding its two-letter code to both tables below.
 
 from __future__ import annotations
 
-# Conditions-summary fragments. ``{v}`` is a pre-formatted value.
+# Conditions-summary fragments. ``{v}`` is a pre-formatted value, unit included,
+# so it follows the configured display units.
 _SUMMARY: dict[str, dict[str, str]] = {
     "en": {
-        "feels_like": "feels like {v}°C",
-        "rain": "{v} mm/h rain",
+        "feels_like": "feels like {v}",
+        "rain": "{v} rain",
         "gusting": "gusting {v}",
         "humidity": "RH {v}%",
         "no_data": "No data",
     },
     "fr": {
-        "feels_like": "ressenti {v}°C",
-        "rain": "{v} mm/h de pluie",
+        "feels_like": "ressenti {v}",
+        "rain": "{v} de pluie",
         "gusting": "rafales {v}",
         "humidity": "HR {v}%",
         "no_data": "Aucune donnée",
     },
 }
 
-# Alert-message fragments. ``{v}`` is a pre-formatted value.
+# Alert-message fragments. ``{v}`` is a pre-formatted value, unit included.
 _ALERT: dict[str, dict[str, str]] = {
     "en": {
-        "wind": "Extreme wind: {v} m/s",
-        "rain": "Heavy rain: {v} mm/h",
-        "freeze": "Freeze risk: {v}°C",
+        "wind": "Extreme wind: {v}",
+        "rain": "Heavy rain: {v}",
+        "freeze": "Freeze risk: {v}",
         "lightning": "Lightning detected nearby — stay indoors",
         "clear": "All clear",
     },
     "fr": {
-        "wind": "Vent extrême : {v} m/s",
-        "rain": "Pluie forte : {v} mm/h",
-        "freeze": "Risque de gel : {v}°C",
+        "wind": "Vent extrême : {v}",
+        "rain": "Pluie forte : {v}",
+        "freeze": "Risque de gel : {v}",
         "lightning": "Foudre détectée à proximité — restez à l'intérieur",
         "clear": "Tout est normal",
     },
