@@ -7,6 +7,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util.unit_conversion import (
+    DistanceConverter,
+    SpeedConverter,
+    TemperatureConverter,
+)
 
 from .base import ForecastProvider
 
@@ -31,6 +37,38 @@ _CONDITION_TO_WMO: dict[str, int] = {
     "exceptional": 0,
 }
 
+# weather.get_forecasts answers in the source entity's display units, which
+# its state attributes name. ws_core's forecast contract is metric.
+_TEMP_UNIT_ATTR = "temperature_unit"
+_WIND_UNIT_ATTR = "wind_speed_unit"
+_PRECIP_UNIT_ATTR = "precipitation_unit"
+
+
+def _first(entry: dict, *keys: str) -> Any:
+    """Return the first value among keys that is not None (0 is a real value)."""
+    for key in keys:
+        value = entry.get(key)
+        if value is not None:
+            return value
+    return None
+
+
+def _convert(value: Any, converter: Any, from_unit: str | None, to_unit: str) -> float | None:
+    """Convert value into to_unit; pass it through when the source unit is unknown."""
+    if value is None:
+        return None
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not from_unit or from_unit == to_unit:
+        return num
+    try:
+        return round(converter.convert(num, from_unit, to_unit), 2)
+    except HomeAssistantError:
+        _LOGGER.debug("Unsupported forecast unit %r, passing the value through", from_unit)
+        return num
+
 
 class HaWeatherEntityProvider(ForecastProvider):
     """Forecast provider backed by an existing Home Assistant weather.* entity.
@@ -45,6 +83,8 @@ class HaWeatherEntityProvider(ForecastProvider):
 
     def __init__(self, hass: Any = None) -> None:
         self._hass = hass
+        # Unit attributes of the source entity, refreshed on every fetch.
+        self._units: dict[str, Any] = {}
 
     async def async_fetch(
         self,
@@ -64,9 +104,9 @@ class HaWeatherEntityProvider(ForecastProvider):
         daily_forecast = await self._get_forecast_via_service(entity_id, "daily")
         hourly_forecast = await self._get_forecast_via_service(entity_id, "hourly")
 
+        state = self._hass.states.get(entity_id)
         # Fall back to the deprecated forecast attribute if service call fails
         if not daily_forecast and not hourly_forecast:
-            state = self._hass.states.get(entity_id)
             if state is None:
                 raise ValueError(f"Weather entity '{entity_id}' not found in Home Assistant")
             raw = state.attributes.get("forecast") or []
@@ -74,6 +114,7 @@ class HaWeatherEntityProvider(ForecastProvider):
             daily_forecast = raw
             hourly_forecast = []
 
+        self._units = dict(state.attributes) if state is not None else {}
         daily_out = self._normalise_daily(daily_forecast)
         hourly_out = self._normalise_hourly(hourly_forecast or [])
 
@@ -98,6 +139,15 @@ class HaWeatherEntityProvider(ForecastProvider):
             _LOGGER.debug("weather.get_forecasts (%s, %s) unavailable: %s", entity_id, forecast_type, exc)
             return []
 
+    def _temp_c(self, entry: dict, *keys: str) -> float | None:
+        return _convert(_first(entry, *keys), TemperatureConverter, self._units.get(_TEMP_UNIT_ATTR), "°C")
+
+    def _speed_kmh(self, entry: dict, *keys: str) -> float | None:
+        return _convert(_first(entry, *keys), SpeedConverter, self._units.get(_WIND_UNIT_ATTR), "km/h")
+
+    def _precip_mm(self, entry: dict, *keys: str) -> float | None:
+        return _convert(_first(entry, *keys), DistanceConverter, self._units.get(_PRECIP_UNIT_ATTR), "mm")
+
     def _condition_to_wmo(self, condition: str | None) -> int | None:
         if not condition:
             return None
@@ -120,11 +170,11 @@ class HaWeatherEntityProvider(ForecastProvider):
             out.append(
                 {
                     "date": date,
-                    "tmax_c": entry.get("temperature") or entry.get("native_temperature"),
-                    "tmin_c": entry.get("templow") or entry.get("native_templow"),
-                    "precip_mm": entry.get("precipitation") or entry.get("native_precipitation"),
-                    "wind_kmh": entry.get("wind_speed") or entry.get("native_wind_speed"),
-                    "gust_kmh": entry.get("wind_gust_speed") or entry.get("native_wind_gust_speed"),
+                    "tmax_c": self._temp_c(entry, "temperature", "native_temperature"),
+                    "tmin_c": self._temp_c(entry, "templow", "native_templow"),
+                    "precip_mm": self._precip_mm(entry, "precipitation", "native_precipitation"),
+                    "wind_kmh": self._speed_kmh(entry, "wind_speed", "native_wind_speed"),
+                    "gust_kmh": self._speed_kmh(entry, "wind_gust_speed", "native_wind_gust_speed"),
                     "weathercode": self._condition_to_wmo(entry.get("condition")),
                     "precip_prob": entry.get("precipitation_probability"),
                 }
@@ -151,14 +201,14 @@ class HaWeatherEntityProvider(ForecastProvider):
             out.append(
                 {
                     "datetime": self._parse_dt(entry.get("datetime")) or "",
-                    "temp_c": entry.get("temperature") or entry.get("native_temperature"),
-                    "apparent_temp_c": entry.get("apparent_temperature") or entry.get("native_apparent_temperature"),
-                    "dewpoint_c": entry.get("dew_point") or entry.get("native_dew_point"),
+                    "temp_c": self._temp_c(entry, "temperature", "native_temperature"),
+                    "apparent_temp_c": self._temp_c(entry, "apparent_temperature", "native_apparent_temperature"),
+                    "dewpoint_c": self._temp_c(entry, "dew_point", "native_dew_point"),
                     "precip_prob": entry.get("precipitation_probability"),
-                    "precip_mm": entry.get("precipitation") or entry.get("native_precipitation"),
+                    "precip_mm": self._precip_mm(entry, "precipitation", "native_precipitation"),
                     "weathercode": self._condition_to_wmo(entry.get("condition")),
-                    "wind_kmh": entry.get("wind_speed") or entry.get("native_wind_speed"),
-                    "gust_kmh": entry.get("wind_gust_speed") or entry.get("native_wind_gust_speed"),
+                    "wind_kmh": self._speed_kmh(entry, "wind_speed", "native_wind_speed"),
+                    "gust_kmh": self._speed_kmh(entry, "wind_gust_speed", "native_wind_gust_speed"),
                     "humidity": entry.get("humidity"),
                     "cloud_cover": entry.get("cloud_coverage"),
                 }

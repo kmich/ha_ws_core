@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.7] - 2026-10-28
+
+### Fixed
+
+- Forecasts read from another Home Assistant weather entity are no longer converted twice on imperial installs. Home Assistant hands out that entity's forecast in its own display units (°F, mph, inches), but ws_core treated the numbers as °C, km/h and mm, so a 66 °F high showed as 151 °F. The forecast is now converted from the source entity's units, and a forecast of exactly 0 °C or 0 mm is no longer dropped.
+
 ## [2.13.6] - 2026-10-28
 
 ### Fixed
