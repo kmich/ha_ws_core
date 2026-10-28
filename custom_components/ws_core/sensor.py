@@ -8,7 +8,9 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import UnitOfTemperature
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -506,9 +508,18 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
                 "altitude": coordinator.altitude_unit,
                 "snow": coordinator.snow_unit,
                 "snow_rate": coordinator.snow_rate_unit,
+                "temp_delta": coordinator.temp_unit,
+                "degree_day": f"{coordinator.temp_unit}·d",
             }.get(desc.unit_group, desc.native_unit)
+            # Without a suggestion HA converts device-class sensors to the HA
+            # unit system's default, so a wind speed set to m/s showed in mph.
+            self._attr_suggested_unit_of_measurement = self._attr_native_unit_of_measurement
         else:
             self._attr_native_unit_of_measurement = desc.native_unit
+            if desc.device_class == SensorDeviceClass.TEMPERATURE and desc.native_unit == UNIT_TEMP_C:
+                # HA converts temperatures itself; this makes it use the unit
+                # chosen in ws_core instead of the HA unit system's.
+                self._attr_suggested_unit_of_measurement = coordinator.temp_unit
         self._attr_state_class = desc.state_class
         if desc.suggested_display_precision is not None:
             self._attr_suggested_display_precision = desc.suggested_display_precision
@@ -523,6 +534,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self._async_sync_registry_unit()
         # The entity_id is set once at creation from self.entity_id (assigned in
         # __init__), which yields sensor.{prefix}_{key} on a fresh install. We
         # deliberately do NOT force the entity_id back to that value on later
@@ -548,6 +560,28 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
                         self._restored_value = last_state.state
             else:
                 self._restored_value = None
+
+    @callback
+    def _async_sync_registry_unit(self) -> None:
+        """Make an already registered entity show the unit chosen in ws_core.
+
+        HA stores the suggested unit in the entity registry only when an entity
+        is first created, so a later change to ws_core's unit options kept
+        showing the old unit. A unit the user picked in HA's entity settings
+        always wins.
+        """
+        want = getattr(self, "_attr_suggested_unit_of_measurement", None)
+        entry = self.registry_entry
+        if not want or entry is None or entry.options.get("sensor", {}).get("unit_of_measurement"):
+            return
+        if self.unit_of_measurement == want:
+            return
+        private = dict(entry.options.get("sensor.private", {}))
+        private["suggested_unit_of_measurement"] = want
+        self.registry_entry = er.async_get(self.hass).async_update_entity_options(
+            self.entity_id, "sensor.private", private
+        )
+        self.async_registry_entry_updated()
 
     @staticmethod
     def _slug_for_key(key: str) -> str:
@@ -794,6 +828,9 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             return val / 2.54 if unit == "in" else val
         if group == "snow_rate":
             return val / 2.54 if unit == "in/h" else val
+        if group in ("temp_delta", "degree_day"):
+            # A difference scales by 9/5 with no +32 offset.
+            return round(val * 1.8, 2) if unit.startswith(UnitOfTemperature.FAHRENHEIT) else val
         return val
 
     @property

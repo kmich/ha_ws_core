@@ -2,6 +2,17 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.6] - 2026-10-28
+
+### Fixed
+
+- Unit preferences now apply everywhere. Home Assistant was converting ws_core's sensors to the HA unit system's units, so a station set to m/s, hPa and mm on an imperial HA install showed mph, inHg and inches in entity cards, and a station set to imperial on a metric HA install showed metric. Sensors now tell HA to use the units chosen in ws_core, and sensors created before this release switch over on the next restart. A unit you pick in an entity's own settings in HA still wins.
+- The temperature unit setting (°C / °F) is now applied. Temperatures used the HA unit system's unit, and degree days were always °C·day; they now follow the setting, with degree days in °F·day when it is °F.
+- Temperature differences (the temperature anomalies, Delta-T and the indoor/outdoor delta) no longer gain 32 degrees when shown in °F. A +2 °C anomaly is now +3.6 °F, not 35.6 °F.
+- The weather entity (weather.ws) uses the units chosen in ws_core when they are set explicitly rather than left on auto. Units you set yourself in the weather entity's settings are kept.
+- The conditions summary, temperature display and alert messages use your units instead of always °C, m/s and mm/h.
+- Pressure Out of Range no longer fires on high-altitude stations. The 870-1085 hPa limits are sea-level values, but the check compares station pressure, so a station at 2195 m reading a normal 784 hPa was flagged. The limits now scale with the configured elevation (about 666-831 hPa at 2195 m).
+
 ## [2.13.5] - 2026-10-27
 
 ### Fixed
