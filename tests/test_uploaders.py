@@ -660,8 +660,10 @@ class TestMQTTPublish:
 
         from custom_components.ws_core import mqtt_publisher
 
+        known = {dc.value for dc in SensorDeviceClass}
         for _key, slug, _name, unit, device_class, _icon in mqtt_publisher.MQTT_SENSORS:
-            if device_class is None:
+            # wind_direction only exists on newer HA versions than some CI jobs run.
+            if device_class is None or device_class not in known:
                 continue
             allowed = DEVICE_CLASS_UNITS.get(SensorDeviceClass(device_class))
             if allowed is not None:
