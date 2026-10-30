@@ -417,6 +417,19 @@ The `last_upload` state attribute holds the timestamp of the last successful upl
 Republishes 70+ derived sensors as MQTT Discovery payloads. Requires the Home Assistant
 MQTT integration to be set up.
 
+- Discovery configs go to `<discovery prefix>/sensor/ws_core_<prefix>_<sensor>/config`
+  (retained) and values to `<state prefix>/<prefix>/<sensor>/state`. The defaults are
+  `homeassistant` and `ws_core`.
+- Discovery is sent about 15 seconds after startup. If the broker is not connected yet,
+  it is sent with the next state update instead.
+- On a clean shutdown the discovery configs are removed again.
+- When MQTT republishing is off, ws_core clears its own discovery configs from the broker
+  a minute after startup if the MQTT integration is connected. This removes configs left
+  by older versions or from before you turned the feature off, which Home Assistant would
+  otherwise read at every start. Only the `ws_core_<prefix>_*` topics are touched.
+- On Home Assistant versions without the `wind_direction` device class (2025.1 and
+  older), Wind Direction and Dominant Wind Direction are published as plain ° sensors.
+
 ---
 
 ## Other entities

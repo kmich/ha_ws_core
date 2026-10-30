@@ -19,9 +19,15 @@ import json
 import logging
 from typing import Any
 
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+
+# HA's MQTT discovery rejects the whole config for a device class it does not
+# know, and newer ones such as wind_direction are missing on older cores we
+# still support. Those sensors are published without a device class there.
+_SUPPORTED_DEVICE_CLASSES = frozenset(dc.value for dc in SensorDeviceClass)
 
 
 def _connected_mqtt(hass: HomeAssistant) -> Any | None:
@@ -200,7 +206,7 @@ async def async_publish_discovery(
         }
         if unit:
             config["unit_of_measurement"] = unit
-        if device_class:
+        if device_class in _SUPPORTED_DEVICE_CLASSES:
             config["device_class"] = device_class
 
         discovery_topic = f"{discovery_prefix}/sensor/{unique_id}/config"

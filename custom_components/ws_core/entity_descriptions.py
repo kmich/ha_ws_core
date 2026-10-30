@@ -308,7 +308,7 @@ _DISTANCE_FACTORS: dict[str, float] = {"km": 1.0, "mi": 0.621371}
 _ALTITUDE_FACTORS: dict[str, float] = {"m": 1.0, "ft": 3.28084}
 
 # SensorDeviceClass.WIND_DIRECTION and SensorStateClass.MEASUREMENT_ANGLE were
-# added in HA 2025.1. We support down to HA 2024.6.0 (see hacs.json), so resolve
+# added after HA 2025.1 (2025.1.4 has neither). We support down to HA 2024.6.0 (see hacs.json), so resolve
 # them defensively: on older cores the wind-direction sensors simply fall back to
 # a plain numeric "°" sensor (no device class / measurement state class) instead
 # of raising AttributeError at import and breaking the whole sensor platform.

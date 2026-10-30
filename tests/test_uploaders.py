@@ -17,6 +17,7 @@ CWOP) are contacted.
 """
 
 import asyncio
+import json
 import os
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -668,6 +669,35 @@ class TestMQTTPublish:
             allowed = DEVICE_CLASS_UNITS.get(SensorDeviceClass(device_class))
             if allowed is not None:
                 assert unit in allowed, f"{slug}: {unit!r} is not valid for device class {device_class!r}"
+
+    async def test_device_class_unknown_to_ha_is_left_out(self):
+        """Older HA cores have no wind_direction device class and would reject the config."""
+        from custom_components.ws_core import mqtt_publisher
+
+        publish = AsyncMock()
+        fake_mqtt = MagicMock()
+        fake_mqtt.is_connected.return_value = True
+        fake_mqtt.async_publish = publish
+        old_core = mqtt_publisher._SUPPORTED_DEVICE_CLASSES - {"wind_direction"}
+
+        with (
+            patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}),
+            patch.object(mqtt_publisher, "_SUPPORTED_DEVICE_CLASSES", old_core),
+        ):
+            await mqtt_publisher.async_publish_discovery(
+                _mqtt_hass(),
+                discovery_prefix="homeassistant",
+                state_prefix="ws_core",
+                entity_prefix="ws",
+                station_name="Backyard",
+                integration_version="2.0.0",
+            )
+
+        configs = {call.args[1]: json.loads(call.args[2]) for call in publish.await_args_list}
+        wind_dir = configs["homeassistant/sensor/ws_core_ws_wind_direction/config"]
+        assert "device_class" not in wind_dir
+        assert wind_dir["unit_of_measurement"] == "°"
+        assert configs["homeassistant/sensor/ws_core_ws_temperature/config"]["device_class"] == "temperature"
 
     async def test_coordinator_retries_discovery_after_broker_connects(self):
         coord = _coord()
