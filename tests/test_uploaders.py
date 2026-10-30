@@ -535,6 +535,13 @@ class TestCWOP:
 # ---------------------------------------------------------------------------
 
 
+def _mqtt_hass():
+    """A hass stub with the mqtt integration loaded."""
+    hass = MagicMock()
+    hass.config.components = {"mqtt"}
+    return hass
+
+
 class TestMQTTPublish:
     async def test_discovery_publishes_config_topics(self):
         from custom_components.ws_core import mqtt_publisher
@@ -546,7 +553,7 @@ class TestMQTTPublish:
 
         with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
             await mqtt_publisher.async_publish_discovery(
-                MagicMock(),
+                _mqtt_hass(),
                 discovery_prefix="homeassistant",
                 state_prefix="ws_core",
                 entity_prefix="ws",
@@ -569,7 +576,7 @@ class TestMQTTPublish:
 
         with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
             await mqtt_publisher.async_publish_states(
-                MagicMock(),
+                _mqtt_hass(),
                 state_prefix="ws_core",
                 entity_prefix="ws",
                 coordinator_data=_data(),
@@ -589,9 +596,115 @@ class TestMQTTPublish:
 
         with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
             await mqtt_publisher.async_publish_states(
-                MagicMock(),
+                _mqtt_hass(),
                 state_prefix="ws_core",
                 entity_prefix="ws",
                 coordinator_data=_data(),
             )
         publish.assert_not_awaited()
+
+    async def test_discovery_reports_not_published_when_disconnected(self):
+        from custom_components.ws_core import mqtt_publisher
+
+        publish = AsyncMock()
+        fake_mqtt = MagicMock()
+        fake_mqtt.is_connected.return_value = False
+        fake_mqtt.async_publish = publish
+
+        with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
+            published = await mqtt_publisher.async_publish_discovery(
+                _mqtt_hass(),
+                discovery_prefix="homeassistant",
+                state_prefix="ws_core",
+                entity_prefix="ws",
+                station_name="Backyard",
+                integration_version="2.0.0",
+            )
+        assert published is False
+        publish.assert_not_awaited()
+
+    async def test_nothing_published_without_mqtt_integration(self):
+        from custom_components.ws_core import mqtt_publisher
+
+        publish = AsyncMock()
+        fake_mqtt = MagicMock()
+        fake_mqtt.async_publish = publish
+        hass = MagicMock()
+        hass.config.components = {"sensor"}
+
+        with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
+            assert await mqtt_publisher.async_unpublish_discovery(hass, "homeassistant", "ws") is False
+        fake_mqtt.is_connected.assert_not_called()
+        publish.assert_not_awaited()
+
+    async def test_unpublish_clears_every_discovery_topic(self):
+        from custom_components.ws_core import mqtt_publisher
+
+        publish = AsyncMock()
+        fake_mqtt = MagicMock()
+        fake_mqtt.is_connected.return_value = True
+        fake_mqtt.async_publish = publish
+
+        with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
+            assert await mqtt_publisher.async_unpublish_discovery(_mqtt_hass(), "homeassistant", "ws") is True
+
+        assert publish.await_count == len(mqtt_publisher.MQTT_SENSORS)
+        for call in publish.await_args_list:
+            assert call.args[1].startswith("homeassistant/sensor/ws_core_ws_")
+            assert call.args[2] == ""
+            assert call.kwargs["retain"] is True
+
+    async def test_discovery_units_are_valid_for_their_device_class(self):
+        """Issue #177: HA rejects a discovery config whose unit does not fit its device class."""
+        from homeassistant.components.sensor import DEVICE_CLASS_UNITS, SensorDeviceClass
+
+        from custom_components.ws_core import mqtt_publisher
+
+        for _key, slug, _name, unit, device_class, _icon in mqtt_publisher.MQTT_SENSORS:
+            if device_class is None:
+                continue
+            allowed = DEVICE_CLASS_UNITS.get(SensorDeviceClass(device_class))
+            if allowed is not None:
+                assert unit in allowed, f"{slug}: {unit!r} is not valid for device class {device_class!r}"
+
+    async def test_coordinator_retries_discovery_after_broker_connects(self):
+        coord = _coord()
+        coord.hass = _mqtt_hass()
+        coord._mqtt_discovery_prefix = "homeassistant"
+        coord._mqtt_state_prefix = "ws_core"
+        coord._mqtt_discovery_published = False
+        coord.entry_options = {}
+        coord.entry_data = {"name": "Backyard"}
+
+        publish = AsyncMock()
+        fake_mqtt = MagicMock()
+        fake_mqtt.is_connected.return_value = False
+        fake_mqtt.async_publish = publish
+
+        with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
+            await coord._async_mqtt_discovery()
+            assert coord._mqtt_discovery_published is False
+
+            fake_mqtt.is_connected.return_value = True
+            await coord._async_mqtt_discovery()
+            assert coord._mqtt_discovery_published is True
+        publish.assert_awaited()
+
+    async def test_coordinator_clears_stale_discovery_when_mqtt_off(self):
+        coord = _coord()
+        coord.hass = _mqtt_hass()
+        coord._mqtt_discovery_prefix = "homeassistant"
+        coord.entry_options = {"prefix": "ws"}
+        coord.entry_data = {}
+
+        publish = AsyncMock()
+        fake_mqtt = MagicMock()
+        fake_mqtt.is_connected.return_value = True
+        fake_mqtt.async_publish = publish
+
+        with patch.dict("sys.modules", {"homeassistant.components.mqtt": fake_mqtt}):
+            await coord._async_mqtt_clear_discovery()
+
+        topics = [call.args[1] for call in publish.await_args_list]
+        assert "homeassistant/sensor/ws_core_ws_solar_energy_today/config" in topics
+        assert all(call.args[2] == "" for call in publish.await_args_list)

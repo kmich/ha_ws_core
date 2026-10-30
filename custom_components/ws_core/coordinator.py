@@ -1414,6 +1414,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.mqtt_enabled:
             self._start_periodic(self._async_mqtt_publish, self._mqtt_interval_min * 60, "ws_core_mqtt_publish")
             self._start_once(self._async_mqtt_discovery, 15, "ws_core_mqtt_discovery")
+        else:
+            # Issue #177: discovery configs are retained, so ones published by an
+            # older version (or before MQTT was switched off) stay on the broker
+            # and are re-read by HA at every start. Clear them.
+            self._start_once(self._async_mqtt_clear_discovery, 60, "ws_core_mqtt_clear_discovery")
 
         # Defer the first sample by 5s so config entry creation completes before any network calls.
         self._start_once(self._async_first_sample, 5, "ws_core_first_refresh")
@@ -5254,7 +5259,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         entity_prefix = self.entry_options.get("prefix") or self.entry_data.get("prefix") or "ws"
         station_name = self.entry_data.get("name") or "Weather Station"
-        await async_publish_discovery(
+        # Only mark as published once the broker took it, so a broker that is not
+        # yet connected at startup gets the discovery on the next state publish.
+        self._mqtt_discovery_published = await async_publish_discovery(
             self.hass,
             discovery_prefix=self._mqtt_discovery_prefix,
             state_prefix=self._mqtt_state_prefix,
@@ -5262,7 +5269,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             station_name=station_name,
             integration_version=_INTEGRATION_VERSION,
         )
-        self._mqtt_discovery_published = True
+
+    async def _async_mqtt_clear_discovery(self) -> None:
+        """Remove retained discovery configs left on the broker while MQTT is off."""
+        from .mqtt_publisher import async_unpublish_discovery
+
+        entity_prefix = self.entry_options.get("prefix") or self.entry_data.get("prefix") or "ws"
+        await async_unpublish_discovery(self.hass, self._mqtt_discovery_prefix, entity_prefix)
 
     async def _async_mqtt_publish(self) -> None:
         """Publish current sensor states to MQTT state topics."""
