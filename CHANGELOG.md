@@ -2,6 +2,14 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.8] - 2026-10-30
+
+### Fixed
+
+- Home Assistant no longer logs "The unit of measurement `Wh/m²` is not valid together with device class `energy`" for `ws_core_ws_solar_energy_today` at startup. MQTT discovery configs stay on the broker, and one sent by an older version (before 2.3.2) was read again at every start. With MQTT republishing off, ws_core now removes its old discovery configs from the broker a minute after startup, so the error shows once more on the first restart after updating and then stops.
+- With MQTT republishing on, discovery is sent again later if the broker was not connected yet at startup. Before, it was skipped for the rest of the session, which left older discovery configs in place.
+- MQTT republishing no longer sends the `wind_direction` device class to Home Assistant versions that do not have it (2025.1 and older). Those versions rejected the Wind Direction and Dominant Wind Direction discovery configs; the sensors are now published as plain ° sensors there.
+
 ## [2.13.7] - 2026-10-28
 
 ### Fixed

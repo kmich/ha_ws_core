@@ -129,7 +129,7 @@ ws_core sends no telemetry or analytics. These are the only features that contac
 | **Lightning via Blitzortung** | Blitzortung, through its own integration | Whatever the Blitzortung integration sends | If that integration is installed and no lightning sensor is mapped |
 | **Pattern Forecast storm data** (internet lightning) | Blitzortung, through its own integration | Nothing sent by ws_core | If Pattern Forecast is on, no lightning detector is mapped, and you turn on *Use internet lightning data*. The sensor name says so. Every other Pattern Forecast sensor is local |
 | **Station network uploads** | The networks you choose (for example WU, WOW) | Station readings and your credentials for that network | If enabled |
-| **MQTT discovery** | Your local MQTT broker | Derived sensor values | If enabled |
+| **MQTT discovery** | Your local MQTT broker | Derived sensor values. When off, empty messages that clear ws_core's own old discovery topics | If enabled. The cleanup runs when it is off and the MQTT integration is connected |
 
 To run fully offline, turn off the weather forecast and the sensor sanity check and leave the optional internet features off. All locally derived sensors keep working. Diagnostics downloads redact credentials and coordinates.
 

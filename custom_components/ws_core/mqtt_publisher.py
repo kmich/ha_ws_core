@@ -19,9 +19,30 @@ import json
 import logging
 from typing import Any
 
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+
+# HA's MQTT discovery rejects the whole config for a device class it does not
+# know, and newer ones such as wind_direction are missing on older cores we
+# still support. Those sensors are published without a device class there.
+_SUPPORTED_DEVICE_CLASSES = frozenset(dc.value for dc in SensorDeviceClass)
+
+
+def _connected_mqtt(hass: HomeAssistant) -> Any | None:
+    """Return HA's mqtt component when it is set up and its broker is connected."""
+    if "mqtt" not in hass.config.components:
+        return None
+    try:
+        from homeassistant.components import mqtt as mqtt_component
+    except ImportError:
+        return None
+    try:
+        return mqtt_component if mqtt_component.is_connected(hass) else None
+    except KeyError:  # integration loaded but not yet initialised
+        return None
+
 
 # Sensor publish spec: (coordinator_data_key, slug, name, unit, device_class, icon)
 # unit=None → no unit_of_measurement in discovery payload.
@@ -154,17 +175,15 @@ async def async_publish_discovery(
     entity_prefix: str,
     station_name: str,
     integration_version: str,
-) -> None:
-    """Publish MQTT Discovery payloads for all ws_core sensors."""
-    try:
-        from homeassistant.components import mqtt as mqtt_component
-    except ImportError:
-        _LOGGER.warning("ws_core MQTT: homeassistant.components.mqtt not available")
-        return
+) -> bool:
+    """Publish MQTT Discovery payloads for all ws_core sensors.
 
-    if not mqtt_component.is_connected(hass):
+    Returns False when the broker is not connected, so the caller can retry.
+    """
+    mqtt_component = _connected_mqtt(hass)
+    if mqtt_component is None:
         _LOGGER.debug("ws_core MQTT: broker not connected, skipping discovery")
-        return
+        return False
 
     device_payload = {
         "identifiers": [f"ws_core_{entity_prefix}"],
@@ -187,7 +206,7 @@ async def async_publish_discovery(
         }
         if unit:
             config["unit_of_measurement"] = unit
-        if device_class:
+        if device_class in _SUPPORTED_DEVICE_CLASSES:
             config["device_class"] = device_class
 
         discovery_topic = f"{discovery_prefix}/sensor/{unique_id}/config"
@@ -197,6 +216,7 @@ async def async_publish_discovery(
             await mqtt_component.async_publish(hass, discovery_topic, payload, retain=True)
         except Exception as exc:  # noqa: BLE001
             _LOGGER.debug("ws_core MQTT discovery publish failed for %s: %s", slug, exc)
+    return True
 
 
 async def async_publish_states(
@@ -206,12 +226,8 @@ async def async_publish_states(
     coordinator_data: dict[str, Any],
 ) -> None:
     """Publish current sensor states to MQTT state topics."""
-    try:
-        from homeassistant.components import mqtt as mqtt_component
-    except ImportError:
-        return
-
-    if not mqtt_component.is_connected(hass):
+    mqtt_component = _connected_mqtt(hass)
+    if mqtt_component is None:
         return
 
     for data_key, slug, _name, _unit, _dc, _icon in MQTT_SENSORS:
@@ -233,15 +249,18 @@ async def async_unpublish_discovery(
     hass: HomeAssistant,
     discovery_prefix: str,
     entity_prefix: str,
-) -> None:
-    """Remove MQTT Discovery entries (publish empty retained messages)."""
-    try:
-        from homeassistant.components import mqtt as mqtt_component
-    except ImportError:
-        return
+) -> bool:
+    """Remove MQTT Discovery entries (publish empty retained messages).
+
+    Returns False when the broker is not connected.
+    """
+    mqtt_component = _connected_mqtt(hass)
+    if mqtt_component is None:
+        return False
 
     for _data_key, slug, *_ in MQTT_SENSORS:
         unique_id = f"ws_core_{entity_prefix}_{slug}"
         discovery_topic = f"{discovery_prefix}/sensor/{unique_id}/config"
         with contextlib.suppress(Exception):
             await mqtt_component.async_publish(hass, discovery_topic, "", retain=True)
+    return True
