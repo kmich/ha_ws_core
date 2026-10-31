@@ -2,6 +2,16 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.9] - 2026-10-31
+
+### Fixed
+
+- The "Weather station source entities not found" repair no longer appears right after a restart while the station's sensors are still coming up. Some integrations, such as Ecowitt, only create their sensors when the station sends its first reading, which can take a few minutes. The repair is now raised only once a source has been missing for 5 minutes, and is cleared as soon as it appears.
+
+### Changed
+
+- Dashboard docs: the Enhanced dashboard section now explains the optional weather background photos, which are not included with ws_core, and lists the file names it looks for.
+
 ## [2.13.8] - 2026-10-30
 
 ### Fixed

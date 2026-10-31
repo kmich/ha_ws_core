@@ -192,6 +192,7 @@ def _make_coordinator(
 
     # v1.8.4
     coord.suppress_notifications = False
+    coord._missing_sources_since = None
 
     # v2.0 accumulators / rolling histories (normally set in __init__, which the
     # fixture bypasses).

@@ -75,6 +75,19 @@ Install all dependencies from HACS before pasting the dashboard YAML.
 - Station health and data quality badges
 - AQI and pollen level display
 
+**Weather background (optional).** The Weather page can show a photo of the current
+weather behind its main card. The photos are not included with ws_core: add your own JPEG files (any
+landscape photo works, around 1920 px wide keeps them light) to `/config/www/weather`
+(served as `/local/weather`), or set `input_text.weather_background_path` to another
+folder under `/local`. Restart Home Assistant after creating `/config/www` for the
+first time. The file names are:
+
+`sunny-day`, `partly-cloudy-day`, `cloudy-day`, `overcast-day`, `clear-night`,
+`sunrise`, `sunset`, `drizzle`, `rainy-day`, `rainy-night`, `thunderstorm-day`,
+`thunderstorm-night`, `fog-day`, `fog-night`, `windy-day`, `windy-night`
+
+Without the photos that card keeps its plain background.
+
 ---
 
 ## v2.0 Full Dashboard (`ws_core_dashboard.yaml`)
@@ -137,7 +150,8 @@ shows *unavailable* for features you haven't enabled.
 photo of the current weather behind the cards. The scene follows nearby lightning,
 heavy rain (10 mm/h or more), rain (over 0.5 mm/h), then the current condition, with
 day and night versions. The photo is tinted toward your theme's background so the
-text stays readable in light and dark themes. Put these JPEG files in
+text stays readable in light and dark themes. The photos are not included with
+ws_core; put your own JPEG files in
 `/config/www/weather` (served as `/local/weather`), or set
 `input_text.weather_background_path` to another folder under `/local`:
 
