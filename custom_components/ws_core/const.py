@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.13.8"
+_INTEGRATION_VERSION = "2.13.9"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -405,6 +405,10 @@ CONFIG_VERSION = 4
 # Alert hysteresis: ticks above/below threshold before state changes
 ALERT_DEBOUNCE_ON_TICKS: int = 2  # consecutive ticks above threshold → fire
 ALERT_DEBOUNCE_OFF_TICKS: int = 3  # consecutive ticks below threshold → clear
+
+# Source entities can register a few minutes after startup (Ecowitt creates them on
+# the first packet), so the missing-sources repair waits this long before it is raised
+MISSING_SOURCE_GRACE_S: int = 300
 
 # ---------------------------------------------------------------------------
 # v0.7.0 - Air Quality (Open-Meteo AQI, free/no key)

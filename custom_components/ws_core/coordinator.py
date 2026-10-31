@@ -560,6 +560,7 @@ from .const import (
     KEY_ZAMBRETTI_NUMBER,
     LEARNING_SAVE_INTERVAL_S,
     LUX_TO_WM2_FACTOR,
+    MISSING_SOURCE_GRACE_S,
     NOWCAST_STALE_MULTIPLIER,
     PATTERN_HISTORY_DELAY_S,
     PRESSURE_HISTORY_INTERVAL_MIN,
@@ -1074,6 +1075,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # v1.8.4 Suppress HA Repairs notifications (issue #20)
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
+        # When source entities were first found missing (None while all exist)
+        self._missing_sources_since: datetime | None = None
 
         # Alert hysteresis: count consecutive ticks above/below threshold
         self._alert_debounce_raw: dict[str, int] = {}  # ticks above threshold
@@ -3682,6 +3685,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_ALERT_MESSAGE] = alert_msg
         data["_active_alerts"] = active_alerts
 
+        # Only report missing sources once they have stayed missing past the grace period
+        if missing_entities:
+            if self._missing_sources_since is None:
+                self._missing_sources_since = now
+        else:
+            self._missing_sources_since = None
+        report_missing = (
+            self._missing_sources_since is not None
+            and (now - self._missing_sources_since).total_seconds() >= MISSING_SOURCE_GRACE_S
+        )
+
         # HA Repairs integration: create/clear issues for missing sources
         if HAS_REPAIRS:
             from .const import DOMAIN
@@ -3695,7 +3709,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("sensor_drift_detected"))
                 ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("et0_pm_unavailable"))
             else:
-                if missing_entities:
+                if report_missing:
                     ir.async_create_issue(
                         self.hass,
                         DOMAIN,

@@ -30,6 +30,7 @@ from custom_components.ws_core.const import (
     KEY_SENSOR_SPIKE,
     KEY_SENSOR_STUCK,
     KEY_SOIL_MOISTURE,
+    MISSING_SOURCE_GRACE_S,
     SRC_TEMP,
 )
 from custom_components.ws_core.coordinator import WSStationCoordinator, _redact_secrets
@@ -364,14 +365,44 @@ async def test_owm_http_error_does_not_expose_key():
 def test_repairs_issues_are_scoped_per_entry():
     coord = _make_coordinator()
     coord.entry_data["entry_id"] = "E1"
+    t0 = datetime.now(UTC)
     with (
         patch.object(cmod.ir, "async_create_issue") as create,
         patch.object(cmod.ir, "async_delete_issue"),
     ):
-        coord._compute_health({}, datetime.now(UTC), [], ["temp"])
+        coord._compute_health({}, t0, [], ["temp"])
+        coord._compute_health({}, t0 + timedelta(seconds=MISSING_SOURCE_GRACE_S), [], ["temp"])
     issue_ids = [c.args[2] for c in create.call_args_list]
     assert "missing_source_entities_E1" in issue_ids
     assert create.call_args_list[0].kwargs["translation_key"] == "missing_source_entities"
+
+
+def test_missing_sources_repair_waits_for_grace_period():
+    """Entities that register late after a restart (Ecowitt) raise no repair."""
+    coord = _make_coordinator()
+    coord.entry_data["entry_id"] = "E1"
+    t0 = datetime.now(UTC)
+
+    def created(create):
+        return [c for c in create.call_args_list if c.args[2] == "missing_source_entities_E1"]
+
+    with (
+        patch.object(cmod.ir, "async_create_issue") as create,
+        patch.object(cmod.ir, "async_delete_issue") as delete,
+    ):
+        coord._compute_health({}, t0, [], ["temp"])
+        coord._compute_health({}, t0 + timedelta(seconds=MISSING_SOURCE_GRACE_S - 60), [], ["temp"])
+        assert not created(create)
+
+        # The entity appears, so the timer resets and the issue is cleared
+        coord._compute_health({}, t0 + timedelta(seconds=MISSING_SOURCE_GRACE_S - 30), [], [])
+        assert any(c.args[2] == "missing_source_entities_E1" for c in delete.call_args_list)
+        t1 = t0 + timedelta(seconds=MISSING_SOURCE_GRACE_S)
+        coord._compute_health({}, t1, [], ["temp"])
+        assert not created(create)
+
+        coord._compute_health({}, t1 + timedelta(seconds=MISSING_SOURCE_GRACE_S), [], ["temp"])
+        assert len(created(create)) == 1
 
 
 def test_weather_entity_pushes_forecast_updates():
