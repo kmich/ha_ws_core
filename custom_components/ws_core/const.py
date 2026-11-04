@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.13.9"
+_INTEGRATION_VERSION = "2.13.10"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -1099,6 +1099,21 @@ STUCK_DURATION_S = {"temp": 4 * 3600, "humidity": 6 * 3600, "pressure": 6 * 3600
 # Saturated / bone-dry humidity can legitimately sit at the rail for hours
 # (fog, desert afternoons), so it is excluded from stuck detection.
 STUCK_HUMIDITY_RAIL_PCT = 2.0
+
+# A gust only counts toward the month / year / all-time records when the wind
+# speed of the same reading makes it plausible, so a stuck or glitching gust
+# channel (a WS90 read 40 m/s for hours in a 3 m/s breeze) cannot set a record.
+# The margin covers the high gust factors of light, turbulent wind.
+GUST_PLAUSIBLE_FACTOR = 3.0
+GUST_PLAUSIBLE_MARGIN_MS = 10.0
+# The same test on hourly statistics is looser: the hour's mean wind dilutes a
+# short squall.
+GUST_HOURLY_PLAUSIBLE_FACTOR = 4.0
+GUST_HOURLY_PLAUSIBLE_MARGIN_MS = 12.0
+
+# Startup repair of the rain totals and gust records from recorder statistics
+HISTORY_BACKFILL_DELAY_S = 120.0  # wait after startup before reading the recorder
+HISTORY_RAIN_JUMP_CAP_MM_PER_H = 60.0  # a counter rise faster than this is a glitch, not rain
 
 # ---------------------------------------------------------------------------
 # v2.7 - Adaptive (auto-apply) sensor calibration

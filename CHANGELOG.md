@@ -2,6 +2,13 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.10] - 2026-11-03
+
+### Fixed
+
+- A glitching gust sensor can no longer set the monthly, yearly or all-time gust record. A Shelly WS90 that reported 38-40 m/s for eight hours while the wind averaged 1-5 m/s left a 40 m/s (144 km/h) all-time record behind. A gust now only counts toward the records when it is at most 3 times the wind speed of the same reading plus 10 m/s. Records already set by such a glitch are corrected at the next start: when the recorder statistics show that only hours with an implausible gust reached the record, it is replaced with the highest believable gust of that period.
+- Rain this week, month and year no longer undercount when the sensor was added part-way through the period or Home Assistant was down while it rained. They were counted only while ws_core was running, so a station set up in June showed rain since June as the year's total. At every start ws_core now reads the rain gauge's recorder statistics and raises each total to what the gauge measured. A total is never lowered, and a station's own year-to-date counter, when mapped, is still used as is.
+
 ## [2.13.9] - 2026-10-31
 
 ### Fixed
