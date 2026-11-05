@@ -93,6 +93,8 @@ first time. The file names are:
 `sunrise`, `sunset`, `drizzle`, `rainy-day`, `rainy-night`, `thunderstorm-day`,
 `thunderstorm-night`, `fog-day`, `fog-night`, `windy-day`, `windy-night`
 
+Use the `.jpg` extension, for example `sunny-day.jpg` or `rainy-night.jpg`.
+
 Without the photos that card keeps its plain background.
 
 ---

@@ -19,3 +19,5 @@ known-third-party = ["aiohttp", "homeassistant"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# HA installs its HTTP-client alias before HTTP mocking plugins import httpx.
+addopts = "-p no:respx"
