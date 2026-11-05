@@ -3545,15 +3545,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _source_is_stale(self, key: str, now: datetime) -> bool:
         """Shared source freshness for health, quality and pressure diagnostics."""
-        state = self.hass.states.get(self.sources.get(key))
+        entity_id = self.sources.get(key)
+        if not entity_id:
+            return False
+        state = self.hass.states.get(entity_id)
         reported = self._reported_at(state)
         if reported is None or (now - reported).total_seconds() <= self.staleness_s:
             return False
         # Some stations omit wind-speed reports while calm, but still report gusts.
         # Require a recent, numeric zero gust as independent evidence of calm.
-        if key == SRC_WIND and self._num(self.hass, self.sources.get(key)) == 0.0:
+        if key == SRC_WIND and self._num(self.hass, entity_id) == 0.0:
             gust_id = self.sources.get(SRC_GUST)
-            gust_reported = self._reported_at(self.hass.states.get(gust_id))
+            gust_reported = self._reported_at(self.hass.states.get(gust_id)) if gust_id else None
             if (
                 gust_id
                 and self._num(self.hass, gust_id) == 0.0

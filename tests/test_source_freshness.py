@@ -120,6 +120,14 @@ def test_missing_gust_mapping_does_not_exempt_calm_wind():
     coord = _station()
     coord.sources.pop(SRC_GUST)
     coord.hass.states.get(coord.sources[SRC_WIND]).last_reported = OLD
+    get_state = coord.hass.states.get
+
+    def strict_get(entity_id):
+        # Match the real StateMachine: None is not a valid entity ID.
+        assert isinstance(entity_id, str)
+        return get_state(entity_id)
+
+    coord.hass.states.get = strict_get
     data, _ = _outputs(coord)
     assert SRC_WIND in data["_stale_sources"]
 

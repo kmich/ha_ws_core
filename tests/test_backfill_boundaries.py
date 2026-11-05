@@ -20,14 +20,14 @@ def _rain(rows, has_sum=True, live=0.0, raw=1010.0, first=3600.0):
     return coord, meta, {"sensor.rain": rows}, periods
 
 
-@pytest.mark.parametrize("offset", [1000.0, -500.0])
-def test_recorder_sum_and_raw_counter_can_have_different_zero_points(offset):
+@pytest.mark.parametrize("sum_start", [0.0, 2000.0])
+def test_recorder_sum_and_raw_counter_can_have_different_zero_points(sum_start):
     coord, meta, rows, periods = _rain(
         [
-            {"start": 0.0, "sum": 0.0, "state": offset},
-            {"start": 3600.0, "sum": 10.0, "state": offset + 10.0},
+            {"start": 0.0, "sum": sum_start, "state": 1000.0},
+            {"start": 3600.0, "sum": sum_start + 10.0, "state": 1010.0},
         ],
-        raw=offset + 13.0,
+        raw=1013.0,
     )
     apply_rain(coord, meta, rows, 0.0, 2, periods)
     assert coord._rain_this_week_mm == 13.0
