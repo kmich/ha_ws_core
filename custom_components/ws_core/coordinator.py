@@ -104,6 +104,7 @@ from .algorithms import (
     format_rain_display,
     fwi_indices,
     get_condition_severity,
+    gust_is_plausible,
     humidity_level,
     indoor_comfort_score,
     least_squares_pressure_trend,
@@ -327,6 +328,9 @@ from .const import (
     FORECAST_MIN_RETRY_S,
     FORECAST_PROVIDER_HA_ENTITY,
     FWI_OBSERVATION_HOUR,
+    GUST_PLAUSIBLE_FACTOR,
+    GUST_PLAUSIBLE_MARGIN_MS,
+    HISTORY_BACKFILL_DELAY_S,
     # v1.5.0
     KEY_ABSOLUTE_HUMIDITY,
     KEY_AIR_DENSITY,
@@ -1341,6 +1345,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # (targets that already learned, or are waiting for a retry, are skipped).
             self._start_once(self._pattern.async_learn_history, PATTERN_HISTORY_DELAY_S, "ws_core_pattern_history")
 
+        # Once per start, fill rain totals from the station's recorder statistics.
+        from .history_backfill import async_backfill_from_statistics
+
+        self._start_once(
+            lambda: async_backfill_from_statistics(self), HISTORY_BACKFILL_DELAY_S, "ws_core_history_backfill"
+        )
+
         # v2.7 - Climate normals table (its own store: infrequently written,
         # ~365 entries, kept separate from the frequently-saved learning blob)
         if self.climate_normals_enabled:
@@ -2119,7 +2130,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 data[KEY_WIND_GUST_MAX_24H] = round(max(gust_vals), 1)
 
         # Monthly / yearly / all-time gust max (issue #127)
-        self._update_gust_month_year_all_time(data, gust_ms)
+        self._update_gust_month_year_all_time(data, gust_ms, wind_ms)
 
         # v2.0 wind gust factor
         if wind_ms is not None and gust_ms is not None:
@@ -2138,12 +2149,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if var is not None:
                 data[KEY_WIND_DIR_VARIABILITY] = var
 
-    def _update_gust_month_year_all_time(self, data: dict, gust_ms: float | None) -> None:
+    def _update_gust_month_year_all_time(self, data: dict, gust_ms: float | None, wind_ms: float | None = None) -> None:
         """Update monthly, yearly and all-time wind gust max (issue #127).
 
         Monthly resets on the 1st, yearly on Jan 1st (each exposing a
         ``*_ref`` attribute with the period key). All-time never resets
-        automatically.
+        automatically. A gust far above the wind of the same reading is a
+        sensor glitch: the records keep their values and it sets none.
         """
         if gust_ms is None:
             return
@@ -2151,6 +2163,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now_local = dt_util.now()
         month_key = now_local.strftime("%Y-%m")
         year_key = now_local.strftime("%Y")
+
+        if not gust_is_plausible(gust, wind_ms, GUST_PLAUSIBLE_FACTOR, GUST_PLAUSIBLE_MARGIN_MS):
+            if month_key == self._gust_month_key and self._gust_max_month is not None:
+                data[KEY_WIND_GUST_MAX_MONTH] = round(self._gust_max_month, 1)
+                data[KEY_WIND_GUST_MONTH_REF] = self._gust_month_key
+            if year_key == self._gust_year_key and self._gust_max_year is not None:
+                data[KEY_WIND_GUST_MAX_YEAR] = round(self._gust_max_year, 1)
+                data[KEY_WIND_GUST_YEAR_REF] = self._gust_year_key
+            if self._gust_max_all_time is not None:
+                data[KEY_WIND_GUST_MAX_ALL_TIME] = round(self._gust_max_all_time, 1)
+            return
 
         if month_key != self._gust_month_key:
             self._gust_max_month = gust
@@ -3333,6 +3356,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._stuck_ref.pop(label, None)
                 continue
             curr = float(curr)
+            # A barometer can legitimately hold one integer hPa value for hours.
+            # Fresh reports are evidence of communication even without movement.
+            if src_key == SRC_PRESS and not self._source_is_stale(src_key, now):
+                self._stuck_ref.pop(label, None)
+                continue
             if label == "humidity" and (curr >= 100.0 - STUCK_HUMIDITY_RAIL_PCT or curr <= STUCK_HUMIDITY_RAIL_PCT):
                 self._stuck_ref.pop(label, None)
                 continue
@@ -3411,8 +3439,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             k
             for k in STALENESS_CHECK_SOURCES
             if self.sources.get(k)
-            and (state := self.hass.states.get(self.sources[k])) is not None
-            and (now - state.last_updated).total_seconds() > self.staleness_s
+            and self.hass.states.get(self.sources[k]) is not None
+            and self._source_is_stale(k, now)
         ]
         score -= min(70, (len(missing_required) + len(unavailable_required)) * 15)
         score -= min(30, len(stale_sources) * 10)
@@ -3507,6 +3535,37 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             elapsed_min = (now - self._lightning_last_strike_ts).total_seconds() / 60.0
             data[KEY_LIGHTNING_CLEARANCE_MIN] = round(elapsed_min, 0)
 
+    @staticmethod
+    def _reported_at(state: Any) -> datetime | None:
+        """Latest report timestamp, including unchanged reports on newer HA."""
+        reported = getattr(state, "last_reported", None)
+        if not isinstance(reported, datetime):
+            reported = getattr(state, "last_updated", None)
+        return reported if isinstance(reported, datetime) else None
+
+    def _source_is_stale(self, key: str, now: datetime) -> bool:
+        """Shared source freshness for health, quality and pressure diagnostics."""
+        entity_id = self.sources.get(key)
+        if not entity_id:
+            return False
+        state = self.hass.states.get(entity_id)
+        reported = self._reported_at(state)
+        if reported is None or (now - reported).total_seconds() <= self.staleness_s:
+            return False
+        # Some stations omit wind-speed reports while calm, but still report gusts.
+        # Require a recent, numeric zero gust as independent evidence of calm.
+        if key == SRC_WIND and self._num(self.hass, entity_id) == 0.0:
+            gust_id = self.sources.get(SRC_GUST)
+            gust_reported = self._reported_at(self.hass.states.get(gust_id)) if gust_id else None
+            if (
+                gust_id
+                and self._num(self.hass, gust_id) == 0.0
+                and gust_reported is not None
+                and 0.0 <= (now - gust_reported).total_seconds() <= min(600.0, self.staleness_s)
+            ):
+                return False
+        return True
+
     def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list, sample: bool = True) -> None:
         """Staleness, package status, data quality, configurable alerts."""
         stale = []
@@ -3521,7 +3580,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             st = self.hass.states.get(eid)
             if st is None:
                 continue
-            if (now - st.last_updated).total_seconds() > self.staleness_s:
+            if self._source_is_stale(k, now):
                 stale.append(k)
 
         unavailable = [
@@ -4134,6 +4193,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._pressure_stuck_start is not None
             and (now - self._pressure_stuck_start).total_seconds() > 8 * 3600
             and (wind_ms is not None and float(wind_ms) > 1.0)
+            and self._source_is_stale(SRC_PRESS, now)
         )
 
         # Track rain total increments vs rain rate

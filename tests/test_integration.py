@@ -737,7 +737,11 @@ class TestDeviceRegistrySetup:
         """Device registry update must not raise AwesomeVersionCompareException when sw_version is None."""
         from awesomeversion import AwesomeVersion, AwesomeVersionCompareException
         from homeassistant.helpers import device_registry as dr
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        try:
+            from pytest_homeassistant.common import MockConfigEntry
+        except ImportError:
+            from pytest_homeassistant_custom_component.common import MockConfigEntry
 
         from custom_components.ws_core import async_setup_entry
         from custom_components.ws_core.const import DOMAIN
@@ -812,7 +816,11 @@ class TestDeviceRegistrySetup:
     async def test_setup_entry_sw_version_fallback_when_version_is_none(self, hass):
         """sw_version falls back to 'unknown' string if integration.version is None."""
         from homeassistant.helpers import device_registry as dr
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        try:
+            from pytest_homeassistant.common import MockConfigEntry
+        except ImportError:
+            from pytest_homeassistant_custom_component.common import MockConfigEntry
 
         from custom_components.ws_core import async_setup_entry
         from custom_components.ws_core.const import DOMAIN

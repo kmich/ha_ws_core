@@ -1,6 +1,6 @@
 [project]
 name = "ha_ws_core"
-version = "2.13.9"
+version = "2.13.10"
 description = "Weather Station Core - Home Assistant integration for personal weather stations"
 requires-python = ">=3.12"
 
@@ -19,3 +19,5 @@ known-third-party = ["aiohttp", "homeassistant"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# HA installs its HTTP-client alias before HTTP mocking plugins import httpx.
+addopts = "-p no:respx"

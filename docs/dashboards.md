@@ -17,14 +17,21 @@ pasting into the raw configuration editor.
 
 ## Installing a dashboard
 
-1. Open Home Assistant and go to your Lovelace dashboard
-2. Click the three-dot menu in the top right and choose **Edit dashboard**
-3. Click the three-dot menu again and choose **Raw configuration editor**
-4. Replace or merge the YAML content with the dashboard file
-5. Save
+1. Go to **Settings → Dashboards → Add Dashboard** and create a new dashboard.
+2. Open it and choose **Edit dashboard** from the three-dot menu.
+3. Open the three-dot menu again and choose **Raw configuration editor**.
+4. Replace the raw configuration with the complete dashboard file, then save.
 
-Alternatively, create a new dashboard: **Settings → Dashboards → Add Dashboard**,
-then paste the YAML into the raw editor.
+The full dashboard files start with `views:`. Paste them into the dashboard's raw
+configuration editor, not an individual view or card editor. To add one view to an
+existing dashboard, copy only that view's entry under `views:`. The gauge presets
+are the exception: paste those into **Add card → Manual**.
+
+On Home Assistant 2026.11 and newer, install custom card dependencies through
+**Settings → Marketplace**. On older versions, use HACS. If an older copy of the
+dashboard reports `mushroom-sensor-card`, replace it with `mushroom-entity-card`;
+replace `mushroom-weather-card` or `mushroom-weather-info-card` with the built-in
+`weather-forecast` card. These old card names are not provided by Mushroom.
 
 ---
 
@@ -85,6 +92,8 @@ first time. The file names are:
 `sunny-day`, `partly-cloudy-day`, `cloudy-day`, `overcast-day`, `clear-night`,
 `sunrise`, `sunset`, `drizzle`, `rainy-day`, `rainy-night`, `thunderstorm-day`,
 `thunderstorm-night`, `fog-day`, `fog-night`, `windy-day`, `windy-night`
+
+Use the `.jpg` extension, for example `sunny-day.jpg` or `rainy-night.jpg`.
 
 Without the photos that card keeps its plain background.
 
