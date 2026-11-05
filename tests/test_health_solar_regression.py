@@ -8,7 +8,9 @@ import pytest
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from custom_components.ws_core.algorithms import solar_elevation_deg
 from custom_components.ws_core.const import (
+    ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE,
     ET0_RADIATION_SOURCE_SENSOR,
     KEY_DATA_QUALITY,
     KEY_DATA_QUALITY_SCORE,
@@ -26,6 +28,7 @@ from custom_components.ws_core.const import (
     KEY_PEAK_SUN_HOURS,
     KEY_SENSOR_DRIFT_FLAGS,
     KEY_SOLAR_ENERGY_TODAY_WHM2,
+    SRC_LUX,
     SRC_SOLAR_RADIATION,
 )
 from tests.test_coordinator import _make_coordinator, _make_state
@@ -162,6 +165,87 @@ def test_stale_numeric_radiation_breaks_coverage():
     coord._compute_solar_energy({}, start + timedelta(minutes=16), None, True)
     assert coord._solar_energy_last_ts is None
     assert coord._solar_today_meta["coverage_s"] == 0.0
+
+
+@pytest.mark.parametrize("source", [SRC_SOLAR_RADIATION, SRC_LUX])
+@pytest.mark.parametrize(
+    "value,hour,age_hours,expected",
+    [
+        ("0", 2, 8, 0.0),
+        ("0", 12, 8, None),
+        ("5", 2, 8, None),
+        ("unavailable", 2, 8, None),
+        ("unknown", 2, 8, None),
+        ("nan", 2, 8, None),
+        ("0", 2, 32, None),
+    ],
+)
+def test_nighttime_zero_freshness_exception_is_bounded(source, value, hour, age_hours, expected):
+    coord = _full_coord()
+    coord.forecast_lat, coord.forecast_lon = 51.5, 0.0
+    coord.sources = {source: "sensor.radiation"}
+    coord.et0_illuminance_fallback = source == SRC_LUX
+    now = datetime(2026, 11, 4, hour, tzinfo=UTC)
+    reported = now - timedelta(hours=age_hours)
+    state = _make_state(value, last_updated=reported)
+    state.last_reported = reported
+    coord.hass.states.get = lambda eid: state if eid == "sensor.radiation" else None
+
+    assert coord._get_solar_radiation_for_et0(now) == expected
+    if expected is None:
+        assert coord._solar_radiation_source is None
+    else:
+        assert coord._solar_radiation_source == (
+            ET0_RADIATION_SOURCE_SENSOR if source == SRC_SOLAR_RADIATION else ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE
+        )
+
+
+@pytest.mark.parametrize("source", [SRC_SOLAR_RADIATION, SRC_LUX])
+@pytest.mark.parametrize("daylight_outage", [False, True])
+def test_short_overcast_day_with_unchanged_overnight_zero(source, daylight_outage):
+    coord = _full_coord()
+    coord.forecast_lat, coord.forecast_lon = 51.5, 0.0
+    coord.sources = {source: "sensor.radiation"}
+    coord.et0_illuminance_fallback = source == SRC_LUX
+    start = datetime(2026, 11, 4, tzinfo=UTC)
+    state = _make_state("0", last_updated=start - timedelta(hours=6))
+    state.last_reported = state.last_updated
+    coord.hass.states.get = lambda eid: state if eid == "sensor.radiation" else None
+
+    # Only changing values are reported overnight. Daytime reports are fresh
+    # but weak: coverage measures observation time, not sunshine strength.
+    for minute in range(24 * 60 + 1):
+        now = start + timedelta(minutes=minute)
+        value = "20" if solar_elevation_deg(51.5, 0.0, now) >= -0.833 else "0"
+        if daylight_outage and 11 <= now.hour < 13:
+            value = "unavailable"
+        if value != state.state or value == "20":
+            state.state = value
+            state.last_updated = state.last_reported = now
+        data = {KEY_NORM_TEMP_C: 8.0, KEY_NORM_HUMIDITY: 90.0, KEY_NORM_WIND_SPEED_MS: 0.5}
+        with patch.object(dt_util, "as_local", side_effect=lambda value: value.astimezone(UTC)):
+            coord._compute_solar_energy(data, now, None, True)
+
+    with patch.object(dt_util, "as_local", side_effect=lambda value: value.astimezone(UTC)):
+        coord._compute_daily_pm(data, now)
+    assert data[KEY_ET0_PM_PERIOD] == "2026-11-04"
+    if daylight_outage:
+        assert data[KEY_ET0_PM_REASON] == "insufficient solar coverage"
+        assert KEY_ET0_PM_DAILY_MM not in data
+    else:
+        assert data[KEY_ET0_PM_REASON] == "ok"
+        assert data[KEY_ET0_PM_COVERAGE] > 0.99
+        assert data[KEY_ET0_PM_DAILY_MM] >= 0.0
+
+    coord.suppress_notifications = False
+    with (
+        patch("custom_components.ws_core.coordinator.ir.async_create_issue") as create,
+        patch("custom_components.ws_core.coordinator.ir.async_delete_issue") as delete,
+    ):
+        coord._compute_health(data, now, missing=[], missing_entities=[])
+    issue_id = coord._issue_id("et0_pm_unavailable")
+    assert any(call.args[2] == issue_id for call in create.call_args_list) == daylight_outage
+    assert any(call.args[2] == issue_id for call in delete.call_args_list) != daylight_outage
 
 
 def test_old_positive_irradiation_does_not_make_daily_pm():
