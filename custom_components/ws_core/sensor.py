@@ -277,9 +277,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     entities: list[SensorEntity] = [WSSensor(coordinator, entry, desc, prefix) for desc in filtered]
 
-    # Named indoor rooms (v2.6.0; issue #115): per-room temp-delta, humidity,
-    # CO2 and comfort sensors. Only the metrics a room actually configures are
-    # created. The temp-delta key matches the v2.0.5 scheme so existing
+    # Named indoor rooms: per-room temp-delta, relative/absolute humidity, CO2
+    # and comfort sensors. Only metrics with the required sources are created.
+    # The temp-delta key matches the v2.0.5 scheme so existing
     # temperature-only rooms keep their entity ids across the upgrade.
     if opts.get(CONF_ENABLE_INDOOR, False):
         for room in normalize_indoor_rooms(opts.get(CONF_INDOOR_ROOMS)):
@@ -334,6 +334,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             attrs_fn=lambda d, _rid=rid, _eid=hum_eid: {
                                 "delta_pct": _room_field(d, _rid, "humidity_delta_pct"),
                                 "source_entity": _eid,
+                            },
+                        ),
+                        prefix,
+                    )
+                )
+            if temp_eid and hum_eid:
+                entities.append(
+                    WSSensor(
+                        coordinator,
+                        entry,
+                        WSSensorDescription(
+                            key=f"indoor_room_absolute_humidity_{rid}",
+                            name=f"Absolute Humidity - {name}",
+                            translation_key="indoor_room_absolute_humidity",
+                            translation_placeholders={"room_name": name},
+                            icon="mdi:water",
+                            native_unit="g/m³",
+                            state_class=SensorStateClass.MEASUREMENT,
+                            suggested_display_precision=2,
+                            value_fn=lambda d, _rid=rid: _room_field(d, _rid, KEY_ABSOLUTE_HUMIDITY),
+                            attrs_fn=lambda d, _rid=rid, _temp=temp_eid, _hum=hum_eid: {
+                                "temp_c": _room_field(d, _rid, "temp_c"),
+                                "humidity_pct": _room_field(d, _rid, "humidity_pct"),
+                                "temperature_source_entity": _temp,
+                                "humidity_source_entity": _hum,
                             },
                         ),
                         prefix,

@@ -14,6 +14,13 @@ and extends them significantly.
 Thermal Comfort entity IDs follow `sensor.<name>_<metric>`. ws_core uses
 `sensor.ws_<metric>` (or your chosen prefix, set in step 1 of setup).
 
+The table below describes values derived from the outdoor station. For a room's
+absolute humidity, enable **Indoor Sensors** and configure both temperature and
+humidity under **Configure → Indoor Rooms**. Use
+`sensor.ws_indoor_room_absolute_humidity_<room>` (g/m³) for that room's
+automations. Other comfort indices in this table remain outdoor station values;
+they are not calculated separately for each room.
+
 | Thermal Comfort sensor | ws_core equivalent | Notes |
 |---|---|---|
 | `sensor.<name>_apparent_temperature` | `sensor.ws_feels_like` | Same formula: Australian BOM / Steadman (1994). Values match within 0.1 °C for identical inputs. |
@@ -117,5 +124,6 @@ ws_core's outdoor weather mode is not a direct replacement.
 ws_core does have an Indoor Sensors group (`enable_indoor`) for monitoring
 indoor comfort alongside outdoor weather - including named multi-room support,
 where each room can have its own temperature, humidity and CO₂ sensors with
-per-room delta and comfort sensors - but it still requires a full outdoor
+per-room delta, absolute humidity (when both temperature and humidity are mapped)
+and comfort sensors - but it still requires a full outdoor
 station for the core integration to function.
