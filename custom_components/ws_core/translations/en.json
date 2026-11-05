@@ -2578,6 +2578,9 @@
       "indoor_room_humidity": {
         "name": "Humidity - {room_name}"
       },
+      "indoor_room_absolute_humidity": {
+        "name": "Absolute Humidity - {room_name}"
+      },
       "indoor_room_co2": {
         "name": "CO₂ - {room_name}"
       },

@@ -244,10 +244,13 @@ Supports WH57, AS3935, and Blitzortung. Blitzortung is auto-discovered if instal
 | `sensor.ws_indoor_comfort` | 0-100 composite indoor comfort score |
 | `sensor.ws_indoor_room_delta_<room>` | Per-room indoor/outdoor temperature delta (one per room with a temperature sensor) |
 | `sensor.ws_indoor_room_humidity_<room>` | Per-room indoor humidity, with outdoor delta attribute (rooms with a humidity sensor) |
+| `sensor.ws_indoor_room_absolute_humidity_<room>` | Per-room absolute humidity in g/m³ (rooms with both temperature and humidity sensors) |
 | `sensor.ws_indoor_room_co2_<room>` | Per-room CO₂ in ppm (rooms with a CO₂ sensor) |
 | `sensor.ws_indoor_room_comfort_<room>` | Per-room 0-100 composite comfort score (any room with at least one sensor) |
 
 Indoor rooms are configured under **Configure → Indoor Rooms**, where each room is given a name and any combination of temperature, humidity and CO₂ sensors.
+
+Room absolute humidity uses that room's temperature and relative humidity, with temperature converted to Celsius before calculation. It does not require Comfort Indices to be enabled. The value is unknown while either source is missing or unavailable. For ventilation automations, compare it with outdoor `sensor.ws_absolute_humidity` (enable Comfort Indices and the outdoor entity).
 
 ---
 

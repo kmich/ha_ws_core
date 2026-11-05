@@ -2928,7 +2928,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Per-room indoor monitoring (named rooms, v2.6.0; issue #115).
         # Each room may carry temp / humidity / CO2 sensors; we derive
-        # outdoor-relative deltas and a per-room comfort score.
+        # outdoor-relative deltas, absolute humidity and a per-room comfort score.
         if self._indoor_rooms:
             outdoor_tc = data.get(KEY_NORM_TEMP_C)
             outdoor_rh = data.get(KEY_NORM_HUMIDITY)
@@ -2958,6 +2958,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         rd["humidity_pct"] = rh
                         if outdoor_rh is not None:
                             rd["humidity_delta_pct"] = round(rh - float(outdoor_rh), 2)
+
+                if tc is not None and rh is not None:
+                    rd[KEY_ABSOLUTE_HUMIDITY] = calculate_absolute_humidity(tc, rh)
 
                 co2_eid = room.get("co2")
                 co2 = None

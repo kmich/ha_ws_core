@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.11] - 2026-11-05
+
+### Added
+
+- Named indoor rooms with both temperature and humidity sensors now get an absolute humidity sensor in g/m³ for ventilation automations. Each calculation uses the room's own readings, handles Celsius, Fahrenheit and Kelvin inputs, and becomes unknown when either source is unavailable. Enable Indoor Sensors and map both sources under Configure → Indoor Rooms; Comfort Indices is not required (#184).
+
 ## [2.13.10] - 2026-11-05
 
 ### Fixed
