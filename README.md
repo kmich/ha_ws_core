@@ -65,7 +65,7 @@ The [hardware mapping guide](docs/hardware_mapping.md) covers each brand in deta
 
 ## Installation
 
-1. In HACS, search for **Weather Station Core**, download it and restart Home Assistant. The button above opens it in HACS for you.
+1. In Home Assistant 2026.11 and newer, open **Settings → Marketplace** and search for **Weather Station Core**. On 2026.10 and older, search for it in HACS. Download it and restart Home Assistant. The button above opens it in HACS for you.
 2. Go to **Settings → Devices & Services → Add Integration** and search for **Weather Station Core**.
 3. Check the entities it suggests for your station and submit.
 

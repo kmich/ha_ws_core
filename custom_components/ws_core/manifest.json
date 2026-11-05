@@ -5,6 +5,7 @@
     "mqtt",
     "recorder"
   ],
+  "categories": ["weather_alerts.forecasts"],
   "codeowners": [
     "@kmich"
   ],
