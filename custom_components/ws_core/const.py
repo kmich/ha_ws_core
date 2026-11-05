@@ -1106,12 +1106,8 @@ STUCK_HUMIDITY_RAIL_PCT = 2.0
 # The margin covers the high gust factors of light, turbulent wind.
 GUST_PLAUSIBLE_FACTOR = 3.0
 GUST_PLAUSIBLE_MARGIN_MS = 10.0
-# The same test on hourly statistics is looser: the hour's mean wind dilutes a
-# short squall.
-GUST_HOURLY_PLAUSIBLE_FACTOR = 4.0
-GUST_HOURLY_PLAUSIBLE_MARGIN_MS = 12.0
-
-# Startup repair of the rain totals and gust records from recorder statistics
+# Startup backfill of rain totals from recorder statistics. Stored gust records
+# are preserved because they do not include their source or observation time.
 HISTORY_BACKFILL_DELAY_S = 120.0  # wait after startup before reading the recorder
 HISTORY_RAIN_JUMP_CAP_MM_PER_H = 60.0  # a counter rise faster than this is a glitch, not rain
 

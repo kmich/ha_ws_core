@@ -19,14 +19,12 @@ from custom_components.ws_core.const import (
     SRC_RAIN_YEAR,
 )
 from custom_components.ws_core.history_backfill import (
-    apply_gust,
     apply_rain,
     async_backfill_from_statistics,
     first_hour,
     hourly_series,
     period_starts,
     rain_deltas,
-    repaired_gust_record,
 )
 
 from .test_coordinator import _make_coordinator
@@ -131,25 +129,6 @@ class TestRainDeltas:
         assert rain_deltas([10.0, None, None, 13.0]) == [None, None, None, 3.0]
 
 
-class TestRepairedGustRecord:
-    def test_glitch_record_is_replaced_by_best_plausible_gust(self):
-        normal = [(12.3, 5.0), (15.5, 6.0), (20.0, 8.0)]
-        hours = normal + GLITCH_HOURS
-        gust = [g for g, _ in hours]
-        wind = [w for _, w in hours]
-        assert repaired_gust_record(40.0, gust, wind, 0) == 20.0
-
-    def test_record_from_plausible_hour_stands(self):
-        assert repaired_gust_record(30.0, [30.0, 12.0], [11.0, 5.0], 0) is None
-
-    def test_record_not_in_statistics_stands(self):
-        # Set before the statistics begin, or by another sensor
-        assert repaired_gust_record(30.0, [12.0, 14.0], [5.0, 6.0], 0) is None
-
-    def test_hours_before_first_are_ignored(self):
-        assert repaired_gust_record(20.0, [20.0, 40.0], [8.0, 3.0], 1) is None
-
-
 def _ts(dt: datetime) -> float:
     return dt.timestamp()
 
@@ -214,88 +193,31 @@ class TestApplyRain:
         assert abs(coord._rain_this_year_mm - (counter[-1] - counter[0] + 3.0)) < 0.01
 
 
-class TestApplyGust:
-    def _setup(self):
-        coord = _make_coordinator()
-        now = dt_util.as_local(datetime(2026, 11, 3, 15, 30, tzinfo=dt_util.UTC))
-        periods = period_starts(now)
-        start_ts = periods["year"][1] - 3600.0
-        n = int((_ts(now) - start_ts) // 3600)
-        gust = [6.0] * n
-        wind = [3.0] * n
-        gust[100] = 18.0  # a real windy hour in January
-        wind[100] = 7.0
-        glitch_at = first_hour(start_ts, periods["month"][1]) - 400  # mid-October
-        for k, (g, w) in enumerate(GLITCH_HOURS):
-            gust[glitch_at + k], wind[glitch_at + k] = g, w
-        gust[-2] = 8.1  # this month's real max
-        rows = {
-            "sensor.gust": [{"start": start_ts + i * 3600.0, "max": g} for i, g in enumerate(gust)],
-            "sensor.wind": [{"start": start_ts + i * 3600.0, "mean": w} for i, w in enumerate(wind)],
-        }
-        meta = {
-            "sensor.gust": {"statistic_id": "sensor.gust", "statistics_unit_of_measurement": "m/s"},
-            "sensor.wind": {"statistic_id": "sensor.wind", "statistics_unit_of_measurement": "m/s"},
-        }
-        coord._gust_max_all_time = 40.0
-        coord._gust_max_year, coord._gust_year_key = 40.0, periods["year"][0]
-        coord._gust_max_month, coord._gust_month_key = 8.1, periods["month"][0]
-        return coord, meta, rows, start_ts, n, periods
-
-    def test_glitch_records_are_repaired(self):
-        coord, meta, rows, start_ts, n, periods = self._setup()
-        changes = apply_gust(coord, meta, rows, None, start_ts, n, periods)
-        assert coord._gust_max_year == 18.0
-        assert coord._gust_max_all_time == 18.0
-        assert coord._gust_max_month == 8.1
-        assert len(changes) == 2
-
-    def test_all_time_keeps_older_statistics(self):
-        coord, meta, rows, start_ts, n, periods = self._setup()
-        apply_gust(coord, meta, rows, 24.0, start_ts, n, periods)
-        assert coord._gust_max_all_time == 24.0
-        assert coord._gust_max_year == 18.0
-
-    def test_no_wind_statistics_no_repair(self):
-        coord, meta, rows, start_ts, n, periods = self._setup()
-        del meta["sensor.wind"]
-        assert apply_gust(coord, meta, rows, None, start_ts, n, periods) == []
-        assert coord._gust_max_all_time == 40.0
-
-
 class FakeRecorder:
     async def async_add_executor_job(self, fn, *args):
         return fn(*args)
 
 
 class TestAsyncBackfill:
-    def test_reads_applies_and_saves(self):
-        coord = _make_coordinator()
+    def test_reads_applies_and_saves_without_changing_gust_records(self):
+        coord, meta, rows, start_ts, n, periods, _ = TestApplyRain()._setup()
         coord.hass.config.components = {"recorder"}
         coord._history_store = MagicMock(async_save=AsyncMock())
         coord._dump_history_state = MagicMock(return_value={})
-        coord._gust_max_all_time = 40.0
-        meta = {"sensor.gust": {"statistic_id": "sensor.gust"}, "sensor.wind": {"statistic_id": "sensor.wind"}}
-        now = dt_util.utcnow()
-        start = dt_util.as_local(now).replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        rows = {
-            "sensor.gust": [
-                {"start": start.timestamp() + 7200.0, "max": 40.0},
-                {"start": start.timestamp() + 10800.0, "max": 9.0},
-            ],
-            "sensor.wind": [
-                {"start": start.timestamp() + 7200.0, "mean": 2.0},
-                {"start": start.timestamp() + 10800.0, "mean": 4.0},
-            ],
-        }
-        read = MagicMock(return_value=(meta, rows, None))
+        coord._gust_max_all_time = 30.0
+        coord._gust_max_year = 25.0
+        coord._gust_max_month = 20.0
+        read = MagicMock(return_value=(meta, rows))
+        now = dt_util.utc_from_timestamp(start_ts + n * 3600.0 + 600.0)
         with (
+            patch.object(history_backfill.dt_util, "utcnow", return_value=now),
             patch.object(history_backfill, "_recorder_instance", return_value=FakeRecorder()),
             patch.object(history_backfill, "read_statistics", read),
         ):
             asyncio.run(async_backfill_from_statistics(coord))
-        assert read.call_args.args[1] == {"sensor.rain", "sensor.gust", "sensor.wind"}
-        assert coord._gust_max_all_time == 9.0
+        assert read.call_args.args[1] == {"sensor.rain"}
+        assert coord._rain_this_year_mm > 130.6
+        assert (coord._gust_max_all_time, coord._gust_max_year, coord._gust_max_month) == (30.0, 25.0, 20.0)
         coord._history_store.async_save.assert_awaited_once()
 
     def test_without_recorder_does_nothing(self):

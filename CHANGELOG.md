@@ -2,12 +2,19 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [2.13.10] - 2026-11-03
+## [2.13.10] - 2026-11-05
 
 ### Fixed
 
-- A glitching gust sensor can no longer set the monthly, yearly or all-time gust record. A Shelly WS90 that reported 38-40 m/s for eight hours while the wind averaged 1-5 m/s left a 40 m/s (144 km/h) all-time record behind. A gust now only counts toward the records when it is at most 3 times the wind speed of the same reading plus 10 m/s. Records already set by such a glitch are corrected at the next start: when the recorder statistics show that only hours with an implausible gust reached the record, it is replaced with the highest believable gust of that period.
-- Rain this week, month and year no longer undercount when the sensor was added part-way through the period or Home Assistant was down while it rained. They were counted only while ws_core was running, so a station set up in June showed rain since June as the year's total. At every start ws_core now reads the rain gauge's recorder statistics and raises each total to what the gauge measured. A total is never lowered, and a station's own year-to-date counter, when mapped, is still used as is.
+- Monthly, yearly and all-time gust records now reject gusts above 3 times the current wind speed plus 10 m/s. Existing records are preserved: historical hourly maxima and mean wind do not establish which observation set a legacy record, so startup cannot safely lower it automatically.
+- Rain this week, month and year are backfilled at startup from available recorder counter changes. Recorder sums and raw station counters are handled separately, live counter jumps are bounded, and a gap across a period boundary is not attributed entirely to the new period. Totals are never lowered; mapped station year-to-date counters still take precedence. Missing historical coverage and counter resets can still limit recovery.
+- Source health and data quality now use `last_reported` with a `last_updated` fallback, so unchanged values with fresh reports are not considered stale. A stale zero wind speed is treated as calm only while the configured gust is also zero and has reported within 10 minutes and the configured timeout (issue #181). Unavailable sources and genuine reporting outages still degrade health.
+- Fresh pressure reports no longer raise stuck-pressure or pressure-consistency warnings solely because the value stayed constant for hours, including integer-only WS90 pressure readings (issue #182).
+
+### Changed
+
+- Added the Marketplace weather forecast category and updated installation guidance for Home Assistant 2026.11. New Marketplace installations open setup without a restart; updates still require one. Release validation now checks branding, and CI runs the full suite on HA 2026.10.4 and 2026.11.0.
+- Dashboard installation instructions distinguish complete dashboards from individual views and cards, and explain replacements for obsolete Mushroom card names (discussions #162 and #82).
 
 ## [2.13.9] - 2026-10-31
 

@@ -1345,8 +1345,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # (targets that already learned, or are waiting for a retry, are skipped).
             self._start_once(self._pattern.async_learn_history, PATTERN_HISTORY_DELAY_S, "ws_core_pattern_history")
 
-        # Rain totals and gust records only see what happened while ws_core ran:
-        # once per start, fill them in from the station's recorder statistics.
+        # Once per start, fill rain totals from the station's recorder statistics.
         from .history_backfill import async_backfill_from_statistics
 
         self._start_once(
@@ -3357,6 +3356,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._stuck_ref.pop(label, None)
                 continue
             curr = float(curr)
+            # A barometer can legitimately hold one integer hPa value for hours.
+            # Fresh reports are evidence of communication even without movement.
+            if src_key == SRC_PRESS and not self._source_is_stale(src_key, now):
+                self._stuck_ref.pop(label, None)
+                continue
             if label == "humidity" and (curr >= 100.0 - STUCK_HUMIDITY_RAIL_PCT or curr <= STUCK_HUMIDITY_RAIL_PCT):
                 self._stuck_ref.pop(label, None)
                 continue
@@ -3435,8 +3439,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             k
             for k in STALENESS_CHECK_SOURCES
             if self.sources.get(k)
-            and (state := self.hass.states.get(self.sources[k])) is not None
-            and (now - state.last_updated).total_seconds() > self.staleness_s
+            and self.hass.states.get(self.sources[k]) is not None
+            and self._source_is_stale(k, now)
         ]
         score -= min(70, (len(missing_required) + len(unavailable_required)) * 15)
         score -= min(30, len(stale_sources) * 10)
@@ -3531,6 +3535,34 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             elapsed_min = (now - self._lightning_last_strike_ts).total_seconds() / 60.0
             data[KEY_LIGHTNING_CLEARANCE_MIN] = round(elapsed_min, 0)
 
+    @staticmethod
+    def _reported_at(state: Any) -> datetime | None:
+        """Latest report timestamp, including unchanged reports on newer HA."""
+        reported = getattr(state, "last_reported", None)
+        if not isinstance(reported, datetime):
+            reported = getattr(state, "last_updated", None)
+        return reported if isinstance(reported, datetime) else None
+
+    def _source_is_stale(self, key: str, now: datetime) -> bool:
+        """Shared source freshness for health, quality and pressure diagnostics."""
+        state = self.hass.states.get(self.sources.get(key))
+        reported = self._reported_at(state)
+        if reported is None or (now - reported).total_seconds() <= self.staleness_s:
+            return False
+        # Some stations omit wind-speed reports while calm, but still report gusts.
+        # Require a recent, numeric zero gust as independent evidence of calm.
+        if key == SRC_WIND and self._num(self.hass, self.sources.get(key)) == 0.0:
+            gust_id = self.sources.get(SRC_GUST)
+            gust_reported = self._reported_at(self.hass.states.get(gust_id))
+            if (
+                gust_id
+                and self._num(self.hass, gust_id) == 0.0
+                and gust_reported is not None
+                and 0.0 <= (now - gust_reported).total_seconds() <= min(600.0, self.staleness_s)
+            ):
+                return False
+        return True
+
     def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list, sample: bool = True) -> None:
         """Staleness, package status, data quality, configurable alerts."""
         stale = []
@@ -3545,7 +3577,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             st = self.hass.states.get(eid)
             if st is None:
                 continue
-            if (now - st.last_updated).total_seconds() > self.staleness_s:
+            if self._source_is_stale(k, now):
                 stale.append(k)
 
         unavailable = [
@@ -4158,6 +4190,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._pressure_stuck_start is not None
             and (now - self._pressure_stuck_start).total_seconds() > 8 * 3600
             and (wind_ms is not None and float(wind_ms) > 1.0)
+            and self._source_is_stale(SRC_PRESS, now)
         )
 
         # Track rain total increments vs rain rate

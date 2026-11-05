@@ -80,7 +80,23 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_rain_this_year` | mm | Station year-to-date total when mapped; otherwise rainfall since January 1 |
 | `sensor.ws_rain_rate_max_24h` | mm/h | Rolling 24h maximum rain rate |
 
-The week, month and year totals are counted live, and at every start ws_core also reads the rain gauge's recorder statistics. When those show more rain for the period, for example because the sensor was added part-way through the year or Home Assistant was down while it rained, the total is raised to match. A total is never lowered. The statistics only exist if the gauge's sensor has a `state_class`.
+The week, month and year totals are counted live, and at every start ws_core also
+reads the rain gauge's recorder statistics. Available counter changes can raise
+an undercounted total; a total is never lowered. The statistics only exist if the
+gauge's sensor has a supported `state_class`. Missing history, counter resets and
+gaps crossing a period boundary can prevent full recovery, so these totals may
+cover less than the complete calendar period. A mapped year-to-date source is
+preferred for the station's annual total.
+
+Gust records reject new implausible readings, but existing records are preserved.
+Legacy records do not identify their source observation, and hourly statistics
+alone cannot safely establish that a stored record should be lowered.
+
+Source freshness follows the latest report, including unchanged reports. During
+calm conditions, a zero wind speed may be corroborated by a zero gust reported
+within 10 minutes and the configured staleness timeout. Constant pressure with
+fresh reports does not by itself indicate a failed sensor. Missing, unavailable
+and genuinely stale sources continue to affect station health and data quality.
 
 ---
 
