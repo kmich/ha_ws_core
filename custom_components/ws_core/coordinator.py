@@ -115,6 +115,7 @@ from .algorithms import (
     pressure_trend_arrow,
     pressure_trend_display,
     smooth_wind_direction,
+    solar_elevation_deg,
     thunderstorm_risk_index,
     uv_burn_time_minutes,
     uv_level,
@@ -5536,14 +5537,28 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             state = self.hass.states.get(eid)
             if state is None:
                 return None
+            value = self._num(self.hass, eid)
+            if value is None:
+                return None
             reported = getattr(state, "last_reported", None)
             if not isinstance(reported, datetime):
                 reported = getattr(state, "last_updated", None)
             if now is not None and isinstance(reported, datetime):
                 age_s = (now - reported).total_seconds()
                 if age_s > self.staleness_s:
-                    return None
-            return self._num(self.hass, eid)
+                    # Change-only sources can leave zero unchanged all night.
+                    # Count that available zero while the station's sun is down,
+                    # but never carry it through daylight or beyond one day.
+                    night_zero = (
+                        value == 0.0
+                        and age_s <= 86400
+                        and self.forecast_lat is not None
+                        and self.forecast_lon is not None
+                        and solar_elevation_deg(float(self.forecast_lat), float(self.forecast_lon), now) < -0.833
+                    )
+                    if not night_zero:
+                        return None
+            return value
 
         eid = self.sources.get(SRC_SOLAR_RADIATION)
         if eid:

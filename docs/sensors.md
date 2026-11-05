@@ -66,6 +66,16 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_et0_daily` | mm | Hargreaves-Samani 1985 | Daily reference ET₀ (±15-20%) |
 | `sensor.ws_et0_penman_monteith` | mm | FAO-56 Penman-Monteith | Activates when solar radiation sensor is mapped (±5-10%) |
 
+Penman–Monteith ET₀ describes the previous completed local calendar day and requires
+at least 95% radiation and matching temperature, humidity and wind coverage.
+Low radiation on a short or overcast day still counts as coverage. A numeric zero
+from the radiation sensor (or optional illuminance fallback) can remain unchanged
+overnight: with station coordinates configured, it counts while the sun is below
+the horizon, for up to 24 hours after its last report. Daylight zeros and positive
+readings still require fresh reports. Missing or unavailable sources remain gaps.
+After an incomplete day, the sensor and its repair recover once a sufficiently
+covered completed day is available; missing history is not filled retrospectively.
+
 ## Always-on: v2.0 additions
 
 | Entity ID | Unit | Description |

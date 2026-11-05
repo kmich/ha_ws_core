@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.12] - 2026-11-05
+
+### Fixed
+
+- PM ET₀ no longer loses overnight coverage when a change-only radiation or illuminance source stays at zero. With station coordinates configured, an available numeric zero up to 24 hours old counts while the sun is below the horizon. Stale daylight readings, stale positive values and unavailable sources still leave gaps. Short, overcast days can now produce a completed-day result without a false insufficient-coverage repair (#186).
+
 ## [2.13.11] - 2026-11-05
 
 ### Added
