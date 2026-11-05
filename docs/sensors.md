@@ -75,10 +75,12 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_wind_gust_factor` | — | Gust ÷ mean wind speed ratio |
 | `sensor.ws_dominant_wind_direction` | ° | Circular-mean wind direction (24h) |
 | `sensor.ws_wind_direction_variability` | ° | Circular standard deviation of wind direction |
-| `sensor.ws_rain_this_week` | mm | Rolling weekly rainfall accumulator |
-| `sensor.ws_rain_this_month` | mm | Rolling monthly rainfall accumulator |
-| `sensor.ws_rain_this_year` | mm | Station year-to-date total when mapped; otherwise rainfall observed by WS Core since January 1 (or installation) |
+| `sensor.ws_rain_this_week` | mm | Rainfall since Monday |
+| `sensor.ws_rain_this_month` | mm | Rainfall since the 1st of the month |
+| `sensor.ws_rain_this_year` | mm | Station year-to-date total when mapped; otherwise rainfall since January 1 |
 | `sensor.ws_rain_rate_max_24h` | mm/h | Rolling 24h maximum rain rate |
+
+The week, month and year totals are counted live, and at every start ws_core also reads the rain gauge's recorder statistics. When those show more rain for the period, for example because the sensor was added part-way through the year or Home Assistant was down while it rained, the total is raised to match. A total is never lowered. The statistics only exist if the gauge's sensor has a `state_class`.
 
 ---
 

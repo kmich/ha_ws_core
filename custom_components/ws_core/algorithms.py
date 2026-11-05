@@ -2119,6 +2119,17 @@ def calculate_specific_humidity(temp_c: float, humidity: float, pressure_hpa: fl
     return round(0.622 * e / denom * 1000.0, 2)
 
 
+def gust_is_plausible(gust_ms: float, wind_ms: float | None, factor: float, margin_ms: float) -> bool:
+    """Whether a gust is consistent with the mean wind measured alongside it.
+
+    A gust above ``factor`` x wind + ``margin_ms`` is a sensor glitch, not
+    weather. Without a wind reading the gust gets the benefit of the doubt.
+    """
+    if wind_ms is None:
+        return True
+    return float(gust_ms) <= factor * max(0.0, float(wind_ms)) + margin_ms
+
+
 def calculate_wind_gust_factor(gust_ms: float, wind_ms: float) -> float | None:
     """Wind gust factor (dimensionless ratio: gust / mean wind speed).
 
