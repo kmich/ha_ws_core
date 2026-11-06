@@ -2,7 +2,7 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [Unreleased]
+## Unreleased
 
 ### Fixed
 

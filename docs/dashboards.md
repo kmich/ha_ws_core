@@ -84,7 +84,7 @@ Install all dependencies from HACS before pasting the dashboard YAML.
 
 **Display units.** Temperature cards use each sensor's Home Assistant display unit,
 including entity-specific overrides. The five-day outlook converts the integration's
-Celsius forecast attributes to the temperature sensor's display unit. Wind and pressure
+Celsius forecast attributes to the temperature sensor's display unit. The main wind and pressure
 tiles also use their sensor units; explicitly named metric diagnostic attributes keep
 their metric units. Temperature colors and comfort thresholds keep the same physical
 meaning in Celsius, Fahrenheit and Kelvin.
