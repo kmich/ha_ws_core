@@ -556,15 +556,19 @@ views:
                       const pressArrow = pressAttrs.arrow || '→';
                       const pressColor = pressAttrs.color || 'rgba(255,255,255,0.6)';
 
-                      const tempUnit = '°C';
-                      const windUnit = 'm/s';
+                      const tempUnit = states['sensor.ws_temperature']?.attributes?.unit_of_measurement || '°C';
+                      const highUnit = states['sensor.ws_temperature_high_24h']?.attributes?.unit_of_measurement || tempUnit;
+                      const lowUnit = states['sensor.ws_temperature_low_24h']?.attributes?.unit_of_measurement || tempUnit;
+                      const feelsUnit = states['sensor.ws_feels_like']?.attributes?.unit_of_measurement || tempUnit;
+                      const windUnit = states['sensor.ws_wind_speed']?.attributes?.unit_of_measurement || 'm/s';
 
                       const tempHighVal = parseFloat(states['sensor.ws_temperature_high_24h']?.state);
                       const tempLowVal = parseFloat(states['sensor.ws_temperature_low_24h']?.state);
                       const tempHigh = isNaN(tempHighVal) ? '--' : tempHighVal.toFixed(0);
                       const tempLow = isNaN(tempLowVal) ? '--' : tempLowVal.toFixed(0);
 
-                      const feelsLike = parseFloat(states['sensor.ws_feels_like']?.state) || 0;
+                      const feelsLikeVal = parseFloat(states['sensor.ws_feels_like']?.state);
+                      const feelsLike = isNaN(feelsLikeVal) ? '--' : feelsLikeVal.toFixed(1);
                       const comfort = (states['sensor.ws_humidity_level']?.state || 'Comfortable').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
                       const rainProb = parseInt(states['sensor.ws_rain_probability_combined']?.state) || 0;
@@ -618,7 +622,7 @@ views:
                               ${moonHtml}
                             </div>
                             <div style="font-size: clamp(9px, 1.5vw, 11px); color: rgba(255,255,255,0.75);">
-                              ${condState.replace(/-/g, ' ')} · Feels ${feelsLike}${tempUnit} · H:${tempHigh}${tempUnit} L:${tempLow}${tempUnit}
+                              ${condState.replace(/-/g, ' ')} · Feels ${feelsLike}${feelsUnit} · H:${tempHigh}${highUnit} L:${tempLow}${lowUnit}
                             </div>
                           </div>
 
@@ -734,7 +738,9 @@ views:
                           </div>`;
                       }
 
-                      const tempUnit = '°C';
+                      const tempUnit = entity?.attributes?.unit_of_measurement || '°C';
+                      const feelsUnit = states['sensor.ws_feels_like']?.attributes?.unit_of_measurement || tempUnit;
+                      const dewUnit = states['sensor.ws_dew_point']?.attributes?.unit_of_measurement || tempUnit;
                       const tempDisplay = temp.toFixed(1);
                       const feelsLikeVal = parseFloat(states['sensor.ws_feels_like']?.state);
                       const feelsDisplay = isNaN(feelsLikeVal) ? temp.toFixed(0) : feelsLikeVal.toFixed(0);
@@ -752,8 +758,8 @@ views:
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
                           <ha-icon icon="mdi:thermometer" style="--mdc-icon-size: clamp(32px, 5vw, 40px); color: ${color}; filter: drop-shadow(0 0 12px ${color}50);"></ha-icon>
                           <div style="font-size: clamp(36px, 7vw, 54px); font-weight: 200; color: white; line-height: 1; margin: 4px 0;">${tempDisplay}${tempUnit.replace('°', '°')}</div>
-                          <div style="font-size: clamp(11px, 1.8vw, 13px); font-weight:500; color: ${color}; margin-bottom:2px;">Feels ${feelsDisplay}${tempUnit} (${comfort})</div>
-                          <div style="font-size: clamp(9px, 1.5vw, 11px); color: rgba(255,255,255,0.75);">Dew ${dewDisplay}${tempUnit} · Hum ${Math.round(humid)}%</div>
+                          <div style="font-size: clamp(11px, 1.8vw, 13px); font-weight:500; color: ${color}; margin-bottom:2px;">Feels ${feelsDisplay}${isNaN(feelsLikeVal) ? tempUnit : feelsUnit} (${comfort})</div>
+                          <div style="font-size: clamp(9px, 1.5vw, 11px); color: rgba(255,255,255,0.75);">Dew ${dewDisplay}${dewUnit} · Hum ${Math.round(humid)}%</div>
                           <div style="width: 75%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 10px; overflow: hidden;">
                             <div style="height: 100%; width: ${pct}%; background: linear-gradient(90deg, #60A5FA, #4ADE80, #FBBF24, #EF4444); border-radius: 3px;"></div>
                           </div>
@@ -792,9 +798,11 @@ views:
                       const attrs = entity?.attributes || {};
                       const desc = attrs.description || 'Calm';
 
-                      const speed = attrs.speed_ms || parseFloat(states['sensor.ws_wind_speed']?.state) || 0;
-                      const gust = attrs.gust_ms || parseFloat(states['sensor.ws_wind_gust']?.state) || 0;
-                      const windUnit = 'm/s';
+                      const speed = parseFloat(states['sensor.ws_wind_speed']?.state);
+                      const gust = parseFloat(states['sensor.ws_wind_gust']?.state);
+                      const gustUnit = states['sensor.ws_wind_gust']?.attributes?.unit_of_measurement || 'm/s';
+                      const fmt = v => isNaN(v) ? '--' : v.toFixed(1);
+                      const windUnit = states['sensor.ws_wind_speed']?.attributes?.unit_of_measurement || 'm/s';
 
                       const quadAttrs = states['sensor.ws_wind_quadrant']?.attributes || {};
                       const deg = parseFloat(quadAttrs.degrees) || 0;
@@ -806,7 +814,7 @@ views:
                             <ha-icon icon="mdi:weather-windy" style="--mdc-icon-size: clamp(28px, 4.5vw, 34px); color: #67E8F9;"></ha-icon>
                             <div style="font-size: clamp(36px, 6.5vw, 52px); font-weight: 200; color: white; line-height: 1; margin: 6px 0;">${bft}<span style="font-size: clamp(14px, 2vw, 16px); color: rgba(255,255,255,0.4); margin-left: 4px;">Bft</span></div>
                             <div style="font-size: clamp(11px, 1.8vw, 13px); color: #67E8F9;">${desc}</div>
-                            <div style="font-size: clamp(9px, 1.5vw, 11px); color: rgba(255,255,255,0.4); margin-top: 4px;">${parseFloat(speed).toFixed(1)} ${windUnit} G${parseFloat(gust).toFixed(1)}</div>
+                            <div style="font-size: clamp(9px, 1.5vw, 11px); color: rgba(255,255,255,0.4); margin-top: 4px;">${fmt(speed)} ${windUnit} G${fmt(gust)} ${gustUnit}</div>
                           </div>
 
                           <div style="display: flex; flex-direction: column; align-items: center;">
@@ -923,7 +931,9 @@ views:
                 custom_fields:
                   content: |
                     [[[
-                      const t = parseFloat(entity?.state);
+                      const displayT = parseFloat(entity?.state);
+                      const tempUnit = entity?.attributes?.unit_of_measurement || '°C';
+                      const t = tempUnit === '°F' ? (displayT - 32) / 1.8 : tempUnit === 'K' ? displayT - 273.15 : displayT;
                       const fmt = v => isNaN(v) ? '--' : parseFloat(v).toFixed(1);
                       let comfort, color;
                       if      (isNaN(t))  { comfort = '--';          color = 'rgba(255,255,255,0.4)'; }
@@ -942,7 +952,7 @@ views:
                         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
                           <ha-icon icon="mdi:pool" style="--mdc-icon-size:clamp(32px,5vw,40px); color:${color}; filter:drop-shadow(0 0 12px ${color}50);"></ha-icon>
                           <div style="font-size:clamp(36px,6.5vw,52px); font-weight:200; color:white; line-height:1; margin:8px 0 4px;">
-                            ${fmt(t)}<span style="font-size:clamp(14px,2vw,18px); color:rgba(255,255,255,0.4);">°C</span>
+                            ${fmt(displayT)}<span style="font-size:clamp(14px,2vw,18px); color:rgba(255,255,255,0.4);">${tempUnit}</span>
                           </div>
                           <div style="font-size:clamp(11px,1.8vw,13px); font-weight:500; color:${color};">${comfort}</div>
                           <div style="font-size:clamp(9px,1.5vw,11px); color:rgba(255,255,255,0.4); margin-top:2px;">Pool</div>
@@ -975,7 +985,9 @@ views:
                 custom_fields:
                   content: |
                     [[[
-                      const t = parseFloat(entity?.state);
+                      const displayT = parseFloat(entity?.state);
+                      const tempUnit = entity?.attributes?.unit_of_measurement || '°C';
+                      const t = tempUnit === '°F' ? (displayT - 32) / 1.8 : tempUnit === 'K' ? displayT - 273.15 : displayT;
                       const fmt = v => isNaN(v) ? '--' : parseFloat(v).toFixed(1);
                       let comfort, color;
                       if      (isNaN(t))  { comfort = '--';          color = 'rgba(255,255,255,0.4)'; }
@@ -988,7 +1000,7 @@ views:
                         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
                           <ha-icon icon="mdi:waves" style="--mdc-icon-size:clamp(32px,5vw,40px); color:${color}; filter:drop-shadow(0 0 12px ${color}50);"></ha-icon>
                           <div style="font-size:clamp(36px,6.5vw,52px); font-weight:200; color:white; line-height:1; margin:8px 0 4px;">
-                            ${fmt(t)}<span style="font-size:clamp(14px,2vw,18px); color:rgba(255,255,255,0.4);">°C</span>
+                            ${fmt(displayT)}<span style="font-size:clamp(14px,2vw,18px); color:rgba(255,255,255,0.4);">${tempUnit}</span>
                           </div>
                           <div style="font-size:clamp(11px,1.8vw,13px); font-weight:500; color:${color};">${comfort}</div>
                           <div style="font-size:clamp(9px,1.5vw,11px); color:rgba(255,255,255,0.4); margin-top:2px;">Aegean Sea</div>
@@ -1083,7 +1095,9 @@ views:
                               const alertState = states['sensor.ws_alert_state']?.state;
                               const weatherAlert = alertState === 'warning' || alertState === 'advisory';
                               const wildfireEnabled = states['sensor.ws_fire_risk_score'] !== undefined;
-                              const t = parseFloat(states['sensor.ws_temperature']?.state);
+                              const displayT = parseFloat(states['sensor.ws_temperature']?.state);
+                              const tempUnit = states['sensor.ws_temperature']?.attributes?.unit_of_measurement;
+                              const t = tempUnit === '°F' ? (displayT - 32) / 1.8 : tempUnit === 'K' ? displayT - 273.15 : displayT;
                               const h = parseFloat(states['sensor.ws_humidity']?.state);
                               const w = parseFloat(states['sensor.ws_wind_beaufort']?.attributes?.speed_ms);
                               const fire = wildfireEnabled && !isNaN(t) && !isNaN(h) && !isNaN(w) && (t > 32 && h < 25 && w > 6);
@@ -1144,6 +1158,8 @@ views:
                       content: |
                         [[[ 
                           const p = parseFloat(entity?.state);
+                          const pressureUnit = entity?.attributes?.unit_of_measurement || 'hPa';
+                          const pressureText = p.toFixed(pressureUnit === 'inHg' ? 2 : pressureUnit === 'hPa' ? 0 : 1);
                           if (isNaN(p)) return `<div style="color:rgba(255,255,255,0.75);">N/A</div>`;
                           const trendAttrs = states['sensor.ws_pressure_trend']?.attributes || {};
                           const change = parseFloat(trendAttrs.change_3h_hpa) || 0;
@@ -1153,8 +1169,8 @@ views:
                             <div style="display:flex; align-items:center; gap:10px; height:100%;">
                               <ha-icon icon="mdi:gauge" style="--mdc-icon-size:clamp(26px, 4vw, 32px); color:#C084FC;"></ha-icon>
                               <div style="line-height:1.05;">
-                                <div style="font-size:clamp(18px, 3vw, 22px); font-weight:300; color:white;">${Math.round(p)}<span style="font-size:clamp(8px, 1.3vw, 10px);">hPa</span></div>
-                                <div style="font-size:clamp(9px, 1.5vw, 11px); color:${pColor}; font-weight:700;">${arrow} ${change > 0 ? '+' : ''}${change.toFixed(1)}/3h</div>
+                                <div style="font-size:clamp(18px, 3vw, 22px); font-weight:300; color:white;">${pressureText}<span style="font-size:clamp(8px, 1.3vw, 10px);">${pressureUnit}</span></div>
+                                <div style="font-size:clamp(9px, 1.5vw, 11px); color:${pColor}; font-weight:700;">${arrow} ${change > 0 ? '+' : ''}${change.toFixed(1)} hPa/3h</div>
                               </div>
                             </div>`;
                         ]]]
@@ -1245,20 +1261,29 @@ views:
                       return "mdi:weather-sunny";
                     }
 
+                    const tempUnit = states['sensor.ws_temperature']?.attributes?.unit_of_measurement || hass?.config?.unit_system?.temperature || '°C';
+                    const rainUnit = states['sensor.ws_rain_today_mm']?.attributes?.unit_of_measurement || hass?.config?.unit_system?.precipitation || 'mm';
+                    const formatTemp = value => {
+                      const c = parseFloat(value);
+                      if (!Number.isFinite(c)) return '--';
+                      const t = tempUnit === '°F' ? c * 1.8 + 32 : tempUnit === 'K' ? c + 273.15 : c;
+                      return Math.round(t) + tempUnit;
+                    };
                     let tiles = "";
                     for (let i = 0; i < fc.length; i++) {
                       const d = fc[i] || {};
                       const label = d.label || 'Day ' + (i+1);
-                      const tHigh = (d.tmax !== undefined) ? d.tmax : (d.tmax_c !== undefined ? d.tmax_c : d.temperature);
-                      const tLow = (d.tmin !== undefined) ? d.tmin : (d.tmin_c !== undefined ? d.tmin_c : d.templow);
-                      const range = (tHigh !== null && tLow !== null) ? Math.round(tHigh)+"° / "+Math.round(tLow)+"°" : (tHigh!==null?Math.round(tHigh)+"°":"-");
+                      const tHigh = d.tmax ?? d.tmax_c ?? d.temperature;
+                      const tLow = d.tmin ?? d.tmin_c ?? d.templow;
+                      const range = formatTemp(tHigh) + " / " + formatTemp(tLow);
                       const precip = parseFloat(d.precip_mm) || 0;
+                      const displayPrecip = rainUnit === 'in' ? precip / 25.4 : precip;
                       const prob = parseInt(d.precip_prob || d.precipitation_probability) || 0;
 
                       let popHtml = "";
                       if (precip > 0.1) {
                         const c = (precip > 10) ? "#60A5FA" : (precip > 2 ? "#FACC15" : "#22C55E");
-                        popHtml = `<div style='font-size:clamp(10px, 1.6vw, 12px); margin-top:1px; color:${c}; font-weight:600;'>💧${precip.toFixed(1)}mm</div>`;
+                        popHtml = `<div style='font-size:clamp(10px, 1.6vw, 12px); margin-top:1px; color:${c}; font-weight:600;'>💧${displayPrecip.toFixed(rainUnit === 'in' ? 2 : 1)} ${rainUnit}</div>`;
                       } else if (prob > 0) {
                         const c = (prob > 60) ? "#60A5FA" : (prob > 30 ? "#FACC15" : "#22C55E");
                         popHtml = `<div style='font-size:clamp(10px, 1.6vw, 12px); margin-top:1px; color:${c}; font-weight:600;'>${prob}%</div>`;
@@ -2302,15 +2327,18 @@ views:
                       var temp = parseFloat((states['sensor.ws_temperature'] || {}).state);
                       var gust = parseFloat((states['sensor.ws_wind_gust'] || {}).state);
                       var rainRate = parseFloat((states['sensor.ws_rain_rate'] || {}).state) || 0;
+                      var tempUnit = states['sensor.ws_temperature']?.attributes?.unit_of_measurement || '°C';
+                      var gustUnit = states['sensor.ws_wind_gust']?.attributes?.unit_of_measurement || 'm/s';
+                      var rainUnit = states['sensor.ws_rain_rate']?.attributes?.unit_of_measurement || 'mm/h';
                       var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
                       var sevColor = severity === 'Extreme' ? '#991b1b' : severity === 'High' ? '#ef4444' : severity === 'Moderate' ? '#f59e0b' : severity === 'Low' ? '#fbbf24' : '#10b981';
                       return '<div style="margin-top:8px;">'
                         + '<div style="font-size:22px;font-weight:400;color:' + color + ';">' + desc + '</div>'
                         + '<div style="display:inline-block;margin-top:6px;padding:2px 10px;border-radius:8px;background:' + sevColor + '22;border:1px solid ' + sevColor + '55;font-size:12px;font-weight:600;color:' + sevColor + ';">Severity: ' + severity + '</div>'
                         + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
-                        + '<div><strong>Temp:</strong> ' + fmt(temp) + ' °C</div>'
-                        + '<div><strong>Wind Gust:</strong> ' + fmt(gust) + ' m/s</div>'
-                        + (rainRate > 0 ? '<div style="color:#60a5fa;"><strong>Rain:</strong> ' + rainRate.toFixed(1) + ' mm/h</div>' : '')
+                        + '<div><strong>Temp:</strong> ' + fmt(temp) + ' ' + tempUnit + '</div>'
+                        + '<div><strong>Wind Gust:</strong> ' + fmt(gust) + ' ' + gustUnit + '</div>'
+                        + (rainRate > 0 ? '<div style="color:#60a5fa;"><strong>Rain:</strong> ' + rainRate.toFixed(1) + ' ' + rainUnit + '</div>' : '')
                         + '</div></div>';
                     ]]]
 
@@ -3381,19 +3409,22 @@ views:
                     - width: 48px
                     - color: |
                         [[[
-                          var v = parseFloat(entity && entity.state);
+                          var displayV = parseFloat(entity && entity.state);
+                          var unit = entity?.attributes?.unit_of_measurement || '°C';
+                          var v = unit === '°F' ? (displayV - 32) / 1.8 : unit === 'K' ? displayV - 273.15 : displayV;
                           if (isNaN(v)) return 'rgba(255,255,255,0.3)';
                           return v >= 41 ? '#991b1b' : v >= 32 ? '#ef4444' : v >= 27 ? '#f97316' : '#10b981';
                         ]]]
                 custom_fields:
                   details: |
                     [[[
-                      var v = parseFloat(entity && entity.state);
+                      var displayV = parseFloat(entity && entity.state);
+                      var unit = entity?.attributes?.unit_of_measurement || '°C';
+                      var v = unit === '°F' ? (displayV - 32) / 1.8 : unit === 'K' ? displayV - 273.15 : displayV;
                       var col = isNaN(v) ? 'rgba(255,255,255,0.3)' : v >= 41 ? '#991b1b' : v >= 32 ? '#ef4444' : v >= 27 ? '#f97316' : '#10b981';
                       var label = isNaN(v) ? 'Outside range' : v >= 41 ? 'Dangerous' : v >= 32 ? 'Extreme caution' : v >= 27 ? 'Caution' : 'OK';
-                      var unit = (states['sensor.ws_temperature'] || {}).attributes && (states['sensor.ws_temperature'] || {}).attributes.unit_of_measurement || '°C';
                       return '<div style="margin-top:8px;">'
-                        + '<div style="font-size:36px;font-weight:200;color:' + col + ';">' + (isNaN(v) ? '--' : v.toFixed(1)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> °C</span></div>'
+                        + '<div style="font-size:36px;font-weight:200;color:' + col + ';">' + (isNaN(displayV) ? '--' : displayV.toFixed(1)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> ' + unit + '</span></div>'
                         + '<div style="font-size:13px;color:' + col + ';margin-top:4px;">' + label + '</div>'
                         + '</div>';
                     ]]]
@@ -3423,18 +3454,22 @@ views:
                     - width: 48px
                     - color: |
                         [[[
-                          var v = parseFloat(entity && entity.state);
+                          var displayV = parseFloat(entity && entity.state);
+                          var unit = entity?.attributes?.unit_of_measurement || '°C';
+                          var v = unit === '°F' ? (displayV - 32) / 1.8 : unit === 'K' ? displayV - 273.15 : displayV;
                           if (isNaN(v)) return 'rgba(255,255,255,0.3)';
                           return v <= -27 ? '#7c3aed' : v <= -9 ? '#3b82f6' : v <= 0 ? '#38bdf8' : '#10b981';
                         ]]]
                 custom_fields:
                   details: |
                     [[[
-                      var v = parseFloat(entity && entity.state);
+                      var displayV = parseFloat(entity && entity.state);
+                      var unit = entity?.attributes?.unit_of_measurement || '°C';
+                      var v = unit === '°F' ? (displayV - 32) / 1.8 : unit === 'K' ? displayV - 273.15 : displayV;
                       var col = isNaN(v) ? 'rgba(255,255,255,0.3)' : v <= -27 ? '#7c3aed' : v <= -9 ? '#3b82f6' : v <= 0 ? '#38bdf8' : '#10b981';
                       var label = isNaN(v) ? 'Outside range' : v <= -27 ? 'Extreme danger' : v <= -9 ? 'Danger' : v <= 0 ? 'Very cold' : 'Brisk';
                       return '<div style="margin-top:8px;">'
-                        + '<div style="font-size:36px;font-weight:200;color:' + col + ';">' + (isNaN(v) ? '--' : v.toFixed(1)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> °C</span></div>'
+                        + '<div style="font-size:36px;font-weight:200;color:' + col + ';">' + (isNaN(displayV) ? '--' : displayV.toFixed(1)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> ' + unit + '</span></div>'
                         + '<div style="font-size:13px;color:' + col + ';margin-top:4px;">' + label + '</div>'
                         + '</div>';
                     ]]]
@@ -3576,13 +3611,15 @@ views:
                   details: |
                     [[[
                       var v = parseFloat(entity && entity.state);
+                      var unit = entity?.attributes?.unit_of_measurement || '°C';
+                      var ideal = unit === '°F' ? '3.6-14.4 °F' : '2-8 ' + unit;
                       var attrs = (entity && entity.attributes) || {};
                       var s = attrs.spray_suitability || '--';
                       var col = s === 'ideal' ? '#10b981' : s.includes('low') ? '#38bdf8' : '#ef4444';
                       return '<div style="margin-top:8px;">'
-                        + '<div style="font-size:36px;font-weight:200;color:white;">' + (isNaN(v) ? '--' : v.toFixed(1)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> °C</span></div>'
+                        + '<div style="font-size:36px;font-weight:200;color:white;">' + (isNaN(v) ? '--' : v.toFixed(1)) + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> ' + unit + '</span></div>'
                         + '<div style="font-size:13px;color:' + col + ';margin-top:4px;">' + s.replace(/_/g,' ') + '</div>'
-                        + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">Ideal: 2-8 °C</div>'
+                        + '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">Ideal: ' + ideal + '</div>'
                         + '</div>';
                     ]]]
               # Absolute Humidity
