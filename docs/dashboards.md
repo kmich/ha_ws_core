@@ -82,6 +82,18 @@ Install all dependencies from HACS before pasting the dashboard YAML.
 - Station health and data quality badges
 - AQI and pollen level display
 
+**Display units.** Temperature cards use each sensor's Home Assistant display unit,
+including entity-specific overrides. The five-day outlook converts the integration's
+Celsius forecast attributes to the temperature sensor's display unit. Wind and pressure
+tiles also use their sensor units; explicitly named metric diagnostic attributes keep
+their metric units. Temperature colors and comfort thresholds keep the same physical
+meaning in Celsius, Fahrenheit and Kelvin.
+
+To update an existing dashboard, back up its raw configuration, download the latest
+`weather_dashboard.yaml`, and replace the dashboard's raw configuration as described
+above. Reapply your entity prefixes and other customizations before saving. Integration
+updates do not replace dashboard YAML that you previously copied into Home Assistant.
+
 **Weather background (optional).** The Weather page can show a photo of the current
 weather behind its main card. The photos are not included with ws_core: add your own JPEG files (any
 landscape photo works, around 1920 px wide keeps them light) to `/config/www/weather`

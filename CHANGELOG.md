@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- Enhanced dashboard temperature cards now use each sensor's display unit instead of labelling Fahrenheit readings as Celsius. The five-day outlook converts Celsius forecast attributes to the selected temperature unit, preserves zero readings, and shows missing temperatures as unknown. Pool, sea, heat-index and wind-chill thresholds retain their physical meaning; Delta-T scales without an absolute-temperature offset. The main wind and pressure tiles also respect their sensor units. Reimport the updated `dashboards/weather_dashboard.yaml` to apply the fix to an existing dashboard (#188).
+
 ## [2.13.12] - 2026-11-05
 
 ### Fixed
