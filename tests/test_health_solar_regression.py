@@ -5,6 +5,7 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -416,3 +417,41 @@ def test_storage_migration_rejects_legacy_partial_day_and_restores_covered_day()
     with _at(at):
         rejected._restore_history_state(corrupted)
     assert rejected._solar_previous_meta == {}
+
+
+async def test_clean_restart_saves_solar_coverage_since_last_periodic_save(tmp_path):
+    async def start_station(now):
+        coord = _full_coord()
+        coord.hass = HomeAssistant(str(tmp_path))
+        coord.entry_data = {**coord.entry_data, "entry_id": "station"}
+        coord.forecast_lat, coord.forecast_lon = 51.5, 0.0
+        coord.sources = {SRC_SOLAR_RADIATION: "sensor.solar"}
+        with (
+            _at(now),
+            patch.object(coord, "_start_once"),
+            patch.object(coord, "_start_periodic"),
+        ):
+            await coord.async_start()
+        return coord
+
+    coord = await start_station(datetime(2026, 11, 6, 23, tzinfo=UTC))
+    coord._solar_energy_date = "2026-11-06"
+    coord._solar_energy_today_whm2 = 4800.0
+    coord._solar_today_meta = _covered_meta(day="2026-11-06", hours=22.0)
+    await coord._async_maybe_save_learning()
+    coord._solar_today_meta = _covered_meta(day="2026-11-06", hours=23.0)
+    await coord.hass.async_stop(force=True)
+
+    # Startup after midnight promotes the saved day and evaluates its coverage.
+    next_day = datetime(2026, 11, 7, 0, 5, tzinfo=UTC)
+    restarted = await start_station(next_day)
+    try:
+        data = {}
+        with patch.object(dt_util, "as_local", side_effect=lambda value: value.astimezone(UTC)):
+            restarted._compute_daily_pm(data, next_day)
+        assert data[KEY_ET0_PM_PERIOD] == "2026-11-06"
+        assert data[KEY_ET0_PM_COVERAGE] == pytest.approx(23 / 24, abs=0.001)
+        assert data[KEY_ET0_PM_REASON] == "ok"
+        assert KEY_ET0_PM_DAILY_MM in data
+    finally:
+        await restarted.hass.async_stop(force=True)

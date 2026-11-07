@@ -35,8 +35,8 @@ from typing import Any
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_FINAL_WRITE, UnitOfTemperature
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -1337,6 +1337,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("ws_core: failed to restore history state (starting fresh): %s", err)
 
+        # HA shuts down without unloading config entries, so persist the
+        # latest accumulators during its final write stage as well.
+        self._unsubs.append(self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_FINAL_WRITE, self._async_save_history))
+
         # v2.11 - Pattern Forecast engine (its own store, so a learning-state schema
         # bump never wipes trained models and vice versa). A missing or corrupt store
         # starts fresh; async_load_engine never raises.
@@ -1491,11 +1495,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             from .learning_state import async_save_learning
 
             await async_save_learning(self._learning_store, self._learning_state)
-        # v1.7.1: persist rolling-window history + accumulators (issue #16).
-        # Clean restarts/upgrades go through here, so the windows survive.
-        if self._history_store is not None:
-            with contextlib.suppress(Exception):
-                await self._history_store.async_save(self._dump_history_state())
+        # Preserve history and accumulators across an entry reload.
+        await self._async_save_history()
         if self._pattern is not None:
             await self._pattern.async_save()
         # v2.0: remove MQTT Discovery entries on clean shutdown
@@ -4385,13 +4386,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             await async_save_learning(self._learning_store, self._learning_state)
             self._learning_last_save = now
-            # Backstop save of history/accumulators on the same cadence, so a
-            # hard crash (no clean async_stop) loses at most one interval.
-            if self._history_store is not None:
-                with contextlib.suppress(Exception):
-                    await self._history_store.async_save(self._dump_history_state())
+            # Checkpoint history on the same cadence in case HA crashes.
+            await self._async_save_history()
             if self._pattern is not None:
                 await self._pattern.async_save()
+
+    async def _async_save_history(self, _event: Event | None = None) -> None:
+        """Persist rolling history and daily accumulators."""
+        if self._history_store is not None:
+            with contextlib.suppress(Exception):
+                await self._history_store.async_save(self._dump_history_state())
 
     # ------------------------------------------------------------------
     # v1.7.1 - rolling-window history + accumulator persistence (issue #16)
