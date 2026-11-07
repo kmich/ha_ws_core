@@ -430,6 +430,7 @@ async def test_clean_restart_saves_solar_coverage_since_last_periodic_save(tmp_p
             _at(now),
             patch.object(coord, "_start_once"),
             patch.object(coord, "_start_periodic"),
+            patch("custom_components.ws_core.coordinator.async_track_time_interval"),
         ):
             await coord.async_start()
         return coord
