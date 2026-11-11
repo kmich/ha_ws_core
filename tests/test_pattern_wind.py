@@ -99,3 +99,43 @@ def test_collecting_sensor_reports_both_event_and_day_requirements():
     assert attrs["events_required"] == 5
     assert attrs["days_required"] == 7
     assert "Collecting:" in attrs["explanation"]
+    rt._rebuild_published()
+    status_target = rt._published["status_attrs"]["per_target"]["frost_12h"]
+    assert status_target["events_required"] == 5
+    assert status_target["explanation"] == attrs["explanation"]
+
+
+def test_learning_status_explains_live_event_bar_without_hiding_sensor_factors():
+    _, rt = make_runtime(sources=SOURCES_WITH_DIR)
+    eng = rt.engine
+    now_ts = NOW.timestamp()
+    eng._now_ts = now_ts
+    rain = eng.models["rain_1h"]
+    rain.maturity = "learning"
+    rain.ev_live = 9
+    rain.ev_hist = 143
+    rain.hist_days = 207.7
+    wk = int(now_ts // (7 * 86400))
+    eng.scoring["rain_1h"] = [[float(wk), 100.0, 6.929, 10.0, 8.0, 0.0, 0.0, 9.0]]
+    eng._last_issue["rain_1h"] = {
+        "p": 0.16,
+        "reason": None,
+        "factors": [{"factor": "pressure_falling", "effect": "raises"}],
+        "issued_at": now_ts,
+    }
+    attrs = rt._target_attrs("rain_1h")
+    assert attrs["maturity"] == "learning"
+    assert attrs["events_live"] == 9
+    assert attrs["events_from_history"] == 143
+    assert attrs["events_required"] == 15
+    assert "explanation" not in attrs and "reason" not in attrs
+    assert attrs["top_factors"] == [{"factor": "pressure_falling", "effect": "raises"}]
+
+    rt._rebuild_published()
+    status_attrs = rt._published["status_attrs"]
+    assert "Publishing forecasts while scoring on live events" in status_attrs["explanation"]
+    per_rain = status_attrs["per_target"]["rain_1h"]
+    assert per_rain["events_required"] == 15
+    assert per_rain["explanation"] == (
+        "Learning: 9/15 live events needed for skilled (history events do not count); BSS 0.31 (needs > 0.02)."
+    )

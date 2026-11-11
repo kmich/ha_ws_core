@@ -36,7 +36,7 @@ lower than the 3 h chance.
 
 Two more entities report on the feature itself:
 
-- `sensor.ws_pattern_forecast_status` is `collecting`, `waiting` (required inputs missing), `learning` or `active`.
+- `sensor.ws_pattern_forecast_status` is `collecting`, `waiting` (required inputs missing), `learning` (one or more forecasts are publishing probabilities, none `skilled` yet) or `active` (at least one forecast is `skilled`).
 - `sensor.ws_pattern_forecast_skill` (diagnostic, disabled by default) counts how many
   forecasts are currently proven `skilled`.
 
@@ -72,13 +72,18 @@ forecast has a **maturity**, shown in the `maturity` attribute:
 
 | `maturity` | Meaning | State of the sensor |
 |---|---|---|
-| `collecting` | Not enough yet: fewer than 7 days of checked forecasts, or fewer than 5 events seen | `unknown` (never 0 %) |
-| `learning` | Publishing numbers, but it has not yet proven it beats the station's usual rate | number, flagged |
-| `skilled` | Has seen enough real events since going live and beats the station's usual rate by a margin | number |
+| `collecting` | Not enough yet: fewer than 7 days of checked forecasts, or fewer than 5 events seen (live + history) | `unknown` (never 0 %) |
+| `learning` | Publishing numbers, but it still needs enough **live** events (15 for rain, 10 for frost/heat/gust/storm) and `brier_skill > 0.02` to prove it beats the station's usual rate | number, flagged |
+| `skilled` | Has seen enough real events since going live and beats the station's usual rate by a margin (`brier_skill > 0.02`) | number |
 | `degraded` | Was `skilled`, but has stopped beating the usual rate recently | number, flagged |
 | `paused` | An input is unavailable, stale, or flagged by the drift and stuck-sensor checks | `unknown` |
 
-While `collecting`, the `progress_pct` attribute shows how far along it is.
+While `collecting`, `progress_pct`, `events_collected` and `events_required` (`5`) show how
+far along it is toward publishing its first numbers. Once in `learning`, `events_live`,
+`events_from_history` and `events_required` (`15` for rain, `10` for the others) show
+how many live events have been scored toward `skilled`, and `per_target` on
+`sensor.ws_pattern_forecast_status` includes a plain-text `explanation` of what each
+forecast is waiting for.
 
 "Beats the usual rate" has a precise meaning. The lazy forecast always says the usual
 chance for your station, for example 10 % if it rains within 3 h about one time in ten
@@ -323,7 +328,7 @@ content: |-
   | Event | Chance | Status | Why |
   |---|---|---|---|
   {% for name, entity in rows -%}
-  | {{ name }} | {% if is_number(states(entity)) %}{{ states(entity) | float(0) | round(0) | int }} %{% else %}-{% endif %} | {{ state_attr(entity, 'maturity') or 'n/a' }} | {{ state_attr(entity, 'explanation') or state_attr(entity, 'reason') or '' }} |
+  | {{ name }} | {% if is_number(states(entity)) %}{{ states(entity) | float(0) | round(0) | int }} %{% else %}-{% endif %} | {{ state_attr(entity, 'maturity') or 'n/a' }} | {% if state_attr(entity, 'explanation') or state_attr(entity, 'reason') %}{{ state_attr(entity, 'explanation') or state_attr(entity, 'reason') }}{% else %}{% for f in state_attr(entity, 'top_factors') or [] %}{{ f.factor | replace('_', ' ') }} ({{ f.effect }}){{ ', ' if not loop.last }}{% endfor %}{% endif %} |
   {% endfor %}
   Overall: {{ states('sensor.ws_pattern_forecast_status') }}
 ```

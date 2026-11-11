@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.14] - 2026-11-11
+
+### Fixed
+
+- Pattern Forecast status and target attributes now explain what each forecast is waiting for during `learning` and `collecting`. `sensor.ws_pattern_forecast_status` exposes an overall `explanation` and per-target `explanation` showing live event progress toward `skilled` (`events_live` / `events_required`, noting that replayed `events_from_history` only leave `collecting` and do not count toward `skilled`) alongside current Brier skill vs the `0.02` threshold. While a target is still `collecting`, `per_target` now reports `events_required: 5` (matching its `"Collecting: X/5 events"` explanation) instead of the `10`/`15` live-event bar for `skilled`, and individual Pattern Forecast sensors also expose `events_live`, `events_from_history` and `events_required`. Existing stored Pattern Forecast data is preserved without reset (#191).
+
 ## [2.13.13] - 2026-11-07
 
 ### Fixed
