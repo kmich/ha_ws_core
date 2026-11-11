@@ -484,7 +484,7 @@ class PatternRuntime:
     def _status_target_explanation(o: dict[str, Any], sk: dict[str, Any], target_attrs: dict[str, Any]) -> str:
         if target_attrs.get("explanation"):
             return str(target_attrs["explanation"])
-        live, req, bss = o["events_live"], o["events_required"], sk["bss"]
+        live, req, bss = sk["events"], o["events_required"], sk["bss"]
         if o["maturity"] == "learning":
             if bss is None:
                 return (
@@ -493,12 +493,13 @@ class PatternRuntime:
                 )
             return (
                 f"Learning: {live}/{req} live events needed for skilled "
-                f"(history events do not count); BSS {bss:.2f} (needs > {PATTERN_SKILLED_BSS_MIN})."
+                f"(history events do not count); BSS {bss} (needs > {PATTERN_SKILLED_BSS_MIN})."
             )
         if o["maturity"] == "degraded":
             return "Degraded: recent 5-week skill dropped to 0 or below vs the usual rate."
-        bss_text = f"BSS {bss:.2f} > {PATTERN_SKILLED_BSS_MIN}" if bss is not None else "off-season hold"
-        return f"Skilled: {live}/{req} live events; {bss_text}."
+        if bss is not None and bss > PATTERN_SKILLED_BSS_MIN and live >= req:
+            return f"Skilled: {live}/{req} live events; BSS {bss} > {PATTERN_SKILLED_BSS_MIN}."
+        return f"Skilled: {live}/{req} live events; off-season hold (previous skilled verdict retained)."
 
     @staticmethod
     def _overall_status_explanation(status: str, skilled: int, total: int) -> str:

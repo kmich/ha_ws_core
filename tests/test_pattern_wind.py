@@ -135,7 +135,19 @@ def test_learning_status_explains_live_event_bar_without_hiding_sensor_factors()
     status_attrs = rt._published["status_attrs"]
     assert "Publishing forecasts while scoring on live events" in status_attrs["explanation"]
     per_rain = status_attrs["per_target"]["rain_1h"]
+    assert per_rain["progress_pct"] == 60
     assert per_rain["events_required"] == 15
     assert per_rain["explanation"] == (
-        "Learning: 9/15 live events needed for skilled (history events do not count); BSS 0.31 (needs > 0.02)."
+        "Learning: 9/15 live events needed for skilled (history events do not count); BSS 0.3071 (needs > 0.02)."
     )
+
+    # Off-season hold: when maturity stays skilled with fewer recent events or low 52-week BSS, do not claim BSS > 0.02.
+    frost = eng.models["frost_12h"]
+    frost.maturity = "skilled"
+    frost.ev_live = 12
+    eng.scoring["frost_12h"] = [[float(wk), 50.0, 9.9, 10.0, 9.0, 0.0, 0.0, 2.0]]
+    eng._last_issue["frost_12h"] = {"p": 0.0, "reason": None, "factors": [], "issued_at": now_ts}
+    rt._rebuild_published()
+    per_frost = rt._published["status_attrs"]["per_target"]["frost_12h"]
+    assert per_frost["progress_pct"] == 100
+    assert "off-season hold" in per_frost["explanation"]
