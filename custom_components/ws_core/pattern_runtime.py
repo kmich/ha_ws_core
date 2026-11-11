@@ -74,6 +74,7 @@ from .const import (
     PATTERN_MIN_DAYS_COLLECTING,
     PATTERN_MIN_EVENTS_COLLECTING,
     PATTERN_RAIN_JUMP_CAP_MM,
+    PATTERN_SKILLED_BSS_MIN,
     PATTERN_SOURCE_INTERNET,
     PATTERN_SOURCE_LOCAL,
     PATTERN_STORE_VERSION,
@@ -451,6 +452,9 @@ class PatternRuntime:
             "valid_until": _iso(o["valid_until"]),
             "top_factors": o["top_factors"],
             "samples_trained": o["samples_trained"],
+            "events_live": o["events_live"],
+            "events_from_history": o["events_from_history"],
+            "events_required": o["events_required"],
         }
         if o["model_maturity"] == "collecting":
             attrs["progress_pct"] = o["progress_pct"]
@@ -476,6 +480,40 @@ class PatternRuntime:
             )
         return attrs
 
+    @staticmethod
+    def _status_target_explanation(o: dict[str, Any], sk: dict[str, Any], target_attrs: dict[str, Any]) -> str:
+        if target_attrs.get("explanation"):
+            return str(target_attrs["explanation"])
+        live, req, bss = sk["events"], o["events_required"], sk["bss"]
+        if o["maturity"] == "learning":
+            if bss is None:
+                return (
+                    f"Learning: {live}/{req} live events needed for skilled "
+                    "(history events do not count); waiting for first scored live event."
+                )
+            return (
+                f"Learning: {live}/{req} live events needed for skilled "
+                f"(history events do not count); BSS {bss} (needs > {PATTERN_SKILLED_BSS_MIN})."
+            )
+        if o["maturity"] == "degraded":
+            return "Degraded: recent 5-week skill dropped to 0 or below vs the usual rate."
+        if bss is not None and bss > PATTERN_SKILLED_BSS_MIN and live >= req:
+            return f"Skilled: {live}/{req} live events; BSS {bss} > {PATTERN_SKILLED_BSS_MIN}."
+        return f"Skilled: {live}/{req} live events; off-season hold (previous skilled verdict retained)."
+
+    @staticmethod
+    def _overall_status_explanation(status: str, skilled: int, total: int) -> str:
+        if status == "active":
+            return f"Active: {skilled} of {total} forecasts have reached skilled status on live data."
+        if status == "learning":
+            return (
+                "Publishing forecasts while scoring on live events; status becomes active once a target "
+                f"reaches skilled (10-15 live events with BSS > {PATTERN_SKILLED_BSS_MIN})."
+            )
+        if status == "waiting":
+            return "Waiting for recent sensor history before issuing forecasts."
+        return "Collecting initial training data; a forecast begins publishing once it has 7 checked days and 5 events."
+
     def _rebuild_published(self) -> None:
         eng = self.engine
         probs: dict[str, int | None] = {}
@@ -492,13 +530,16 @@ class PatternRuntime:
                 "progress_pct": o["progress_pct"],
                 "events_live": o["events_live"],
                 "events_from_history": o["events_from_history"],
-                "events_required": o["events_required"],
+                "events_required": outputs[tid]["events_required"],
                 "bss": sk["bss"],
                 "reason": outputs[tid].get("reason"),
-                "explanation": outputs[tid].get("explanation"),
+                "explanation": self._status_target_explanation(o, sk, outputs[tid]),
             }
             skill[tid] = sk
+        status = eng.overall_status()
+        skilled = eng.skilled_count()
         status_attrs: dict[str, Any] = {
+            "explanation": self._overall_status_explanation(status, skilled, len(per_target)),
             "per_target": per_target,
             "history_learn": self._history_attrs(),
             "internet_inputs": eng.internet_inputs(),
@@ -509,8 +550,8 @@ class PatternRuntime:
         self._published = {
             "probs": probs,
             "outputs": outputs,
-            "status": eng.overall_status(),
-            "skilled": eng.skilled_count(),
+            "status": status,
+            "skilled": skilled,
             "status_attrs": status_attrs,
             "skill_attrs": {"per_target": skill},
         }

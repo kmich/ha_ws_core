@@ -157,10 +157,12 @@ Probability sensors are `unknown` (never 0 %) while a forecast is `collecting` o
 | `issued_at`, `valid_until` | When the forecast was issued and when its window ends |
 | `top_factors` | Up to three `{factor, effect}` entries, deterministic keys |
 | `samples_trained` | Number of examples the model has learned from |
-| `reason` | Why there is no number right now (for example `waiting_for:dp_24h`) |
+| `events_live`, `events_from_history` | Live events observed since enabling Pattern Forecast, and events replayed from recorder statistics |
+| `events_required` | Events needed for the next milestone: `5` (live + history) while `collecting`, or `15` for rain and `10` for frost/heat/gust/storm (live events only) once in `learning` |
+| `reason`, `explanation` | Why there is no number right now while `collecting` or `paused` (for example `waiting_for:dp_24h`) |
 
-**Status sensor attributes:** `per_target` (maturity, progress, live events, events from
-history, events required, skill), `history_learn` (learning-from-history result per
+**Status sensor attributes:** `explanation` (summary of the overall status), `per_target` (maturity, progress, live events, events from
+history, events required for the current stage, skill, and a plain-text `explanation` of what each target needs next), `history_learn` (learning-from-history result per
 forecast), `internet_inputs` (empty, or `[storm_3h]`), `last_trained_at`, `storm_target`.
 
 **Skill sensor attributes:** `per_target`, each with `brier`, `brier_usual`,

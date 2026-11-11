@@ -99,6 +99,15 @@ def test_dashboard_card_template_renders():
     assert "| Rain, next 1 h | 42 % | learning |" in out
     assert "| Frost, next 12 h | - | n/a |" in out
 
+    # When a forecast is publishing in learning/skilled (no blocking explanation), top_factors render in Why.
+    attrs = {
+        "maturity": "learning",
+        "top_factors": [{"factor": "pressure_falling", "effect": "raises"}],
+    }
+    env.globals["state_attr"] = lambda e, a: attrs.get(a) if e.endswith("rain_1h") else None
+    out_factors = env.from_string(card["content"]).render()
+    assert "| Rain, next 1 h | 42 % | learning | pressure falling (raises) |" in out_factors
+
 
 def test_readme_entry_is_honest():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

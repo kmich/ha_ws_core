@@ -1638,6 +1638,16 @@ class PatternEngine:
         published = status in ("learning", "skilled", "degraded") and li.get("p") is not None
         issued_at = li.get("issued_at")
         w52 = self.window_stats(tid, self._now_ts, PATTERN_SCORING_WEEKS)
+        need = PATTERN_SKILLED_MIN_EVENTS[m.spec.kind]
+        if m.maturity == "collecting":
+            progress = self.progress_pct(m)
+            req = PATTERN_MIN_EVENTS_COLLECTING
+        elif m.maturity == "learning":
+            progress = min(99, int(round(100.0 * min(1.0, w52["ev"] / need))))
+            req = need
+        else:
+            progress = 100
+            req = need
         return {
             "target": m.spec.kind,
             "target_id": tid,
@@ -1645,7 +1655,7 @@ class PatternEngine:
             "probability": int(round(li["p"] * 100)) if published else None,
             "maturity": status,
             "model_maturity": m.maturity,
-            "progress_pct": self.progress_pct(m) if m.maturity == "collecting" else 100,
+            "progress_pct": progress,
             "brier_skill": self._round(self._skill_of(w52)),
             "usual_rate": round(self.base_rate[tid][0], 4),
             "issued_at": issued_at,
@@ -1655,7 +1665,7 @@ class PatternEngine:
             "reason": li.get("reason"),
             "events_live": m.ev_live,
             "events_from_history": m.ev_hist,
-            "events_required": PATTERN_SKILLED_MIN_EVENTS[m.spec.kind],
+            "events_required": req,
         }
 
     @staticmethod
