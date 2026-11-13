@@ -909,14 +909,19 @@ def determine_current_condition(
     is_sunrise = is_golden_hour and is_rising
     is_sunset = is_golden_hour and not is_rising
 
+    # Zambretti is a 6-12 h barometric outlook ("stormy" just means low and
+    # falling pressure), not an observation, so it never decides a severe
+    # state on its own; measured wind and rain do.
+    stormy_outlook = "stormy" in str(zambretti)
+
     # Severe weather (highest priority)
-    if wind_gust_ms > 32 or "stormy" in str(zambretti):
+    if wind_gust_ms > 32:
         return "hurricane"
     if wind_gust_ms > 25 and pressure_trend < -3:
         return "severe-storm"
-    if "stormy" in str(zambretti) and rain_rate_mmph > 10:
+    if stormy_outlook and rain_rate_mmph > 10:
         return "thunderstorm"
-    if "stormy" in str(zambretti) or (rain_rate_mmph > 5 and wind_gust_ms > 15):
+    if rain_rate_mmph > 5 and wind_gust_ms > 15:
         return "pre-storm"
 
     # Frozen precipitation
@@ -934,6 +939,10 @@ def determine_current_condition(
         return "rainy"
     if rain_rate_mmph > 0 or is_wet:
         return "drizzle"
+
+    # Dry, but the barometer points to a storm: it is still on its way.
+    if stormy_outlook:
+        return "pre-storm"
 
     # Temperature extremes & ice
     if temp_c < -5 and wind_speed_ms > 10:
@@ -1095,6 +1104,41 @@ def get_condition_severity(condition: str) -> str:
     if condition in ("pre-storm", "sleet", "snow-accumulation", "hot"):
         return "advisory"
     return "normal"
+
+
+# How long a new condition must hold before the reported one changes.
+CONDITION_DWELL_S = 300.0
+
+
+class ConditionHold:
+    """Keep the reported condition until a different one holds for a while.
+
+    The classifier works on instantaneous readings, so values sitting on a
+    threshold (humidity near 95 %, a lux band edge, a gust near a limit) made
+    the condition flip every few seconds. A new condition is reported only
+    once it has been the classifier's answer on every update for
+    ``dwell_s`` seconds. Critical conditions are reported at once.
+    """
+
+    def __init__(self, dwell_s: float = CONDITION_DWELL_S) -> None:
+        self.dwell_s = dwell_s
+        self.current: str | None = None
+        self._pending: str | None = None
+        self._pending_since: float = 0.0
+
+    def update(self, candidate: str, now_s: float) -> str:
+        """Feed the classifier's answer at time ``now_s`` (seconds); return the condition to report."""
+        if self.current is None or candidate == self.current or get_condition_severity(candidate) == "critical":
+            self.current = candidate
+            self._pending = None
+            return candidate
+        if candidate != self._pending:
+            self._pending = candidate
+            self._pending_since = now_s
+        elif now_s - self._pending_since >= self.dwell_s:
+            self.current = candidate
+            self._pending = None
+        return self.current
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.weather import WeatherEntity
@@ -65,6 +66,22 @@ def _nowcast_blend(local_val: float | None, api_val: float | None, local_w: floa
         return local_val
     result = local_val * local_w + api_val * (1.0 - local_w)
     return round(result, 1)
+
+
+def _local_iso(value: str) -> str:
+    """ISO datetime with HA's UTC offset for a local "YYYY-MM-DD[THH:MM[:SS]]" string.
+
+    The frontend reads a datetime without an offset in the browser's timezone,
+    so the offset is always attached. Strings that already carry one are
+    passed through unchanged.
+    """
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if dt.tzinfo is not None:
+        return value
+    return dt_util.as_local(dt).isoformat()  # a naive value is taken as local
 
 
 def _weathercode_to_condition(code: int | None) -> str | None:
@@ -297,7 +314,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             date_s = item.get("date")
             if not date_s:
                 continue
-            dt = f"{date_s}T12:00:00"
+            dt = _local_iso(f"{str(date_s)[:10]}T12:00:00")
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")
@@ -341,15 +358,18 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             dt_s = item.get("datetime")
             if not dt_s:
                 continue
-            # Ensure ISO format
-            dt = f"{dt_s}:00" if len(dt_s) == 16 else dt_s
+            # The cached forecast is refreshed every 30-60 min; hours that have
+            # already passed would otherwise lead the card, reading as an offset.
+            if str(dt_s)[:13] < now_hour_iso:
+                continue
+            dt = _local_iso(str(dt_s))
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
 
             # Determine if this slot falls within the nowcast window (hours 0-2)
-            is_nowcast = nowcast_slot < len(_NOWCAST_LOCAL_WEIGHTS) and str(dt_s)[:13] >= now_hour_iso
+            is_nowcast = nowcast_slot < len(_NOWCAST_LOCAL_WEIGHTS)
 
             if is_nowcast:
                 lw = _NOWCAST_LOCAL_WEIGHTS[nowcast_slot]

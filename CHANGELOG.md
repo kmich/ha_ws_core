@@ -2,6 +2,14 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.15] - 2026-11-13
+
+### Fixed
+
+- The current condition no longer reports `hurricane` because the Zambretti outlook reads "stormy". Zambretti is a 6–12 hour barometric outlook driven by low and falling pressure, so it no longer decides a severe condition on its own: `hurricane` now needs measured gusts above 32 m/s, rain under a stormy outlook reports the rain, and a dry stormy outlook reports `pre-storm` (#193).
+- The current condition no longer flips every few seconds when a reading sits on a threshold (for example fog ↔ overcast night). A new condition is reported once the classifier has returned it on every update for 5 minutes; `hurricane` and `severe-storm` are still reported at once. The weather entity's condition follows the same value (#193).
+- Hourly forecast times on the weather entity were shifted by the UTC offset (1 hour in Central Europe in winter) with the Home Assistant weather entity, Met.no, NWS, OpenWeatherMap and Pirate Weather providers, because their times were stored as UTC without a timezone and shown as local time. All providers now store local time, the weather entity sends forecast times with the UTC offset, and hours that have already passed are dropped instead of leading the card until the next forecast refresh. Daily forecast dates from a weather entity that sends local midnight as UTC no longer land on the previous day (#194).
+
 ## [2.13.14] - 2026-11-11
 
 ### Fixed

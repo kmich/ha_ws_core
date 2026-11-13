@@ -28,6 +28,7 @@ import json as _json
 import logging
 import math
 import pathlib as _pathlib
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -49,6 +50,7 @@ from .algorithms import (
     CONDITION_ICONS,
     NOWCAST_BUCKET_THRESHOLD_MM,
     ZAMBRETTI_RAIN_PCT,
+    ConditionHold,
     KalmanFilter,
     aqi_level,
     beaufort_description,
@@ -680,6 +682,9 @@ class WSStationRuntime:
 
     # Kalman filter for rain rate
     kalman: KalmanFilter = field(default_factory=KalmanFilter)
+
+    # Holds the reported current condition against threshold flicker
+    condition_hold: ConditionHold = field(default_factory=ConditionHold)
 
     # 24h rolling windows (timestamp-based)
     temp_history_24h: deque = field(default_factory=deque)
@@ -2363,6 +2368,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             is_day=is_day,
             current_hour=dt_util.now().hour,
         )
+        condition = self.runtime.condition_hold.update(condition, time.monotonic())
         data[KEY_CURRENT_CONDITION] = condition
         data["_condition_icon"] = CONDITION_ICONS.get(condition, "mdi:weather-partly-cloudy")
         data["_condition_color"] = CONDITION_COLORS.get(condition, "#FCD34D")

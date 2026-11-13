@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
 
-from .base import ForecastProvider
+from .base import ForecastProvider, local_date_str, local_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,7 +61,7 @@ class PirateWeatherProvider(ForecastProvider):
         daily_out: list[dict[str, Any]] = []
         for day in (js.get("daily", {}).get("data") or [])[:7]:
             dt = day.get("time", 0)
-            date_str = datetime.fromtimestamp(dt, tz=UTC).strftime("%Y-%m-%d")
+            date_str = local_date_str(dt)
             daily_out.append(
                 {
                     "date": date_str,
@@ -80,7 +79,7 @@ class PirateWeatherProvider(ForecastProvider):
         hourly_out: list[dict[str, Any]] = []
         for hour in (js.get("hourly", {}).get("data") or [])[:24]:
             dt = hour.get("time", 0)
-            dt_str = datetime.fromtimestamp(dt, tz=UTC).strftime("%Y-%m-%dT%H:%M")
+            dt_str = local_datetime_str(dt)
             hourly_out.append(
                 {
                     "datetime": dt_str,
