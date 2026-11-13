@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
+from homeassistant.util import dt as dt_util
 
 from custom_components.ws_core.const import (
     CONF_PREFIX,
@@ -83,7 +85,7 @@ def mock_coordinator():
             ],
             "hourly": [
                 {
-                    "datetime": "2026-06-01T12:00",
+                    "datetime": (dt_util.now() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:00"),
                     "temp_c": 22.0,
                     "apparent_temp_c": 22.5,
                     "dewpoint_c": 15.0,

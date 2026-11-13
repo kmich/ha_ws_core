@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -14,7 +13,7 @@ from homeassistant.util.unit_conversion import (
     TemperatureConverter,
 )
 
-from .base import ForecastProvider
+from .base import ForecastProvider, local_date_str, local_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -156,17 +155,15 @@ class HaWeatherEntityProvider(ForecastProvider):
     def _parse_dt(self, dt_str: str | None) -> str | None:
         if not dt_str:
             return None
-        try:
-            dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-            return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M")
-        except (ValueError, AttributeError):
-            return dt_str[:16] if dt_str else None
+        return local_datetime_str(dt_str) or str(dt_str)[:16]
 
     def _normalise_daily(self, raw: list[dict]) -> list[dict]:
         out: list[dict] = []
         for entry in raw[:7]:
             dt_str = entry.get("datetime") or entry.get("date") or ""
-            date = dt_str[:10] if dt_str else ""
+            # A daily entry is often local midnight sent as UTC (23:00Z the day
+            # before in Central Europe), so the date comes from local time.
+            date = (local_date_str(dt_str) or str(dt_str)[:10]) if dt_str else ""
             out.append(
                 {
                     "date": date,

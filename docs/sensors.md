@@ -38,7 +38,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_zambretti_number` | — | Z-number 1-26 |
 | `sensor.ws_wind_beaufort` | — | Beaufort scale classification |
 | `sensor.ws_wind_quadrant` | — | N / E / S / W compass quadrant |
-| `sensor.ws_current_condition` | — | 36-condition weather classifier |
+| `sensor.ws_current_condition` | — | 36-condition weather classifier from measured readings. A new condition is reported once it has held for 5 minutes; hurricane and severe storm are reported at once |
 | `sensor.ws_rain_probability` | % | Local sensor-based rain index |
 | `sensor.ws_rain_probability_combined` | % | Brier-score blended local + NWP |
 | `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` |

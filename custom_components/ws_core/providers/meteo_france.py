@@ -7,7 +7,7 @@ from typing import Any
 
 import aiohttp
 
-from .base import ForecastProvider
+from .base import ForecastProvider, local_date_str, local_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ class MeteoFranceProvider(ForecastProvider):
             mf_code = d.get("weather")
             daily_out.append(
                 {
-                    "date": d.get("datetime"),
+                    "date": local_date_str(d.get("datetime")) or "",
                     "tmax_c": d.get("tmax"),
                     "tmin_c": d.get("tmin"),
                     "precip_mm": d.get("rr10"),
@@ -140,7 +140,7 @@ class MeteoFranceProvider(ForecastProvider):
             mf_code = h.get("weather")
             hourly_out.append(
                 {
-                    "datetime": h.get("datetime"),
+                    "datetime": local_datetime_str(h.get("datetime")) or "",
                     "temp_c": h.get("temp2m"),
                     "apparent_temp_c": None,  # not provided by Météo Concept
                     "dewpoint_c": None,  # not provided by Météo Concept

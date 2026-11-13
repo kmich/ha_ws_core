@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
 
-from .base import ForecastProvider
+from .base import ForecastProvider, local_date_str, local_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,7 +91,7 @@ class OpenWeatherMapProvider(ForecastProvider):
         daily_out: list[dict[str, Any]] = []
         for day in (js.get("daily") or [])[:7]:
             dt = day.get("dt", 0)
-            date_str = datetime.fromtimestamp(dt, tz=UTC).strftime("%Y-%m-%d")
+            date_str = local_date_str(dt)
             temp = day.get("temp", {})
             weather = (day.get("weather") or [{}])[0]
             daily_out.append(
@@ -112,7 +111,7 @@ class OpenWeatherMapProvider(ForecastProvider):
         hourly_out: list[dict[str, Any]] = []
         for hour in (js.get("hourly") or [])[:24]:
             dt = hour.get("dt", 0)
-            dt_str = datetime.fromtimestamp(dt, tz=UTC).strftime("%Y-%m-%dT%H:%M")
+            dt_str = local_datetime_str(dt)
             weather = (hour.get("weather") or [{}])[0]
             rain_1h = (hour.get("rain") or {}).get("1h", 0.0)
             hourly_out.append(
