@@ -46,6 +46,7 @@ does not replace a stored dashboard.
 | Forecast shows "unavailable" | Provider API timeout or auth error | Check internet connectivity. Verify the API key if using OpenWeatherMap, Pirate Weather, or Météo France. The forecast retries automatically. |
 | "Stale" warning on sensors | Source sensor stopped updating | Check your weather station hardware. Is the station powered and connected? |
 | Weather Underground upload never succeeds | Wrong API credential | Use the **station key (password)** from `wunderground.com/member/devices`, not a read API key. |
+| Windy upload returns HTTP 401 (`error_auth`) | Stations API v2 credentials used without Station ID, or general API key used instead of Station password | On `stations.windy.com` → My Stations → Connection, copy the **Station password** into API key and the alphanumeric **Station ID** into Station ID. |
 | Blitzortung data not appearing | Auto-discovery needs restart | Restart HA after installing Blitzortung. ws_core discovers Blitzortung entities at startup. |
 | Comfort indices sensors not created | Feature toggle is off | Toggle `switch.ws_enable_comfort_indices` on the device page, or Configure → Features. |
 | FWI values very high on first run | Standard initial values | FWI moisture codes start at Van Wagner (1987) defaults (FFMC=85, DMC=6, DC=15) and self-correct within a few days. |

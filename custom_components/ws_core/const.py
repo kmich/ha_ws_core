@@ -936,7 +936,7 @@ DEFAULT_OWM_STATIONS_INTERVAL_MIN = 10
 # Windy.com (Windguru-compatible community upload via stations.windy.com)
 CONF_ENABLE_WINDY = "enable_windy"
 CONF_WINDY_API_KEY = "windy_api_key"
-CONF_WINDY_STATION_ID = "windy_station_id"  # integer station id from windy account
+CONF_WINDY_STATION_ID = "windy_station_id"  # alphanumeric v2 station id or legacy integer index
 CONF_WINDY_INTERVAL_MIN = "windy_interval_min"
 DEFAULT_ENABLE_WINDY = False
 DEFAULT_WINDY_INTERVAL_MIN = 10

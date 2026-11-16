@@ -145,8 +145,9 @@ UPLOAD_SERVICES: tuple[_UploadService, ...] = (
             _Field(CONF_WINDY_STATION_ID, "", "text"),
             _Field(CONF_WINDY_INTERVAL_MIN, DEFAULT_WINDY_INTERVAL_MIN, "minutes"),
         ),
-        "Windy.com Stations API key from stations.windy.com. Station ID is optional "
-        "(defaults to 0 for single-station accounts). Leave the key blank to skip.",
+        "Windy.com upload from stations.windy.com. For Stations API v2, enter your "
+        "Station password as the API key and your alphanumeric Station ID (e.g. abc1234). "
+        "For legacy v1 API keys, Station ID is optional (defaults to 0). Leave the key blank to skip.",
     ),
     _UploadService(
         "cwop",
