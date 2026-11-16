@@ -441,6 +441,69 @@ class TestWindy:
             await coord._async_upload_windy()
         assert coord._windy_status == "error_auth"
 
+    async def test_v2_happy_path_units(self):
+        sess = _FakeSession(status=200, body="SUCCESS")
+        coord = _coord()
+        coord.windy_station_id = "STN123A"
+        with _patch_session(sess):
+            await coord._async_upload_windy()
+
+        assert coord._windy_status == "ok"
+        assert coord._windy_last_upload is not None
+        c = sess.last
+        assert c["method"] == "GET"
+        assert c["url"] == "https://stations.windy.com/api/v2/observation/update"
+        p = c["params"]
+        assert p["id"] == "STN123A"
+        assert p["PASSWORD"] == "windykey"
+        assert isinstance(p["ts"], int)
+        assert p["temp"] == 20.0  # °C
+        assert p["dewpoint"] == 10.0  # °C
+        assert p["humidity"] == 55
+        assert p["pressure"] == 101300  # Pa = hPa * 100
+        assert p["wind"] == 5.0  # m/s
+        assert p["gust"] == 8.0  # m/s
+        assert p["winddir"] == 180
+        assert p["precip"] == pytest.approx(2.5)  # mm last 1h
+        assert p["uv"] == 4.0
+
+    async def test_v2_auth_error(self):
+        sess = _FakeSession(status=401, body="")
+        coord = _coord()
+        coord.windy_station_id = "STN123A"
+        with _patch_session(sess):
+            await coord._async_upload_windy()
+        assert coord._windy_status == "error_auth"
+
+    async def test_v2_network_error(self):
+        sess = _FakeSession(raise_exc=aiohttp.ClientError("dns"))
+        coord = _coord()
+        coord.windy_station_id = "STN123A"
+        with _patch_session(sess):
+            await coord._async_upload_windy()
+        assert coord._windy_status == "error_network"
+
+    async def test_v2_strips_whitespace(self):
+        sess = _FakeSession(status=200, body="SUCCESS")
+        coord = _coord()
+        coord.windy_station_id = " STN123A "
+        coord.windy_api_key = " windykey "
+        with _patch_session(sess):
+            await coord._async_upload_windy()
+        assert coord._windy_status == "ok"
+        p = sess.last["params"]
+        assert p["id"] == "STN123A"
+        assert p["PASSWORD"] == "windykey"
+
+    async def test_skips_when_key_blank(self):
+        sess = _FakeSession()
+        coord = _coord()
+        coord.windy_api_key = "   "
+        with _patch_session(sess):
+            await coord._async_upload_windy()
+        assert sess.calls == []
+        assert coord._windy_status == "disabled"
+
 
 # ---------------------------------------------------------------------------
 # CWOP (APRS over TCP)

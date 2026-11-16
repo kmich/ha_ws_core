@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.16] - 2026-11-16
+
+### Fixed
+
+- Windy upload now supports Stations API v2 (`GET https://stations.windy.com/api/v2/observation/update`) when configured with an alphanumeric Station ID and Station password, avoiding HTTP 401 errors while preserving backwards compatibility with legacy numeric/empty v1 station IDs (#196).
+
 ## [2.13.15] - 2026-11-13
 
 ### Fixed

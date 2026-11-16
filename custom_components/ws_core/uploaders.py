@@ -504,12 +504,16 @@ async def async_upload_owm_stations(coord: Any, session: aiohttp.ClientSession |
 
 
 async def async_upload_windy(coord: Any, session: aiohttp.ClientSession | None = None) -> None:
-    """Upload an observation to Windy.com Stations API."""
+    """Upload an observation to Windy.com Stations API (v2 for alphanumeric IDs, legacy v1 otherwise)."""
     data = coord.data
-    if not data or not coord.windy_api_key:
+    api_key = str(coord.windy_api_key).strip() if coord.windy_api_key else ""
+    if not data or not api_key:
         return
 
     now_utc = dt_util.utcnow()
+    station_id = str(coord.windy_station_id).strip() if coord.windy_station_id else ""
+    use_v2 = bool(station_id) and not station_id.isdigit()
+
     temp_c = data.get(KEY_NORM_TEMP_C)
     dew_c = data.get(KEY_DEW_POINT_C)
     humidity = data.get(KEY_NORM_HUMIDITY)
@@ -518,35 +522,48 @@ async def async_upload_windy(coord: Any, session: aiohttp.ClientSession | None =
     wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
     gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
     rain_1h = data.get(KEY_RAIN_ACCUM_1H)
+    uv = data.get(KEY_UV)
 
-    obs: dict[str, Any] = {
-        "dateutc": now_utc.strftime("%Y-%m-%d %H:%M:%S"),
-    }
-    try:
-        obs["station"] = int(coord.windy_station_id) if coord.windy_station_id else 0
-    except (TypeError, ValueError):
-        obs["station"] = 0
+    metrics: dict[str, Any] = {}
     if temp_c is not None:
-        obs["temp"] = round(float(temp_c), 1)
+        metrics["temp"] = round(float(temp_c), 1)
     if dew_c is not None:
-        obs["dewpoint"] = round(float(dew_c), 1)
+        metrics["dewpoint"] = round(float(dew_c), 1)
     if humidity is not None:
-        obs["rh"] = int(float(humidity))
+        metrics["humidity" if use_v2 else "rh"] = int(float(humidity))
     if press is not None:
-        obs["pressure"] = round(float(press) * 100.0)
+        metrics["pressure"] = round(float(press) * 100.0)
     if wind_ms is not None:
-        obs["wind"] = round(float(wind_ms), 1)
+        metrics["wind"] = round(float(wind_ms), 1)
     if gust_ms is not None:
-        obs["gust"] = round(float(gust_ms), 1)
+        metrics["gust"] = round(float(gust_ms), 1)
     if wind_dir is not None:
-        obs["winddir"] = int(float(wind_dir))
+        metrics["winddir"] = int(float(wind_dir))
     if rain_1h is not None:
-        obs["precip"] = round(float(rain_1h), 1)
+        metrics["precip"] = round(float(rain_1h), 1)
+    if use_v2 and uv is not None:
+        metrics["uv"] = round(float(uv), 1)
 
-    url = f"https://stations.windy.com/pws/update/{coord.windy_api_key}"
     try:
         sess = session or async_get_clientsession(coord.hass)
-        async with sess.post(url, json={"observations": [obs]}, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+        if use_v2:
+            req_cm = sess.get(
+                "https://stations.windy.com/api/v2/observation/update",
+                params={"id": station_id, "PASSWORD": api_key, "ts": int(now_utc.timestamp()), **metrics},
+                timeout=aiohttp.ClientTimeout(total=15),
+            )
+        else:
+            obs: dict[str, Any] = {
+                "dateutc": now_utc.strftime("%Y-%m-%d %H:%M:%S"),
+                "station": int(station_id) if station_id else 0,
+                **metrics,
+            }
+            req_cm = sess.post(
+                f"https://stations.windy.com/pws/update/{api_key}",
+                json={"observations": [obs]},
+                timeout=aiohttp.ClientTimeout(total=15),
+            )
+        async with req_cm as resp:
             if resp.status in (200, 201, 204):
                 coord._windy_last_upload = now_utc
                 coord._windy_status = "ok"
@@ -558,7 +575,7 @@ async def async_upload_windy(coord: Any, session: aiohttp.ClientSession | None =
                 _LOGGER.warning("Windy upload HTTP %d", resp.status)
     except (aiohttp.ClientError, TimeoutError) as exc:
         coord._windy_status = "error_network"
-        _LOGGER.warning("Windy upload error: %s", _redact_secrets(exc, coord.windy_api_key))
+        _LOGGER.warning("Windy upload error: %s", _redact_secrets(exc, coord.windy_api_key, api_key))
     except Exception as exc:  # noqa: BLE001
         coord._windy_status = "error"
-        _LOGGER.error("Windy upload unexpected error: %s", _redact_secrets(exc, coord.windy_api_key))
+        _LOGGER.error("Windy upload unexpected error: %s", _redact_secrets(exc, coord.windy_api_key, api_key))
