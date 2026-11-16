@@ -81,10 +81,6 @@ def rain_deltas(cum: list[float | None]) -> list[float | None]:
     return out
 
 
-def _unit(meta_entry: dict) -> str:
-    return str(meta_entry.get("statistics_unit_of_measurement") or meta_entry.get("unit_of_measurement") or "")
-
-
 def read_statistics(hass: Any, ids: set[str], start_ts: float, end_ts: float) -> tuple[dict, dict]:
     """Rain metadata and hourly rows. Runs on the recorder executor."""
     from homeassistant.components.recorder.statistics import list_statistic_ids, statistics_during_period
@@ -108,12 +104,12 @@ def apply_rain(
     coord: WSStationCoordinator, meta: dict, rows: dict, start_ts: float, n: int, periods: dict
 ) -> list[str]:
     """Raise totals using counter changes attributable to each period."""
-    from .pattern_runtime import PatternRuntime
+    from .pattern_runtime import PatternRuntime, statistics_unit
 
     rain_id = coord.sources.get(SRC_RAIN_TOTAL)
     if not rain_id or rain_id not in meta:
         return []
-    unit = _unit(meta[rain_id])
+    unit = statistics_unit(meta[rain_id])
     rain_rows = rows.get(rain_id) or []
     key = PatternRuntime._cumulative_key(meta[rain_id], rain_rows)
     cum = [None if v is None else coord._to_mm(v, unit) for v in hourly_series(rain_rows, start_ts, n, key)]

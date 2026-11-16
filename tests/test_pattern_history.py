@@ -107,7 +107,8 @@ def year_of_statistics(
             continue
         meta[eid] = {
             "statistic_id": eid,
-            "unit_of_measurement": unit,
+            "statistics_unit_of_measurement": unit,
+            "display_unit_of_measurement": unit,
             "has_sum": eid in ("sensor.r", "sensor.l"),
             "has_mean": eid not in ("sensor.r", "sensor.l"),
         }
@@ -141,6 +142,7 @@ def make_runtime(options: dict | None = None, stats=None, sources: dict | None =
         return {k: v for k, v in m.items() if k in entity_ids}, {k: v for k, v in r.items() if k in entity_ids}
 
     rt._fetch_statistics = fetch  # type: ignore[method-assign]
+    rt._read_statistic_meta = lambda ids: {k: v for k, v in meta.items() if k in ids}  # type: ignore[method-assign]
     rt._test_threads = threads  # type: ignore[attr-defined]
     rt._test_periods = periods  # type: ignore[attr-defined]
     rt._test_loop_thread = loop_thread  # type: ignore[attr-defined]
@@ -307,7 +309,15 @@ class TestRecorderCall:
 
         def list_statistic_ids(hass, statistic_ids=None, statistic_type=None):
             calls["list"] = statistic_ids
-            return [{"statistic_id": e, "unit_of_measurement": "x", "has_sum": False} for e in statistic_ids]
+            return [
+                {
+                    "statistic_id": e,
+                    "statistics_unit_of_measurement": "x",
+                    "display_unit_of_measurement": "x",
+                    "has_sum": False,
+                }
+                for e in statistic_ids
+            ]
 
         def statistics_during_period(hass, start, end, ids, period, units, types_):
             calls["period"] = (start, end, set(ids), period, units, set(types_))
@@ -319,6 +329,7 @@ class TestRecorderCall:
         recorder = types.ModuleType("homeassistant.components.recorder")
         recorder.statistics = stats
         coord, rt = make_runtime()
+        del rt._read_statistic_meta  # the real one, against the fake recorder above
         rt_fetch = pattern_runtime.PatternRuntime._fetch_statistics
         with patch.dict(
             sys.modules,
@@ -715,7 +726,13 @@ class TestPressureSeed:
             "sensor.p": [{"start": start + j * 3600, "mean": 1013.0} for j in range(38)],
         }
         meta = {
-            eid: {"statistic_id": eid, "unit_of_measurement": unit, "has_mean": True, "has_sum": False}
+            eid: {
+                "statistic_id": eid,
+                "statistics_unit_of_measurement": unit,
+                "display_unit_of_measurement": unit,
+                "has_mean": True,
+                "has_sum": False,
+            }
             for eid, unit in (("sensor.t", "°C"), ("sensor.p", "hPa"))
         }
         coord, rt = make_runtime(stats=(meta, rows))
@@ -937,3 +954,243 @@ class TestPressureSeed:
         assert [live_ts, 990.0] in [list(p) for p in eng.pressure]
         assert [live_ts - 900.0, 1019.0] in [list(p) for p in eng.pressure]
         assert len(eng.pressure) == 2
+
+
+# ---------------------------------------------------------------------------
+# 2.13.17: statistics are read in their own unit; replays from before that
+# took everything for metric, so those stations learn again
+# ---------------------------------------------------------------------------
+
+
+def set_units(meta: dict, units: dict[str, str]) -> None:
+    for eid, unit in units.items():
+        meta[eid]["statistics_unit_of_measurement"] = unit
+        meta[eid]["display_unit_of_measurement"] = unit
+
+
+def imperial_statistics():
+    """``year_of_statistics`` as a °F / inHg / mph / in station reports the same weather."""
+    meta, rows = year_of_statistics()
+    for r in rows["sensor.t"]:
+        for key in ("mean", "min", "max"):
+            r[key] = r[key] * 9 / 5 + 32
+    for r in rows["sensor.p"]:
+        r["mean"] /= 33.8638866667
+    for r in rows["sensor.ws"]:
+        r["mean"] /= 0.44704
+    for r in rows["sensor.wg"]:
+        r["max"] /= 0.44704
+    for r in rows["sensor.r"]:
+        r["sum"] /= 25.4
+        r["state"] /= 25.4
+    set_units(meta, {"sensor.t": "°F", "sensor.p": "inHg", "sensor.ws": "mph", "sensor.wg": "mph", "sensor.r": "in"})
+    return meta, rows
+
+
+class CountingStore:
+    def __init__(self) -> None:
+        self.saved = 0
+
+    async def async_save(self, data) -> None:
+        self.saved += 1
+
+
+def as_learned_by_an_older_version(rt, method: int = 2) -> None:
+    """What a replay under an older method left behind: the entries say so, the weights are off."""
+    for entry in rt.engine.history_learn["targets"].values():
+        entry["method"] = method
+    for m in rt.engine.models.values():
+        m.w = [w + 1.0 for w in m.w]
+    rt.engine.std.mean[POOL_INDEX["mslp"]] = 29.9
+
+
+class TestStatisticsUnit:
+    def test_rows_come_in_the_display_unit(self):
+        meta = {"statistics_unit_of_measurement": "°C", "display_unit_of_measurement": "°F"}
+        assert pattern_runtime.statistics_unit(meta) == "°F"
+
+    def test_fallbacks(self):
+        assert pattern_runtime.statistics_unit({"statistics_unit_of_measurement": "mph"}) == "mph"
+        assert pattern_runtime.statistics_unit({"unit_of_measurement": "mph"}) == "mph"
+        unitless = {"display_unit_of_measurement": None, "statistics_unit_of_measurement": None}
+        assert pattern_runtime.statistics_unit(unitless) == ""
+        assert pattern_runtime.statistics_unit({}) == ""
+
+    @staticmethod
+    def _one_station(units: dict[str, str], display: dict[str, str] | None = None):
+        rows = {
+            "sensor.t": [{"start": START_TS + j * 3600, "mean": 68.0, "min": 59.0, "max": 77.0} for j in range(2)],
+            "sensor.h": [{"start": START_TS + j * 3600, "mean": 50.0} for j in range(2)],
+            "sensor.p": [{"start": START_TS + j * 3600, "mean": 29.92} for j in range(2)],
+            "sensor.ws": [{"start": START_TS + j * 3600, "mean": 22.3694} for j in range(2)],
+            "sensor.wg": [{"start": START_TS + j * 3600, "max": 44.7388} for j in range(2)],
+            "sensor.r": [{"start": START_TS + j * 3600, "sum": 1.0 + 0.5 * j} for j in range(2)],
+        }
+        meta = {
+            eid: {
+                "statistic_id": eid,
+                "statistics_unit_of_measurement": unit,
+                "display_unit_of_measurement": (display or {}).get(eid, unit),
+                "has_sum": eid == "sensor.r",
+            }
+            for eid, unit in units.items()
+        }
+        return meta, rows
+
+    def _check(self, meta, rows):
+        coord, rt = make_runtime(stats=(meta, rows))
+        plan = {n: rt.history_entity(n, START_TS) for n in ("temp", "hum", "press", "wind", "gust", "rain")}
+        h = rt.build_history(plan, meta, rows, START_TS, 2, need_night=False)
+        assert h.temp[0] == pytest.approx(20.0)
+        assert h.temp_min[0] == pytest.approx(15.0)
+        assert h.temp_max[0] == pytest.approx(25.0)
+        assert h.wind[0] == pytest.approx(10.0, abs=0.001)
+        assert h.gust[0] == pytest.approx(20.0, abs=0.001)
+        assert h.mslp[0] == pytest.approx(1013.2, abs=0.1)
+        assert h.rain[1] == pytest.approx(12.7)
+
+    def test_imperial_station_replays_to_metric_values(self):
+        self._check(
+            *self._one_station(
+                {
+                    "sensor.t": "°F",
+                    "sensor.h": "%",
+                    "sensor.p": "inHg",
+                    "sensor.ws": "mph",
+                    "sensor.wg": "mph",
+                    "sensor.r": "in",
+                }
+            )
+        )
+
+    def test_stored_metric_but_displayed_imperial_is_read_as_displayed(self):
+        # The recorder converts rows to the display unit: these numbers are °F, mph, ... whatever is stored.
+        self._check(
+            *self._one_station(
+                {
+                    "sensor.t": "°C",
+                    "sensor.h": "%",
+                    "sensor.p": "hPa",
+                    "sensor.ws": "m/s",
+                    "sensor.wg": "m/s",
+                    "sensor.r": "mm",
+                },
+                {"sensor.t": "°F", "sensor.p": "inHg", "sensor.ws": "mph", "sensor.wg": "mph", "sensor.r": "in"},
+            )
+        )
+
+    def test_imperial_station_learns_the_same_as_a_metric_one(self, learned):
+        _, metric = learned
+        coord, rt = make_runtime(stats=imperial_statistics())
+        learn(rt)
+        for tid, m in metric.engine.models.items():
+            imperial = rt.engine.models[tid]
+            assert imperial.ev_hist == m.ev_hist, tid
+            assert imperial.n_updates == m.n_updates, tid
+            assert rt.engine.base_rate[tid][0] == pytest.approx(metric.engine.base_rate[tid][0], abs=0.001), tid
+        for i, mean in enumerate(metric.engine.std.mean):
+            assert rt.engine.std.mean[i] == pytest.approx(mean, abs=0.05), POOL[i]
+
+
+class TestRelearnAfterMisreadUnits:
+    def test_imperial_station_starts_over_once(self, caplog):
+        coord, rt = make_runtime(stats=imperial_statistics())
+        learn(rt)
+        clean = {t: list(m.w) for t, m in rt.engine.models.items()}
+        clean_std = rt.engine.std.to_dict()
+        as_learned_by_an_older_version(rt)
+        rt.engine.models["rain_3h"].ev_live = 3
+
+        learn(rt)
+        assert {t: m.w for t, m in rt.engine.models.items()} == clean
+        assert rt.engine.std.to_dict() == clean_std
+        assert rt.engine.models["rain_3h"].ev_live == 0
+        assert "sensor.t (°F)" in caplog.text and "sensor.r (in)" in caplog.text
+        targets = rt.engine.history_learn["targets"]
+        assert {e["method"] for e in targets.values()} == {PATTERN_HISTORY_METHOD}
+
+        # done: the next start leaves it alone
+        rt.engine.models["rain_3h"].ev_live = 3
+        updates = {t: m.n_updates for t, m in rt.engine.models.items()}
+        learn(rt)
+        assert rt.engine.models["rain_3h"].ev_live == 3
+        assert {t: m.n_updates for t, m in rt.engine.models.items()} == updates
+
+    def test_a_single_misread_input_is_enough(self):
+        meta, rows = year_of_statistics()
+        set_units(meta, {"sensor.ws": "km/h", "sensor.wg": "km/h"})
+        coord, rt = make_runtime(stats=(meta, rows))
+        learn(rt)
+        as_learned_by_an_older_version(rt)
+        rt.engine.models["rain_3h"].ev_live = 3
+        learn(rt)
+        assert rt.engine.models["rain_3h"].ev_live == 0
+
+    def test_metric_station_keeps_everything(self):
+        coord, rt = make_runtime()
+        learn(rt)
+        as_learned_by_an_older_version(rt)
+        rt.engine.models["rain_3h"].ev_live = 3
+        rt.store = CountingStore()
+        before = {t: list(m.w) for t, m in rt.engine.models.items()}
+        std = rt.engine.std.to_dict()
+        updates = {t: m.n_updates for t, m in rt.engine.models.items()}
+
+        learn(rt)
+        assert {t: m.w for t, m in rt.engine.models.items()} == before
+        assert {t: m.n_updates for t, m in rt.engine.models.items()} == updates
+        assert rt.engine.std.to_dict() == std
+        assert rt.engine.models["rain_3h"].ev_live == 3
+        targets = rt.engine.history_learn["targets"]
+        assert {e["method"] for e in targets.values()} == {PATTERN_HISTORY_METHOD}
+        assert rt.store.saved >= 1  # the check is not repeated at every start
+
+        rt._read_statistic_meta = MagicMock(side_effect=AssertionError("checked twice"))
+        learn(rt)
+
+    def test_mbar_counts_as_metric(self):
+        meta, rows = year_of_statistics()
+        set_units(meta, {"sensor.p": "mbar"})
+        coord, rt = make_runtime(stats=(meta, rows))
+        learn(rt)
+        as_learned_by_an_older_version(rt)
+        rt.engine.models["rain_3h"].ev_live = 3
+        learn(rt)
+        assert rt.engine.models["rain_3h"].ev_live == 3
+
+    def test_a_failed_target_still_retries_on_a_metric_station(self):
+        coord, rt = make_runtime()
+        learn(rt)
+        as_learned_by_an_older_version(rt)
+        targets = rt.engine.history_learn["targets"]
+        targets["rain_3h"] = {**targets["rain_3h"], "status": "too_short", "attempted_at": NOW.timestamp()}
+        learn(rt)
+        entry = rt.engine.history_learn["targets"]["rain_3h"]
+        assert entry["status"] == "ok" and entry["method"] == PATTERN_HISTORY_METHOD
+
+    def test_unreadable_recorder_changes_nothing_and_retries(self):
+        coord, rt = make_runtime()
+        learn(rt)
+        as_learned_by_an_older_version(rt)
+        rt.engine.models["rain_3h"].ev_live = 3
+        before = {t: list(m.w) for t, m in rt.engine.models.items()}
+        scheduled = []
+        coord._spawn = lambda coro, name: (scheduled.append(name), coro.close())
+        rt._read_statistic_meta = MagicMock(side_effect=RuntimeError("database is locked"))
+
+        learn(rt)
+        assert {t: m.w for t, m in rt.engine.models.items()} == before
+        assert rt.engine.models["rain_3h"].ev_live == 3
+        assert rt.engine.targets_replayed_before(3) == list(rt.engine.history_learn["targets"])
+        assert scheduled
+
+    def test_the_mark_survives_a_store_roundtrip(self):
+        coord, rt = make_runtime()
+        learn(rt)
+        as_learned_by_an_older_version(rt)
+        learn(rt)
+        again, notes = PatternEngine.from_dict(
+            rt.engine.to_dict(), rt.engine.thresholds, rt.engine.storm_source, rt.fingerprint
+        )
+        assert notes == []
+        assert again.targets_replayed_before(3) == []

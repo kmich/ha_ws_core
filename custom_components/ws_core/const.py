@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.13.16"
+_INTEGRATION_VERSION = "2.13.17"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -762,7 +762,11 @@ PATTERN_HISTORY_RETRY_S = 7 * 86400.0  # a target that could not replay is retri
 # that failed under an older method retries at the next replay instead of waiting
 # out PATTERN_HISTORY_RETRY_S. v2 (2.11.1): cumulative counters recorded as
 # measurement statistics (hourly mean/min/max only) are read from the hourly max.
-PATTERN_HISTORY_METHOD = 2
+# v3 (2.13.17): the unit of each statistic is read, not taken for metric.
+PATTERN_HISTORY_METHOD = 3
+# Replays older than this took every statistic for metric: a station whose
+# statistics are not metric has to learn again.
+PATTERN_HISTORY_UNITS_METHOD = 3
 PATTERN_HISTORY_STD_WEIGHT = 4.0  # an hourly replay sample weighs like four 15-min samples in the EMA
 PATTERN_HISTORY_DELAY_S = 120.0  # wait after startup before reading the recorder
 

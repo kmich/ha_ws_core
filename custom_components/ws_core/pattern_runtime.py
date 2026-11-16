@@ -70,6 +70,7 @@ from .const import (
     LUX_TO_WM2_FACTOR,
     PATTERN_BIN_COUNT,
     PATTERN_HISTORY_DAYS,
+    PATTERN_HISTORY_UNITS_METHOD,
     PATTERN_ISSUE_INTERVAL_MIN,
     PATTERN_MIN_DAYS_COLLECTING,
     PATTERN_MIN_EVENTS_COLLECTING,
@@ -156,6 +157,19 @@ def _recorder_instance(hass: Any) -> Any:
     from homeassistant.components.recorder import get_instance
 
     return get_instance(hass)
+
+
+def statistics_unit(meta_entry: dict) -> str:
+    """Unit of the rows ``statistics_during_period`` returns for a statistic.
+
+    Asked for no particular unit, the recorder converts rows to the entity's display
+    unit, so that key comes first: the statistics unit is only how they are stored,
+    and the two differ once an entity's unit has been changed.
+    """
+    for key in ("display_unit_of_measurement", "statistics_unit_of_measurement", "unit_of_measurement"):
+        if unit := meta_entry.get(key):
+            return str(unit)
+    return ""
 
 
 def _iso(ts: float | None) -> str | None:
@@ -609,6 +623,12 @@ class PatternRuntime:
             return self._blitz_entities(ts).get(SRC_LIGHTNING_COUNT)
         return None
 
+    def _read_statistic_meta(self, entity_ids: set[str]) -> dict:
+        """Statistics metadata by entity. Synchronous: runs on the recorder executor."""
+        from homeassistant.components.recorder.statistics import list_statistic_ids
+
+        return {m["statistic_id"]: m for m in list_statistic_ids(self.coord.hass, statistic_ids=entity_ids)}
+
     def _fetch_statistics(
         self, entity_ids: set[str], start: datetime, end: datetime, period: str = "hour"
     ) -> tuple[dict, dict]:
@@ -616,9 +636,9 @@ class PatternRuntime:
 
         Synchronous: runs on the recorder executor.
         """
-        from homeassistant.components.recorder.statistics import list_statistic_ids, statistics_during_period
+        from homeassistant.components.recorder.statistics import statistics_during_period
 
-        meta = {m["statistic_id"]: m for m in list_statistic_ids(self.coord.hass, statistic_ids=entity_ids)}
+        meta = self._read_statistic_meta(entity_ids)
         rows = statistics_during_period(
             self.coord.hass, start, end, set(meta), period, None, {"mean", "min", "max", "sum", "state"}
         )
@@ -655,7 +675,7 @@ class PatternRuntime:
 
         def unit(name: str) -> str:
             eid = plan.get(name)
-            return str((meta.get(eid) or {}).get("unit_of_measurement") or "") if eid else ""
+            return statistics_unit(meta.get(eid) or {}) if eid else ""
 
         def by_start(name: str) -> dict[float, dict]:
             eid = plan.get(name)
@@ -875,7 +895,7 @@ class PatternRuntime:
 
         def unit(name: str) -> str:
             eid = plan.get(name)
-            return str((meta.get(eid) or {}).get("unit_of_measurement") or "") if eid else ""
+            return statistics_unit(meta.get(eid) or {}) if eid else ""
 
         def rws(name: str) -> list[dict]:
             eid = plan.get(name)
@@ -1000,6 +1020,56 @@ class PatternRuntime:
             "last_rain_ts": last_rain_ts,
         }
 
+    def _misread_inputs(self, plan: dict[str, str | None], meta: dict) -> list[str]:
+        """Inputs a replay from before 2.13.17 took for metric although they are not."""
+        c = self.coord
+        converters = {"temp": c._to_celsius, "press": c._to_hpa, "wind": c._to_ms, "gust": c._to_ms, "rain": c._to_mm}
+        misread = []
+        for name, convert in converters.items():
+            eid = plan.get(name)
+            if eid in meta:
+                unit = statistics_unit(meta[eid])
+                if not math.isclose(convert(100.0, unit), 100.0):
+                    misread.append(f"{eid} ({unit})")
+        return misread
+
+    async def _async_forget_misread_replay(self, now: datetime) -> bool:
+        """Start over, once, if a replay from before 2.13.17 misread this station's units.
+
+        Those replays ignored the unit of every statistic. The damage does not heal by
+        itself: labels, weights, usual rates and the standardizer were all built on the
+        wrong scale, and a new replay would only train on top of them, so the engine
+        goes back to fresh and learns again in this same run. Stations whose statistics
+        were metric anyway keep everything. Returns True when the recorder could not be
+        read, so the check runs again.
+        """
+        eng = self.engine
+        old = eng.targets_replayed_before(PATTERN_HISTORY_UNITS_METHOD)
+        if not old:
+            return False
+        ts = now.timestamp()
+        names = {x for t in old for x in _HISTORY_NEEDS[eng.models[t].spec.kind]}
+        plan = {name: self.history_entity(name, ts) for name in names}
+        ids = {eid for eid in plan.values() if eid}
+        try:
+            meta = await _recorder_instance(self.coord.hass).async_add_executor_job(self._read_statistic_meta, ids)
+        except Exception as err:  # noqa: BLE001 - a short recorder outage is retried
+            _LOGGER.debug("ws_core pattern forecast: could not read the units of the statistics: %s", err)
+            return True
+        misread = self._misread_inputs(plan, meta)
+        if misread:
+            _LOGGER.warning(
+                "ws_core pattern forecast: learning from history took %s for metric units; learning again",
+                ", ".join(sorted(misread)),
+            )
+            eng.reset_all()
+            self._published = {}
+            self._last_bucket = None
+        else:
+            eng.mark_replay_current(old)
+            await self.async_save()
+        return False
+
     async def _async_seed_pressure(self, now: datetime) -> tuple[int, bool]:
         """Read a bounded pressure window regardless of annual replay eligibility."""
         end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
@@ -1066,8 +1136,9 @@ class PatternRuntime:
         cancelled = False
         try:
             now = dt_util.utcnow()
+            retry_needed = await self._async_forget_misread_replay(now)
             bins = await self._async_seed_recent(now)
-            retry_needed = self._recent_failed
+            retry_needed = retry_needed or self._recent_failed
             if bins:
                 _LOGGER.info("ws_core pattern forecast: seeded %d recent 15-min history bins from the recorder", bins)
             eng = self.engine
