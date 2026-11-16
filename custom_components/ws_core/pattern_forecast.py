@@ -1421,12 +1421,28 @@ class PatternEngine:
                 and (
                     entry.get("retryable") is True
                     or now_ts - float(entry.get("attempted_at", 0.0)) >= PATTERN_HISTORY_RETRY_S
-                    or (float(entry["method"]) if _finite(entry.get("method")) else 1.0) < PATTERN_HISTORY_METHOD
+                    or self._replay_method(entry) < PATTERN_HISTORY_METHOD
                 )
             )
             if entry is None or stale:
                 out.append(tid)
         return out
+
+    @staticmethod
+    def _replay_method(entry: dict[str, Any]) -> float:
+        """The replay method a history entry ran under (2.11.0 recorded none)."""
+        return float(entry["method"]) if _finite(entry.get("method")) else 1.0
+
+    def targets_replayed_before(self, method: int) -> list[str]:
+        """Targets whose weights came from a replay that ran under an older method."""
+        done = (self.history_learn or {}).get("targets") or {}
+        return [t for t, e in done.items() if e.get("status") == "ok" and self._replay_method(e) < method]
+
+    def mark_replay_current(self, targets: list[str]) -> None:
+        """Record that these targets' replay results still hold under the current method."""
+        done = self.history_learn["targets"]
+        for tid in targets:
+            done[tid]["method"] = PATTERN_HISTORY_METHOD
 
     def std_is_cold(self) -> bool:
         """True when the standardizer has (almost) no data, so a replay may build it."""

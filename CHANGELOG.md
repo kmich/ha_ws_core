@@ -2,6 +2,14 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.13.17] - 2026-11-16
+
+### Fixed
+
+- Pattern Forecast now reads the unit of the recorder statistics it learns from. It looked up a field Home Assistant does not send, so every statistic was taken for metric: °F as °C, mph or km/h as m/s, inches of rain as mm, inHg as hPa. Stations with metric statistics were not affected, but any station with a non-metric temperature, pressure, wind, gust or rain sensor learned from wrong values, and wind in km/h is enough. Frost, hot days, strong gusts and rain amounts were misjudged. The last 3 hours and 24 hours of readings filled in at each start were wrong in the same way.
+- Stations affected by this start Pattern Forecast over, once, about 2 minutes after the first start on this version, and learn again from the recorder with the right units. Their forecasts return to `collecting` until that finishes, and their skill scores restart. A warning in the log names the sensors involved. Stations with metric statistics keep everything they have learned.
+- The rain totals filled in from the recorder at startup (since 2.13.10) now use the unit Home Assistant returns the statistics in. When a rain sensor's unit had been changed after its statistics started, for example from inches to mm, the totals were read in the old unit and this week, month and year could be raised about 25 times too high. Totals are never lowered, so a total raised this way stays until that week, month or year ends.
+
 ## [2.13.16] - 2026-11-16
 
 ### Fixed

@@ -144,7 +144,12 @@ class TestApplyRain:
         counter = [98.0 + 0.025 * i for i in range(n)]
         rows = {"sensor.rain": [{"start": start_ts + i * 3600.0, "max": v} for i, v in enumerate(counter)]}
         meta = {
-            "sensor.rain": {"statistic_id": "sensor.rain", "statistics_unit_of_measurement": "mm", "has_sum": False}
+            "sensor.rain": {
+                "statistic_id": "sensor.rain",
+                "statistics_unit_of_measurement": "mm",
+                "display_unit_of_measurement": "mm",
+                "has_sum": False,
+            }
         }
         coord._rain_this_year_key, coord._rain_this_year_mm = periods["year"][0], live_year
         coord._rain_this_month_key, coord._rain_this_month_mm = periods["month"][0], 50.0
@@ -187,8 +192,16 @@ class TestApplyRain:
     def test_inches_are_converted(self):
         coord, meta, rows, start_ts, n, periods, counter = self._setup()
         meta["sensor.rain"]["statistics_unit_of_measurement"] = "in"
+        meta["sensor.rain"]["display_unit_of_measurement"] = "in"
         for r in rows["sensor.rain"]:
             r["max"] /= 25.4
+        apply_rain(coord, meta, rows, start_ts, n, periods)
+        assert abs(coord._rain_this_year_mm - (counter[-1] - counter[0] + 3.0)) < 0.01
+
+    def test_rows_are_read_in_the_display_unit(self):
+        # Stored in inches, shown in mm since: the recorder hands the rows out in mm.
+        coord, meta, rows, start_ts, n, periods, counter = self._setup()
+        meta["sensor.rain"]["statistics_unit_of_measurement"] = "in"
         apply_rain(coord, meta, rows, start_ts, n, periods)
         assert abs(coord._rain_this_year_mm - (counter[-1] - counter[0] + 3.0)) < 0.01
 

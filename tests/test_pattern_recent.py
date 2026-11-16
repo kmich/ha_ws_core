@@ -53,7 +53,8 @@ def five_minute_statistics(now_ts=None, hours=3.6, direction=None, rain_key="sum
     meta = {
         eid: {
             "statistic_id": eid,
-            "unit_of_measurement": u,
+            "statistics_unit_of_measurement": u,
+            "display_unit_of_measurement": u,
             "has_sum": eid == "sensor.r" and rain_key == "sum",
             "has_mean": not (eid == "sensor.r" and rain_key == "sum"),
             "mean_type": 1,
@@ -147,6 +148,31 @@ class TestRecentBinsFromShortTermStatistics:
     def test_no_sensors_mapped_means_nothing_is_read(self):
         coord, rt = make_runtime(sources=SOURCES_WITH_DIR)
         assert rt._recent_job(dict.fromkeys(pattern_runtime._RECENT_INPUTS), NOW.timestamp()) == []
+
+    def test_imperial_statistics_give_the_same_bins(self):
+        meta, rows = five_minute_statistics()
+        coord, rt = make_runtime(sources=SOURCES_WITH_DIR)
+        metric = rt.build_recent_bins(recent_plan(rt), meta, rows, NOW.timestamp())
+
+        meta, rows = five_minute_statistics()
+        for r in rows["sensor.t"]:
+            r["mean"] = r["mean"] * 9 / 5 + 32
+        for r in rows["sensor.ws"]:
+            r["mean"] /= 0.44704
+        for r in rows["sensor.wg"]:
+            r["max"] /= 0.44704
+        for r in rows["sensor.r"]:
+            r["sum"] /= 25.4
+            r["state"] /= 25.4
+        for eid, unit in (("sensor.t", "°F"), ("sensor.ws", "mph"), ("sensor.wg", "mph"), ("sensor.r", "in")):
+            meta[eid]["statistics_unit_of_measurement"] = unit
+            meta[eid]["display_unit_of_measurement"] = unit
+        imperial = rt.build_recent_bins(recent_plan(rt), meta, rows, NOW.timestamp())
+
+        assert len(imperial) == len(metric)
+        for a, b in zip(imperial, metric, strict=True):
+            for key in ("t", "d", "s", "g", "r"):
+                assert a[key] == pytest.approx(b[key], abs=0.01), key
 
 
 class TestSeedBins:

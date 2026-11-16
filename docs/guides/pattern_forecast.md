@@ -360,7 +360,9 @@ storm forecast. A dash means the forecast is still `collecting` or `paused`.
 
 Call `ws_core.reset_learning_state` with **target** `pattern_forecast` (or `all`) to
 delete the learned state. Every forecast returns to `collecting` and relearns from
-history. There is no automatic reset, even from `degraded`: you decide.
+history. There is no automatic reset, even from `degraded`: you decide. The one
+exception was a one-time restart in 2.13.17 for stations whose history had been read
+in the wrong units.
 
 Changing the freeze, heat, gust or lightning proximity threshold, or the storm data
 source, restarts only the affected forecast. Mapping a different station, or editing
