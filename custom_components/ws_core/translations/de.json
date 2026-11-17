@@ -35,10 +35,12 @@
           "solar_radiation": "Solarstrahlung (W/m², für Penman-Monteith ET₀)",
           "lightning_count": "Blitzanzahl (kumulativ, z. B. von WH57 oder AS3935)",
           "lightning_dist": "Nächster Blitzabstand (km, z. B. von WH57)",
+          "lightning_azimuth": "Blitzazimut (Grad)",
           "indoor_temp": "Innentemperatursensor",
           "indoor_humidity": "Innenluftfeuchtigkeitssensor",
           "indoor_co2": "Innen-CO₂-Sensor (ppm)",
           "soil_moisture": "Bodenfeuchtigkeitssensor (0-100% oder 0-1 volumetrisch)",
+          "soil_moisture_unit": "Einheit des Bodenfeuchtesensors",
           "soil_temperature": "Bodentemperatursensor",
           "_go_back": "← Zurück zum vorherigen Schritt"
         }
@@ -484,6 +486,7 @@
           "indoor_humidity": "Innenluftfeuchtigkeitssensor",
           "indoor_co2": "Innen-CO₂-Sensor (ppm)",
           "soil_moisture": "Bodenfeuchtigkeitssensor (0-100% oder 0-1 volumetrisch)",
+          "soil_moisture_unit": "Einheit des Bodenfeuchtesensors",
           "soil_temperature": "Bodentemperatursensor"
         }
       },
@@ -760,6 +763,10 @@
     "et0_pm_unavailable": {
       "title": "PM ET₀ daily measurement unavailable",
       "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
+    },
+    "ambiguous_soil_moisture_unit": {
+      "title": "Einheit des Bodenfeuchtesensors fehlt oder ist mehrdeutig",
+      "description": "Die Bodenfeuchte-Entität {entity_id} hat keine erkannte Maßeinheit (z. B. '%' oder 'm³/m³'), sodass Werte ≤ 1,0 zwischen 1 % und 100 % mehrdeutig sind. Wählen Sie unter Konfigurieren → Optionale Quellen 'Prozent' oder 'Volumenanteil'."
     }
   },
   "entity": {
@@ -2999,6 +3006,13 @@
         "south_america_east": "Südamerika (Ost)",
         "australia": "Australien",
         "custom": "Benutzerdefiniert"
+      }
+    },
+    "soil_moisture_unit": {
+      "options": {
+        "auto": "Automatisch (aus Sensoreinheit erkennen)",
+        "percent": "Prozent (0–100 %)",
+        "fraction": "Volumenanteil (0–1 / m³/m³)"
       }
     }
   }

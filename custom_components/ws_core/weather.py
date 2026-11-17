@@ -227,11 +227,24 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
     def uv_index(self) -> float | None:
         return (self.coordinator.data or {}).get(KEY_UV)
 
+    _PROVIDER_ATTRIBUTION = {
+        "open_meteo": "Open-Meteo",
+        "open-meteo": "Open-Meteo",
+        "met_no": "MET Norway",
+        "nws_noaa": "NOAA / National Weather Service",
+        "openweathermap": "OpenWeatherMap",
+        "pirate_weather": "Pirate Weather",
+        "meteo_france": "Météo-France",
+        "ha_weather_entity": "Home Assistant weather entity",
+    }
+
     @property
     def attribution(self) -> str:
         fc = (self.coordinator.data or {}).get(KEY_FORECAST) or {}
-        if fc.get("provider") == "open-meteo":
-            return "Local station data processed by Weather Station Core – forecast by Open-Meteo"
+        prov = str(fc.get("provider") or "").strip()
+        credit = self._PROVIDER_ATTRIBUTION.get(prov)
+        if credit:
+            return f"Local station data processed by Weather Station Core – forecast by {credit}"
         return "Local station data processed by Weather Station Core"
 
     _LOCAL_CONDITION_MAP = {
@@ -322,11 +335,11 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             out.append(
                 {
                     "datetime": dt,
-                    "temperature": item.get("tmax_c"),
-                    "templow": item.get("tmin_c"),
-                    "precipitation": item.get("precip_mm"),
+                    "native_temperature": item.get("tmax_c"),
+                    "native_templow": item.get("tmin_c"),
+                    "native_precipitation": item.get("precip_mm"),
                     "precipitation_probability": item.get("precip_prob"),
-                    "wind_speed": wind_ms,
+                    "native_wind_speed": wind_ms,
                     "native_wind_gust_speed": gust_ms,
                     "condition": _weathercode_to_condition(item.get("weathercode")),
                     ATTR_ATTRIBUTION: self.attribution,
@@ -350,8 +363,8 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         local_gust_ms = d.get(KEY_NORM_WIND_GUST_MS)
         local_condition = d.get(KEY_CURRENT_CONDITION)
         local_rain_rate = d.get(KEY_RAIN_RATE_FILT)  # mm/h  → approx mm in 1h
-        now_hour_iso = dt_util.now().strftime("%Y-%m-%dT%H")
-        nowcast_slot = 0  # counts how many hourly slots we've applied local data to
+        now_local = dt_util.now().replace(minute=0, second=0, microsecond=0)
+        now_hour_iso = now_local.strftime("%Y-%m-%dT%H")
 
         out: list[dict[str, Any]] = []
         for item in hourly:
@@ -368,11 +381,23 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             gust_kmh = item.get("gust_kmh")
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
 
-            # Determine if this slot falls within the nowcast window (hours 0-2)
-            is_nowcast = nowcast_slot < len(_NOWCAST_LOCAL_WEIGHTS)
+            # Determine lead hours from valid timestamp so sparse/future slots
+            # outside the 0-2h window never receive current local observations.
+            lead_h: int | None = None
+            slot_dt = dt_util.parse_datetime(dt)
+            if slot_dt is not None:
+                if slot_dt.tzinfo is None:
+                    slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
+                else:
+                    slot_dt = dt_util.as_local(slot_dt)
+                lead_f = (slot_dt - now_local).total_seconds() / 3600.0
+                if abs(lead_f - round(lead_f)) < 1e-3:
+                    lead_h = int(round(lead_f))
+                elif lead_f >= 0:
+                    lead_h = int(lead_f)
 
-            if is_nowcast:
-                lw = _NOWCAST_LOCAL_WEIGHTS[nowcast_slot]
+            if lead_h is not None and 0 <= lead_h < len(_NOWCAST_LOCAL_WEIGHTS):
+                lw = _NOWCAST_LOCAL_WEIGHTS[lead_h]
                 temperature = _nowcast_blend(local_temp, item.get("temp_c"), lw)
                 apparent = _nowcast_blend(local_apparent, item.get("apparent_temp_c"), lw)
                 dew = _nowcast_blend(local_dew, item.get("dewpoint_c"), lw)
@@ -381,16 +406,15 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                 wind_ms = _nowcast_blend(local_wind_ms, wind_ms, lw)
                 gust_ms = _nowcast_blend(local_gust_ms, gust_ms, lw)
                 # For hour 0 use local condition; beyond that use API
-                if nowcast_slot == 0 and local_condition:
+                if lead_h == 0 and local_condition:
                     condition = self._LOCAL_CONDITION_MAP.get(local_condition, "partlycloudy")
                 else:
                     condition = _weathercode_to_condition(item.get("weathercode"))
                 # Precipitation: use rain rate as a 1h proxy for slot 0
-                if nowcast_slot == 0 and local_rain_rate is not None:
+                if lead_h == 0 and local_rain_rate is not None:
                     precip = _nowcast_blend(local_rain_rate, item.get("precip_mm"), lw)
                 else:
                     precip = item.get("precip_mm")
-                nowcast_slot += 1
             else:
                 temperature = item.get("temp_c")
                 apparent = item.get("apparent_temp_c")
@@ -402,12 +426,12 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             out.append(
                 {
                     "datetime": dt,
-                    "temperature": temperature,
+                    "native_temperature": temperature,
                     "native_apparent_temperature": apparent,
                     "native_dew_point": dew,
                     "precipitation_probability": item.get("precip_prob"),
-                    "precipitation": precip,
-                    "wind_speed": wind_ms,
+                    "native_precipitation": precip,
+                    "native_wind_speed": wind_ms,
                     "native_wind_gust_speed": gust_ms,
                     "humidity": humidity,
                     "cloud_coverage": item.get("cloud_cover"),

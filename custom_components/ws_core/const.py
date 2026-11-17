@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.13.17"
+_INTEGRATION_VERSION = "2.14.0"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -380,6 +380,7 @@ ZAMBRETTI_LOWER_PRESSURE: float = 950.0
 
 FORECAST_MIN_RETRY_S: int = 300
 FORECAST_MAX_RETRY_S: int = 3600
+FORECAST_CACHE_MAX_AGE_S: int = 12 * 3600
 
 # Forecast agreement thresholds (percentage points)
 FORECAST_AGREEMENT_ALIGNED_PP: int = 20  # delta < 20 pp  -> aligned
@@ -1046,6 +1047,16 @@ def normalize_indoor_rooms(raw: Any) -> list[dict]:
 CONF_ENABLE_SOIL = "enable_soil"
 # SRC_SOIL_MOISTURE / SRC_SOIL_TEMP defined near OPTIONAL_SOURCES above.
 DEFAULT_ENABLE_SOIL = False
+CONF_SOIL_MOISTURE_UNIT = "soil_moisture_unit"
+SOIL_MOISTURE_UNIT_AUTO = "auto"
+SOIL_MOISTURE_UNIT_PERCENT = "percent"
+SOIL_MOISTURE_UNIT_FRACTION = "fraction"
+SOIL_MOISTURE_UNIT_OPTIONS = (
+    SOIL_MOISTURE_UNIT_AUTO,
+    SOIL_MOISTURE_UNIT_PERCENT,
+    SOIL_MOISTURE_UNIT_FRACTION,
+)
+DEFAULT_SOIL_MOISTURE_UNIT = SOIL_MOISTURE_UNIT_AUTO
 
 # Data keys - v2.1 Soil sensors
 KEY_SOIL_MOISTURE = "soil_moisture_pct"  # normalized to 0-100%
@@ -1277,6 +1288,8 @@ ENTRY_REPAIR_ISSUES = (
     "stuck_sensors",
     "sensor_drift_detected",
     "large_calibration_offset",
+    "et0_pm_unavailable",
+    "ambiguous_soil_moisture_unit",
 )
 
 

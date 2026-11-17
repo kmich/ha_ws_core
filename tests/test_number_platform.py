@@ -89,3 +89,33 @@ async def test_number_set_native_value(mock_config_entry):
         mock_config_entry,
         options={CONF_THRESH_WIND_GUST_MS: 35.5},
     )
+
+
+class TestParameterContracts:
+    """Bounds across services.yaml, __init__.py schema, number entities, and config flow."""
+
+    def test_pressure_calibration_range_consistent(self):
+        from pathlib import Path
+
+        import yaml
+
+        from custom_components.ws_core.const import CONF_CAL_PRESSURE_HPA
+        from custom_components.ws_core.number import PARAM_NUMBERS
+
+        services_path = Path(__file__).resolve().parent.parent / "custom_components" / "ws_core" / "services.yaml"
+        services = yaml.safe_load(services_path.read_text(encoding="utf-8"))
+        svc_num = services["apply_calibration"]["fields"][CONF_CAL_PRESSURE_HPA]["selector"]["number"]
+        assert svc_num["min"] == -10
+        assert svc_num["max"] == 10
+
+        pressure_desc = next(d for d in PARAM_NUMBERS if d.conf_key == CONF_CAL_PRESSURE_HPA)
+        assert pressure_desc.native_min == -10.0
+        assert pressure_desc.native_max == 10.0
+
+    def test_staleness_timeout_default_inside_number_and_flow_bounds(self):
+        from custom_components.ws_core.const import DEFAULT_STALENESS_S
+        from custom_components.ws_core.number import PARAM_NUMBERS
+
+        desc = next(d for d in PARAM_NUMBERS if d.key == "staleness_timeout")
+        assert desc.native_min <= float(DEFAULT_STALENESS_S) <= desc.native_max
+        assert desc.native_max == 86400.0

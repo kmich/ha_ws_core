@@ -585,6 +585,7 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "provider_name": d.get("_forecast_provider_name"),
             "forecast_enabled": d.get("_forecast_provider_enabled"),
+            "forecast_status": d.get("_forecast_status"),
         },
     ),
     # =========================================================================

@@ -1481,7 +1481,7 @@ def extraterrestrial_radiation_mj(lat_deg: float, day_of_year: int) -> float:
     phi = math.radians(lat_deg)
     dr = 1 + 0.033 * math.cos(2 * math.pi * day_of_year / 365)
     delta = 0.409 * math.sin(2 * math.pi * day_of_year / 365 - 1.39)
-    ws = math.acos(-math.tan(phi) * math.tan(delta))
+    ws = math.acos(max(-1.0, min(1.0, -math.tan(phi) * math.tan(delta))))
     Gsc = 0.0820  # solar constant MJ m⁻² min⁻¹
     Ra = (
         (24 * 60 / math.pi)
@@ -2420,7 +2420,7 @@ def calculate_max_solar_radiation(lat_deg: float, day_of_year: int, elevation_m:
     lat_rad = math.radians(lat_deg)
     dr = 1.0 + 0.033 * math.cos(2.0 * math.pi * day_of_year / 365.0)
     decl = 0.409 * math.sin(2.0 * math.pi * day_of_year / 365.0 - 1.39)
-    ws = math.acos(-math.tan(lat_rad) * math.tan(decl))
+    ws = math.acos(max(-1.0, min(1.0, -math.tan(lat_rad) * math.tan(decl))))
     # Extra-terrestrial radiation (MJ m⁻² day⁻¹)
     Gsc = 0.0820  # solar constant (MJ m⁻² min⁻¹)
     Ra = (

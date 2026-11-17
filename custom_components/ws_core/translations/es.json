@@ -35,10 +35,12 @@
           "solar_radiation": "Radiación solar (W/m², para ET₀ Penman-Monteith)",
           "lightning_count": "Contador de rayos (acumulado, p. ej. WH57 o AS3935)",
           "lightning_dist": "Distancia del rayo más cercano (km, p. ej. de WH57)",
+          "lightning_azimuth": "Azimut del rayo (grados)",
           "indoor_temp": "Sensor de temperatura interior",
           "indoor_humidity": "Sensor de humedad interior",
           "indoor_co2": "Sensor de CO₂ interior (ppm)",
           "soil_moisture": "Sensor de humedad del suelo (0-100% o 0-1 volumétrico)",
+          "soil_moisture_unit": "Unidad del sensor de humedad del suelo",
           "soil_temperature": "Sensor de temperatura del suelo",
           "_go_back": "← Volver al paso anterior"
         }
@@ -484,6 +486,7 @@
           "indoor_humidity": "Sensor de humedad interior",
           "indoor_co2": "Sensor de CO₂ interior (ppm)",
           "soil_moisture": "Sensor de humedad del suelo (0-100% o 0-1 volumétrico)",
+          "soil_moisture_unit": "Unidad del sensor de humedad del suelo",
           "soil_temperature": "Sensor de temperatura del suelo"
         }
       },
@@ -760,6 +763,10 @@
     "et0_pm_unavailable": {
       "title": "PM ET₀ daily measurement unavailable",
       "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
+    },
+    "ambiguous_soil_moisture_unit": {
+      "title": "Falta la unidad del sensor de humedad del suelo o es ambigua",
+      "description": "La entidad de humedad del suelo {entity_id} no tiene una unidad de medida reconocida (por ejemplo '%' o 'm³/m³'), por lo que valores ≤ 1,0 son ambiguos entre 1 % y 100 %. Seleccione Porcentaje o Fracción en Configurar → Fuentes opcionales."
     }
   },
   "entity": {
@@ -2999,6 +3006,13 @@
         "south_america_east": "Sudamérica (Este)",
         "australia": "Australia",
         "custom": "Personalizado"
+      }
+    },
+    "soil_moisture_unit": {
+      "options": {
+        "auto": "Automático (detectar de la unidad del sensor)",
+        "percent": "Porcentaje (0-100 %)",
+        "fraction": "Fracción volumétrica (0-1 / m³/m³)"
       }
     }
   }

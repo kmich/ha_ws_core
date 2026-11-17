@@ -59,3 +59,47 @@ class TestFrostRiskSensor:
         assert "key=KEY_FROST_RISK" in text
         assert 'translation_key="frost_risk"' in text
         assert KEY_FROST_RISK == "frost_risk"
+
+
+class TestPR6LocalizationCompleteness:
+    """PR 6 item 25 & PR 4 item 17 translation completeness across strings and all 8 languages."""
+
+    @staticmethod
+    def _load(name: str) -> dict:
+        import json
+        from pathlib import Path
+
+        base = Path(__file__).resolve().parent.parent / "custom_components" / "ws_core"
+        p = base / ("strings.json" if name == "strings" else f"translations/{name}.json")
+        return json.loads(p.read_text(encoding="utf-8"))
+
+    def test_optional_sources_and_soil_keys_present_in_all_languages(self):
+        from custom_components.ws_core.const import CONF_SOIL_MOISTURE_UNIT, SRC_LIGHTNING_AZIMUTH
+
+        en = self._load("en")
+        assert self._load("strings") == en
+
+        for lang in ("strings", "en", "de", "es", "fr", "it", "nl", "pl", "pt"):
+            d = self._load(lang)
+            cfg_data = d["config"]["step"]["optional_sources"]["data"]
+            opt_data = d["options"]["step"]["optional_sources_opt"]["data"]
+            assert cfg_data[SRC_LIGHTNING_AZIMUTH]
+            assert opt_data[SRC_LIGHTNING_AZIMUTH]
+            assert cfg_data[CONF_SOIL_MOISTURE_UNIT]
+            assert opt_data[CONF_SOIL_MOISTURE_UNIT]
+            opts = d["selector"]["soil_moisture_unit"]["options"]
+            assert set(opts) == {"auto", "percent", "fraction"}
+            assert all(opts.values())
+            issue = d["issues"]["ambiguous_soil_moisture_unit"]
+            assert issue["title"] and issue["description"]
+
+        for lang in ("de", "es", "fr", "it", "nl", "pl", "pt"):
+            tr = self._load(lang)
+            assert (
+                tr["issues"]["ambiguous_soil_moisture_unit"]["title"]
+                != en["issues"]["ambiguous_soil_moisture_unit"]["title"]
+            )
+            assert (
+                tr["config"]["step"]["optional_sources"]["data"][CONF_SOIL_MOISTURE_UNIT]
+                != en["config"]["step"]["optional_sources"]["data"][CONF_SOIL_MOISTURE_UNIT]
+            )
