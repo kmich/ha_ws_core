@@ -35,10 +35,12 @@
           "solar_radiation": "Zonnestraling (W/m², voor Penman-Monteith ET₀)",
           "lightning_count": "Bliksemteller (cumulatief, bijv. WH57 of AS3935)",
           "lightning_dist": "Dichtstbijzijnde blikseminslag (km)",
+          "lightning_azimuth": "Azimut blikseminslag (graden)",
           "indoor_temp": "Binnentemperatuursensor",
           "indoor_humidity": "Binnenluchtvochtigheidssensor",
           "indoor_co2": "Binnen-CO₂-sensor (ppm)",
           "soil_moisture": "Bodemvochtigheidssensor (0-100% of 0-1 volumetrisch)",
+          "soil_moisture_unit": "Eenheid van de bodemvochtsensor",
           "soil_temperature": "Bodemtemperatuursensor",
           "_go_back": "← Terug naar vorige stap"
         }
@@ -484,6 +486,7 @@
           "indoor_humidity": "Binnenluchtvochtigheidssensor",
           "indoor_co2": "Binnen-CO₂-sensor (ppm)",
           "soil_moisture": "Bodemvochtigheidssensor (0-100% of 0-1 volumetrisch)",
+          "soil_moisture_unit": "Eenheid van de bodemvochtsensor",
           "soil_temperature": "Bodemtemperatuursensor"
         }
       },
@@ -760,6 +763,10 @@
     "et0_pm_unavailable": {
       "title": "PM ET₀ daily measurement unavailable",
       "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
+    },
+    "ambiguous_soil_moisture_unit": {
+      "title": "Eenheid van de bodemvochtsensor ontbreekt of is dubbelzinnig",
+      "description": "De bodemvochtentiteit {entity_id} heeft geen herkende eenheid (bijvoorbeeld '%' of 'm³/m³'), waardoor waarden ≤ 1,0 dubbelzinnig zijn tussen 1% en 100%. Kies Procent of Fractie onder Configureren → Optionele bronnen."
     }
   },
   "entity": {
@@ -2999,6 +3006,13 @@
         "south_america_east": "Zuid-Amerika (Oost)",
         "australia": "Australië",
         "custom": "Aangepast"
+      }
+    },
+    "soil_moisture_unit": {
+      "options": {
+        "auto": "Automatisch (detecteren via sensoreenheid)",
+        "percent": "Procent (0-100%)",
+        "fraction": "Volumetrische fractie (0-1 / m³/m³)"
       }
     }
   }

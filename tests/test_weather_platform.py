@@ -162,17 +162,113 @@ async def test_weather_forecast_daily_and_hourly(mock_config_entry, mock_coordin
     daily = await entity.async_forecast_daily()
     assert daily is not None
     assert len(daily) == 1
-    assert daily[0]["temperature"] == 25.0
-    assert daily[0]["templow"] == 14.0
-    assert daily[0]["wind_speed"] == pytest.approx(4.0)  # 14.4 km/h -> 4.0 m/s
+    assert daily[0]["native_temperature"] == 25.0
+    assert daily[0]["native_templow"] == 14.0
+    assert daily[0]["native_wind_speed"] == pytest.approx(4.0)  # 14.4 km/h -> 4.0 m/s
     assert daily[0]["native_wind_gust_speed"] == pytest.approx(8.0)  # 28.8 km/h -> 8.0 m/s
     assert daily[0]["condition"] == "sunny"
 
     hourly = await entity.async_forecast_hourly()
     assert hourly is not None
     assert len(hourly) == 1
-    assert hourly[0]["temperature"] is not None
-    assert hourly[0]["wind_speed"] is not None
+    assert hourly[0]["native_temperature"] is not None
+    assert hourly[0]["native_wind_speed"] is not None
+
+
+async def test_nowcast_blending_uses_lead_time_not_row_count(mock_config_entry, mock_coordinator):
+    now_hr = dt_util.now().replace(minute=0, second=0, microsecond=0)
+    mock_coordinator.data[KEY_NORM_TEMP_C] = 30.0
+    mock_coordinator.data[KEY_FORECAST] = {
+        "provider": "open_meteo",
+        "daily": [],
+        "hourly": [
+            # Tomorrow noon (~24h ahead): MUST NOT receive local 30°C blending
+            {"datetime": (now_hr + timedelta(hours=24)).strftime("%Y-%m-%dT%H:00"), "temp_c": 0.0, "wind_kmh": 0.0}
+        ],
+    }
+    entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+    out = await entity.async_forecast_hourly()
+    assert len(out) == 1
+    assert out[0]["native_temperature"] == 0.0
+
+    # Sparse hours: +1h blends with weight 0.4, +5h stays raw provider value
+    mock_coordinator.data[KEY_FORECAST]["hourly"] = [
+        {"datetime": (now_hr + timedelta(hours=1)).strftime("%Y-%m-%dT%H:00"), "temp_c": 10.0, "wind_kmh": 0.0},
+        {"datetime": (now_hr + timedelta(hours=5)).strftime("%Y-%m-%dT%H:00"), "temp_c": 10.0, "wind_kmh": 0.0},
+    ]
+    out_sparse = await entity.async_forecast_hourly()
+    assert out_sparse[0]["native_temperature"] == pytest.approx(18.0)  # 30*0.4 + 10*0.6
+    assert out_sparse[1]["native_temperature"] == 10.0
+
+
+async def test_weather_forecast_converts_in_imperial_and_metric(mock_config_entry, mock_coordinator):
+    from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
+
+    now_hr = dt_util.now().replace(minute=0, second=0, microsecond=0)
+    mock_coordinator.data[KEY_FORECAST] = {
+        "provider": "open_meteo",
+        "daily": [
+            {
+                "date": now_hr.strftime("%Y-%m-%d"),
+                "tmax_c": 20.0,
+                "tmin_c": 10.0,
+                "precip_mm": 25.4,
+                "wind_kmh": 36.0,  # 10 m/s
+                "gust_kmh": 54.0,  # 15 m/s
+                "weathercode": 0,
+                "precip_prob": 20,
+            }
+        ],
+        "hourly": [
+            {
+                "datetime": (now_hr + timedelta(hours=4)).strftime("%Y-%m-%dT%H:00"),
+                "temp_c": 20.0,
+                "apparent_temp_c": 21.0,
+                "dewpoint_c": 10.0,
+                "precip_mm": 2.54,
+                "wind_kmh": 36.0,
+                "gust_kmh": 54.0,
+                "weathercode": 0,
+            }
+        ],
+    }
+    entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+    entity.hass = MagicMock()
+    entity.hass.config.units = US_CUSTOMARY_SYSTEM
+
+    imp_daily = entity._convert_forecast(await entity.async_forecast_daily())
+    assert imp_daily[0]["temperature"] == pytest.approx(68.0)
+    assert imp_daily[0]["templow"] == pytest.approx(50.0)
+    assert imp_daily[0]["precipitation"] == pytest.approx(1.0)
+    assert imp_daily[0]["wind_speed"] == pytest.approx(22.37, abs=0.1)
+    assert imp_daily[0]["wind_gust_speed"] == pytest.approx(33.55, abs=0.1)
+
+    imp_hourly = entity._convert_forecast(await entity.async_forecast_hourly())
+    assert imp_hourly[0]["apparent_temperature"] == pytest.approx(70.0, abs=0.5)
+    assert imp_hourly[0]["dew_point"] == pytest.approx(50.0)
+
+    entity.hass.config.units = METRIC_SYSTEM
+    met_daily = entity._convert_forecast(await entity.async_forecast_daily())
+    assert met_daily[0]["temperature"] == pytest.approx(20.0)
+    assert met_daily[0]["wind_speed"] == pytest.approx(36.0, abs=0.1)
+
+
+@pytest.mark.parametrize(
+    ("provider_id", "expected_credit"),
+    [
+        ("open_meteo", "Open-Meteo"),
+        ("met_no", "MET Norway"),
+        ("nws_noaa", "NOAA"),
+        ("openweathermap", "OpenWeatherMap"),
+        ("pirate_weather", "Pirate Weather"),
+        ("meteo_france", "Météo-France"),
+        ("ha_weather_entity", "Home Assistant"),
+    ],
+)
+def test_provider_attribution_covers_all_providers(mock_config_entry, mock_coordinator, provider_id, expected_credit):
+    mock_coordinator.data[KEY_FORECAST] = {"provider": provider_id}
+    entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+    assert expected_credit in entity.attribution
 
 
 def _sync_weather_units(entity, options, explicit):

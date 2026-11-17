@@ -11,6 +11,8 @@ from collections import deque
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from homeassistant.util import dt as dt_util
@@ -1497,3 +1499,692 @@ class TestEt0PmUnavailableIssue:
         mock_create, _ = self._run(solar_forecast_enabled=True, forecast_lat=37.9, sources={}, et0_present=True)
         keys = [c.args[2] for c in mock_create.call_args_list]
         assert not any(k.startswith("et0_pm_unavailable") for k in keys)
+
+
+# ---------------------------------------------------------------------------
+# Tests: PR 1 lifecycle, forecast retry backoff & task cleanup
+# ---------------------------------------------------------------------------
+
+
+class TestLifecycleAndBackoff:
+    def test_cold_start_forecast_failures_back_off_from_last_attempt(self):
+        coord = _make_coordinator()
+        coord.forecast_enabled = True
+        coord._forecast_cache = None
+        coord.runtime.last_forecast_fetch = None
+        coord.runtime.forecast_consecutive_failures = 5
+        coord._unsubs = []
+        coord._bg_tasks = set()
+        coord._stopped = False
+
+        scheduled = []
+
+        def fake_create_task(coro):
+            coro.close()
+            t = MagicMock()
+            scheduled.append(t)
+            return t
+
+        coord.hass.async_create_task = fake_create_task
+        t0 = datetime(2026, 11, 17, 12, 0, 0, tzinfo=UTC)
+
+        # First call at t0 schedules a fetch; next two calls 2s apart must back off.
+        coord._get_cached_or_schedule_forecast(t0)
+        coord.runtime.forecast_inflight = False
+        coord._get_cached_or_schedule_forecast(t0 + timedelta(seconds=2))
+        coord._get_cached_or_schedule_forecast(t0 + timedelta(seconds=4))
+        assert len(scheduled) == 1
+
+    def test_cached_forecast_failure_backs_off_from_last_attempt_not_old_success(self):
+        coord = _make_coordinator()
+        coord.forecast_enabled = True
+        coord._forecast_cache = {"daily": [{"date": "2026-11-17"}]}
+        old_success = datetime(2026, 11, 17, 6, 0, 0, tzinfo=UTC)
+        coord.runtime.last_forecast_fetch = old_success
+        coord.runtime.forecast_consecutive_failures = 2  # 2 * 60 = 120s? or FORECAST_MIN_RETRY_S * 2
+        coord._unsubs = []
+        coord._bg_tasks = set()
+        coord._stopped = False
+
+        scheduled = []
+
+        def fake_create_task(coro):
+            coro.close()
+            t = MagicMock()
+            scheduled.append(t)
+            return t
+
+        coord.hass.async_create_task = fake_create_task
+        t0 = datetime(2026, 11, 17, 12, 0, 0, tzinfo=UTC)
+
+        coord._get_cached_or_schedule_forecast(t0)
+        coord.runtime.forecast_inflight = False
+        coord._get_cached_or_schedule_forecast(t0 + timedelta(seconds=5))
+        assert len(scheduled) == 1
+
+    async def test_fetch_clears_inflight_flag_on_unexpected_error_and_cancellation(self):
+        import asyncio
+
+        coord = _make_coordinator()
+        coord.config_entry = None
+        coord.forecast_enabled = True
+        coord.entry_options["forecast_provider"] = "open_meteo"
+        coord.forecast_lat = 37.9
+        coord.forecast_lon = 23.7
+        coord.runtime.forecast_inflight = True
+
+        with (
+            patch("custom_components.ws_core.coordinator.async_get_clientsession", return_value=MagicMock()),
+            patch(
+                "custom_components.ws_core.coordinator.get_provider",
+                side_effect=asyncio.CancelledError(),
+            ),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await coord._async_fetch_forecast()
+        assert coord.runtime.forecast_inflight is False
+
+    async def test_stop_cancels_bg_tasks_and_blocks_late_publish(self):
+        import asyncio
+
+        coord = _make_coordinator()
+        coord.config_entry = None
+        coord.forecast_enabled = True
+        coord.entry_options["forecast_provider"] = "open_meteo"
+        coord.forecast_lat = 37.9
+        coord.forecast_lon = 23.7
+        coord.mqtt_enabled = False
+        coord._mqtt_discovery_published = False
+        coord._learning_store = None
+        coord._history_store = None
+        coord._pattern = None
+        coord._unsubs = []
+        coord._bg_tasks = set()
+        coord._stopped = False
+        coord.async_set_updated_data = MagicMock()
+        coord._async_save_history = MagicMock()
+
+        async def _noop_save():
+            return None
+
+        coord._async_save_history = _noop_save
+
+        gate = asyncio.Event()
+
+        class SlowProvider:
+            PROVIDER_NAME = "Slow"
+
+            async def async_fetch(self, *a, **kw):
+                await gate.wait()
+                return {"provider": "open_meteo", "daily": [], "hourly": []}
+
+        def real_task(coro):
+            return asyncio.create_task(coro)
+
+        coord.hass.async_create_task = real_task
+        with (
+            patch("custom_components.ws_core.coordinator.async_get_clientsession", return_value=MagicMock()),
+            patch("custom_components.ws_core.coordinator.get_provider", return_value=SlowProvider()),
+        ):
+            coord._get_cached_or_schedule_forecast(datetime.now(UTC))
+            assert len(coord._bg_tasks) == 1
+            task = next(iter(coord._bg_tasks))
+            await asyncio.sleep(0)
+            await coord.async_stop()
+            await asyncio.sleep(0)
+            assert task.cancelled()
+            coord.async_set_updated_data.assert_not_called()
+
+    async def test_late_completion_after_stop_does_not_publish(self):
+        coord = _make_coordinator()
+        coord.config_entry = None
+        coord.forecast_enabled = True
+        coord.entry_options["forecast_provider"] = "open_meteo"
+        coord.forecast_lat = 37.9
+        coord.forecast_lon = 23.7
+        coord._stopped = True
+        coord.async_set_updated_data = MagicMock()
+
+        class FastProvider:
+            PROVIDER_NAME = "Fast"
+
+            async def async_fetch(self, *a, **kw):
+                return {"provider": "open_meteo", "daily": [], "hourly": []}
+
+        with (
+            patch("custom_components.ws_core.coordinator.async_get_clientsession", return_value=MagicMock()),
+            patch("custom_components.ws_core.coordinator.get_provider", return_value=FastProvider()),
+        ):
+            await coord._async_fetch_forecast()
+        coord.async_set_updated_data.assert_not_called()
+        assert coord.runtime.forecast_inflight is False
+
+
+class TestForecastTilePadding:
+    def test_skips_empty_padding_days(self):
+        coord = _make_coordinator()
+        daily = [
+            {"date": "2026-11-17", "tmax_c": 12.0, "tmin_c": 4.0, "precip_mm": 0.0, "wind_kmh": 10.0, "weathercode": 1},
+            {"date": "2026-11-18", "tmax_c": 14.0, "tmin_c": 5.0, "precip_mm": 0.0, "wind_kmh": 8.0, "weathercode": 2},
+            {
+                "date": "2026-11-19",
+                "tmax_c": 11.0,
+                "tmin_c": 3.0,
+                "precip_mm": 2.0,
+                "wind_kmh": 15.0,
+                "weathercode": 61,
+            },
+            {"date": "", "tmax_c": None, "tmin_c": None, "precip_mm": None, "wind_kmh": None, "weathercode": None},
+            {"date": "", "tmax_c": None, "tmin_c": None, "precip_mm": None, "wind_kmh": None, "weathercode": None},
+        ]
+        tiles = coord._build_forecast_tiles(daily)
+        assert len(tiles) == 3
+        assert all(t["date"] for t in tiles)
+
+
+class TestForecastValidity:
+    def test_expired_cache_and_past_date_do_not_feed_rain_blend(self):
+        from custom_components.ws_core.const import (
+            KEY_FORECAST,
+            KEY_FORECAST_AGREEMENT,
+            KEY_RAIN_PROBABILITY,
+            KEY_RAIN_PROBABILITY_COMBINED,
+        )
+
+        coord = _make_coordinator(humidity=70.0, pressure=1012.0)
+        coord.forecast_enabled = True
+        coord.entry_options["forecast_provider"] = "open_meteo"
+        coord.config_entry = None
+        coord._learning_state = MagicMock()
+        coord._learning_state.forecast_outcomes = []
+        coord._learning_state.blend_local = 0.5
+        coord._learning_state.blend_openmeteo = 0.5
+
+        now = datetime(2026, 11, 17, 14, 0, tzinfo=UTC)
+        # Cached forecast from Nov 1 claiming 100% rain prob -> expired on Nov 17
+        coord._forecast_cache = {
+            "provider": "open_meteo",
+            "daily": [{"date": "2026-11-01", "tmax_c": 15.0, "tmin_c": 8.0, "precip_prob": 100}],
+            "hourly": [],
+        }
+        coord.runtime.last_forecast_fetch = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
+
+        data: dict = {}
+        coord._compute_rain_probability(data, mslp=1012.0, trend_3h=0.0, rh=70.0, now=now)
+        assert data[KEY_RAIN_PROBABILITY_COMBINED] == data[KEY_RAIN_PROBABILITY]
+        assert data["_forecast_status"] == "local_only"
+
+        # Midnight rollover: cache fetched recently (1h ago at 23:00 yesterday),
+        # but only yesterday's date row is present.
+        coord.runtime.last_forecast_fetch = now - timedelta(hours=1)
+        coord._forecast_cache = {
+            "provider": "open_meteo",
+            "daily": [{"date": "2026-11-16", "tmax_c": 15.0, "tmin_c": 8.0, "precip_prob": 100}],
+            "hourly": [],
+        }
+        data2: dict = {}
+        coord._compute_rain_probability(data2, mslp=1012.0, trend_3h=0.0, rh=70.0, now=now)
+        assert data2[KEY_RAIN_PROBABILITY_COMBINED] == data2[KEY_RAIN_PROBABILITY]
+        assert data2["_forecast_status"] == "local_only"
+
+        # Forecast agreement must also not run on expired cache
+        data2["zambretti_number"] = 10
+        coord._compute_forecast_agreement(data2, now=now)
+        assert KEY_FORECAST_AGREEMENT not in data2
+
+        # Fresh cache with today's date blends normally and reports ok/degraded
+        coord._forecast_cache = {
+            "provider": "open_meteo",
+            "daily": [{"date": "2026-11-17", "tmax_c": 15.0, "tmin_c": 8.0, "precip_prob": 100}],
+            "hourly": [],
+        }
+        data3: dict = {}
+        coord._compute_rain_probability(data3, mslp=1012.0, trend_3h=0.0, rh=70.0, now=now)
+        assert data3[KEY_RAIN_PROBABILITY_COMBINED] > data3[KEY_RAIN_PROBABILITY]
+        assert data3["_forecast_status"] == "ok"
+
+        # _compute() also drops expired rows from KEY_FORECAST when stale
+        from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+
+        with patch.object(DataUpdateCoordinator, "__init__", lambda self, *a, **kw: None):
+            real_coord = WSStationCoordinator(
+                coord.hass, {"entry_id": "fv", "sources": coord.sources, "forecast_enabled": True}, {}
+            )
+        real_coord._forecast_cache = {
+            "provider": "open_meteo",
+            "daily": [{"date": "2026-11-01", "tmax_c": 15.0, "tmin_c": 8.0, "precip_prob": 100}],
+            "hourly": [{"datetime": "2026-11-01T12:00", "temp_c": 15.0}],
+        }
+        real_coord.runtime.last_forecast_fetch = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
+        with patch.object(real_coord, "_get_cached_or_schedule_forecast", return_value=real_coord._forecast_cache):
+            full = real_coord._compute(sample=False)
+        assert full.get(KEY_FORECAST) in (None, {"provider": "open_meteo", "daily": [], "hourly": []}) or not (
+            (full.get(KEY_FORECAST) or {}).get("daily")
+        )
+
+
+class TestSoilMoistureUnits:
+    """Soil moisture unit handling and ambiguous_soil_moisture_unit Repairs issue."""
+
+    @staticmethod
+    def _build_real_coord(soil_state, soil_unit: str = "auto"):
+        from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+        from custom_components.ws_core.const import (
+            CONF_ENABLE_SOIL,
+            CONF_SOIL_MOISTURE_UNIT,
+            SRC_SOIL_MOISTURE,
+        )
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+
+        stub = _make_coordinator()
+        sources = {**stub.sources, SRC_SOIL_MOISTURE: "sensor.soil"}
+        orig_get = stub.hass.states.get
+        stub.hass.states.get = lambda eid: soil_state if eid == "sensor.soil" else orig_get(eid)
+        with patch.object(DataUpdateCoordinator, "__init__", lambda self, *a, **kw: None):
+            coord = WSStationCoordinator(
+                stub.hass,
+                {
+                    "entry_id": "soil_test",
+                    "sources": sources,
+                    CONF_ENABLE_SOIL: True,
+                    CONF_SOIL_MOISTURE_UNIT: soil_unit,
+                },
+                {},
+            )
+        coord.suppress_notifications = False
+        return coord
+
+    def test_percent_unit_not_multiplied_and_no_issue(self):
+        from types import SimpleNamespace
+
+        from custom_components.ws_core.const import KEY_SOIL_MOISTURE
+
+        coord = self._build_real_coord(SimpleNamespace(state="1.0", attributes={"unit_of_measurement": "%"}))
+        with (
+            patch("custom_components.ws_core.coordinator.ir.async_create_issue") as mock_create,
+            patch("custom_components.ws_core.coordinator.ir.async_delete_issue") as mock_delete,
+        ):
+            data = coord._compute(sample=False)
+
+        assert data[KEY_SOIL_MOISTURE] == 1.0
+        created_ids = [c.args[2] for c in mock_create.call_args_list]
+        assert not any(iid.startswith("ambiguous_soil_moisture_unit") for iid in created_ids)
+        deleted_ids = [c.args[2] for c in mock_delete.call_args_list]
+        assert any(iid.startswith("ambiguous_soil_moisture_unit") for iid in deleted_ids)
+
+    def test_fraction_unit_multiplied_without_issue(self):
+        from types import SimpleNamespace
+
+        from custom_components.ws_core.const import KEY_SOIL_MOISTURE
+
+        coord = self._build_real_coord(SimpleNamespace(state="0.35", attributes={"unit_of_measurement": "m³/m³"}))
+        with (
+            patch("custom_components.ws_core.coordinator.ir.async_create_issue") as mock_create,
+            patch("custom_components.ws_core.coordinator.ir.async_delete_issue") as mock_delete,
+        ):
+            data = coord._compute(sample=False)
+
+        assert data[KEY_SOIL_MOISTURE] == 35.0
+        created_ids = [c.args[2] for c in mock_create.call_args_list]
+        assert not any(iid.startswith("ambiguous_soil_moisture_unit") for iid in created_ids)
+        deleted_ids = [c.args[2] for c in mock_delete.call_args_list]
+        assert any(iid.startswith("ambiguous_soil_moisture_unit") for iid in deleted_ids)
+
+    def test_missing_unit_auto_keeps_legacy_and_raises_issue_until_explicit(self):
+        from types import SimpleNamespace
+
+        from custom_components.ws_core.const import (
+            CONF_SOIL_MOISTURE_UNIT,
+            ENTRY_REPAIR_ISSUES,
+            KEY_SOIL_MOISTURE,
+        )
+
+        assert "ambiguous_soil_moisture_unit" in ENTRY_REPAIR_ISSUES
+
+        coord = self._build_real_coord(SimpleNamespace(state="1.0", attributes={}), soil_unit="auto")
+        with (
+            patch("custom_components.ws_core.coordinator.ir.async_create_issue") as mock_create,
+            patch("custom_components.ws_core.coordinator.ir.async_delete_issue"),
+        ):
+            data = coord._compute(sample=False)
+
+        assert data[KEY_SOIL_MOISTURE] == 100.0
+        created_ids = [c.args[2] for c in mock_create.call_args_list]
+        assert any(iid.startswith("ambiguous_soil_moisture_unit") for iid in created_ids)
+
+        # Switching soil_moisture_unit to explicit "percent" resolves ambiguity and clears issue
+        coord.entry_options[CONF_SOIL_MOISTURE_UNIT] = "percent"
+        with (
+            patch("custom_components.ws_core.coordinator.ir.async_create_issue") as mock_create2,
+            patch("custom_components.ws_core.coordinator.ir.async_delete_issue") as mock_delete2,
+        ):
+            data2 = coord._compute(sample=False)
+
+        assert data2[KEY_SOIL_MOISTURE] == 1.0
+        created_ids2 = [c.args[2] for c in mock_create2.call_args_list]
+        assert not any(iid.startswith("ambiguous_soil_moisture_unit") for iid in created_ids2)
+        deleted_ids2 = [c.args[2] for c in mock_delete2.call_args_list]
+        assert any(iid.startswith("ambiguous_soil_moisture_unit") for iid in deleted_ids2)
+
+
+class TestPR5CalibrationAndClimatology:
+    """PR 5: Open-Meteo neighbor QC elevation check, one-time bias reset, 30d climatology."""
+
+    async def test_neighbor_qc_sends_elevation_and_skips_mismatched_temp_pressure(self):
+        from custom_components.ws_core.const import (
+            CONF_ENABLE_AUTO_CALIBRATION,
+            KEY_NORM_HUMIDITY,
+            KEY_NORM_PRESSURE_HPA,
+            KEY_NORM_TEMP_C,
+        )
+        from custom_components.ws_core.learning_state import LearningState
+
+        coord = _make_coordinator()
+        coord.forecast_lat = 46.5
+        coord.forecast_lon = 10.2
+        coord.elevation_m = 200.0
+        coord.config_entry = None
+        coord.entry_options = {CONF_ENABLE_AUTO_CALIBRATION: True}
+        coord._learning_state = LearningState()
+        coord.data = {
+            KEY_NORM_TEMP_C: 20.0,
+            KEY_NORM_HUMIDITY: 55.0,
+            KEY_NORM_PRESSURE_HPA: 990.0,
+        }
+
+        requested_urls: list[str] = []
+
+        class FakeResp:
+            def __init__(self, status: int, payload: dict):
+                self.status = status
+                self._payload = payload
+
+            async def json(self):
+                return self._payload
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+        class FakeSession:
+            def __init__(self, payload: dict):
+                self._payload = payload
+
+            def get(self, url, timeout=None):
+                requested_urls.append(url)
+                return FakeResp(200, self._payload)
+
+        # Returned model terrain height is 550m (>1m away from station 200m)
+        mismatched_payload = {
+            "elevation": 550.0,
+            "current": {"temperature_2m": 16.0, "relative_humidity_2m": 50.0, "surface_pressure": 950.0},
+        }
+        with patch(
+            "custom_components.ws_core.coordinator.async_get_clientsession",
+            return_value=FakeSession(mismatched_payload),
+        ):
+            await coord._async_fetch_neighbor_qc()
+
+        assert requested_urls
+        assert "elevation=200.0" in requested_urls[0]
+        assert coord._neighbor_qc_cache["elevation"] == 550.0
+        # Temperature and pressure must not update when elevation differs by > 1 m
+        assert coord._learning_state.cal_bias_temp_c is None
+        assert coord._learning_state.cal_bias_pressure_hpa is None
+        assert coord._learning_state.cal_bias_humidity == 5.0
+
+        # When returned elevation matches station within 1 m, temp and pressure DO update
+        matched_payload = {
+            "elevation": 200.4,
+            "current": {"temperature_2m": 19.0, "relative_humidity_2m": 50.0, "surface_pressure": 989.0},
+        }
+        with patch(
+            "custom_components.ws_core.coordinator.async_get_clientsession",
+            return_value=FakeSession(matched_payload),
+        ):
+            await coord._async_fetch_neighbor_qc()
+
+        assert coord._learning_state.cal_bias_temp_c == 1.0
+        assert coord._learning_state.cal_bias_pressure_hpa == 1.0
+
+    async def test_auto_calibration_performs_one_time_bias_reset_on_first_run(self):
+        from custom_components.ws_core.const import (
+            CONF_ENABLE_AUTO_CALIBRATION,
+            KEY_NORM_HUMIDITY,
+            KEY_NORM_PRESSURE_HPA,
+            KEY_NORM_TEMP_C,
+        )
+        from custom_components.ws_core.learning_state import CALIBRATION_BIAS_REF_VERSION, LearningState
+
+        coord = _make_coordinator()
+        coord.elevation_m = 200.0
+        coord.config_entry = None
+        coord.entry_options = {CONF_ENABLE_AUTO_CALIBRATION: True}
+        coord._learning_state = LearningState(
+            solar_lux_factor=125.0,
+            cal_bias_temp_c=4.0,
+            cal_bias_humidity=10.0,
+            cal_bias_pressure_hpa=-5.0,
+            cal_bias_n=200,
+            cal_bias_ref_version=0,
+            cal_last_auto_apply_date="2026-11-10",
+        )
+        coord.data = {
+            KEY_NORM_TEMP_C: 20.0,
+            KEY_NORM_HUMIDITY: 55.0,
+            KEY_NORM_PRESSURE_HPA: 990.0,
+        }
+
+        await coord._maybe_update_auto_calibration(
+            {"temp_c": 20.0, "humidity": 55.0, "pressure_hpa": 990.0, "elevation": 200.0}
+        )
+
+        # Legacy bias (n=200, temp=4.0) was cleared before folding the new zero-delta sample
+        assert coord._learning_state.cal_bias_ref_version == CALIBRATION_BIAS_REF_VERSION
+        assert coord._learning_state.cal_bias_n == 1
+        assert coord._learning_state.cal_bias_temp_c == 0.0
+        assert coord._learning_state.solar_lux_factor == 125.0
+        assert coord._learning_state.cal_last_auto_apply_date == "2026-11-10"
+
+    def test_compute_climatology_uses_strict_30_day_window(self):
+        from custom_components.ws_core.const import (
+            KEY_CLIMATOLOGY_30D,
+            KEY_NORM_TEMP_C,
+            KEY_RAIN_ANOMALY_30D,
+            KEY_TEMP_ANOMALY_30D,
+        )
+        from custom_components.ws_core.learning_state import LearningState
+
+        coord = _make_coordinator()
+        # 60 older cool/dry days followed by 30 warm/wet days
+        older_days = [
+            {"date": f"2026-08-{i + 1:02d}", "t_high": 10.0, "t_low": 0.0, "rain_total": 0.0} for i in range(60)
+        ]
+        recent_days = [
+            {"date": f"2026-10-{i + 1:02d}", "t_high": 30.0, "t_low": 20.0, "rain_total": 10.0} for i in range(30)
+        ]
+        coord._learning_state = LearningState(climatology_days=older_days + recent_days)
+
+        data = {KEY_NORM_TEMP_C: 25.0, "_rain_today_mm": 10.0}
+        coord._compute_climatology(data)
+
+        assert data[KEY_CLIMATOLOGY_30D] == 30
+        assert data[KEY_TEMP_ANOMALY_30D] == 0.0
+        assert data[KEY_RAIN_ANOMALY_30D] == 0.0
+
+
+class TestPR6Fixes:
+    """PR 6: solar midnight rollover gap, blitzortung throttle, missing extremes, repairs."""
+
+    def test_solar_energy_publishes_zero_after_midnight_before_sample_tick(self):
+        from custom_components.ws_core.const import KEY_PEAK_SUN_HOURS, KEY_SOLAR_ENERGY_TODAY_WHM2
+
+        coord = _make_coordinator()
+        now_utc = datetime(2026, 11, 17, 0, 0, 5, tzinfo=UTC)
+        local_yesterday = (dt_util.as_local(now_utc).date() - timedelta(days=1)).isoformat()
+        coord._solar_energy_date = local_yesterday
+        coord._solar_energy_today_whm2 = 2450.0
+        coord._solar_energy_previous_whm2 = 1800.0
+        coord._solar_energy_previous_date = ""
+        coord._solar_today_meta = {"date": local_yesterday, "energy_whm2": 2450.0}
+        coord._solar_previous_meta = {}
+        coord._get_solar_radiation_for_et0 = MagicMock(return_value=0.0)
+
+        data: dict = {}
+        coord._compute_solar_energy(data, now_utc, max_solar=0.0, sample=False)
+
+        assert data[KEY_SOLAR_ENERGY_TODAY_WHM2] == 0.0
+        assert data[KEY_PEAK_SUN_HOURS] == 0.0
+        # Must not roll state before the sample tick
+        assert coord._solar_energy_date == local_yesterday
+        assert coord._solar_energy_today_whm2 == 2450.0
+
+    def test_blitzortung_discovery_skipped_for_physical_source_and_throttled(self):
+        from custom_components.ws_core.const import SRC_LIGHTNING_COUNT
+
+        # Physical lightning sensor mapped -> no registry scan at all
+        coord = _make_coordinator()
+        coord.lightning_enabled = True
+        coord._lightning_proximity_km = 25.0
+        coord._lightning_count_history_1h = deque()
+        coord._lightning_last_count = None
+        coord._lightning_last_strike_ts = None
+        coord._lightning_last_near_strike_ts = None
+        coord._blitzortung_sources = {}
+        coord._last_blitz_scan_ts = None
+        coord.sources = {**coord.sources, SRC_LIGHTNING_COUNT: "sensor.wh57_count"}
+
+        with patch.object(coord, "_discover_blitzortung") as mock_scan:
+            coord._compute_lightning({}, datetime.now(UTC))
+            coord._compute_lightning({}, datetime.now(UTC))
+            mock_scan.assert_not_called()
+
+        # No physical lightning source -> rate-limited to once per 300s
+        coord.sources.pop(SRC_LIGHTNING_COUNT, None)
+        fake_mono = [1000.0]
+        with (
+            patch("custom_components.ws_core.coordinator.time.monotonic", side_effect=lambda: fake_mono[0]),
+            patch.object(coord, "_discover_blitzortung") as mock_scan2,
+        ):
+            coord._compute_lightning({}, datetime.now(UTC))
+            fake_mono[0] = 1060.0
+            coord._compute_lightning({}, datetime.now(UTC))
+            fake_mono[0] = 1299.0
+            coord._compute_lightning({}, datetime.now(UTC))
+            assert mock_scan2.call_count == 1
+            fake_mono[0] = 1301.0
+            coord._compute_lightning({}, datetime.now(UTC))
+            assert mock_scan2.call_count == 2
+
+    def test_period_extremes_survive_missing_temperature_and_gust(self):
+        from custom_components.ws_core.const import (
+            KEY_TEMP_HIGH_ALL_TIME,
+            KEY_TEMP_HIGH_MONTH,
+            KEY_TEMP_HIGH_WEEK,
+            KEY_TEMP_HIGH_YEAR,
+            KEY_TEMP_LOW_ALL_TIME,
+            KEY_TEMP_LOW_MONTH,
+            KEY_TEMP_LOW_WEEK,
+            KEY_TEMP_LOW_YEAR,
+            KEY_TEMP_MONTH_REF,
+            KEY_TEMP_WEEK_REF,
+            KEY_TEMP_YEAR_REF,
+            KEY_WIND_GUST_MAX_ALL_TIME,
+            KEY_WIND_GUST_MAX_MONTH,
+            KEY_WIND_GUST_MAX_YEAR,
+            KEY_WIND_GUST_MONTH_REF,
+            KEY_WIND_GUST_YEAR_REF,
+        )
+
+        coord = _make_coordinator()
+        now_local = dt_util.now()
+        year_key = now_local.strftime("%Y")
+        week_key = now_local.strftime("%G-W%V")
+        month_key = now_local.strftime("%Y-%m")
+
+        coord._temp_year_key = year_key
+        coord._temp_high_year = 34.5
+        coord._temp_low_year = -2.1
+        coord._temp_high_all_time = 41.2
+        coord._temp_low_all_time = -8.4
+        coord._temp_week_isoweek = week_key
+        coord._temp_high_week = 22.0
+        coord._temp_low_week = 5.0
+        coord._temp_month_key = month_key
+        coord._temp_high_month = 25.0
+        coord._temp_low_month = 3.0
+        coord._gust_month_key = month_key
+        coord._gust_max_month = 18.5
+        coord._gust_year_key = year_key
+        coord._gust_max_year = 24.0
+        coord._gust_max_all_time = 29.5
+
+        data: dict = {}
+        coord._update_temp_year_all_time(data, None)
+        coord._update_temp_week_month(data, None)
+        coord._update_gust_month_year_all_time(data, None)
+
+        assert data[KEY_TEMP_HIGH_YEAR] == 34.5
+        assert data[KEY_TEMP_LOW_YEAR] == -2.1
+        assert data[KEY_TEMP_YEAR_REF] == year_key
+        assert data[KEY_TEMP_HIGH_ALL_TIME] == 41.2
+        assert data[KEY_TEMP_LOW_ALL_TIME] == -8.4
+        assert data[KEY_TEMP_HIGH_WEEK] == 22.0
+        assert data[KEY_TEMP_LOW_WEEK] == 5.0
+        assert data[KEY_TEMP_WEEK_REF] == week_key
+        assert data[KEY_TEMP_HIGH_MONTH] == 25.0
+        assert data[KEY_TEMP_LOW_MONTH] == 3.0
+        assert data[KEY_TEMP_MONTH_REF] == month_key
+        assert data[KEY_WIND_GUST_MAX_MONTH] == 18.5
+        assert data[KEY_WIND_GUST_MONTH_REF] == month_key
+        assert data[KEY_WIND_GUST_MAX_YEAR] == 24.0
+        assert data[KEY_WIND_GUST_YEAR_REF] == year_key
+        assert data[KEY_WIND_GUST_MAX_ALL_TIME] == 29.5
+
+    def test_repair_issues_registered_and_cleared_on_suppress_and_disable(self):
+        from custom_components.ws_core.const import DOMAIN, ENTRY_REPAIR_ISSUES
+
+        assert "et0_pm_unavailable" in ENTRY_REPAIR_ISSUES
+        assert "ambiguous_soil_moisture_unit" in ENTRY_REPAIR_ISSUES
+
+        coord = _make_coordinator()
+        coord.forecast_enabled = False
+        coord.runtime.forecast_consecutive_failures = 5
+        coord.forecast_lat = None
+        coord._missing_sources_since = None
+        coord.suppress_notifications = True
+        coord._source_is_stale = lambda k, now: False
+        coord._alert_debounce_raw = {}
+        coord._alert_debounce_clear = {}
+        coord._alert_active = {}
+        coord._eval_alert = MagicMock(return_value=False)
+
+        with (
+            patch("custom_components.ws_core.coordinator.HAS_REPAIRS", True),
+            patch("custom_components.ws_core.coordinator.ir.async_delete_issue") as mock_delete,
+        ):
+            coord._compute_health({}, datetime.now(UTC), [], [], sample=False)
+
+        deleted = {c.args[2] for c in mock_delete.call_args_list if c.args[:2] == (coord.hass, DOMAIN)}
+        for name in ENTRY_REPAIR_ISSUES:
+            assert coord._issue_id(name) in deleted
+
+        # Disabling forecast must also clear forecast_api_failures even with suppress=False
+        coord.suppress_notifications = False
+        with (
+            patch("custom_components.ws_core.coordinator.HAS_REPAIRS", True),
+            patch("custom_components.ws_core.coordinator.ir.async_create_issue") as mock_create,
+            patch("custom_components.ws_core.coordinator.ir.async_delete_issue") as mock_delete2,
+        ):
+            coord._compute_health({}, datetime.now(UTC), [], [], sample=False)
+
+        created2 = [c.args[2] for c in mock_create.call_args_list]
+        assert not any(iid.startswith("forecast_api_failures") for iid in created2)
+        deleted2 = {c.args[2] for c in mock_delete2.call_args_list}
+        assert coord._issue_id("forecast_api_failures") in deleted2
+        assert coord._issue_id("large_calibration_offset") in deleted2

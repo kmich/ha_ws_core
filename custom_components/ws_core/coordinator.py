@@ -209,6 +209,7 @@ from .const import (
     CONF_RAIN_UNIT,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
+    CONF_SOIL_MOISTURE_UNIT,
     CONF_SOLAR_INTERVAL_MIN,
     CONF_SOLAR_PANEL_AZIMUTH,
     CONF_SOLAR_PANEL_TILT,
@@ -298,6 +299,7 @@ from .const import (
     DEFAULT_PWS_INTERVAL_MIN,
     DEFAULT_RAIN_FILTER_ALPHA,
     DEFAULT_RAIN_UNIT,
+    DEFAULT_SOIL_MOISTURE_UNIT,
     DEFAULT_SOLAR_INTERVAL_MIN,
     DEFAULT_SOLAR_PANEL_AZIMUTH,
     DEFAULT_SOLAR_PANEL_TILT,
@@ -327,6 +329,7 @@ from .const import (
     ET0_RADIATION_SOURCE_SENSOR,
     FORECAST_AGREEMENT_ALIGNED_PP,
     FORECAST_AGREEMENT_CONFLICT_PP,
+    FORECAST_CACHE_MAX_AGE_S,
     FORECAST_MAX_RETRY_S,
     FORECAST_MIN_RETRY_S,
     FORECAST_PROVIDER_HA_ENTITY,
@@ -693,6 +696,7 @@ class WSStationRuntime:
 
     # Forecast cache
     last_forecast_fetch: Any | None = None
+    last_forecast_attempt: Any | None = None
     last_sea_temp_fetch: Any | None = None
     forecast_inflight: bool = False
     sea_temp_inflight: bool = False
@@ -881,7 +885,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._lightning_last_near_strike_ts: Any = None
         # Entities from the Blitzortung HA integration, used as fallback when no physical sensor is mapped
         self._blitzortung_sources: dict[str, str] = {}
-        if self.lightning_enabled:
+        self._last_blitz_scan_ts: float | None = None
+        if self.lightning_enabled and not (
+            self.sources.get(SRC_LIGHTNING_COUNT) or self.sources.get(SRC_LIGHTNING_DISTANCE)
+        ):
             self._discover_blitzortung()
 
         # v2.0: degree days restored with improved implementation
@@ -1179,6 +1186,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             config_entry=self.config_entry,
         )
         self._unsubs: list = []
+        self._bg_tasks: set[asyncio.Task[Any]] = set()
+        self._stopped: bool = False
 
     # ------------------------------------------------------------------
     # Properties
@@ -1312,6 +1321,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     async def async_start(self) -> None:
+        self._stopped = False
         # Resolve the integration version without blocking the event loop.
         global _INTEGRATION_VERSION
         if _INTEGRATION_VERSION == "unknown":
@@ -1320,13 +1330,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Load persistent learning state from HA storage
         from homeassistant.helpers.storage import Store
 
-        from .learning_state import async_load_learning
+        from .learning_state import async_load_learning, async_save_learning, ensure_calibration_ref_version
 
         entry_id = self.entry_data.get("entry_id") or id(self)
         # v0.3.0: bumped Store version to 2 to match LearningState schema_version.
         # Old v1 state files contain METAR bias/GDD fields; from_dict will discard them.
         self._learning_store = Store(self.hass, 2, f"ws_core_{entry_id}_learning")
         self._learning_state = await async_load_learning(self._learning_store)
+        if self.entry_options.get(
+            CONF_ENABLE_AUTO_CALIBRATION, DEFAULT_ENABLE_AUTO_CALIBRATION
+        ) and ensure_calibration_ref_version(self._learning_state):
+            await async_save_learning(self._learning_store, self._learning_state)
         _LOGGER.debug(
             "ws_core learning state loaded (solar_factor_n=%s, dry_streak=%s)",
             self._learning_state.solar_factor_n,
@@ -1459,6 +1473,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         task = self.hass.async_create_background_task(coro, name)
         self._unsubs.append(task.cancel)
 
+    def _create_bg_task(self, coro: Any) -> asyncio.Task[Any] | None:
+        """Start an entry-owned task tracked in ``_bg_tasks`` and cancelled in ``async_stop``."""
+        if getattr(self, "_stopped", False):
+            if hasattr(coro, "close"):
+                coro.close()
+            return None
+        tasks = getattr(self, "_bg_tasks", None)
+        if tasks is None:
+            tasks = set()
+            self._bg_tasks = tasks
+        task = self.hass.async_create_task(coro)
+        if hasattr(task, "add_done_callback"):
+            tasks.add(task)
+            task.add_done_callback(tasks.discard)
+        return task
+
     def _start_once(self, fn: Any, delay_s: float, name: str) -> None:
         """Run ``fn`` once after ``delay_s``; failures are logged, never raised."""
 
@@ -1491,6 +1521,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._spawn(_loop(), name)
 
     async def async_stop(self) -> None:
+        self._stopped = True
+        for task in list(getattr(self, "_bg_tasks", ())):
+            with contextlib.suppress(Exception):
+                task.cancel()
+        if getattr(self, "_bg_tasks", None) is not None:
+            self._bg_tasks.clear()
         for u in self._unsubs:
             with contextlib.suppress(Exception):
                 u()
@@ -1707,6 +1743,21 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return v * 25.4
         return v
 
+    @staticmethod
+    def _normalize_soil_moisture(raw: float, uom: str, unit_setting: str) -> tuple[float, bool]:
+        """Return (soil_moisture_pct, is_ambiguous) according to configured unit mode and sensor UoM."""
+        mode = unit_setting.strip().lower()
+        if mode == "percent":
+            return raw, False
+        if mode == "fraction":
+            return raw * 100.0, False
+        u = uom.strip().lower().replace(" ", "")
+        if u in ("%", "percent", "pct"):
+            return raw, False
+        if u in ("m³/m³", "m3/m3", "m^3/m^3", "fraction", "volumetric", "vwc", "ratio", "v/v", "cm³/cm³", "cm3/cm3"):
+            return raw * 100.0, False
+        return (raw if raw > 1.0 else raw * 100.0), True
+
     # ------------------------------------------------------------------
     # Sensor quality / physics validation
     # ------------------------------------------------------------------
@@ -1817,11 +1868,20 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             dp_c = round(self._to_celsius(dp_ext, self._uom(hass, self.sources.get(SRC_DEW_POINT))), 2)
             data[KEY_DEW_POINT_C] = dp_c
 
-        # Optional: soil moisture sensor (normalize 0-1 volumetric to 0-100%)
+        # Optional: soil moisture sensor (respect unit / explicit option; warn if ambiguous)
         soil_m_raw = num(SRC_SOIL_MOISTURE)
         if soil_m_raw is not None:
-            soil_pct = float(soil_m_raw) if float(soil_m_raw) > 1.0 else float(soil_m_raw) * 100.0
+            soil_pct, soil_ambiguous = self._normalize_soil_moisture(
+                float(soil_m_raw),
+                uom(SRC_SOIL_MOISTURE),
+                str(
+                    self.entry_options.get(CONF_SOIL_MOISTURE_UNIT, DEFAULT_SOIL_MOISTURE_UNIT)
+                    or DEFAULT_SOIL_MOISTURE_UNIT
+                ),
+            )
             data[KEY_SOIL_MOISTURE] = round(soil_pct, 2)
+            if soil_ambiguous:
+                data["_soil_moisture_ambiguous"] = True
 
         # Optional: soil temperature sensor (unit-detected conversion to °C)
         soil_t_raw = num(SRC_SOIL_TEMP)
@@ -1949,6 +2009,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return dew_c
 
+    def _publish_temp_year_all_time(self, data: dict, year_key: str) -> None:
+        if getattr(self, "_temp_year_key", "") == year_key:
+            if getattr(self, "_temp_high_year", None) is not None:
+                data[KEY_TEMP_HIGH_YEAR] = round(self._temp_high_year, 1)
+            if getattr(self, "_temp_low_year", None) is not None:
+                data[KEY_TEMP_LOW_YEAR] = round(self._temp_low_year, 1)
+            data[KEY_TEMP_YEAR_REF] = self._temp_year_key
+        if getattr(self, "_temp_high_all_time", None) is not None:
+            data[KEY_TEMP_HIGH_ALL_TIME] = round(self._temp_high_all_time, 1)
+        if getattr(self, "_temp_low_all_time", None) is not None:
+            data[KEY_TEMP_LOW_ALL_TIME] = round(self._temp_low_all_time, 1)
+
     def _update_temp_year_all_time(self, data: dict, tc: float | None) -> None:
         """Update yearly and all-time temperature high/low extremes (issue #124).
 
@@ -1957,11 +2029,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ``year_ref`` attribute on the yearly sensors). All-time extremes never
         reset automatically - they persist for the life of the config entry.
         """
+        year_key = dt_util.now().strftime("%Y")
         if tc is None:
+            self._publish_temp_year_all_time(data, year_key)
             return
         temp = float(tc)
 
-        year_key = dt_util.now().strftime("%Y")
         if year_key != self._temp_year_key:
             self._temp_high_year = temp
             self._temp_low_year = temp
@@ -1971,16 +2044,26 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._temp_high_year = temp
             if self._temp_low_year is None or temp < self._temp_low_year:
                 self._temp_low_year = temp
-        data[KEY_TEMP_HIGH_YEAR] = round(self._temp_high_year, 1)
-        data[KEY_TEMP_LOW_YEAR] = round(self._temp_low_year, 1)
-        data[KEY_TEMP_YEAR_REF] = self._temp_year_key
 
         if self._temp_high_all_time is None or temp > self._temp_high_all_time:
             self._temp_high_all_time = temp
         if self._temp_low_all_time is None or temp < self._temp_low_all_time:
             self._temp_low_all_time = temp
-        data[KEY_TEMP_HIGH_ALL_TIME] = round(self._temp_high_all_time, 1)
-        data[KEY_TEMP_LOW_ALL_TIME] = round(self._temp_low_all_time, 1)
+        self._publish_temp_year_all_time(data, year_key)
+
+    def _publish_temp_week_month(self, data: dict, iso_week: str, month_key: str) -> None:
+        if getattr(self, "_temp_week_isoweek", "") == iso_week:
+            if getattr(self, "_temp_high_week", None) is not None:
+                data[KEY_TEMP_HIGH_WEEK] = round(self._temp_high_week, 1)
+            if getattr(self, "_temp_low_week", None) is not None:
+                data[KEY_TEMP_LOW_WEEK] = round(self._temp_low_week, 1)
+            data[KEY_TEMP_WEEK_REF] = self._temp_week_isoweek
+        if getattr(self, "_temp_month_key", "") == month_key:
+            if getattr(self, "_temp_high_month", None) is not None:
+                data[KEY_TEMP_HIGH_MONTH] = round(self._temp_high_month, 1)
+            if getattr(self, "_temp_low_month", None) is not None:
+                data[KEY_TEMP_LOW_MONTH] = round(self._temp_low_month, 1)
+            data[KEY_TEMP_MONTH_REF] = self._temp_month_key
 
     def _update_temp_week_month(self, data: dict, tc: float | None) -> None:
         """Update this-week and this-month temperature high/low extremes (issue #127).
@@ -1989,12 +2072,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         the ``week_ref`` attribute. Monthly extremes reset on the 1st,
         exposed as ``month_ref``.
         """
-        if tc is None:
-            return
-        temp = float(tc)
         now_local = dt_util.now()
         iso_week = now_local.strftime("%G-W%V")
         month_key = now_local.strftime("%Y-%m")
+        if tc is None:
+            self._publish_temp_week_month(data, iso_week, month_key)
+            return
+        temp = float(tc)
 
         if iso_week != self._temp_week_isoweek:
             self._temp_high_week = temp
@@ -2005,9 +2089,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._temp_high_week = temp
             if self._temp_low_week is None or temp < self._temp_low_week:
                 self._temp_low_week = temp
-        data[KEY_TEMP_HIGH_WEEK] = round(self._temp_high_week, 1)
-        data[KEY_TEMP_LOW_WEEK] = round(self._temp_low_week, 1)
-        data[KEY_TEMP_WEEK_REF] = self._temp_week_isoweek
 
         if month_key != self._temp_month_key:
             self._temp_high_month = temp
@@ -2018,9 +2099,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._temp_high_month = temp
             if self._temp_low_month is None or temp < self._temp_low_month:
                 self._temp_low_month = temp
-        data[KEY_TEMP_HIGH_MONTH] = round(self._temp_high_month, 1)
-        data[KEY_TEMP_LOW_MONTH] = round(self._temp_low_month, 1)
-        data[KEY_TEMP_MONTH_REF] = self._temp_month_key
+        self._publish_temp_week_month(data, iso_week, month_key)
 
     def _compute_derived_pressure(
         self, data: dict, now: Any, tc: float | None, pressure_hpa: float | None, rh: float | None
@@ -2156,6 +2235,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if var is not None:
                 data[KEY_WIND_DIR_VARIABILITY] = var
 
+    def _publish_gust_month_year_all_time(self, data: dict, month_key: str, year_key: str) -> None:
+        if getattr(self, "_gust_month_key", "") == month_key and getattr(self, "_gust_max_month", None) is not None:
+            data[KEY_WIND_GUST_MAX_MONTH] = round(self._gust_max_month, 1)
+            data[KEY_WIND_GUST_MONTH_REF] = self._gust_month_key
+        if getattr(self, "_gust_year_key", "") == year_key and getattr(self, "_gust_max_year", None) is not None:
+            data[KEY_WIND_GUST_MAX_YEAR] = round(self._gust_max_year, 1)
+            data[KEY_WIND_GUST_YEAR_REF] = self._gust_year_key
+        if getattr(self, "_gust_max_all_time", None) is not None:
+            data[KEY_WIND_GUST_MAX_ALL_TIME] = round(self._gust_max_all_time, 1)
+
     def _update_gust_month_year_all_time(self, data: dict, gust_ms: float | None, wind_ms: float | None = None) -> None:
         """Update monthly, yearly and all-time wind gust max (issue #127).
 
@@ -2164,22 +2253,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         automatically. A gust far above the wind of the same reading is a
         sensor glitch: the records keep their values and it sets none.
         """
-        if gust_ms is None:
-            return
-        gust = float(gust_ms)
         now_local = dt_util.now()
         month_key = now_local.strftime("%Y-%m")
         year_key = now_local.strftime("%Y")
+        if gust_ms is None:
+            self._publish_gust_month_year_all_time(data, month_key, year_key)
+            return
+        gust = float(gust_ms)
 
         if not gust_is_plausible(gust, wind_ms, GUST_PLAUSIBLE_FACTOR, GUST_PLAUSIBLE_MARGIN_MS):
-            if month_key == self._gust_month_key and self._gust_max_month is not None:
-                data[KEY_WIND_GUST_MAX_MONTH] = round(self._gust_max_month, 1)
-                data[KEY_WIND_GUST_MONTH_REF] = self._gust_month_key
-            if year_key == self._gust_year_key and self._gust_max_year is not None:
-                data[KEY_WIND_GUST_MAX_YEAR] = round(self._gust_max_year, 1)
-                data[KEY_WIND_GUST_YEAR_REF] = self._gust_year_key
-            if self._gust_max_all_time is not None:
-                data[KEY_WIND_GUST_MAX_ALL_TIME] = round(self._gust_max_all_time, 1)
+            self._publish_gust_month_year_all_time(data, month_key, year_key)
             return
 
         if month_key != self._gust_month_key:
@@ -2187,20 +2270,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._gust_month_key = month_key
         elif self._gust_max_month is None or gust > self._gust_max_month:
             self._gust_max_month = gust
-        data[KEY_WIND_GUST_MAX_MONTH] = round(self._gust_max_month, 1)
-        data[KEY_WIND_GUST_MONTH_REF] = self._gust_month_key
 
         if year_key != self._gust_year_key:
             self._gust_max_year = gust
             self._gust_year_key = year_key
         elif self._gust_max_year is None or gust > self._gust_max_year:
             self._gust_max_year = gust
-        data[KEY_WIND_GUST_MAX_YEAR] = round(self._gust_max_year, 1)
-        data[KEY_WIND_GUST_YEAR_REF] = self._gust_year_key
 
         if self._gust_max_all_time is None or gust > self._gust_max_all_time:
             self._gust_max_all_time = gust
-        data[KEY_WIND_GUST_MAX_ALL_TIME] = round(self._gust_max_all_time, 1)
+        self._publish_gust_month_year_all_time(data, month_key, year_key)
 
     def _compute_derived_precipitation(
         self, data: dict, now: Any, rain_total_mm: float | None, sample: bool = True
@@ -2376,8 +2455,74 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_condition_severity"] = get_condition_severity(condition)
         return condition
 
-    def _compute_rain_probability(self, data: dict, mslp: float, trend_3h: float, rh: float | None) -> None:
+    def _forecast_validity(self, now: Any) -> tuple[dict[str, Any] | None, str]:
+        """Return (today_daily_row, status) if the cached forecast is valid for today."""
+        if not getattr(self, "forecast_enabled", True):
+            return None, "local_only"
+        fc = getattr(self, "_forecast_cache", None)
+        if not fc:
+            return None, "local_only"
+
+        max_age_s = max(FORECAST_CACHE_MAX_AGE_S, int(getattr(self, "forecast_interval_min", 30)) * 60 * 6)
+        rt = getattr(self, "runtime", None)
+        last = getattr(rt, "last_forecast_fetch", None) if rt is not None else None
+        if last is not None and (now - last).total_seconds() > max_age_s:
+            return None, "local_only"
+
+        daily = fc.get("daily") or []
+        if not daily:
+            return None, "local_only"
+
+        today_str = dt_util.as_local(now).strftime("%Y-%m-%d")
+        today_row: dict[str, Any] | None = None
+        has_dated_rows = False
+        for row in daily:
+            if not isinstance(row, dict):
+                continue
+            date_val = row.get("date")
+            if date_val:
+                has_dated_rows = True
+                if str(date_val)[:10] == today_str:
+                    today_row = row
+                    break
+        if today_row is None and not has_dated_rows and isinstance(daily[0], dict):
+            today_row = daily[0]
+
+        if today_row is None:
+            return None, "local_only"
+
+        failures = int(getattr(rt, "forecast_consecutive_failures", 0)) if rt is not None else 0
+        return today_row, ("degraded" if failures > 0 else "ok")
+
+    def _published_forecast(self, fc: dict[str, Any] | None, now: Any) -> dict[str, Any] | None:
+        """Return a shallow forecast copy excluding expired caches and past daily dates."""
+        if not fc:
+            return None
+        max_age_s = max(FORECAST_CACHE_MAX_AGE_S, int(getattr(self, "forecast_interval_min", 30)) * 60 * 6)
+        rt = getattr(self, "runtime", None)
+        last = getattr(rt, "last_forecast_fetch", None) if rt is not None else None
+        if last is not None and (now - last).total_seconds() > max_age_s:
+            return None
+
+        today_str = dt_util.as_local(now).strftime("%Y-%m-%d")
+        daily = fc.get("daily") or []
+        valid_daily = [
+            row
+            for row in daily
+            if isinstance(row, dict) and (not row.get("date") or str(row["date"])[:10] >= today_str)
+        ]
+        if daily and not valid_daily:
+            return {**fc, "daily": [], "hourly": []}
+        return {**fc, "daily": valid_daily}
+
+    def _compute_rain_probability(
+        self, data: dict, mslp: float, trend_3h: float, rh: float | None, now: Any = None
+    ) -> None:
         """Local + API-blended rain probability."""
+        now = now or dt_util.utcnow()
+        today_row, fc_status = self._forecast_validity(now)
+        data["_forecast_status"] = fc_status
+
         wind_quad = data.get(KEY_WIND_QUADRANT, "N")
         if mslp and rh is not None:
             local_prob = calculate_rain_probability(
@@ -2390,9 +2535,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_RAIN_PROBABILITY] = local_prob
 
             api_prob = None
-            fc = getattr(self, "_forecast_cache", None)
-            if fc and fc.get("daily"):
-                pp = (fc["daily"][0] or {}).get("precip_prob")
+            if today_row is not None:
+                pp = today_row.get("precip_prob")
                 if pp is not None:
                     api_prob = int(pp)
 
@@ -2408,7 +2552,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             data[KEY_RAIN_PROBABILITY_COMBINED] = combined
 
-    def _compute_forecast_agreement(self, data: dict) -> None:
+    def _compute_forecast_agreement(self, data: dict, now: Any = None) -> None:
         """Compare Zambretti local outlook vs Open-Meteo precip probability.
 
         Derives an implied rain likelihood from the Z-number (using the
@@ -2435,10 +2579,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (TypeError, ValueError):
             return
 
-        fc = getattr(self, "_forecast_cache", None)
-        if not fc or not fc.get("daily"):
+        now = now or dt_util.utcnow()
+        today_row, _ = self._forecast_validity(now)
+        if not today_row:
             return
-        api_precip_prob = (fc["daily"][0] or {}).get("precip_prob")
+        api_precip_prob = today_row.get("precip_prob")
         if api_precip_prob is None:
             return
 
@@ -2805,7 +2950,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         yesterday = (now_local.date() - timedelta(days=1)).isoformat()
         if not sample and solar_date != self._solar_energy_date:
             # Source-change republish must not roll a day or consume a sample.
-            # The next 60-second tick performs the rollover.
+            # Still expose 0.0 for the new calendar day so entities do not go
+            # unknown at midnight before the next 60-second rollover tick runs.
+            solar_rad = self._get_solar_radiation_for_et0(now)
+            if solar_rad is not None and solar_rad >= 0:
+                data[KEY_SOLAR_ENERGY_TODAY_WHM2] = 0.0
+                data[KEY_PEAK_SUN_HOURS] = 0.0
             return
         if solar_date != self._solar_energy_date:
             if self._solar_energy_date == yesterday:
@@ -3117,9 +3267,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if lat is None or lon is None:
             return
         try:
+            elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
             url = (
                 "https://api.open-meteo.com/v1/forecast"
                 f"?latitude={lat:.4f}&longitude={lon:.4f}"
+                f"&elevation={round(elev, 1)}"
                 "&current=temperature_2m,relative_humidity_2m,surface_pressure"
                 "&wind_speed_unit=ms&timezone=auto"
             )
@@ -3133,6 +3285,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "temp_c": current.get("temperature_2m"),
                 "humidity": current.get("relative_humidity_2m"),
                 "pressure_hpa": current.get("surface_pressure"),
+                "elevation": payload.get("elevation"),
                 "fetched_at": dt_util.utcnow().isoformat(),
             }
             await self._maybe_update_auto_calibration(self._neighbor_qc_cache)
@@ -3154,16 +3307,30 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         local = self.data or {}
         from .const import AUTO_CAL_BIAS_ALPHA, AUTO_CAL_DEADBAND, AUTO_CAL_MIN_SAMPLES, AUTO_CAL_STEP
-        from .learning_state import compute_auto_calibration_step, update_calibration_bias
+        from .learning_state import (
+            compute_auto_calibration_step,
+            ensure_calibration_ref_version,
+            update_calibration_bias,
+        )
+
+        ensure_calibration_ref_version(self._learning_state)
+        station_elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
+        nwp_elev = nwp.get("elevation")
+        elev_ok = False
+        if nwp_elev is not None:
+            try:
+                elev_ok = abs(float(nwp_elev) - station_elev) <= 1.0
+            except (TypeError, ValueError):
+                elev_ok = False
 
         update_calibration_bias(
             self._learning_state,
             local.get(KEY_NORM_TEMP_C),
-            nwp.get("temp_c"),
+            nwp.get("temp_c") if elev_ok else None,
             local.get(KEY_NORM_HUMIDITY),
             nwp.get("humidity"),
             local.get(KEY_NORM_PRESSURE_HPA),
-            nwp.get("pressure_hpa"),
+            nwp.get("pressure_hpa") if elev_ok else None,
             alpha=AUTO_CAL_BIAS_ALPHA,
         )
 
@@ -3491,10 +3658,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not self.lightning_enabled:
             return
 
-        # Retry Blitzortung discovery on every tick until at least count or distance is found;
-        # the initial __init__ call may run before Blitzortung has registered its entities.
-        if len(self._blitzortung_sources) < 1:
-            self._discover_blitzortung()
+        # Retry Blitzortung discovery on a 5-minute cooldown when no physical
+        # lightning source is mapped; the initial __init__ scan may run before
+        # Blitzortung has registered its entities.
+        has_physical = bool(self.sources.get(SRC_LIGHTNING_COUNT) or self.sources.get(SRC_LIGHTNING_DISTANCE))
+        if not has_physical and len(self._blitzortung_sources) < 1:
+            now_mono = time.monotonic()
+            last_scan = getattr(self, "_last_blitz_scan_ts", None)
+            if last_scan is None or (now_mono - last_scan) >= 300.0:
+                self._discover_blitzortung()
+                self._last_blitz_scan_ts = now_mono
 
         # Use physical sensor if mapped; fall back to auto-detected Blitzortung entity
         count_raw = self._num(
@@ -3520,10 +3693,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_LIGHTNING_PROXIMITY] = "near" if float(dist_raw) <= prox_km else "clear"
 
         # 1h rolling strike count (accumulates increases in cumulative counter)
+        new_strikes = 0
         if count_raw is not None:
             if self._lightning_last_count is not None:
                 delta = float(count_raw) - float(self._lightning_last_count)
                 if delta > 0:
+                    new_strikes = max(1, int(round(delta)))
                     self._lightning_last_strike_ts = now
                     if dist_raw is not None and float(dist_raw) <= self._lightning_proximity_km:
                         self._lightning_last_near_strike_ts = now
@@ -3540,6 +3715,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_LIGHTNING_COUNT_1H] = int(count_1h)
             # Rate in strikes/min over the 1h window
             data[KEY_LIGHTNING_RATE_1H] = round(count_1h / 60.0, 2)
+        data["_lightning_new_strikes"] = new_strikes
+        if self._lightning_last_strike_ts is not None:
+            data["_lightning_last_strike_ts"] = self._lightning_last_strike_ts.isoformat()
 
         # Clearance timer (minutes since last detected strike)
         if self._lightning_last_strike_ts is not None:
@@ -3768,16 +3946,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # HA Repairs integration: create/clear issues for missing sources
         if HAS_REPAIRS:
-            from .const import DOMAIN
+            from .const import DOMAIN, ENTRY_REPAIR_ISSUES
 
             if self.suppress_notifications:
                 # User has disabled notifications - clear any existing issues immediately
-                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("missing_source_entities"))
-                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stale_sensors"))
-                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("forecast_api_failures"))
-                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stuck_sensors"))
-                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("sensor_drift_detected"))
-                ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("et0_pm_unavailable"))
+                for issue_key in ENTRY_REPAIR_ISSUES:
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(issue_key))
             else:
                 if report_missing:
                     ir.async_create_issue(
@@ -3805,7 +3979,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else:
                     ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("stale_sensors"))
 
-                if self.runtime.forecast_consecutive_failures >= 3:
+                if getattr(self, "forecast_enabled", True) and self.runtime.forecast_consecutive_failures >= 3:
                     provider = get_provider(self.forecast_provider)
                     ir.async_create_issue(
                         self.hass,
@@ -3876,6 +4050,33 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                 else:
                     ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("et0_pm_unavailable"))
+
+                soil_ambiguous = (
+                    bool(self.entry_options.get(CONF_ENABLE_SOIL, DEFAULT_ENABLE_SOIL))
+                    and bool(self.sources.get(SRC_SOIL_MOISTURE))
+                    and bool(data.get("_soil_moisture_ambiguous"))
+                )
+                if soil_ambiguous:
+                    ir.async_create_issue(
+                        self.hass,
+                        DOMAIN,
+                        self._issue_id("ambiguous_soil_moisture_unit"),
+                        is_fixable=False,
+                        severity=ir.IssueSeverity.WARNING,
+                        translation_key="ambiguous_soil_moisture_unit",
+                        translation_placeholders={"entity_id": str(self.sources.get(SRC_SOIL_MOISTURE, ""))},
+                    )
+                else:
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("ambiguous_soil_moisture_unit"))
+
+                cal_limits = (
+                    ("cal_temp_c", 5.0),
+                    ("cal_humidity", 10.0),
+                    ("cal_pressure_hpa", 5.0),
+                    ("cal_wind_ms", 2.5),
+                )
+                if not any(abs(float(self.entry_options.get(k, 0.0) or 0.0)) > lim for k, lim in cal_limits):
+                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id("large_calibration_offset"))
 
     # ------------------------------------------------------------------
     # v1.2.0 - Fog, precipitation type, thunderstorm index
@@ -4053,9 +4254,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _compute_climatology(self, data: dict) -> None:
         """Publish rolling 30-day stats and today-vs-normal anomalies."""
-        from .learning_state import climatology_stats, climatology_stats_by_window
+        from .learning_state import climatology_stats_by_window
 
-        stats = climatology_stats(self._learning_state)
+        stats = climatology_stats_by_window(self._learning_state, 30)
         if stats is None:
             data[KEY_CLIMATOLOGY_30D] = "building"
             return
@@ -4764,8 +4965,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         rain_rate = self._compute_derived_precipitation(data, now, rain_total_mm, sample)
         dew_c = self._compute_derived_temperature(data, now, tc, rh, wind_ms, sample)
         trend_3h, mslp = self._compute_derived_pressure(data, now, tc, pressure_hpa, rh)
-        self._compute_rain_probability(data, mslp, trend_3h, rh)
-        self._compute_forecast_agreement(data)
+        self._compute_rain_probability(data, mslp, trend_3h, rh, now=now)
+        self._compute_forecast_agreement(data, now=now)
 
         flags = self._validate_readings(tc, rh, pressure_hpa, wind_ms, gust_ms, dew_c, self.elevation_m)
         data[KEY_SENSOR_QUALITY_FLAGS] = flags
@@ -4838,7 +5039,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Periodic save of learning state (async, fire-and-forget)
         if sample:
             with contextlib.suppress(RuntimeError):
-                self.hass.async_create_task(self._async_maybe_save_learning())
+                self._create_bg_task(self._async_maybe_save_learning())
 
         provider = get_provider(self.forecast_provider)
         data[KEY_FORECAST_PROVIDER] = self.forecast_provider
@@ -4846,23 +5047,22 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_forecast_provider_enabled"] = self.forecast_enabled
 
         if self.forecast_enabled:
-            data[KEY_FORECAST] = self._get_cached_or_schedule_forecast(now)
+            raw_fc = self._get_cached_or_schedule_forecast(now)
+            published_fc = self._published_forecast(raw_fc, now)
+            data[KEY_FORECAST] = published_fc
+            _, fc_status = self._forecast_validity(now)
+            data["_forecast_status"] = fc_status
         else:
+            published_fc = None
             data[KEY_FORECAST] = None
-
-        # Raw provider forecast; the weather entity blends local readings into
-        # the upcoming hours itself (time-aware), so it is not blended here.
-        fc = getattr(self, "_forecast_cache", None)
-        if fc:
-            data[KEY_FORECAST] = fc
+            data["_forecast_status"] = "local_only"
 
         # Sea temperature: independent fetch schedule (every forecast interval)
         if self.sea_temp_enabled:
             self._schedule_sea_temp_fetch(now)
 
-        fc = getattr(self, "_forecast_cache", None)
-        if fc and fc.get("daily"):
-            data[KEY_FORECAST_TILES] = self._build_forecast_tiles(fc["daily"])
+        if published_fc and published_fc.get("daily"):
+            data[KEY_FORECAST_TILES] = self._build_forecast_tiles(published_fc["daily"])
 
         # Frost risk
         self._compute_frost_risk(data, tc)
@@ -5073,6 +5273,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _build_forecast_tiles(self, daily: list) -> list:
         labels = ["Today", "Tomorrow", "Day 3", "Day 4", "Day 5"]
+        valid_days = [day for day in daily if isinstance(day, dict) and day.get("date")]
         return [
             {
                 "label": labels[i] if i < len(labels) else f"Day {i + 1}",
@@ -5083,24 +5284,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "wind_kmh": day.get("wind_kmh"),
                 "weathercode": day.get("weathercode"),
             }
-            for i, day in enumerate(daily[:5])
+            for i, day in enumerate(valid_days[:5])
         ]
 
     def _get_cached_or_schedule_forecast(self, now: Any) -> dict[str, Any] | None:
         cached = getattr(self, "_forecast_cache", None)
-        last = self.runtime.last_forecast_fetch
-        if cached is not None and last is not None:
-            # Exponential backoff: normal interval unless consecutive failures
-            failures = self.runtime.forecast_consecutive_failures
-            if failures > 0:
-                backoff_s = min(
-                    FORECAST_MAX_RETRY_S,
-                    FORECAST_MIN_RETRY_S * (2 ** min(failures - 1, 6)),
-                )
-                min_interval_s = backoff_s
-            else:
-                min_interval_s = max(300, self.forecast_interval_min * 60)
+        rt = self.runtime
+        failures = rt.forecast_consecutive_failures
+        if failures > 0 and rt.last_forecast_attempt is not None:
+            backoff_s = min(
+                FORECAST_MAX_RETRY_S,
+                FORECAST_MIN_RETRY_S * (2 ** min(failures - 1, 6)),
+            )
+            if (now - rt.last_forecast_attempt).total_seconds() < backoff_s:
+                return cached
 
+        last = rt.last_forecast_fetch
+        if cached is not None and last is not None and failures == 0:
+            min_interval_s = max(300, self.forecast_interval_min * 60)
             age_s = (now - last).total_seconds()
             if age_s < min_interval_s:
                 return cached
@@ -5108,13 +5309,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not self.forecast_enabled:
             return cached
 
-        rt = self.runtime
         if rt.forecast_inflight:
             return cached
 
         try:
             rt.forecast_inflight = True
-            self.hass.async_create_task(self._async_fetch_forecast())
+            rt.last_forecast_attempt = now
+            self._create_bg_task(self._async_fetch_forecast())
         except RuntimeError:
             # Event loop shutting down - reset flag so next tick can retry.
             rt.forecast_inflight = False
@@ -5133,49 +5334,56 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             min_interval_s = max(300, self.forecast_interval_min * 60)
             if age_s < min_interval_s:
                 return
-        rt.sea_temp_inflight = True
-        self.hass.async_create_task(self._async_fetch_sea_temp())
+        try:
+            rt.sea_temp_inflight = True
+            self._create_bg_task(self._async_fetch_sea_temp())
+        except RuntimeError:
+            rt.sea_temp_inflight = False
 
     async def _async_fetch_forecast(self) -> None:
         rt = self.runtime
-        if not self.forecast_enabled:
-            rt.forecast_inflight = False
-            return
-        lat = self.forecast_lat or float(self.hass.config.latitude)
-        lon = self.forecast_lon or float(self.hass.config.longitude)
-
-        session = async_get_clientsession(self.hass)
-        is_ha_entity = self.forecast_provider == FORECAST_PROVIDER_HA_ENTITY
-        provider = get_provider(self.forecast_provider, hass=self.hass if is_ha_entity else None)
-        api_key = self.forecast_entity if is_ha_entity else self.forecast_api_key
         try:
-            result = await provider.async_fetch(session, lat, lon, api_key=api_key)
-        except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
-            _LOGGER.warning(
-                "Forecast fetch failed (%s): %s", provider.PROVIDER_NAME, _redact_secrets(exc, self.forecast_api_key)
-            )
-            rt.forecast_consecutive_failures += 1
-            rt.forecast_inflight = False
-            return
-        except Exception as exc:
-            _LOGGER.error(
-                "Forecast fetch unexpected error (%s): %s",
-                provider.PROVIDER_NAME,
-                _redact_secrets(exc, self.forecast_api_key),
-            )
-            rt.forecast_consecutive_failures += 1
-            rt.forecast_inflight = False
-            return
+            if not self.forecast_enabled or getattr(self, "_stopped", False):
+                return
+            rt.last_forecast_attempt = dt_util.utcnow()
+            lat = self.forecast_lat or float(self.hass.config.latitude)
+            lon = self.forecast_lon or float(self.hass.config.longitude)
 
-        self._forecast_cache = {
-            **result,
-            "lat": lat,
-            "lon": lon,
-        }
-        self.runtime.last_forecast_fetch = dt_util.utcnow()
-        rt.forecast_consecutive_failures = 0
-        self.async_set_updated_data(self._compute(sample=False))
-        rt.forecast_inflight = False
+            session = async_get_clientsession(self.hass)
+            is_ha_entity = self.forecast_provider == FORECAST_PROVIDER_HA_ENTITY
+            provider = get_provider(self.forecast_provider, hass=self.hass if is_ha_entity else None)
+            api_key = self.forecast_entity if is_ha_entity else self.forecast_api_key
+            try:
+                result = await provider.async_fetch(session, lat, lon, api_key=api_key)
+            except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
+                _LOGGER.warning(
+                    "Forecast fetch failed (%s): %s",
+                    provider.PROVIDER_NAME,
+                    _redact_secrets(exc, self.forecast_api_key),
+                )
+                rt.forecast_consecutive_failures += 1
+                return
+            except Exception as exc:
+                _LOGGER.error(
+                    "Forecast fetch unexpected error (%s): %s",
+                    provider.PROVIDER_NAME,
+                    _redact_secrets(exc, self.forecast_api_key),
+                )
+                rt.forecast_consecutive_failures += 1
+                return
+
+            if getattr(self, "_stopped", False):
+                return
+            self._forecast_cache = {
+                **result,
+                "lat": lat,
+                "lon": lon,
+            }
+            rt.last_forecast_fetch = dt_util.utcnow()
+            rt.forecast_consecutive_failures = 0
+            self.async_set_updated_data(self._compute(sample=False))
+        finally:
+            rt.forecast_inflight = False
 
     async def _async_fetch_sea_temp(self) -> None:
         """Fetch sea surface temperature from Open-Meteo Marine API."""
@@ -5238,6 +5446,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 comfort = "Hot"
 
+            if getattr(self, "_stopped", False):
+                return
             self._sea_temp_cache = {
                 "current_c": round(sst_c, 1) if sst_c is not None else None,
                 "comfort": comfort,

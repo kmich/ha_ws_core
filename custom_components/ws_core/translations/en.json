@@ -35,10 +35,12 @@
           "solar_radiation": "Solar radiation (W/m², for Penman-Monteith ET₀)",
           "lightning_count": "Lightning strike count (cumulative, e.g. from WH57 or AS3935)",
           "lightning_dist": "Lightning nearest distance (km, e.g. from WH57)",
+          "lightning_azimuth": "Lightning strike azimuth (degrees)",
           "indoor_temp": "Indoor temperature sensor",
           "indoor_humidity": "Indoor humidity sensor",
           "indoor_co2": "Indoor CO₂ sensor (ppm)",
           "soil_moisture": "Soil moisture sensor (0-100% or 0-1 volumetric)",
+          "soil_moisture_unit": "Soil moisture sensor unit",
           "soil_temperature": "Soil temperature sensor",
           "_go_back": "← Go back to previous step"
         }
@@ -484,6 +486,7 @@
           "indoor_humidity": "Indoor humidity sensor",
           "indoor_co2": "Indoor CO₂ sensor (ppm)",
           "soil_moisture": "Soil moisture sensor (0-100% or 0-1 volumetric)",
+          "soil_moisture_unit": "Soil moisture sensor unit",
           "soil_temperature": "Soil temperature sensor"
         }
       },
@@ -760,6 +763,10 @@
     "et0_pm_unavailable": {
       "title": "PM ET₀ daily measurement unavailable",
       "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
+    },
+    "ambiguous_soil_moisture_unit": {
+      "title": "Soil moisture sensor unit is missing or ambiguous",
+      "description": "Soil moisture entity {entity_id} has no recognized unit of measurement (for example '%' or 'm³/m³'), so values ≤ 1.0 are ambiguous between 1% and 100%. Select Percent or Fraction in Optional Sources under Configure to avoid wrong scaling."
     }
   },
   "entity": {
@@ -2999,6 +3006,13 @@
         "south_america_east": "South America (East)",
         "australia": "Australia",
         "custom": "Custom"
+      }
+    },
+    "soil_moisture_unit": {
+      "options": {
+        "auto": "Auto (detect from sensor unit)",
+        "percent": "Percent (0-100%)",
+        "fraction": "Volumetric fraction (0-1 / m³/m³)"
       }
     }
   }

@@ -111,3 +111,112 @@ async def test_options_rooms_menu_uses_options_step_id():
     flow = _options_flow(stored={CONF_INDOOR_ROOMS: []}, opt={})
     flow.async_show_menu = MagicMock(side_effect=lambda **kw: {"menu": kw["step_id"]})
     assert (await flow.async_step_indoor_rooms_opt())["menu"] == "indoor_rooms_opt"
+
+
+class TestFreezeThresholdRoundTrip:
+    """Submitting Core options unchanged must preserve CONF_THRESH_FREEZE_C across unit mixes."""
+
+    @pytest.mark.parametrize(
+        ("imperial_ha", "units_mode", "temp_unit", "initial_freeze_c"),
+        [
+            (False, "auto", "auto", -2.0),
+            (True, "auto", "auto", -2.0),
+            (True, "auto", "C", -2.0),  # Imperial HA system with Celsius override
+            (False, "auto", "F", -2.0),  # Metric HA system with Fahrenheit override
+            (False, "imperial", "C", -2.0),  # Imperial mode override with Celsius temp override
+        ],
+    )
+    async def test_core_options_unchanged_preserves_freeze_threshold(
+        self,
+        imperial_ha: bool,
+        units_mode: str,
+        temp_unit: str,
+        initial_freeze_c: float,
+    ):
+        import voluptuous as vol
+        from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
+
+        from custom_components.ws_core.const import (
+            CONF_TEMP_UNIT,
+            CONF_THRESH_FREEZE_C,
+            CONF_UNITS_MODE,
+        )
+
+        flow = _options_flow(
+            {
+                CONF_UNITS_MODE: units_mode,
+                CONF_TEMP_UNIT: temp_unit,
+                CONF_THRESH_FREEZE_C: initial_freeze_c,
+            },
+            {},
+        )
+        flow.hass.config.units = US_CUSTOMARY_SYSTEM if imperial_ha else METRIC_SYSTEM
+        flow.hass.config.latitude = 40.0
+        flow.hass.config.longitude = -74.0
+        flow.async_step_required_sources_opt = AsyncMock(return_value={"step_id": "required_sources_opt"})
+        show_res = await flow.async_step_init(user_input=None)
+        schema = show_res["schema"]
+
+        unchanged_input = {}
+        for key in schema.schema:
+            name = getattr(key, "schema", key)
+            if isinstance(key, vol.Optional) and key.default is not vol.UNDEFINED:
+                unchanged_input[name] = key.default() if callable(key.default) else key.default
+
+        # Submit the exact schema defaults unchanged
+        await flow.async_step_init(user_input=unchanged_input)
+        assert abs(flow._opt[CONF_THRESH_FREEZE_C] - initial_freeze_c) < 0.15
+
+
+class TestSoilMoistureUnitFlow:
+    """CONF_SOIL_MOISTURE_UNIT option appears next to soil_moisture in optional_sources steps."""
+
+    async def test_optional_sources_exposes_and_stores_soil_moisture_unit(self):
+        from custom_components.ws_core.const import (
+            CONF_SOIL_MOISTURE_UNIT,
+            CONF_SOURCES,
+            SRC_SOIL_MOISTURE,
+        )
+
+        flow = _config_flow({})
+        flow._validate_numeric_sensor = MagicMock(return_value=None)
+        flow.async_step_location = AsyncMock(return_value={"step_id": "location"})
+
+        res = await flow.async_step_optional_sources(user_input=None)
+        keys = [str(getattr(k, "schema", k)) for k in res["schema"].schema]
+        assert CONF_SOIL_MOISTURE_UNIT in keys
+        assert keys.index(CONF_SOIL_MOISTURE_UNIT) == keys.index(SRC_SOIL_MOISTURE) + 1
+
+        await flow.async_step_optional_sources(
+            user_input={SRC_SOIL_MOISTURE: "sensor.soil", CONF_SOIL_MOISTURE_UNIT: "percent"}
+        )
+        assert flow._data[CONF_SOURCES][SRC_SOIL_MOISTURE] == "sensor.soil"
+        assert CONF_SOIL_MOISTURE_UNIT not in flow._data[CONF_SOURCES]
+        assert flow._data[CONF_SOIL_MOISTURE_UNIT] == "percent"
+
+    async def test_optional_sources_opt_exposes_and_stores_soil_moisture_unit(self):
+        from unittest.mock import patch
+
+        from custom_components.ws_core.const import (
+            CONF_SOIL_MOISTURE_UNIT,
+            CONF_SOURCES,
+            SRC_SOIL_MOISTURE,
+        )
+
+        flow = _options_flow({CONF_SOIL_MOISTURE_UNIT: "fraction"}, {})
+        flow._current_sources_for_options = MagicMock(return_value={SRC_SOIL_MOISTURE: "sensor.soil"})
+        flow.async_step_features_opt = AsyncMock(return_value={"step_id": "features_opt"})
+
+        res = await flow.async_step_optional_sources_opt(user_input=None)
+        keys = [str(getattr(k, "schema", k)) for k in res["schema"].schema]
+        assert CONF_SOIL_MOISTURE_UNIT in keys
+        assert keys.index(CONF_SOIL_MOISTURE_UNIT) == keys.index(SRC_SOIL_MOISTURE) + 1
+        assert _default(res["schema"], CONF_SOIL_MOISTURE_UNIT) == "fraction"
+
+        with patch("custom_components.ws_core.config_flow._validate_numeric_sensor", return_value=None):
+            await flow.async_step_optional_sources_opt(
+                user_input={SRC_SOIL_MOISTURE: "sensor.soil", CONF_SOIL_MOISTURE_UNIT: "percent"}
+            )
+        assert flow._opt[CONF_SOURCES][SRC_SOIL_MOISTURE] == "sensor.soil"
+        assert CONF_SOIL_MOISTURE_UNIT not in flow._opt[CONF_SOURCES]
+        assert flow._opt[CONF_SOIL_MOISTURE_UNIT] == "percent"

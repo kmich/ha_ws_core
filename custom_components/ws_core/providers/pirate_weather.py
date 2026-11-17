@@ -62,12 +62,20 @@ class PirateWeatherProvider(ForecastProvider):
         for day in (js.get("daily", {}).get("data") or [])[:7]:
             dt = day.get("time", 0)
             date_str = local_date_str(dt)
+            if day.get("precipAccumulation") is not None:
+                daily_precip_mm: float | None = round(float(day["precipAccumulation"]) * 10.0, 1)
+            elif day.get("liquidAccumulation") is not None:
+                daily_precip_mm = round(float(day["liquidAccumulation"]) * 10.0, 1)
+            elif day.get("precipIntensity") is not None:
+                daily_precip_mm = round(float(day["precipIntensity"]) * 24.0, 1)
+            else:
+                daily_precip_mm = None
             daily_out.append(
                 {
                     "date": date_str,
                     "tmax_c": day.get("temperatureHigh"),
                     "tmin_c": day.get("temperatureLow"),
-                    "precip_mm": day.get("precipAccumulation", 0.0),
+                    "precip_mm": daily_precip_mm,
                     "wind_kmh": round(day.get("windSpeed", 0) * 3.6, 1),
                     "gust_kmh": round(day.get("windGust", 0) * 3.6, 1) if day.get("windGust") else None,
                     "weathercode": _ICON_TO_WMO.get(day.get("icon", "")),
@@ -80,6 +88,7 @@ class PirateWeatherProvider(ForecastProvider):
         for hour in (js.get("hourly", {}).get("data") or [])[:24]:
             dt = hour.get("time", 0)
             dt_str = local_datetime_str(dt)
+            h_intensity = hour.get("precipIntensity")
             hourly_out.append(
                 {
                     "datetime": dt_str,
@@ -87,7 +96,7 @@ class PirateWeatherProvider(ForecastProvider):
                     "apparent_temp_c": hour.get("apparentTemperature"),
                     "dewpoint_c": hour.get("dewPoint"),
                     "precip_prob": int(hour.get("precipProbability", 0) * 100),
-                    "precip_mm": hour.get("precipIntensity", 0.0),
+                    "precip_mm": round(float(h_intensity), 2) if h_intensity is not None else None,
                     "weathercode": _ICON_TO_WMO.get(hour.get("icon", "")),
                     "wind_kmh": round(hour.get("windSpeed", 0) * 3.6, 1),
                     "gust_kmh": round(hour.get("windGust", 0) * 3.6, 1) if hour.get("windGust") else None,

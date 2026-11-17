@@ -35,10 +35,12 @@
           "solar_radiation": "Radiazione solare (W/m², per ET₀ Penman-Monteith)",
           "lightning_count": "Contatore fulmini (cumulativo, es. WH57 o AS3935)",
           "lightning_dist": "Distanza fulmine più vicino (km, es. WH57)",
+          "lightning_azimuth": "Azimut colpo di fulmine (gradi)",
           "indoor_temp": "Sensore temperatura interna",
           "indoor_humidity": "Sensore umidità interna",
           "indoor_co2": "Sensore CO₂ interna (ppm)",
           "soil_moisture": "Sensore umidità del suolo (0-100% o 0-1 volumetrico)",
+          "soil_moisture_unit": "Unità del sensore di umidità del suolo",
           "soil_temperature": "Sensore temperatura del suolo",
           "_go_back": "← Torna al passaggio precedente"
         }
@@ -484,6 +486,7 @@
           "indoor_humidity": "Sensore umidità interna",
           "indoor_co2": "Sensore CO₂ interna (ppm)",
           "soil_moisture": "Sensore umidità del suolo (0-100% o 0-1 volumetrico)",
+          "soil_moisture_unit": "Unità del sensore di umidità del suolo",
           "soil_temperature": "Sensore temperatura del suolo"
         }
       },
@@ -760,6 +763,10 @@
     "et0_pm_unavailable": {
       "title": "PM ET₀ daily measurement unavailable",
       "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
+    },
+    "ambiguous_soil_moisture_unit": {
+      "title": "Unità del sensore di umidità del suolo mancante o ambigua",
+      "description": "L'entità di umidità del suolo {entity_id} non ha un'unità di misura riconosciuta (ad esempio '%' o 'm³/m³'): valori ≤ 1,0 sono ambigui tra 1% e 100%. Selezionare Percentuale o Frazione in Configura → Sorgenti opzionali."
     }
   },
   "entity": {
@@ -2999,6 +3006,13 @@
         "south_america_east": "Sud America (Est)",
         "australia": "Australia",
         "custom": "Personalizzato"
+      }
+    },
+    "soil_moisture_unit": {
+      "options": {
+        "auto": "Automatico (rileva dall'unità del sensore)",
+        "percent": "Percentuale (0-100%)",
+        "fraction": "Frazione volumetrica (0-1 / m³/m³)"
       }
     }
   }

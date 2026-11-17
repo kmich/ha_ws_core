@@ -83,6 +83,9 @@ class LearningState:
     cal_bias_pressure_hpa: float | None = None
     cal_bias_n: int = 0
     cal_last_auto_apply_date: str = ""  # ISO date of the last auto-applied nudge
+    # v2.14.0 - Reference version marker for one-time residual bias reset without
+    # bumping LEARNING_SCHEMA_VERSION (preserves all other learned state).
+    cal_bias_ref_version: int = 0
 
     # Internal: last time we pushed a 6h forecast outcome window
     _last_outcome_window: str = ""
@@ -441,6 +444,34 @@ def climatology_stats_by_window(state: LearningState, window_days: int) -> dict[
 # the enable_auto_calibration option and a once-per-day rate limit.
 
 AUTO_CAL_FIELDS = ("cal_temp_c", "cal_humidity", "cal_pressure_hpa")
+CALIBRATION_BIAS_REF_VERSION = 1
+
+
+def ensure_calibration_ref_version(
+    state: LearningState,
+    version: int = CALIBRATION_BIAS_REF_VERSION,
+) -> bool:
+    """Reset residual calibration bias EMAs once when reference semantics change."""
+    if getattr(state, "cal_bias_ref_version", 0) >= version:
+        return False
+    had_samples = (
+        state.cal_bias_n > 0
+        or state.cal_bias_temp_c is not None
+        or state.cal_bias_humidity is not None
+        or state.cal_bias_pressure_hpa is not None
+    )
+    state.cal_bias_temp_c = None
+    state.cal_bias_humidity = None
+    state.cal_bias_pressure_hpa = None
+    state.cal_bias_n = 0
+    state.cal_bias_ref_version = version
+    if had_samples:
+        _LOGGER.info(
+            "ws_core: reset auto-calibration residual bias accumulators for reference v%s "
+            "(applied calibration offsets and learned models preserved)",
+            version,
+        )
+    return True
 
 
 def update_calibration_bias(

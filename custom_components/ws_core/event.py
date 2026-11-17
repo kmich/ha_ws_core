@@ -95,7 +95,9 @@ if _HAS_EVENT:
 
         def check_and_fire(self, data: dict[str, Any]) -> None:
             """Called from coordinator on each compute cycle."""
-            rate = data.get("rain_rate_mmph_filtered", 0.0) or 0.0
+            rate = data.get("rain_rate_mmph_filtered")
+            if rate is None:
+                return
             is_raining = float(rate) > 0.1
             if self._prev_raining is None:
                 self._prev_raining = is_raining
@@ -189,27 +191,33 @@ if _HAS_EVENT:
 
         def check_and_fire(self, data: dict[str, Any]) -> None:
             count_1h = data.get("lightning_count_1h", 0) or 0
-            proximity = data.get("lightning_proximity", "clear") or "clear"
-            if float(count_1h) > self._prev_count_1h:
+            proximity = data.get("lightning_proximity")
+            if "_lightning_new_strikes" in data:
+                strike_fired = int(data.get("_lightning_new_strikes") or 0) > 0
+            else:
+                strike_fired = data.get("lightning_count_1h") is not None and float(count_1h) > self._prev_count_1h
+
+            if strike_fired:
                 self._trigger_event(
                     "strike_detected",
                     {
                         "count_1h": int(count_1h),
                         "distance_km": data.get("lightning_distance_km"),
-                        "proximity": proximity,
+                        "proximity": proximity or self._prev_proximity,
                     },
                 )
                 self.async_write_ha_state()
-            if proximity == "near" and self._prev_proximity == "clear":
-                self._trigger_event(
-                    "proximity_alert",
-                    {
-                        "distance_km": data.get("lightning_distance_km"),
-                    },
-                )
-                self.async_write_ha_state()
+            if proximity is not None:
+                if proximity == "near" and self._prev_proximity == "clear":
+                    self._trigger_event(
+                        "proximity_alert",
+                        {
+                            "distance_km": data.get("lightning_distance_km"),
+                        },
+                    )
+                    self.async_write_ha_state()
+                self._prev_proximity = proximity
             self._prev_count_1h = float(count_1h)
-            self._prev_proximity = proximity
 
 else:
     # Stub classes for HA < 2023.8 (never instantiated)

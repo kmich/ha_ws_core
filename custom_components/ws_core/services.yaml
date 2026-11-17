@@ -99,8 +99,8 @@ apply_calibration:
       example: 1.2
       selector:
         number:
-          min: -20
-          max: 20
+          min: -10
+          max: 10
           step: 0.1
           unit_of_measurement: "hPa"
     cal_wind_ms:

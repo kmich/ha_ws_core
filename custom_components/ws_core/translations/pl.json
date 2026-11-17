@@ -35,10 +35,12 @@
           "solar_radiation": "Promieniowanie słoneczne (W/m², dla ET₀ Penman-Monteith)",
           "lightning_count": "Licznik wyładowań (skumulowany, np. WH57 lub AS3935)",
           "lightning_dist": "Odległość najbliższego wyładowania (km, np. WH57)",
+          "lightning_azimuth": "Azymut uderzenia pioruna (stopnie)",
           "indoor_temp": "Czujnik temperatury wewnętrznej",
           "indoor_humidity": "Czujnik wilgotności wewnętrznej",
           "indoor_co2": "Czujnik CO₂ wewnętrznego (ppm)",
           "soil_moisture": "Czujnik wilgotności gleby (0-100% lub 0-1 objętościowo)",
+          "soil_moisture_unit": "Jednostka czujnika wilgotności gleby",
           "soil_temperature": "Czujnik temperatury gleby",
           "_go_back": "← Wróć do poprzedniego kroku"
         }
@@ -484,6 +486,7 @@
           "indoor_humidity": "Czujnik wilgotności wewnętrznej",
           "indoor_co2": "Czujnik CO₂ wewnętrznego (ppm)",
           "soil_moisture": "Czujnik wilgotności gleby (0-100% lub 0-1 objętościowo)",
+          "soil_moisture_unit": "Jednostka czujnika wilgotności gleby",
           "soil_temperature": "Czujnik temperatury gleby"
         }
       },
@@ -760,6 +763,10 @@
     "et0_pm_unavailable": {
       "title": "PM ET₀ daily measurement unavailable",
       "description": "The configured radiation source cannot provide a reliable completed-day calculation: {reason}. Check that the source and daily temperature, humidity and wind readings remain available throughout the local calendar day."
+    },
+    "ambiguous_soil_moisture_unit": {
+      "title": "Brakująca lub niejednoznaczna jednostka czujnika wilgotności gleby",
+      "description": "Encja wilgotności gleby {entity_id} nie ma rozpoznanej jednostki (np. '%' lub 'm³/m³'), przez co wartości ≤ 1,0 są niejednoznaczne między 1% a 100%. Wybierz Procent lub Ułamek w Konfiguracja → Źródła opcjonalne."
     }
   },
   "entity": {
@@ -2999,6 +3006,13 @@
         "south_america_east": "Ameryka Południowa (Wschód)",
         "australia": "Australia",
         "custom": "Niestandardowy"
+      }
+    },
+    "soil_moisture_unit": {
+      "options": {
+        "auto": "Automatycznie (wykryj z jednostki czujnika)",
+        "percent": "Procent (0-100%)",
+        "fraction": "Ułamek objętościowy (0-1 / m³/m³)"
       }
     }
   }

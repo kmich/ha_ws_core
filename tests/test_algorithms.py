@@ -24,6 +24,7 @@ from custom_components.ws_core.algorithms import (
     calculate_freezing_level_m,
     calculate_heat_index,
     calculate_humidex,
+    calculate_max_solar_radiation,
     calculate_moon_illumination,
     calculate_moon_phase,
     calculate_rain_probability,
@@ -44,6 +45,7 @@ from custom_components.ws_core.algorithms import (
     estimate_snowfall_cm,
     et0_hargreaves,
     et0_penman_monteith,
+    extraterrestrial_radiation_mj,
     fog_probability,
     moon_display_string,
     pollen_level,
@@ -1015,6 +1017,39 @@ class TestEstimateSnowfallCm:
         warm = estimate_snowfall_cm(5.0, -1.0)
         cold = estimate_snowfall_cm(5.0, -15.0)
         assert cold > warm
+
+
+class TestPolarRadiation:
+    """Extraterrestrial and clear-sky radiation must not fail inside the polar circles."""
+
+    @pytest.mark.parametrize("lat_deg", [-90.0, -89.9, -80.0, -66.5, 66.5, 80.0, 89.9, 90.0])
+    @pytest.mark.parametrize("doy", [172, 355])
+    def test_polar_no_domain_error_and_non_negative(self, lat_deg: float, doy: int):
+        ra = extraterrestrial_radiation_mj(lat_deg, doy)
+        max_sw = calculate_max_solar_radiation(lat_deg, doy, elevation_m=0.0)
+        assert ra >= 0.0
+        assert max_sw >= 0.0
+
+    def test_polar_night_zero_and_midnight_sun_positive(self):
+        # June solstice (doy=172): northern polar night impossible, southern 80S is polar night
+        assert extraterrestrial_radiation_mj(-80.0, 172) == 0.0
+        assert calculate_max_solar_radiation(-80.0, 172) == 0.0
+        assert extraterrestrial_radiation_mj(80.0, 172) > 35.0
+        assert calculate_max_solar_radiation(80.0, 172) > 250.0
+
+        # December solstice (doy=355): northern 80N is polar night, southern 80S is midnight sun
+        assert extraterrestrial_radiation_mj(80.0, 355) == 0.0
+        assert calculate_max_solar_radiation(80.0, 355) == 0.0
+        assert extraterrestrial_radiation_mj(-80.0, 355) > 35.0
+        assert calculate_max_solar_radiation(-80.0, 355) > 250.0
+
+    def test_continuity_across_polar_circle(self):
+        ra_vals = [extraterrestrial_radiation_mj(lat, 172) for lat in (65.0, 66.5, 68.0)]
+        sw_vals = [calculate_max_solar_radiation(lat, 172) for lat in (65.0, 66.5, 68.0)]
+        assert abs(ra_vals[1] - ra_vals[0]) < 3.0
+        assert abs(ra_vals[2] - ra_vals[1]) < 3.0
+        assert abs(sw_vals[1] - sw_vals[0]) < 50.0
+        assert abs(sw_vals[2] - sw_vals[1]) < 50.0
 
 
 if __name__ == "__main__":

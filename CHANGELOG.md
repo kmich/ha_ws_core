@@ -2,6 +2,38 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.14.0] - 2026-11-17
+
+### Changed
+
+- **Auto-calibration elevation matching & one-time bias reset:** Adaptive sensor calibration (off by default) now passes your station's configured elevation (`elevation_m`) to Open-Meteo and skips temperature and pressure samples whose returned model elevation differs by more than 1 m. On first run with auto-calibration active in 2.14.0, the internal residual bias accumulators (`cal_bias_temp_c`, `cal_bias_humidity`, `cal_bias_pressure_hpa`, `cal_bias_n`) reset once so they relearn against elevation-matched reference values. **No other learned data is lost**: Pattern Forecast models, Rain Blend outcomes/weights, 90-day Climatology history, streak counters/records, `solar_lux_factor`, manual calibration offsets, and already-applied auto-calibration offsets are all preserved.
+- **True 30-day climatology:** `sensor.ws_climatology_30d`, `sensor.ws_temperature_anomaly_30d`, and `sensor.ws_rain_anomaly_30d` now compute averages strictly from the most recent 30 days instead of all stored days (up to 90).
+
+### Fixed
+
+- Failed config entry unload no longer stops the coordinator or unregisters services while entities remain loaded.
+- Failed forecast fetches now back off from the last attempt (including cold starts without a cached forecast), clear in-flight tracking on unexpected errors or cancellation, and cancel entry background tasks cleanly on stop without late updates.
+- Unavailable rain gauges no longer emit false rain-stopped events or duplicate start events when readings return.
+- Lightning strike events now track strike deltas per sample instead of requiring the 1-hour rolling strike count to rise.
+- Uploaders (WUnderground, CWOP, Weathercloud, PWSWeather, WOW, AWEKAS) omit missing wind and rain values instead of fabricating `0`, while continuing to send genuine `0` readings.
+- Pirate Weather precipitation now converts cm accumulations cleanly to mm (preferring liquid accumulation when present) and returns `None` when absent.
+- OpenWeatherMap daily and hourly forecasts sum rain and snow liquid equivalent when mixed precipitation is forecast.
+- Forecast tiles filter out empty padding rows when a provider supplies fewer than five days.
+- Expired or prior-day cached forecasts no longer feed the rain blend or forecast agreement, drop stale rows from forecast outputs, and report `forecast_status` (`ok`, `degraded`, `local_only`) on the forecast provider sensor.
+- Hourly forecast nowcast blending matches lead time (0–2 h ahead) instead of array position so far-ahead rows are never blended with current readings.
+- HA weather entity daily and hourly forecasts emit native field keys (`native_temperature`, `native_templow`, `native_wind_speed`, `native_precipitation`, `native_wind_gust_speed`, `native_apparent_temperature`, `native_dew_point`) for accurate imperial unit conversion.
+- Weather entity attribution now credits every active forecast provider.
+- Polar latitudes (inside the Arctic and Antarctic circles) no longer raise math domain errors in extraterrestrial or clear-sky radiation calculations.
+- Saving Core options unchanged preserves the freeze threshold across auto, explicit (`C`/`F`), and mixed unit configurations.
+- Soil moisture respects explicit entity units (`%` vs volumetric fractions) and adds a `soil_moisture_unit` (`auto`, `percent`, `fraction`) option next to the soil sensor; ambiguous/unitless sensors keep the legacy fallback and surface a clearable `ambiguous_soil_moisture_unit` Repairs notice.
+- Aligned `ws_core.apply_calibration` `cal_pressure_hpa` service selector bounds to ±10 hPa and `number.ws_staleness_timeout` upper limit to 86400 s so its 7200 s default sits inside the valid range.
+- Solar energy today and peak sun hours show `0.0` instead of unknown immediately after midnight before the first sample tick.
+- Blitzortung registry scanning is skipped when physical lightning sensors are configured and rate-limited otherwise.
+- Added the missing `lightning_azimuth` label in initial setup optional sources plus `soil_moisture_unit` and `ambiguous_soil_moisture_unit` translations across all 8 languages.
+- AWEKAS uploader error logs redact username and password credentials.
+- Stored weekly, monthly, yearly, and all-time temperature and wind gust extremes remain published when the live sensor is temporarily unavailable.
+- Per-entry Repairs issues (including `et0_pm_unavailable` and `ambiguous_soil_moisture_unit`) clear reliably when resolved, disabled, suppressed, or removed.
+
 ## [2.13.17] - 2026-11-16
 
 ### Fixed

@@ -146,8 +146,10 @@ data:
 
 If you'd rather not track down a reference station yourself, enable **Feature:
 Adaptive Sensor Calibration** under **Configure → Features**. It's off by
-default. When on, it reuses the regional forecast reference point already
-fetched hourly for neighbor QC as a slow-moving comparison: temperature,
+default. When on, it reuses the regional Open-Meteo reference point already
+fetched hourly for neighbor QC (requesting the station's configured `elevation_m`,
+and skipping temperature/pressure samples whose returned model elevation differs
+by more than 1 m) as a slow-moving comparison: temperature,
 humidity, and pressure each get a residual-bias estimate that only settles
 after many samples (~10 days), and only once that bias is both confident and
 outside a noise deadband does it nudge the same `cal_temp_c` / `cal_humidity`

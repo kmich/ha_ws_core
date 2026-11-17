@@ -158,7 +158,7 @@ PARAM_NUMBERS: tuple[WSNumberDesc, ...] = (
         name="Tuning: Staleness Timeout",
         icon="mdi:timer-alert-outline",
         native_min=60.0,
-        native_max=3600.0,
+        native_max=86400.0,
         native_step=60.0,
         native_unit="s",
     ),

@@ -395,7 +395,7 @@ Requires: soil moisture or soil temperature source sensors mapped in Configure �
 
 | Entity ID | Unit | State Class | Description |
 |---|---|---|---|
-| `sensor.ws_soil_moisture_pct` | % | measurement | Volumetric soil moisture (auto-normalised from 0–1 or 0–100 input) |
+| `sensor.ws_soil_moisture_pct` | % | measurement | Volumetric soil moisture (respects entity unit or the `soil_moisture_unit` option in Optional Sources) |
 | `sensor.ws_soil_temp` | °C | measurement | Soil temperature |
 | `sensor.ws_soil_moisture_deficit_pct` | % | measurement | Deficit from field capacity (40% FC assumed for loam soil) |
 | `sensor.ws_irrigation_need` | — | — | Text label: None / Low / Moderate / High / Critical |
@@ -476,7 +476,7 @@ MQTT integration to be set up.
 | `event.ws_frost_event` | event | Fires on frost onset and thaw |
 | `event.ws_lightning_event` | event | Fires on lightning strike or proximity change |
 | `select.ws_graph_range` | select | Dashboard graph time range: 6h / 24h / 3d |
-| `sensor.ws_forecast_provider` | sensor | Active forecast provider name |
+| `sensor.ws_forecast_provider` | sensor | Active forecast provider name (`forecast_status` attribute shows `ok` / `degraded` / `local_only`) |
 
 ---
 

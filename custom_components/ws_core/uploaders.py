@@ -81,25 +81,32 @@ async def async_upload_wunderground(coord: Any, session: aiohttp.ClientSession |
     temp_c = data.get(KEY_NORM_TEMP_C)
     dew_c = data.get(KEY_DEW_POINT_C)
     humidity = data.get(KEY_NORM_HUMIDITY)
-    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-    gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-    rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-    rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
+    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA)
+    if press is None:
+        press = data.get(KEY_NORM_PRESSURE_HPA)
+    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+    gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+    rain_1h = data.get(KEY_RAIN_ACCUM_1H)
+    rain_today = data.get(KEY_RAIN_TODAY_MM)
 
-    params = {
+    params: dict[str, Any] = {
         "ID": coord.wu_station_id,
         "PASSWORD": coord.wu_api_key,
         "dateutc": date_utc,
-        "winddir": int(wind_dir),
-        "windspeedmph": _ms_to_mph(wind_ms),
-        "windgustmph": _ms_to_mph(gust_ms),
-        "rainin": _mm_to_in(rain_1h),
-        "dailyrainin": _mm_to_in(rain_today),
         "action": "updateraw",
         "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
     }
+    if wind_dir is not None:
+        params["winddir"] = int(wind_dir)
+    if wind_ms is not None:
+        params["windspeedmph"] = _ms_to_mph(wind_ms)
+    if gust_ms is not None:
+        params["windgustmph"] = _ms_to_mph(gust_ms)
+    if rain_1h is not None:
+        params["rainin"] = _mm_to_in(rain_1h)
+    if rain_today is not None:
+        params["dailyrainin"] = _mm_to_in(rain_today)
     if temp_c is not None:
         params["tempf"] = _c_to_f(float(temp_c))
     if dew_c is not None:
@@ -143,13 +150,15 @@ async def async_upload_cwop(coord: Any) -> None:
 
     temp_c = data.get(KEY_NORM_TEMP_C)
     humidity = data.get(KEY_NORM_HUMIDITY)
-    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-    gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-    rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-    rain_24h = data.get(KEY_RAIN_ACCUM_24H) or 0
-    rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
+    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA)
+    if press is None:
+        press = data.get(KEY_NORM_PRESSURE_HPA)
+    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+    gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+    rain_1h = data.get(KEY_RAIN_ACCUM_1H)
+    rain_24h = data.get(KEY_RAIN_ACCUM_24H)
+    rain_today = data.get(KEY_RAIN_TODAY_MM)
 
     lat_f = float(lat)
     lon_f = float(lon)
@@ -171,13 +180,13 @@ async def async_upload_cwop(coord: Any) -> None:
     def _cwop_c_to_f(c: float) -> int:
         return round(float(c) * 9 / 5 + 32)
 
-    wind_dir_s = f"{int(wind_dir):03d}"
-    wind_spd_s = f"{_cwop_ms_to_mph(wind_ms):03d}"
-    gust_s = f"g{_cwop_ms_to_mph(gust_ms):03d}"
+    wind_dir_s = f"{int(wind_dir):03d}" if wind_dir is not None else "..."
+    wind_spd_s = f"{_cwop_ms_to_mph(wind_ms):03d}" if wind_ms is not None else "..."
+    gust_s = f"g{_cwop_ms_to_mph(gust_ms):03d}" if gust_ms is not None else "g..."
     temp_s = f"t{_cwop_c_to_f(float(temp_c)):03d}" if temp_c is not None else "t..."
-    rain1h_s = f"r{_mm_to_hundredths_in(float(rain_1h)):03d}"
-    rain24h_s = f"p{_mm_to_hundredths_in(float(rain_24h)):03d}"
-    rain_midnight_s = f"P{_mm_to_hundredths_in(float(rain_today)):03d}"
+    rain1h_s = f"r{_mm_to_hundredths_in(float(rain_1h)):03d}" if rain_1h is not None else ""
+    rain24h_s = f"p{_mm_to_hundredths_in(float(rain_24h)):03d}" if rain_24h is not None else ""
+    rain_midnight_s = f"P{_mm_to_hundredths_in(float(rain_today)):03d}" if rain_today is not None else ""
     hum_s = f"h{round(float(humidity)) % 100:02d}" if humidity is not None else ""
     baro_s = f"b{round(float(press) * 10):05d}" if press is not None else ""
 
@@ -229,11 +238,13 @@ async def async_upload_weathercloud(coord: Any, session: aiohttp.ClientSession |
     temp_c = data.get(KEY_NORM_TEMP_C)
     dew_c = data.get(KEY_DEW_POINT_C)
     humidity = data.get(KEY_NORM_HUMIDITY)
-    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-    gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-    rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA)
+    if press is None:
+        press = data.get(KEY_NORM_PRESSURE_HPA)
+    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+    gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+    rain_1h = data.get(KEY_RAIN_ACCUM_1H)
     uv = data.get(KEY_UV)
 
     params: dict = {
@@ -249,10 +260,14 @@ async def async_upload_weathercloud(coord: Any, session: aiohttp.ClientSession |
         params["hum"] = int(float(humidity))
     if press is not None:
         params["bar"] = round(float(press) * 10)
-    params["wspdavg"] = round(_ms_to_kmh(wind_ms) * 10)
-    params["wgust"] = round(_ms_to_kmh(gust_ms) * 10)
-    params["wdir"] = int(wind_dir)
-    params["rain"] = round(float(rain_1h) * 10)
+    if wind_ms is not None:
+        params["wspdavg"] = round(_ms_to_kmh(wind_ms) * 10)
+    if gust_ms is not None:
+        params["wgust"] = round(_ms_to_kmh(gust_ms) * 10)
+    if wind_dir is not None:
+        params["wdir"] = int(wind_dir)
+    if rain_1h is not None:
+        params["rain"] = round(float(rain_1h) * 10)
     if uv is not None:
         params["uvi"] = round(float(uv) * 10)
 
@@ -286,25 +301,32 @@ async def async_upload_pwsweather(coord: Any, session: aiohttp.ClientSession | N
     temp_c = data.get(KEY_NORM_TEMP_C)
     dew_c = data.get(KEY_DEW_POINT_C)
     humidity = data.get(KEY_NORM_HUMIDITY)
-    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
-    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG) or 0
-    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS) or 0
-    gust_ms = data.get(KEY_NORM_WIND_GUST_MS) or 0
-    rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
-    rain_today = data.get(KEY_RAIN_TODAY_MM) or 0
+    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA)
+    if press is None:
+        press = data.get(KEY_NORM_PRESSURE_HPA)
+    wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
+    wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
+    gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
+    rain_1h = data.get(KEY_RAIN_ACCUM_1H)
+    rain_today = data.get(KEY_RAIN_TODAY_MM)
 
     params: dict = {
         "ID": coord.pws_station_id,
         "PASSWORD": coord.pws_api_key,
         "dateutc": date_utc,
-        "winddir": int(wind_dir),
-        "windspeedmph": _ms_to_mph(wind_ms),
-        "windgustmph": _ms_to_mph(gust_ms),
-        "rainin": _mm_to_in(rain_1h),
-        "dailyrainin": _mm_to_in(rain_today),
         "action": "updateraw",
         "softwaretype": f"ws_core_{_INTEGRATION_VERSION}",
     }
+    if wind_dir is not None:
+        params["winddir"] = int(wind_dir)
+    if wind_ms is not None:
+        params["windspeedmph"] = _ms_to_mph(wind_ms)
+    if gust_ms is not None:
+        params["windgustmph"] = _ms_to_mph(gust_ms)
+    if rain_1h is not None:
+        params["rainin"] = _mm_to_in(rain_1h)
+    if rain_today is not None:
+        params["dailyrainin"] = _mm_to_in(rain_today)
     if temp_c is not None:
         params["tempf"] = _c_to_f(float(temp_c))
     if dew_c is not None:
@@ -344,11 +366,13 @@ async def async_upload_wow(coord: Any, session: aiohttp.ClientSession | None = N
     temp_c = data.get(KEY_NORM_TEMP_C)
     dew_c = data.get(KEY_DEW_POINT_C)
     humidity = data.get(KEY_NORM_HUMIDITY)
-    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA)
+    if press is None:
+        press = data.get(KEY_NORM_PRESSURE_HPA)
     wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
     wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
     gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
-    rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+    rain_1h = data.get(KEY_RAIN_ACCUM_1H)
 
     params: dict = {
         "siteid": coord.wow_site_id,
@@ -370,7 +394,8 @@ async def async_upload_wow(coord: Any, session: aiohttp.ClientSession | None = N
         params["windspeedmph"] = round(float(wind_ms) * 2.23694, 1)
     if gust_ms is not None:
         params["windgustmph"] = round(float(gust_ms) * 2.23694, 1)
-    params["rainin"] = round(float(rain_1h) / 25.4, 3)
+    if rain_1h is not None:
+        params["rainin"] = round(float(rain_1h) / 25.4, 3)
 
     url = "https://wow.metoffice.gov.uk/automaticreading"
     try:
@@ -399,11 +424,13 @@ async def async_upload_awekas(coord: Any, session: aiohttp.ClientSession | None 
     now_utc = dt_util.utcnow()
     temp_c = data.get(KEY_NORM_TEMP_C)
     humidity = data.get(KEY_NORM_HUMIDITY)
-    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA) or data.get(KEY_NORM_PRESSURE_HPA)
+    press = data.get(KEY_SEA_LEVEL_PRESSURE_HPA)
+    if press is None:
+        press = data.get(KEY_NORM_PRESSURE_HPA)
     wind_dir = data.get(KEY_NORM_WIND_DIR_DEG)
     wind_ms = data.get(KEY_NORM_WIND_SPEED_MS)
     gust_ms = data.get(KEY_NORM_WIND_GUST_MS)
-    rain_1h = data.get(KEY_RAIN_ACCUM_1H) or 0
+    rain_1h = data.get(KEY_RAIN_ACCUM_1H)
     snow_mm = None
 
     date_str = now_utc.strftime("%d.%m.%Y")
@@ -416,7 +443,7 @@ async def async_upload_awekas(coord: Any, session: aiohttp.ClientSession | None 
         f"{float(temp_c):.1f}" if temp_c is not None else "",
         f"{int(float(humidity))}" if humidity is not None else "",
         f"{float(press):.1f}" if press is not None else "",
-        f"{float(rain_1h):.1f}",
+        f"{float(rain_1h):.1f}" if rain_1h is not None else "",
         f"{round(float(wind_ms) * 3.6, 1)}" if wind_ms is not None else "",
         f"{int(float(wind_dir))}" if wind_dir is not None else "",
         f"{round(float(gust_ms) * 3.6, 1)}" if gust_ms is not None else "",
@@ -442,10 +469,16 @@ async def async_upload_awekas(coord: Any, session: aiohttp.ClientSession | None 
                 _LOGGER.warning("AWEKAS upload HTTP %d", resp.status)
     except (aiohttp.ClientError, TimeoutError) as exc:
         coord._awekas_status = "error_network"
-        _LOGGER.warning("AWEKAS upload error: %s", exc)
+        _LOGGER.warning(
+            "AWEKAS upload error: %s",
+            _redact_secrets(exc, coord.awekas_username, coord.awekas_password),
+        )
     except Exception as exc:  # noqa: BLE001
         coord._awekas_status = "error"
-        _LOGGER.error("AWEKAS upload unexpected error: %s", exc)
+        _LOGGER.error(
+            "AWEKAS upload unexpected error: %s",
+            _redact_secrets(exc, coord.awekas_username, coord.awekas_password),
+        )
 
 
 async def async_upload_owm_stations(coord: Any, session: aiohttp.ClientSession | None = None) -> None:

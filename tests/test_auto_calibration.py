@@ -113,3 +113,72 @@ class TestComputeAutoCalibrationStep:
     def test_unset_bias_is_skipped(self):
         s = self._state(cal_bias_n=300)  # all biases still None
         assert compute_auto_calibration_step(s, 240, DEADBAND, STEP) == {}
+
+
+class TestCalibrationRefVersionMigration:
+    """PR 5 item 21: one-time auto-calibration residual bias reset without schema bump."""
+
+    def test_legacy_dict_without_ref_version_loads_and_preserves_learned_state(self):
+        from custom_components.ws_core.learning_state import LEARNING_SCHEMA_VERSION, LearningState
+
+        assert LEARNING_SCHEMA_VERSION == 2
+        legacy_payload = {
+            "schema_version": 2,
+            "solar_lux_factor": 128.4,
+            "solar_factor_n": 14,
+            "dry_streak_days": 9,
+            "forecast_outcomes": [{"ts": 1000, "outcome": 1, "local_prob": 70, "openmeteo_prob": 60}],
+            "climatology_days": [{"date": "2026-11-16", "t_high": 18.0, "t_low": 9.0, "rain_total": 1.2}],
+            "cal_bias_temp_c": 1.8,
+            "cal_bias_humidity": 4.2,
+            "cal_bias_pressure_hpa": 3.1,
+            "cal_bias_n": 180,
+            "cal_last_auto_apply_date": "2026-11-10",
+        }
+        state = LearningState.from_dict(legacy_payload)
+        assert state.cal_bias_ref_version == 0
+        assert state.solar_lux_factor == 128.4
+        assert state.dry_streak_days == 9
+        assert len(state.forecast_outcomes) == 1
+        assert len(state.climatology_days) == 1
+        assert state.cal_last_auto_apply_date == "2026-11-10"
+        assert state.cal_bias_temp_c == 1.8
+        assert state.cal_bias_n == 180
+
+    def test_ensure_calibration_ref_version_resets_once_and_not_again(self):
+        from custom_components.ws_core.learning_state import (
+            CALIBRATION_BIAS_REF_VERSION,
+            LearningState,
+            ensure_calibration_ref_version,
+        )
+
+        state = LearningState(
+            solar_lux_factor=128.4,
+            dry_streak_days=9,
+            cal_bias_temp_c=1.8,
+            cal_bias_humidity=4.2,
+            cal_bias_pressure_hpa=3.1,
+            cal_bias_n=180,
+            cal_last_auto_apply_date="2026-11-10",
+        )
+        changed = ensure_calibration_ref_version(state, CALIBRATION_BIAS_REF_VERSION)
+        assert changed is True
+        assert state.cal_bias_ref_version == CALIBRATION_BIAS_REF_VERSION
+        assert state.cal_bias_temp_c is None
+        assert state.cal_bias_humidity is None
+        assert state.cal_bias_pressure_hpa is None
+        assert state.cal_bias_n == 0
+        # Preserves everything else including applied date and learned stats
+        assert state.solar_lux_factor == 128.4
+        assert state.dry_streak_days == 9
+        assert state.cal_last_auto_apply_date == "2026-11-10"
+
+        # New sample after reset stays intact on subsequent starts
+        update_calibration_bias(state, 21.0, 20.0, 55.0, 50.0, 1013.0, 1012.0, alpha=0.5)
+        assert state.cal_bias_n == 1
+        assert state.cal_bias_temp_c == 1.0
+
+        changed_again = ensure_calibration_ref_version(state, CALIBRATION_BIAS_REF_VERSION)
+        assert changed_again is False
+        assert state.cal_bias_n == 1
+        assert state.cal_bias_temp_c == 1.0

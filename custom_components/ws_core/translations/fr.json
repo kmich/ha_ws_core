@@ -1,5 +1,5 @@
 {
-    "config": {
+  "config": {
     "step": {
       "user": {
         "title": "Weather Station Core - Créer une station météo",
@@ -40,6 +40,7 @@
           "indoor_humidity": "Capteur d'humidité intérieure",
           "indoor_co2": "Capteur de CO₂ intérieur (ppm)",
           "soil_moisture": "Capteur d'humidité du sol",
+          "soil_moisture_unit": "Unité du capteur d'humidité du sol",
           "soil_temperature": "Capteur de température du sol",
           "_go_back": "← Retour à l'étape précédente"
         }
@@ -92,7 +93,7 @@
         },
         "data_description": {
           "forecast_entity": "Choisissez une entité météo déjà configurée dans Home Assistant (ex. weather.home, weather.forecast_home)"
-                }
+        }
       },
       "forecast_api_key": {
         "title": "Clé API du fournisseur de prévisions météo",
@@ -396,7 +397,7 @@
         "title": "Paramètres généraux",
         "description": "Configurez les paramètres de base de votre station : unités de mesure, localisation des prévisions, seuils d'alerte et ajustements des capteurs.",
         "data": {
-"prefix": "Préfixe des entités",
+          "prefix": "Préfixe des entités",
           "hemisphere": "Hémisphère",
           "climate_region": "Région climatique",
           "elevation_m": "Altitude de la station",
@@ -514,6 +515,7 @@
           "indoor_humidity": "Capteur d'humidité intérieure",
           "indoor_co2": "Capteur de CO₂ intérieur (ppm)",
           "soil_moisture": "Capteur d'humidité du sol",
+          "soil_moisture_unit": "Unité du capteur d'humidité du sol",
           "soil_temperature": "Capteur de température du sol"
         }
       },
@@ -625,7 +627,7 @@
           "enable_windy": "Windy.com",
           "enable_cwop": "CWOP / APRS",
           "enable_mqtt": "MQTT"
-         }
+        }
       },
       "pattern_forecast_opt": {
         "title": "Prévision par motifs : données d'orage",
@@ -794,6 +796,10 @@
     "et0_pm_unavailable": {
       "title": "Mesure ET₀ PM quotidienne indisponible",
       "description": "La source de rayonnement configurée ne permet pas un calcul fiable pour la journée locale complète : {reason}. Vérifiez la disponibilité du rayonnement, de la température, de l'humidité et du vent pendant toute la journée."
+    },
+    "ambiguous_soil_moisture_unit": {
+      "title": "Unité du capteur d'humidité du sol manquante ou ambiguë",
+      "description": "L'entité d'humidité du sol {entity_id} n'a pas d'unité reconnue (par exemple '%' ou 'm³/m³') : une valeur ≤ 1,0 peut correspondre à 1 % ou à 100 %. Sélectionnez Pourcentage ou Fraction dans Configurer → Sources optionnelles."
     }
   },
   "entity": {
@@ -928,7 +934,7 @@
       },
       "forecast_daily": {
         "name": "Prévisions quotidiennes"
-              },
+      },
       "forecast_provider": {
         "name": "Fournisseur de prévisions",
         "state": {
@@ -1254,7 +1260,7 @@
           "light": "Faible",
           "moderate": "Modérée",
           "heavy": "Forte"
-                  }
+        }
       },
       "nowcast_confidence": {
         "name": "Fiabilité de la prévision à court terme",
@@ -1847,7 +1853,7 @@
           "days_to_new_moon": {
             "name": "Jours avant la nouvelle lune"
           }
-                  },
+        },
         "state": {
           "new_moon": "Nouvelle lune",
           "waxing_crescent": "Premier croissant",
@@ -1968,10 +1974,10 @@
       "frost_risk": {
         "name": "Risque de gel",
         "state": {
-          "high": "Élevé",
+          "no_risk": "Aucun",
+          "unlikely": "Faible",
           "probable": "Probable",
-          "unlikely": "Peu probable",
-          "no_risk": "Aucun risque"
+          "high": "Elevé"
         }
       },
       "sensor_drift": {
@@ -2022,7 +2028,7 @@
             "name": "Moyenne (30 j)"
           }
         }
-              },
+      },
       "temp_anomaly_90d": {
         "name": "Écart aux normales (Temp.; 90 j)"
       },
@@ -2126,7 +2132,7 @@
             "name": "Nombre d'échantillons"
           }
         }
-              },
+      },
       "conditions_summary": {
         "name": "Conditions actuelles",
         "state_attributes": {
@@ -2605,7 +2611,7 @@
             "name": "Humidité"
           }
         }
-              },
+      },
       "indoor_room_delta": {
         "name": "Écart de température - {room_name}"
       },
@@ -2647,7 +2653,7 @@
           "soil_moisture_deficit_pct": {
             "name": "Déficit en eau du sol (%)"
           }
-                  },
+        },
         "state": {
           "none": "Aucun",
           "low": "Faible",
@@ -2690,7 +2696,7 @@
           "all_clear": {
             "name": "Aucune anomalie"
           }
-         }
+        }
       },
       "lightning_azimuth": {
         "name": "Azimut de la foudre"
@@ -2700,15 +2706,6 @@
       },
       "vigicrues_river_flow": {
         "name": "{river} - Débit"
-      },
-      "frost_risk": {
-        "name": "Risque de gel",
-        "state": {
-          "no_risk": "Aucun",
-          "unlikely": "Faible",
-          "probable": "Probable",
-          "high": "Elevé"
-        }
       }
     },
     "select": {
@@ -2834,7 +2831,7 @@
       },
       "ws_enable_indoor": {
         "name": "Capteurs intérieurs"
-              },
+      },
       "ws_enable_soil": {
         "name": "Capteurs de sol"
       },
@@ -2990,7 +2987,7 @@
         "pirate_weather": "Pirate Weather (Clé API requise, offre gratuite)",
         "meteo_france": "Météo France (Clé API requise, offre gratuite)",
         "ha_weather_entity": "Entité météo de Home Assistant"
-              }
+      }
     },
     "pattern_factor": {
       "options": {
@@ -3042,6 +3039,13 @@
         "south_america_east": "Amérique du Sud (Est)",
         "australia": "Australie",
         "custom": "Personnalisé"
+      }
+    },
+    "soil_moisture_unit": {
+      "options": {
+        "auto": "Auto (détecter depuis l'unité du capteur)",
+        "percent": "Pourcentage (0-100 %)",
+        "fraction": "Fraction volumique (0-1 / m³/m³)"
       }
     }
   }

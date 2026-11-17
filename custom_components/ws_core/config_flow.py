@@ -92,6 +92,7 @@ from .const import (
     CONF_RAIN_UNIT,
     CONF_SEA_TEMP_LAT,
     CONF_SEA_TEMP_LON,
+    CONF_SOIL_MOISTURE_UNIT,
     CONF_SOLAR_INTERVAL_MIN,
     CONF_SOLAR_PANEL_AZIMUTH,
     CONF_SOLAR_PANEL_TILT,
@@ -167,6 +168,7 @@ from .const import (
     DEFAULT_RAIN_PENALTY_HEAVY_MMPH,
     DEFAULT_RAIN_PENALTY_LIGHT_MMPH,
     DEFAULT_RAIN_UNIT,
+    DEFAULT_SOIL_MOISTURE_UNIT,
     DEFAULT_SOLAR_INTERVAL_MIN,
     DEFAULT_SOLAR_PANEL_AZIMUTH,
     DEFAULT_SOLAR_PANEL_TILT,
@@ -195,6 +197,7 @@ from .const import (
     PROVIDERS_REQUIRING_ENTITY,
     RAIN_UNIT_OPTIONS,
     REQUIRED_SOURCES,
+    SOIL_MOISTURE_UNIT_OPTIONS,
     SRC_BATTERY,
     SRC_DEW_POINT,
     SRC_GUST,
@@ -206,6 +209,7 @@ from .const import (
     SRC_PRESS,
     SRC_RAIN_TOTAL,
     SRC_RAIN_YEAR,
+    SRC_SOIL_MOISTURE,
     SRC_TEMP,
     SRC_UV,
     SRC_WIND,
@@ -536,6 +540,32 @@ def _convert_temp_to_c(val: float, imperial: bool) -> float:
     return (val - 32.0) * 5.0 / 9.0 if imperial else val
 
 
+def _effective_temp_unit(temp_unit_conf: str, imperial: bool) -> str:
+    """Resolve the effective display/input temperature unit symbol."""
+    if temp_unit_conf == "F":
+        return "°F"
+    if temp_unit_conf == "C":
+        return "°C"
+    return "°F" if imperial else "°C"
+
+
+def _build_optional_sources_fields(defaults: dict[str, str], soil_unit: str) -> dict[Any, Any]:
+    """Build schema fields for optional source mapping steps."""
+    fields: dict[Any, Any] = {}
+    for k in OPTIONAL_SOURCES:
+        key = vol.Optional(k, description={"suggested_value": defaults[k]}) if k in defaults else vol.Optional(k)
+        fields[key] = _ENTITY_SELECTOR
+        if k == SRC_SOIL_MOISTURE:
+            fields[vol.Optional(CONF_SOIL_MOISTURE_UNIT, default=soil_unit)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(SOIL_MOISTURE_UNIT_OPTIONS),
+                    mode="dropdown",
+                    translation_key="soil_moisture_unit",
+                )
+            )
+    return fields
+
+
 # Plain sensor selector — no device_class filter (fixes issue #41: sensors mis-routed into wrong slots)
 _ENTITY_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
 
@@ -751,11 +781,15 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
     async def async_step_optional_sources(self, user_input: dict[str, Any] | None = None):
         defaults = _guess_defaults(self.hass)
         errors: dict[str, str] = {}
+        soil_unit = str(
+            self._data.get(CONF_SOIL_MOISTURE_UNIT, DEFAULT_SOIL_MOISTURE_UNIT) or DEFAULT_SOIL_MOISTURE_UNIT
+        )
 
         if user_input is not None:
             back = await self._handle_back(user_input)
             if back:
                 return back
+            soil_unit = str(user_input.get(CONF_SOIL_MOISTURE_UNIT, soil_unit) or DEFAULT_SOIL_MOISTURE_UNIT)
             sources = dict(self._data.get(CONF_SOURCES, {}))
             for k in OPTIONAL_SOURCES:
                 eid = user_input.get(k)
@@ -768,24 +802,15 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
                     sources[k] = eid.strip()
             if not errors:
                 self._data[CONF_SOURCES] = sources
+                self._data[CONF_SOIL_MOISTURE_UNIT] = soil_unit
                 return await self.async_step_location()
             defaults = _merge_submitted_sources(defaults, user_input, OPTIONAL_SOURCES)
 
         # fmt: off
-        # Use description={"suggested_value": ...} rather than default=... here.
-        # A vol.Optional default is "sticky" in the frontend entity picker: the
-        # user cannot clear it back to empty, which blocks saving whenever the
-        # auto-detected guess is wrong, unavailable, or the wrong type
-        # (issue #135). suggested_value pre-fills the same way but the field
-        # stays genuinely clearable.
-        fields = {
-            (
-                vol.Optional(k, description={"suggested_value": defaults[k]})
-                if k in defaults
-                else vol.Optional(k)
-            ): _ENTITY_SELECTOR
-            for k in OPTIONAL_SOURCES
-        }
+        # Use description={"suggested_value": ...} rather than default=... for
+        # entity selectors so guessed/existing entities remain genuinely clearable
+        # (issue #135).
+        fields = _build_optional_sources_fields(defaults, soil_unit)
         # fmt: on
         return self._show_step(
             step_id="optional_sources",
@@ -1570,7 +1595,7 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
         gust_u = wind_unit_conf if wind_unit_conf != "auto" else ("mph" if imperial else "m/s")
         rain_meas = rain_unit_conf if rain_unit_conf != "auto" else ("in" if imperial else "mm")
         rain_u = "in/h" if rain_meas == "in" else "mm/h"
-        temp_u = ("°F" if temp_unit_conf == "F" else "°C") if temp_unit_conf != "auto" else ("°F" if imperial else "°C")
+        temp_u = _effective_temp_unit(temp_unit_conf, imperial)
 
         if user_input is not None:
             back = await self._handle_back(user_input)
@@ -1684,7 +1709,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         gust_u = wind_unit_conf if wind_unit_conf != "auto" else ("mph" if imperial else "m/s")
         rain_meas = rain_unit_conf if rain_unit_conf != "auto" else ("in" if imperial else "mm")
         rain_u = "in/h" if rain_meas == "in" else "mm/h"
-        temp_u = ("°F" if temp_unit_conf == "F" else "°C") if temp_unit_conf != "auto" else ("°F" if imperial else "°C")
+        temp_u = _effective_temp_unit(temp_unit_conf, imperial)
 
         if user_input is not None:
             out = dict(user_input)
@@ -1781,8 +1806,13 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
     async def async_step_optional_sources_opt(self, user_input: dict[str, Any] | None = None):
         defaults = self._current_sources_for_options()
         errors: dict[str, str] = {}
+        soil_unit = str(
+            self._opt.get(CONF_SOIL_MOISTURE_UNIT, self._get(CONF_SOIL_MOISTURE_UNIT, DEFAULT_SOIL_MOISTURE_UNIT))
+            or DEFAULT_SOIL_MOISTURE_UNIT
+        )
 
         if user_input is not None:
+            soil_unit = str(user_input.get(CONF_SOIL_MOISTURE_UNIT, soil_unit) or DEFAULT_SOIL_MOISTURE_UNIT)
             sources = dict(self._opt.get(CONF_SOURCES) or self._get(CONF_SOURCES, {}))
             for k in OPTIONAL_SOURCES:
                 sources.pop(k, None)
@@ -1796,6 +1826,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     sources[k] = eid.strip()
             if not errors:
                 self._opt[CONF_SOURCES] = sources
+                self._opt[CONF_SOIL_MOISTURE_UNIT] = soil_unit
                 if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
                     return await self.async_step_forecast_api_key_opt()
                 return await self.async_step_features_opt()
@@ -1803,12 +1834,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
 
         # See async_step_optional_sources for why suggested_value is used
         # instead of default (issue #135: unclearable, unsaveable fields).
-        fields = {
-            (
-                vol.Optional(k, description={"suggested_value": defaults[k]}) if k in defaults else vol.Optional(k)
-            ): _ENTITY_SELECTOR
-            for k in OPTIONAL_SOURCES
-        }
+        fields = _build_optional_sources_fields(defaults, soil_unit)
         return self.async_show_form(
             step_id="optional_sources_opt",
             data_schema=vol.Schema(fields),
@@ -1946,11 +1972,11 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     selector.NumberSelectorConfig(min=0, max=200, step=0.5, mode="box", unit_of_measurement=rain_u)
                 ),
                 vol.Optional(
-                    CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, imperial), 1)
+                    CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, temp_u == "°F"), 1)
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        min=round(_convert_temp_to_display(-30.0, imperial), 1),
-                        max=round(_convert_temp_to_display(10.0, imperial), 1),
+                        min=round(_convert_temp_to_display(-30.0, temp_u == "°F"), 1),
+                        max=round(_convert_temp_to_display(10.0, temp_u == "°F"), 1),
                         step=0.5,
                         mode="box",
                         unit_of_measurement=temp_u,

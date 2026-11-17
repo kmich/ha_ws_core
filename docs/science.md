@@ -257,8 +257,9 @@ Configurable measurement noise (`number.ws_rain_filter_alpha`).
 ### 30-Day Rolling Climatology
 
 After approximately 14 days of operation, the integration builds a local climate baseline
-from the station's own history. Temperature and rain anomaly sensors are meaningful after
-30+ days of continuous operation.
+from the station's most recent 30 days of history (while keeping up to 90 days stored for the
+90-day anomaly baseline). Temperature and rain 30-day anomaly sensors compare today against
+that recent 30-day baseline and are meaningful after 30+ days of continuous operation.
 
 ---
 

@@ -41,6 +41,12 @@ theme:
 plugins:
   - search
 
+exclude_docs: |
+  v3-review-2026-11-17.md
+  deep_review_and_v3_roadmap.md
+  v3.0.0-release-plan.md
+  v2.14.0-coding-plan.md
+
 markdown_extensions:
   - admonition
   - pymdownx.details

@@ -236,6 +236,39 @@ class TestWUnderground:
         assert sess.calls == []
         assert coord._wu_status == "disabled"
 
+    async def test_missing_wind_rain_omitted_but_real_zero_sent(self):
+        sess = _FakeSession(status=200, body="success\n")
+        coord = _coord()
+        coord.data = {
+            KEY_NORM_TEMP_C: 20.0,
+            KEY_NORM_WIND_DIR_DEG: None,
+            KEY_NORM_WIND_SPEED_MS: None,
+            KEY_NORM_WIND_GUST_MS: None,
+            KEY_RAIN_ACCUM_1H: None,
+            KEY_RAIN_TODAY_MM: None,
+        }
+        with _patch_session(sess):
+            await coord._async_upload_wunderground()
+        p = sess.last["params"]
+        for key in ("winddir", "windspeedmph", "windgustmph", "rainin", "dailyrainin"):
+            assert key not in p
+
+        coord.data = {
+            KEY_NORM_TEMP_C: 20.0,
+            KEY_NORM_WIND_DIR_DEG: 0.0,
+            KEY_NORM_WIND_SPEED_MS: 0.0,
+            KEY_NORM_WIND_GUST_MS: 0.0,
+            KEY_RAIN_ACCUM_1H: 0.0,
+            KEY_RAIN_TODAY_MM: 0.0,
+        }
+        with _patch_session(sess):
+            await coord._async_upload_wunderground()
+        p2 = sess.last["params"]
+        assert p2["winddir"] == 0
+        assert p2["windspeedmph"] == 0.0
+        assert p2["rainin"] == 0.0
+        assert p2["dailyrainin"] == 0.0
+
 
 # ---------------------------------------------------------------------------
 # Weathercloud
@@ -594,6 +627,103 @@ class TestCWOP:
         assert called is False
 
 
+class TestUploadersMissingData:
+    async def test_other_uploaders_omit_missing_wind_rain_and_keep_zero(self):
+        missing_data = {
+            KEY_NORM_TEMP_C: 15.0,
+            KEY_NORM_HUMIDITY: 60.0,
+            KEY_SEA_LEVEL_PRESSURE_HPA: 1012.0,
+            KEY_NORM_WIND_DIR_DEG: None,
+            KEY_NORM_WIND_SPEED_MS: None,
+            KEY_NORM_WIND_GUST_MS: None,
+            KEY_RAIN_ACCUM_1H: None,
+            KEY_RAIN_ACCUM_24H: None,
+            KEY_RAIN_TODAY_MM: None,
+        }
+        zero_data = {
+            KEY_NORM_TEMP_C: 15.0,
+            KEY_NORM_HUMIDITY: 60.0,
+            KEY_SEA_LEVEL_PRESSURE_HPA: 1012.0,
+            KEY_NORM_WIND_DIR_DEG: 0.0,
+            KEY_NORM_WIND_SPEED_MS: 0.0,
+            KEY_NORM_WIND_GUST_MS: 0.0,
+            KEY_RAIN_ACCUM_1H: 0.0,
+            KEY_RAIN_ACCUM_24H: 0.0,
+            KEY_RAIN_TODAY_MM: 0.0,
+        }
+
+        # Weathercloud
+        sess = _FakeSession(status=200, body="200")
+        coord = _coord()
+        coord.data = missing_data
+        with _patch_session(sess):
+            await coord._async_upload_weathercloud()
+        for k in ("wspdavg", "wgust", "wdir", "rain"):
+            assert k not in sess.last["params"]
+        coord.data = zero_data
+        with _patch_session(sess):
+            await coord._async_upload_weathercloud()
+        for k in ("wspdavg", "wgust", "wdir", "rain"):
+            assert sess.last["params"][k] == 0
+
+        # PWSWeather
+        sess = _FakeSession(status=200, body="success")
+        coord = _coord()
+        coord.data = missing_data
+        with _patch_session(sess):
+            await coord._async_upload_pwsweather()
+        for k in ("winddir", "windspeedmph", "windgustmph", "rainin", "dailyrainin"):
+            assert k not in sess.last["params"]
+        coord.data = zero_data
+        with _patch_session(sess):
+            await coord._async_upload_pwsweather()
+        for k in ("winddir", "windspeedmph", "windgustmph", "rainin", "dailyrainin"):
+            assert k in sess.last["params"]
+
+        # WOW
+        sess = _FakeSession(status=200, body="")
+        coord = _coord()
+        coord.data = missing_data
+        with _patch_session(sess):
+            await coord._async_upload_wow()
+        assert "rainin" not in sess.last["params"]
+        coord.data = zero_data
+        with _patch_session(sess):
+            await coord._async_upload_wow()
+        assert sess.last["params"]["rainin"] == 0.0
+
+        # AWEKAS
+        sess = _FakeSession(status=200, body="OK")
+        coord = _coord()
+        coord.data = missing_data
+        with _patch_session(sess):
+            await coord._async_upload_awekas()
+        fields = sess.last["data"]["val"].split(";")
+        assert fields[7] == ""  # rain_1h omitted
+        coord.data = zero_data
+        with _patch_session(sess):
+            await coord._async_upload_awekas()
+        fields_z = sess.last["data"]["val"].split(";")
+        assert fields_z[7] == "0.0"
+
+        # CWOP
+        writer = _FakeWriter()
+
+        async def fake_open(host, port):
+            return _FakeReader(), writer
+
+        coord = _coord()
+        coord.data = missing_data
+        with patch.object(asyncio, "open_connection", fake_open):
+            await coord._async_upload_cwop()
+        sent = b"".join(writer.written).decode("ascii")
+        assert "_.../..." in sent
+        assert "g..." in sent
+        assert "r000" not in sent
+        assert "p000" not in sent
+        assert "P000" not in sent
+
+
 # ---------------------------------------------------------------------------
 # MQTT publishing
 # ---------------------------------------------------------------------------
@@ -803,3 +933,38 @@ class TestMQTTPublish:
         topics = [call.args[1] for call in publish.await_args_list]
         assert "homeassistant/sensor/ws_core_ws_solar_energy_today/config" in topics
         assert all(call.args[2] == "" for call in publish.await_args_list)
+
+
+class TestAwekasLogRedaction:
+    """PR 6 item 26: AWEKAS upload failures must redact username and password."""
+
+    async def test_awekas_errors_redact_credentials(self, caplog):
+        import aiohttp
+
+        from custom_components.ws_core.uploaders import async_upload_awekas
+
+        coord = _coord()
+        coord.awekas_username = "secret_aw_user"
+        coord.awekas_password = "secret_aw_password"
+
+        class RaisingSession:
+            def __init__(self, exc):
+                self._exc = exc
+
+            def post(self, *a, **kw):
+                raise self._exc
+
+        with caplog.at_level("WARNING"):
+            await async_upload_awekas(
+                coord,
+                session=RaisingSession(aiohttp.ClientError("Failed user=secret_aw_user pass=secret_aw_password")),
+            )
+            await async_upload_awekas(
+                coord,
+                session=RaisingSession(RuntimeError("Crash secret_aw_password secret_aw_user")),
+            )
+
+        assert coord._awekas_status == "error"
+        assert "secret_aw_user" not in caplog.text
+        assert "secret_aw_password" not in caplog.text
+        assert "**REDACTED**" in caplog.text

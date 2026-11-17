@@ -94,12 +94,13 @@ class OpenWeatherMapProvider(ForecastProvider):
             date_str = local_date_str(dt)
             temp = day.get("temp", {})
             weather = (day.get("weather") or [{}])[0]
+            daily_precip = round(float(day.get("rain") or 0.0) + float(day.get("snow") or 0.0), 1)
             daily_out.append(
                 {
                     "date": date_str,
                     "tmax_c": temp.get("max"),
                     "tmin_c": temp.get("min"),
-                    "precip_mm": day.get("rain", day.get("snow", 0.0)),
+                    "precip_mm": daily_precip,
                     "wind_kmh": round(day.get("wind_speed", 0) * 3.6, 1),
                     "gust_kmh": round(day.get("wind_gust", 0) * 3.6, 1) if day.get("wind_gust") else None,
                     "weathercode": _owm_to_wmo(weather.get("id")),
@@ -113,7 +114,10 @@ class OpenWeatherMapProvider(ForecastProvider):
             dt = hour.get("dt", 0)
             dt_str = local_datetime_str(dt)
             weather = (hour.get("weather") or [{}])[0]
-            rain_1h = (hour.get("rain") or {}).get("1h", 0.0)
+            rain_1h = round(
+                float((hour.get("rain") or {}).get("1h") or 0.0) + float((hour.get("snow") or {}).get("1h") or 0.0),
+                1,
+            )
             hourly_out.append(
                 {
                     "datetime": dt_str,
