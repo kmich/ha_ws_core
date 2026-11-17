@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.14.1] - 2026-11-17
+
+### Fixed
+
+- **Exclude stale numeric source readings from Pattern Forecast learning (#201):** When mapped weather station entities stop reporting but retain last numeric states in Home Assistant, diagnosed stale sources (`_stale_sources`) are now consumed by `PatternRuntime._flagged_inputs()`. Stale readings are excluded from `engine.observe()` ticks, preventing stale temperature, pressure, wind, and gust values from falsely accumulating outcome-window coverage while allowing unaffected fresh targets to continue learning.
+
 ## [2.14.0] - 2026-11-17
 
 ### Changed
