@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -45,9 +45,35 @@ SERVICE_RESET_RAIN = "reset_rain_baseline"
 SERVICE_RESET_LEARNING = "reset_learning_state"
 SERVICE_EXPORT_LEARNING = "export_learning_state"
 SERVICE_APPLY_CALIBRATION = "apply_calibration"
+SERVICE_GET_WEATHER_WINDOWS = "get_weather_windows"
+SERVICE_GET_STATION_SUMMARY = "get_station_summary"
 ATTR_ENTRY_ID = "entry_id"
 
 SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+SERVICE_GET_STATION_SUMMARY_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+SERVICE_GET_WEATHER_WINDOWS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY_ID): cv.string,
+        vol.Optional("profile_id"): cv.string,
+        vol.Optional("limits"): vol.Schema(
+            {
+                vol.Optional("name"): cv.string,
+                vol.Optional("min_duration_h"): vol.Coerce(int),
+                vol.Optional("max_rain_prob_pct"): vol.Coerce(float),
+                vol.Optional("max_rain_mm"): vol.Coerce(float),
+                vol.Optional("min_temp_c"): vol.Coerce(float),
+                vol.Optional("max_temp_c"): vol.Coerce(float),
+                vol.Optional("min_humidity_pct"): vol.Coerce(float),
+                vol.Optional("max_humidity_pct"): vol.Coerce(float),
+                vol.Optional("min_wind_kmh"): vol.Coerce(float),
+                vol.Optional("max_wind_kmh"): vol.Coerce(float),
+                vol.Optional("max_wind_gust_kmh"): vol.Coerce(float),
+                vol.Optional("max_cloud_cover_pct"): vol.Coerce(float),
+                vol.Optional("require_daylight"): cv.boolean,
+            }
+        ),
+    }
+)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
@@ -290,13 +316,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 await coord.async_reset_pattern_forecast()
             _LOGGER.info("ws_core: learning state reset (target=%s)", target)
 
-    async def _export_learning(call: ServiceCall) -> None:
+    async def _export_learning(call: ServiceCall) -> dict[str, Any]:
+        """Export learning state with response support (SupportsResponse.OPTIONAL)."""
+        is_full = bool(call.data.get("full", False))
+        out: dict[str, Any] = {}
         for coord in _get_targets(call):
-            payload = coord._learning_state.to_dict()
-            _LOGGER.info("ws_core learning state export: %s", payload)
+            eid = coord.entry_data.get("entry_id", "station")
+            ls = coord._learning_state
             pattern = getattr(coord, "_pattern", None)
-            if pattern is not None:
-                _LOGGER.info("ws_core pattern forecast export: %s", pattern.summary())
+            if is_full:
+                payload = ls.to_dict()
+                if pattern is not None:
+                    payload["pattern_forecast"] = (
+                        pattern.engine.to_dict() if hasattr(pattern, "engine") else pattern.summary()
+                    )
+                out[eid] = payload
+            else:
+                out[eid] = {
+                    "solar_lux_factor": round(float(ls.solar_lux_factor), 2),
+                    "solar_factor_n": ls.solar_factor_n,
+                    "blend_local": round(float(ls.blend_local), 3),
+                    "blend_openmeteo": round(float(ls.blend_openmeteo), 3),
+                    "streaks": {
+                        "dry_streak_days": ls.dry_streak_days,
+                        "heat_streak_days": ls.heat_streak_days,
+                        "frost_streak_days": ls.frost_streak_days,
+                    },
+                    "pattern_forecast": pattern.summary() if pattern is not None else None,
+                }
+            _LOGGER.debug("ws_core learning state export (%s): %s", eid, out[eid])
+        return out
+
+    async def _get_weather_windows(call: ServiceCall) -> dict[str, Any]:
+        """Evaluate weather windows (SupportsResponse.ONLY)."""
+        profile_id = call.data.get("profile_id")
+        limits = call.data.get("limits")
+        out: dict[str, Any] = {}
+        for coord in _get_targets(call):
+            eid = coord.entry_data.get("entry_id", "station")
+            out[eid] = coord.get_weather_windows_evaluation(profile_id=profile_id, custom_limits=limits)
+        return out
+
+    async def _get_station_summary(call: ServiceCall) -> dict[str, Any]:
+        """Return station summary (SupportsResponse.ONLY)."""
+        out: dict[str, Any] = {}
+        for coord in _get_targets(call):
+            eid = coord.entry_data.get("entry_id", "station")
+            out[eid] = coord.get_station_summary()
+        return out
 
     if not hass.services.has_service(DOMAIN, SERVICE_RESET_LEARNING):
         hass.services.async_register(
@@ -304,7 +371,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_LEARNING):
         hass.services.async_register(
-            DOMAIN, SERVICE_EXPORT_LEARNING, _export_learning, schema=SERVICE_EXPORT_LEARNING_SCHEMA
+            DOMAIN,
+            SERVICE_EXPORT_LEARNING,
+            _export_learning,
+            schema=SERVICE_EXPORT_LEARNING_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_WEATHER_WINDOWS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_WEATHER_WINDOWS,
+            _get_weather_windows,
+            schema=SERVICE_GET_WEATHER_WINDOWS_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_STATION_SUMMARY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_STATION_SUMMARY,
+            _get_station_summary,
+            schema=SERVICE_GET_STATION_SUMMARY_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
         )
 
     # ── Apply calibration service ────────────────────────────────────────
@@ -418,6 +505,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_RESET_LEARNING,
             SERVICE_EXPORT_LEARNING,
             SERVICE_APPLY_CALIBRATION,
+            SERVICE_GET_WEATHER_WINDOWS,
+            SERVICE_GET_STATION_SUMMARY,
         ):
             if hass.services.has_service(DOMAIN, svc):
                 hass.services.async_remove(DOMAIN, svc)

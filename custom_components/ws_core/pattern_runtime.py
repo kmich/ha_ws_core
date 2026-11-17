@@ -69,7 +69,9 @@ from .const import (
     KEY_THUNDERSTORM_RISK,
     LUX_TO_WM2_FACTOR,
     PATTERN_BIN_COUNT,
+    PATTERN_CORRUPTED_FEATURES,
     PATTERN_HISTORY_DAYS,
+    PATTERN_HISTORY_FEATURES_METHOD,
     PATTERN_HISTORY_UNITS_METHOD,
     PATTERN_ISSUE_INTERVAL_MIN,
     PATTERN_MIN_DAYS_COLLECTING,
@@ -1106,6 +1108,36 @@ class PatternRuntime:
             await self.async_save()
         return False
 
+    async def _async_migrate_feature_replay(self, now: datetime) -> bool:
+        """Migrate targets replayed under older methods (< PATTERN_HISTORY_FEATURES_METHOD).
+
+        Resets standardizer slots and weights for corrupted solar features and dp_3h,
+        keeping all other weights, rates, and history intact.
+        """
+        eng = self.engine
+        hl = eng.history_learn or {}
+        targets = hl.get("targets")
+        if not targets:
+            return False
+        fm = hl.get("features_method")
+        fm_val = int(fm) if fm is not None and str(fm).isdigit() else 1
+        if fm_val >= PATTERN_HISTORY_FEATURES_METHOD:
+            return False
+        ok_targets = [t for t, e in targets.items() if isinstance(e, dict) and e.get("status") == "ok"]
+        if not ok_targets:
+            hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            return False
+
+        _LOGGER.info(
+            "ws_core pattern forecast: migrating pattern state for v3.0 feature alignment (dp_3h and solar replay masking)"
+        )
+        eng.scoped_reset_features(PATTERN_CORRUPTED_FEATURES)
+        hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+        eng.history_learn = hl
+        self._published = {}
+        await self.async_save()
+        return False
+
     async def _async_seed_pressure(self, now: datetime) -> tuple[int, bool]:
         """Read a bounded pressure window regardless of annual replay eligibility."""
         end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
@@ -1173,6 +1205,8 @@ class PatternRuntime:
         try:
             now = dt_util.utcnow()
             retry_needed = await self._async_forget_misread_replay(now)
+            features_migrated = await self._async_migrate_feature_replay(now)
+            retry_needed = retry_needed or features_migrated
             bins = await self._async_seed_recent(now)
             retry_needed = retry_needed or self._recent_failed
             if bins:

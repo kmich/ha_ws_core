@@ -154,7 +154,7 @@ class TestFreezeThresholdRoundTrip:
         flow.hass.config.latitude = 40.0
         flow.hass.config.longitude = -74.0
         flow.async_step_required_sources_opt = AsyncMock(return_value={"step_id": "required_sources_opt"})
-        show_res = await flow.async_step_init(user_input=None)
+        show_res = await flow.async_step_thresholds(user_input=None)
         schema = show_res["schema"]
 
         unchanged_input = {}
@@ -164,7 +164,7 @@ class TestFreezeThresholdRoundTrip:
                 unchanged_input[name] = key.default() if callable(key.default) else key.default
 
         # Submit the exact schema defaults unchanged
-        await flow.async_step_init(user_input=unchanged_input)
+        await flow.async_step_thresholds(user_input=unchanged_input)
         assert abs(flow._opt[CONF_THRESH_FREEZE_C] - initial_freeze_c) < 0.15
 
 
@@ -220,3 +220,97 @@ class TestSoilMoistureUnitFlow:
         assert flow._opt[CONF_SOURCES][SRC_SOIL_MOISTURE] == "sensor.soil"
         assert CONF_SOIL_MOISTURE_UNIT not in flow._opt[CONF_SOURCES]
         assert flow._opt[CONF_SOIL_MOISTURE_UNIT] == "percent"
+
+
+class TestOptionsMenuNavigation:
+    """v3.0.0 Scope D: Menu-driven options flow navigation."""
+
+    async def test_options_init_displays_main_menu(self):
+        flow = _options_flow(stored={}, opt={})
+        flow.async_show_menu = MagicMock(side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]})
+        res = await flow.async_step_init(None)
+        assert res["menu"] == "init"
+        assert res["options"] == [
+            "sources",
+            "forecast",
+            "decision_profiles",
+            "rooms",
+            "thresholds",
+            "uploads",
+            "diagnostics",
+        ]
+
+    async def test_options_forecast_step_saves_and_exposes_schema(self):
+        from custom_components.ws_core.const import (
+            CONF_FORECAST_ENABLED,
+            CONF_FORECAST_INTERVAL_MIN,
+            CONF_FORECAST_PROVIDER,
+        )
+
+        flow = _options_flow(stored={CONF_FORECAST_PROVIDER: "open_meteo"}, opt={})
+        res = await flow.async_step_forecast(None)
+        assert res["step_id"] == "forecast"
+
+        save_res = await flow.async_step_forecast({CONF_FORECAST_ENABLED: False, CONF_FORECAST_INTERVAL_MIN: 60})
+        assert save_res["type"] == "create_entry"
+        assert save_res["data"][CONF_FORECAST_ENABLED] is False
+        assert save_res["data"][CONF_FORECAST_INTERVAL_MIN] == 60
+
+    async def test_options_decision_profiles_step(self):
+        from custom_components.ws_core.const import (
+            CONF_ENABLE_WEATHER_WINDOWS,
+            CONF_WEATHER_WINDOW_PROFILES,
+            PROFILE_OUTDOOR_DRYING,
+        )
+
+        flow = _options_flow(stored={}, opt={})
+        res = await flow.async_step_decision_profiles(None)
+        assert res["step_id"] == "decision_profiles"
+
+        save_res = await flow.async_step_decision_profiles({
+            CONF_ENABLE_WEATHER_WINDOWS: True,
+            CONF_WEATHER_WINDOW_PROFILES: [PROFILE_OUTDOOR_DRYING],
+        })
+        assert save_res["type"] == "create_entry"
+        assert save_res["data"][CONF_ENABLE_WEATHER_WINDOWS] is True
+        assert save_res["data"][CONF_WEATHER_WINDOW_PROFILES] == [PROFILE_OUTDOOR_DRYING]
+
+    async def test_options_thresholds_step_validates_and_saves(self):
+        from custom_components.ws_core.const import CONF_PREFIX
+
+        flow = _options_flow(stored={}, opt={})
+        res = await flow.async_step_thresholds(None)
+        assert res["step_id"] == "thresholds"
+
+        save_res = await flow.async_step_thresholds({CONF_PREFIX: "my_station"})
+        assert save_res["type"] == "create_entry"
+        assert save_res["data"][CONF_PREFIX] == "my_station"
+
+    async def test_options_rooms_menu_routes_and_done_creates_entry(self):
+        flow = _options_flow(stored={CONF_INDOOR_ROOMS: []}, opt={})
+        flow.async_show_menu = MagicMock(side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]})
+        menu = await flow.async_step_rooms(None)
+        assert menu["menu"] == "indoor_rooms_opt"
+        assert flow._in_menu_rooms is True
+
+        done_res = await flow.async_step_room_done()
+        assert done_res["type"] == "create_entry"
+
+    async def test_options_sources_menu_routes_and_done_creates_entry(self):
+        from unittest.mock import patch
+
+        from custom_components.ws_core.const import CONF_SOURCES, REQUIRED_SOURCES
+
+        sources = {k: f"sensor.{k}" for k in REQUIRED_SOURCES}
+        flow = _options_flow(stored={CONF_SOURCES: sources}, opt={})
+
+        req_res = await flow.async_step_sources(None)
+        assert req_res["step_id"] == "required_sources_opt"
+
+        with patch("custom_components.ws_core.config_flow._validate_numeric_sensor", return_value=None):
+            opt_res = await flow.async_step_required_sources_opt(sources)
+            assert opt_res["step_id"] == "optional_sources_opt"
+
+            save_res = await flow.async_step_optional_sources_opt({})
+            assert save_res["type"] == "create_entry"
+

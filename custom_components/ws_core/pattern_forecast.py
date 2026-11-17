@@ -30,6 +30,7 @@ from .const import (
     PATTERN_BASE_RATE_HALF_LIFE_DAYS,
     PATTERN_BIN_COUNT,
     PATTERN_CHECKPOINT_INTERVAL_S,
+    PATTERN_CORRUPTED_FEATURES,
     PATTERN_COVERAGE_MIN,
     PATTERN_DEGRADED_MIN_EVENTS,
     PATTERN_DEGRADED_WEEKS,
@@ -37,6 +38,7 @@ from .const import (
     PATTERN_DRY_HOURS_CAP,
     PATTERN_EVENT_GAP_H,
     PATTERN_GRAD_CLIP,
+    PATTERN_HISTORY_FEATURES_METHOD,
     PATTERN_HISTORY_METHOD,
     PATTERN_HISTORY_RETRY_S,
     PATTERN_HISTORY_STD_WEIGHT,
@@ -181,8 +183,18 @@ _FEATURE_MASKS: dict[str, tuple[str, ...]] = {
 }
 
 # Features the replay of recorder statistics cannot supply (wind direction is
-# not averageable, the storm distance filter is lost); they train as masked.
-REPLAY_MASKED_FEATURES: frozenset[str] = frozenset({"wind_u", "wind_v"})
+# not averageable, the storm distance filter is lost, solar features are unrecorded);
+# they train as masked.
+REPLAY_MASKED_FEATURES: frozenset[str] = frozenset(
+    {
+        "wind_u",
+        "wind_v",
+        "cloud_deficit",
+        "solar_ok",
+        "last_day_clearness",
+        "last_day_clearness_ok",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Target registry: adding a target is a declaration, not new machinery
@@ -834,6 +846,36 @@ class PatternEngine:
         """Back to a fresh engine (same configuration)."""
         fresh = PatternEngine(self.thresholds, self.storm_source, self.source_fingerprint, self.tick_cap_s)
         self.__dict__.update(fresh.__dict__)
+
+    def scoped_reset_features(
+        self, feature_names: tuple[str, ...] | set[str] | frozenset[str] = PATTERN_CORRUPTED_FEATURES
+    ) -> set[str]:
+        """Reset standardizer slots and model weights for specific corrupted features only (v3.0).
+
+        Keeps bias (w[0]), all other feature weights, base rates, conditional rates,
+        scoring, reliability, history entries, and all other standardizer slots untouched.
+        """
+        for feat in feature_names:
+            if feat in POOL_INDEX:
+                slot = POOL_INDEX[feat]
+                self.std.mean[slot] = 0.0
+                self.std.var[slot] = 1.0
+                self.std.n[slot] = 0
+
+        reset_targets: set[str] = set()
+        for tid, model in self.models.items():
+            touched = False
+            for feat in feature_names:
+                if feat in model.spec.features:
+                    idx = model.spec.features.index(feat) + 1  # 0 is bias
+                    model.w[idx] = 0.0
+                    model.g2[idx] = 0.0
+                    model.cp_w[idx] = 0.0
+                    model.cp_g2[idx] = 0.0
+                    touched = True
+            if touched:
+                reset_targets.add(tid)
+        return reset_targets
 
     # -- 60 s tick: tallies, events, label resolution -----------------------
 
@@ -1510,7 +1552,7 @@ class PatternEngine:
             vec: list[float | None] = [None] * N_POOL
             vec[POOL_INDEX["mslp"]] = hist.mslp[j]
             dp3 = diff(hist.mslp, j, j - 3)
-            vec[POOL_INDEX["dp_3h"]] = None if dp3 is None else dp3 / 3.0
+            vec[POOL_INDEX["dp_3h"]] = dp3
             vec[POOL_INDEX["dp_24h"]] = diff(hist.mslp, j, j - 24)
             vec[POOL_INDEX["temp"]] = hist.temp[j]
             vec[POOL_INDEX["dpd"]] = hist.dpd[j]
@@ -1634,6 +1676,7 @@ class PatternEngine:
             "status": "ok" if not failed else ("partial" if oks else "unavailable"),
             "reason": "; ".join(failed) if failed else None,
             "targets": targets,
+            "features_method": PATTERN_HISTORY_FEATURES_METHOD,
         }
         for m in self.models.values():
             self._update_maturity(m, now_ts)
@@ -1907,6 +1950,9 @@ class PatternEngine:
         for key in ("done_at", "span_days"):
             if _opt_ok(hl.get(key)):
                 out[key] = hl.get(key)
+        fm = hl.get("features_method")
+        if _finite(fm):
+            out["features_method"] = int(fm)
         for key in ("status", "reason"):
             if isinstance(hl.get(key), (str, type(None))):
                 out[key] = hl.get(key)

@@ -376,11 +376,18 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             dt_s = item.get("datetime")
             if not dt_s:
                 continue
-            # The cached forecast is refreshed every 30-60 min; hours that have
-            # already passed would otherwise lead the card, reading as an offset.
-            if str(dt_s)[:13] < now_hour_iso:
-                continue
             dt = _local_iso(str(dt_s))
+            slot_dt = dt_util.parse_datetime(dt)
+            if slot_dt is not None:
+                if slot_dt.tzinfo is None:
+                    slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
+                else:
+                    slot_dt = dt_util.as_local(slot_dt)
+                # Past hours are discarded; timestamp-aware comparison handles DST safely
+                if (slot_dt - now_local).total_seconds() < -1e-3:
+                    continue
+            elif str(dt_s)[:13] < now_hour_iso:
+                continue
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")

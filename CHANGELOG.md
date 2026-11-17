@@ -2,6 +2,43 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [3.0.0] - 2026-11-17
+
+### Added
+
+- **Weather Windows Decision Engine:** Evaluates upcoming weather conditions across a 24-hour horizon to identify optimal outdoor activity windows:
+  - `outdoor_drying`: Identifies periods suitable for drying clothes outdoors based on rain probability, ambient temperature, humidity/drying potential, wind/gust speed, and daylight.
+  - `garden_work`: Identifies suitable outdoor gardening intervals with custom temperature, wind gust, daylight, and precipitation limits.
+  - `custom`: Flexible user-defined window criteria with configurable limits and minimum required duration.
+  - **Sensors:** When enabled (`enable_weather_windows`), adds `status`, `next_start` (`SensorDeviceClass.TIMESTAMP`), and `next_end` (`SensorDeviceClass.TIMESTAMP`) sensors for enabled profiles. Zero entities created when disabled.
+  - **Truncation detection:** Automatically marks windows reaching the end of the forecast horizon as horizon-truncated (`is_truncated: True`) to avoid open-ended assumptions.
+  - **Automation Blueprint:** Added `blueprints/automation/ws_core/weather_window_notification.yaml` to notify users when an activity window opens or when rain threatens an active window.
+- **Provider Capability Matrix (`capabilities.py`):** Added capability and coverage definitions across all 7 forecast providers (Open-Meteo, Met.no, NWS/NOAA, OpenWeatherMap, Pirate Weather, Météo-France, and HA Weather Entity) to track assessable horizon and variable availability without fabricating missing series.
+- **New Read-Only Service Actions:**
+  - `ws_core.get_weather_windows` (`SupportsResponse.ONLY`): Evaluates weather windows on demand with structured reasons, assessed intervals, and horizon limits.
+  - `ws_core.get_station_summary` (`SupportsResponse.ONLY`): Deterministic, compact JSON-serializable station snapshot designed for voice assistants (Home Assistant Assist) and scripts.
+- **Modernized `ws_core.export_learning_state` Service:** Upgraded to `SupportsResponse.OPTIONAL`. Returns a compact JSON summary by default (safe for automation traces) with an optional `full: true` parameter for complete model weights and climatology history.
+- **Menu-Driven Options Flow:** Replaced the rigid multi-step wizard in Post-Install Configuration with an `async_show_menu` navigation hub featuring dedicated sections:
+  - **Sensor Sources:** Hardware entity mappings for required and optional sensors.
+  - **Weather Forecast:** Provider selection, coordinates, refresh interval, and HA weather entity setup.
+  - **Decision Profiles:** Weather Windows engine toggle and active profile selection.
+  - **Indoor Rooms:** Room management hub (add, edit, remove rooms).
+  - **Thresholds, Units & Calibration:** Station elevation, unit presets, alert thresholds, filtering, and calibration offsets.
+  - **Weather Services & Uploads:** CWOP, Wunderground, Windy, Weathercloud, PWSweather, WOW, AWEKAS, and MQTT.
+  - **Features & Diagnostics:** Modular feature toggles and diagnostic sensors.
+
+### Changed
+
+- **Coalesced Sensor Burst Updates:** Implemented a 150 ms debounce delay (`COALESCE_BURST_DELAY_S`) in `WSStationCoordinator` for sensor bursts from multi-sensor weather stations (e.g. Ecowitt, Ambient Weather). Immediate state flushing is preserved for lightning hazard events, the 60 s sample tick cancels pending debounce refreshes, and coordinator teardown cancels pending debounce handles cleanly without post-unload writes.
+- **Timestamp-Aware Lead-Time Blending:** Forecast lead-time blending in `weather.py` now uses aware datetime comparisons, ensuring robustness against repeated and skipped DST hours.
+
+### Fixed
+
+- **Pattern Forecast Learning Migration & Replay Alignment:**
+  - Masked solar features (`cloud_deficit`, `solar_ok`, `last_day_clearness`, `last_day_clearness_ok`) in replay vector generation to prevent historical replays from corrupting standardizer slots with zeros.
+  - Aligned `dp_3h` replay units: removed `/ 3.0` factor in `replay()` so historical replays and live station updates both evaluate 3-hour pressure change in hPa consistently.
+  - Implemented scoped reset (`scoped_reset_features`): on upgrade to v3.0 (with `features_method = 4`), standardizer slots and model weights for corrupted features are reset cleanly while preserving all other weights, base rates, and learned history.
+
 ## [2.14.2] - 2026-11-17
 
 ### Fixed

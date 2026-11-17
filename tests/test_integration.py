@@ -707,7 +707,7 @@ class TestOptionsFlowSourceValidation:
         states = {f"sensor.{k}": "1.0" for k in REQUIRED_SOURCES}
         flow = self._make_flow(sources, states)
 
-        res = asyncio.run(flow.async_step_init(None))
+        res = asyncio.run(flow.async_step_forecast(None))
         schema = res["data_schema"]
 
         # Build the payload the frontend submits, omitting the (empty) weather entity.

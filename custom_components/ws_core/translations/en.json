@@ -374,8 +374,45 @@
   "options": {
     "step": {
       "init": {
-        "title": "Core Settings",
-        "description": "Identity, units, forecast, alerts and calibration.",
+        "title": "Configuration Menu",
+        "description": "Choose a section to configure.",
+        "menu_options": {
+          "sources": "Sensor Sources (Hardware Mappings)",
+          "forecast": "Weather Forecast & Location",
+          "decision_profiles": "Decision Engine & Weather Windows",
+          "rooms": "Indoor Rooms",
+          "thresholds": "Thresholds, Units & Calibration",
+          "uploads": "Weather Services & Uploads",
+          "diagnostics": "Features & Diagnostics"
+        }
+      },
+      "sources": {
+        "title": "Sensor Sources",
+        "description": "Configure physical sensor entity mappings."
+      },
+      "forecast": {
+        "title": "Weather Forecast",
+        "description": "Configure external weather forecast provider, update interval, and coordinates.",
+        "data": {
+          "forecast_enabled": "Enable forecast",
+          "forecast_interval_min": "Forecast refresh interval",
+          "forecast_lat": "Forecast latitude",
+          "forecast_lon": "Forecast longitude",
+          "forecast_provider": "Forecast provider",
+          "forecast_entity": "HA weather entity (for Home Assistant provider)"
+        }
+      },
+      "decision_profiles": {
+        "title": "Decision Profiles & Weather Windows",
+        "description": "Configure the Weather Decision Engine and select automated activity windows.",
+        "data": {
+          "enable_weather_windows": "Enable Weather Windows Decision Engine",
+          "weather_window_profiles": "Active Decision Profiles"
+        }
+      },
+      "thresholds": {
+        "title": "Thresholds, Units & Calibration",
+        "description": "Station identity, units, alert thresholds, and sensor calibration offsets.",
         "data": {
           "prefix": "Entity prefix",
           "hemisphere": "Hemisphere",
@@ -388,52 +425,6 @@
           "rain_unit": "Rainfall unit",
           "distance_unit": "Distance unit",
           "altitude_unit": "Altitude unit",
-          "forecast_enabled": "Enable forecast",
-          "forecast_interval_min": "Forecast refresh interval",
-          "forecast_lat": "Forecast latitude",
-          "forecast_lon": "Forecast longitude",
-          "forecast_provider": "Forecast provider",
-          "forecast_api_key": "Forecast API Key",
-          "forecast_entity": "HA weather entity (for Home Assistant provider)",
-          "thresh_wind_gust_ms": "Wind gust alert threshold",
-          "thresh_rain_rate_mmph": "Rain rate alert threshold",
-          "thresh_freeze_c": "Freeze warning threshold",
-          "staleness_s": "Sensor staleness timeout",
-          "rain_filter_alpha": "Rain-rate filter smoothing",
-          "pressure_trend_window_h": "Pressure trend window",
-          "cal_temp_c": "Temperature calibration offset",
-          "cal_humidity": "Humidity calibration offset",
-          "cal_pressure_hpa": "Pressure calibration offset",
-          "cal_wind_ms": "Wind speed calibration offset",
-          "enable_display_sensors": "Display sensors (levels, trends, health)",
-          "enable_fire_risk_score": "Fire risk score",
-          "enable_sea_temp": "Sea surface temperature",
-          "sea_temp_lat": "Sea temperature latitude",
-          "sea_temp_lon": "Sea temperature longitude",
-          "enable_wunderground": "Weather Underground upload",
-          "wu_station_id": "WU Station ID",
-          "wu_api_key": "WU Station key (password)",
-          "wu_interval_min": "WU upload interval"
-        },
-        "data_description": {
-          "prefix": "Entity prefix",
-          "hemisphere": "Hemisphere",
-          "climate_region": "Climate region",
-          "elevation_m": "Station elevation",
-          "units_mode": "Sets a baseline unit system. Individual unit overrides below take precedence.",
-          "temp_unit": "Override temperature display. 'Auto' follows your HA unit system.",
-          "wind_unit": "Override wind speed display. 'Auto' follows your HA unit system.",
-          "pressure_unit": "Override pressure display. 'Auto' follows your HA unit system.",
-          "rain_unit": "Override rainfall display. 'Auto' follows your HA unit system.",
-          "distance_unit": "Override distance display (e.g. lightning distance). 'Auto' follows your HA unit system.",
-          "altitude_unit": "Override altitude display (e.g. cloud base, freezing level). 'Auto' follows your HA unit system.",
-          "forecast_enabled": "Enable forecast",
-          "forecast_interval_min": "Forecast refresh interval",
-          "forecast_lat": "Forecast latitude",
-          "forecast_lon": "Forecast longitude",
-          "forecast_provider": "Weather data source. Open-Meteo and Met.no are free with no API key. NWS/NOAA is free but US only. OpenWeatherMap, Pirate Weather, and Météo France require a free API key. 'Home Assistant weather entity' uses an existing weather.* entity - no extra API calls.",
-          "forecast_api_key": "API key for the selected forecast provider (required for OpenWeatherMap, Pirate Weather, and Météo France).",
-          "forecast_entity": "Required when 'Home Assistant weather entity' is selected. Choose any weather.* entity already set up in Home Assistant.",
           "thresh_wind_gust_ms": "Wind gust alert threshold",
           "thresh_rain_rate_mmph": "Rain rate alert threshold",
           "thresh_freeze_c": "Freeze warning threshold",

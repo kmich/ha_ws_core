@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.14.2"
+_INTEGRATION_VERSION = "3.0.0"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -764,10 +764,21 @@ PATTERN_HISTORY_RETRY_S = 7 * 86400.0  # a target that could not replay is retri
 # out PATTERN_HISTORY_RETRY_S. v2 (2.11.1): cumulative counters recorded as
 # measurement statistics (hourly mean/min/max only) are read from the hourly max.
 # v3 (2.13.17): the unit of each statistic is read, not taken for metric.
-PATTERN_HISTORY_METHOD = 3
+# v4 (3.0.0): dp_3h scale aligned to 3h change; cloud_deficit and solar features masked in replay.
+PATTERN_HISTORY_METHOD = 4
 # Replays older than this took every statistic for metric: a station whose
 # statistics are not metric has to learn again.
 PATTERN_HISTORY_UNITS_METHOD = 3
+# Replays older than this used unmasked solar features and 1h dp_3h: affected
+# features are reset and re-replayed under method 4.
+PATTERN_HISTORY_FEATURES_METHOD = 4
+PATTERN_CORRUPTED_FEATURES: tuple[str, ...] = (
+    "cloud_deficit",
+    "solar_ok",
+    "last_day_clearness",
+    "last_day_clearness_ok",
+    "dp_3h",
+)
 PATTERN_HISTORY_STD_WEIGHT = 4.0  # an hourly replay sample weighs like four 15-min samples in the EMA
 PATTERN_HISTORY_DELAY_S = 120.0  # wait after startup before reading the recorder
 
@@ -1296,3 +1307,28 @@ ENTRY_REPAIR_ISSUES = (
 def issue_id_for_entry(name: str, entry_id: str) -> str:
     """Repairs issue ID for ``name`` scoped to one config entry."""
     return f"{name}_{entry_id}"
+
+
+# ---------------------------------------------------------------------------
+# v3.0.0 Architecture & Weather Decision Engine
+# ---------------------------------------------------------------------------
+
+# Update coalescing (Scope D)
+COALESCE_BURST_DELAY_S = 0.15  # 150 ms debounce to collapse multi-sensor packet bursts
+
+# Weather Windows Decision Engine (Scope C)
+CONF_ENABLE_WEATHER_WINDOWS = "enable_weather_windows"
+DEFAULT_ENABLE_WEATHER_WINDOWS = False
+CONF_WEATHER_WINDOW_PROFILES = "weather_window_profiles"
+
+KEY_WEATHER_WINDOWS = "weather_windows"
+
+SERVICE_GET_WEATHER_WINDOWS = "get_weather_windows"
+SERVICE_GET_STATION_SUMMARY = "get_station_summary"
+
+PROFILE_OUTDOOR_DRYING = "outdoor_drying"
+PROFILE_GARDEN_WORK = "garden_work"
+PROFILE_CUSTOM = "custom"
+
+DEFAULT_WEATHER_WINDOW_PROFILES = [PROFILE_OUTDOOR_DRYING, PROFILE_GARDEN_WORK]
+

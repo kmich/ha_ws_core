@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     CONF_ENABLE_INDOOR,
     CONF_ENABLE_VIGICRUES,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_INDOOR_ROOMS,
     CONF_PREFIX,
     CONF_VIGICRUES_RIVER_NAME,
@@ -200,6 +201,7 @@ from .const import (
     KEY_VPD,
     KEY_WBGT,
     KEY_WC_STATUS,
+    KEY_WEATHER_WINDOWS,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_CHILL,
@@ -429,6 +431,78 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         for st in stations:
             entities.append(WSRiverSensor(coordinator, entry, prefix, st))
             entities.append(WSRiverFlowSensor(coordinator, entry, prefix, st))
+
+    # v3.0.0: Weather Windows Decision Engine entities (created only when enabled)
+    if opts.get(CONF_ENABLE_WEATHER_WINDOWS, False):
+        from homeassistant.util import dt as dt_util
+
+        from .weather_windows import DEFAULT_PROFILES
+
+        def _parse_ts(val: Any):
+            if not val:
+                return None
+            return dt_util.parse_datetime(str(val))
+
+        for pid, prof in DEFAULT_PROFILES.items():
+            if not prof.enabled:
+                continue
+
+            # 1. Profile Status sensor
+            entities.append(
+                WSSensor(
+                    coordinator,
+                    entry,
+                    WSSensorDescription(
+                        key=f"window_{pid}_status",
+                        name=f"{prof.name} Status",
+                        translation_key=f"window_{pid}_status",
+                        icon="mdi:calendar-clock",
+                        value_fn=lambda d, _pid=pid: (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("status"),
+                        attrs_fn=lambda d, _pid=pid: {
+                            "reasons": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("reasons_text", []),
+                            "reason_codes": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("reason_codes", []),
+                            "duration_h": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("duration_h"),
+                            "is_truncated": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("is_truncated", False),
+                            "horizon_hours": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("horizon_hours", 0),
+                        },
+                    ),
+                    prefix,
+                )
+            )
+
+            # 2. Next window start (TIMESTAMP)
+            entities.append(
+                WSSensor(
+                    coordinator,
+                    entry,
+                    WSSensorDescription(
+                        key=f"window_{pid}_next_start",
+                        name=f"{prof.name} Next Start",
+                        translation_key=f"window_{pid}_next_start",
+                        icon="mdi:play-circle-outline",
+                        device_class=SensorDeviceClass.TIMESTAMP,
+                        value_fn=lambda d, _pid=pid: _parse_ts((d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_start")),
+                    ),
+                    prefix,
+                )
+            )
+
+            # 3. Next window end (TIMESTAMP)
+            entities.append(
+                WSSensor(
+                    coordinator,
+                    entry,
+                    WSSensorDescription(
+                        key=f"window_{pid}_next_end",
+                        name=f"{prof.name} Next End",
+                        translation_key=f"window_{pid}_next_end",
+                        icon="mdi:stop-circle-outline",
+                        device_class=SensorDeviceClass.TIMESTAMP,
+                        value_fn=lambda d, _pid=pid: _parse_ts((d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_end")),
+                    ),
+                    prefix,
+                )
+            )
 
     async_add_entities(entities)
 

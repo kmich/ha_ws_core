@@ -66,6 +66,6 @@ async def test_unload_failure_does_not_stop_coordinator_or_remove_services():
 
     assert result_ok is True
     entry.runtime_data.async_stop.assert_awaited_once()
-    assert hass.services.async_remove.call_count == 4
+    assert hass.services.async_remove.call_count == 6
     removed = {c.args for c in hass.services.async_remove.call_args_list}
     assert all(dom == DOMAIN for dom, _ in removed)

@@ -39,7 +39,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_FINAL_WRITE, UnitOfTemperature
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -128,6 +128,7 @@ from .algorithms import (
 from .const import (
     ALERT_DEBOUNCE_OFF_TICKS,
     ALERT_DEBOUNCE_ON_TICKS,
+    COALESCE_BURST_DELAY_S,
     CONF_ALTITUDE_UNIT,
     CONF_AQI_INTERVAL_MIN,
     CONF_AWEKAS_INTERVAL_MIN,
@@ -174,6 +175,7 @@ from .const import (
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_ENABLE_WEATHERCLOUD,
     CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
@@ -277,6 +279,7 @@ from .const import (
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_WEATHER_WINDOWS,
     DEFAULT_ENABLE_WEATHERCLOUD,
     DEFAULT_ENABLE_WINDY,
     DEFAULT_ENABLE_WOW,
@@ -547,6 +550,7 @@ from .const import (
     KEY_VPD,
     KEY_WBGT,
     KEY_WC_STATUS,
+    KEY_WEATHER_WINDOWS,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
@@ -575,6 +579,7 @@ from .const import (
     PATTERN_HISTORY_DELAY_S,
     PRESSURE_HISTORY_INTERVAL_MIN,
     PRESSURE_HISTORY_SAMPLES,
+    PROFILE_CUSTOM,
     RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK,
     RAIN_EXPECTED_SOURCE_NOWCAST,
     RAIN_RATE_PHYSICAL_CAP_MMPH,
@@ -723,6 +728,12 @@ class WSStationRuntime:
 
 class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Keeps all derived values up to date."""
+
+    _debounce_handle: Any = None
+    _burst_debounce_delay_s: float = COALESCE_BURST_DELAY_S
+    weather_windows_enabled: bool = False
+    _weather_windows_engine: Any = None
+    _weather_windows_eval: dict[str, Any] = {}
 
     def __init__(
         self,
@@ -1091,6 +1102,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # lives in PatternRuntime / pattern_forecast.py; the coordinator only hooks it in.
         self.pattern_enabled = bool(_get(CONF_ENABLE_PATTERN_FORECAST, DEFAULT_ENABLE_PATTERN_FORECAST))
         self._pattern: PatternRuntime | None = PatternRuntime(self) if self.pattern_enabled else None
+
+        # v3.0 Update coalescing and Weather Windows Decision Engine
+        self._debounce_handle: Any = None
+        self._burst_debounce_delay_s: float = COALESCE_BURST_DELAY_S
+        self.weather_windows_enabled = bool(_get(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS))
+        self._weather_windows_engine: Any = None
+        self._weather_windows_eval: dict[str, Any] = {}
 
         # v1.8.4 Suppress HA Repairs notifications (issue #20)
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
@@ -1524,26 +1542,29 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_stop(self) -> None:
         self._stopped = True
+        self._cancel_debounce()
         for task in list(getattr(self, "_bg_tasks", ())):
             with contextlib.suppress(Exception):
                 task.cancel()
         if getattr(self, "_bg_tasks", None) is not None:
             self._bg_tasks.clear()
-        for u in self._unsubs:
+        for u in getattr(self, "_unsubs", ()):
             with contextlib.suppress(Exception):
                 u()
-        self._unsubs.clear()
+        if hasattr(self, "_unsubs"):
+            self._unsubs.clear()
         # Persist learning state one last time on clean shutdown
-        if self._learning_store is not None:
+        if getattr(self, "_learning_store", None) is not None:
             from .learning_state import async_save_learning
 
             await async_save_learning(self._learning_store, self._learning_state)
         # Preserve history and accumulators across an entry reload.
-        await self._async_save_history()
-        if self._pattern is not None:
+        if hasattr(self, "_async_save_history"):
+            await self._async_save_history()
+        if getattr(self, "_pattern", None) is not None:
             await self._pattern.async_save()
         # v2.0: remove MQTT Discovery entries on clean shutdown
-        if self.mqtt_enabled and self._mqtt_discovery_published:
+        if getattr(self, "mqtt_enabled", False) and getattr(self, "_mqtt_discovery_published", False):
             from .mqtt_publisher import async_unpublish_discovery
 
             with contextlib.suppress(Exception):
@@ -1553,6 +1574,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self.entry_options.get("prefix", "ws"),
                 )
 
+    def _cancel_debounce(self) -> None:
+        """Cancel any pending coalesced recompute timer."""
+        if self._debounce_handle is not None:
+            with contextlib.suppress(Exception):
+                self._debounce_handle()
+            self._debounce_handle = None
+
     async def async_reset_pattern_forecast(self) -> None:
         """Service hook (reset_learning_state, target pattern_forecast)."""
         if self._pattern is not None:
@@ -1560,11 +1588,43 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._start_once(self._pattern.async_learn_history, 5, "ws_core_pattern_history")
 
     @callback
-    def _handle_source_change(self, event) -> None:
-        self.async_set_updated_data(self._compute(sample=False))
+    def _handle_source_change(self, event=None) -> None:
+        """Handle sensor entity state change with burst coalescing."""
+        if event is None or getattr(self.hass, "loop", None) is None:
+            self._cancel_debounce()
+            self.async_set_updated_data(self._compute(sample=False))
+            return
+
+        # Prompt hazard handling: lightning events bypass debounce
+        eid = getattr(event, "data", {}).get("entity_id") if hasattr(event, "data") else None
+        is_hazard = bool(
+            eid
+            and (
+                eid == self.sources.get(SRC_LIGHTNING_COUNT)
+                or eid == self.sources.get(SRC_LIGHTNING_DISTANCE)
+            )
+        )
+        if is_hazard:
+            self._cancel_debounce()
+            self.async_set_updated_data(self._compute(sample=False))
+            return
+
+        if self._debounce_handle is not None:
+            return  # Already scheduled to flush this burst
+
+        @callback
+        def _flush_coalesced(_now=None) -> None:
+            self._debounce_handle = None
+            if not self._stopped:
+                self.async_set_updated_data(self._compute(sample=False))
+
+        delay = float(getattr(self, "_burst_debounce_delay_s", COALESCE_BURST_DELAY_S))
+        self._debounce_handle = async_call_later(self.hass, delay, _flush_coalesced)
 
     @callback
     def _handle_tick(self, _now) -> None:
+        """Sample tick (advances stored accumulators). Cancels any pending burst flush."""
+        self._cancel_debounce()
         self.async_set_updated_data(self._compute(sample=True))
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -5195,7 +5255,169 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # v2.0: fire HA Event entities for weather transitions
         self._fire_ws_events(data)
 
+        # v3.0: Weather Windows Decision Engine evaluation
+        self._compute_weather_windows(data, now)
+
         return data
+
+    def _compute_weather_windows(self, data: dict, now: Any) -> None:
+        """Evaluate enabled activity profiles for the next 24 hours (v3.0)."""
+        if not getattr(self, "weather_windows_enabled", DEFAULT_ENABLE_WEATHER_WINDOWS):
+            return
+
+        fc = data.get(KEY_FORECAST) or {}
+        hourly = fc.get("hourly") or []
+        lat = self.forecast_lat
+        lon = self.forecast_lon
+        if lat is None or lon is None:
+            return
+
+        if self._weather_windows_engine is None:
+            from .weather_windows import DEFAULT_PROFILES, WeatherWindowsEngine
+
+            self._weather_windows_engine = WeatherWindowsEngine(
+                lat=float(lat),
+                lon=float(lon),
+                elevation_m=float(getattr(self, "elevation_m", 0.0) or 0.0),
+                profiles=DEFAULT_PROFILES,
+            )
+
+        eval_dict = {}
+        for pid, prof in self._weather_windows_engine.profiles.items():
+            if prof.enabled:
+                res = self._weather_windows_engine.evaluate_profile(
+                    prof, hourly, current_data=data, now=now
+                )
+                eval_dict[pid] = res.to_dict()
+
+        self._weather_windows_eval = eval_dict
+        data[KEY_WEATHER_WINDOWS] = eval_dict
+
+    def get_weather_windows_evaluation(
+        self, profile_id: str | None = None, custom_limits: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Return structured weather windows response for actions (SupportsResponse.ONLY)."""
+        lat = self.forecast_lat or 0.0
+        lon = self.forecast_lon or 0.0
+        elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
+        from .weather_windows import DEFAULT_PROFILES, WeatherWindowProfile, WeatherWindowsEngine
+
+        if self._weather_windows_engine is None:
+            self._weather_windows_engine = WeatherWindowsEngine(
+                lat=float(lat), lon=float(lon), elevation_m=elev, profiles=DEFAULT_PROFILES
+            )
+
+        data = self.data or {}
+        fc = data.get(KEY_FORECAST) or {}
+        hourly = fc.get("hourly") or []
+        now = dt_util.now()
+
+        # If custom limits provided, create an ad-hoc profile
+        if custom_limits:
+            target_profile = WeatherWindowProfile(
+                profile_id=profile_id or PROFILE_CUSTOM,
+                name=str(custom_limits.get("name", "Custom")),
+                description="Custom request",
+                enabled=True,
+                min_duration_h=int(custom_limits.get("min_duration_h", 2)),
+                max_rain_prob_pct=float(custom_limits["max_rain_prob_pct"]) if custom_limits.get("max_rain_prob_pct") is not None else None,
+                max_rain_mm=float(custom_limits["max_rain_mm"]) if custom_limits.get("max_rain_mm") is not None else None,
+                min_temp_c=float(custom_limits["min_temp_c"]) if custom_limits.get("min_temp_c") is not None else None,
+                max_temp_c=float(custom_limits["max_temp_c"]) if custom_limits.get("max_temp_c") is not None else None,
+                min_humidity_pct=float(custom_limits["min_humidity_pct"]) if custom_limits.get("min_humidity_pct") is not None else None,
+                max_humidity_pct=float(custom_limits["max_humidity_pct"]) if custom_limits.get("max_humidity_pct") is not None else None,
+                min_wind_kmh=float(custom_limits["min_wind_kmh"]) if custom_limits.get("min_wind_kmh") is not None else None,
+                max_wind_kmh=float(custom_limits["max_wind_kmh"]) if custom_limits.get("max_wind_kmh") is not None else None,
+                max_wind_gust_kmh=float(custom_limits["max_wind_gust_kmh"]) if custom_limits.get("max_wind_gust_kmh") is not None else None,
+                max_cloud_cover_pct=float(custom_limits["max_cloud_cover_pct"]) if custom_limits.get("max_cloud_cover_pct") is not None else None,
+                require_daylight=bool(custom_limits.get("require_daylight", True)),
+            )
+            res = self._weather_windows_engine.evaluate_profile(target_profile, hourly, current_data=data, now=now)
+            return res.to_dict()
+
+        if profile_id:
+            prof = self._weather_windows_engine.profiles.get(profile_id)
+            if prof is None:
+                return {
+                    "error": f"Unknown profile '{profile_id}'",
+                    "available_profiles": list(self._weather_windows_engine.profiles.keys()),
+                }
+            res = self._weather_windows_engine.evaluate_profile(prof, hourly, current_data=data, now=now)
+            return res.to_dict()
+
+        # Return all enabled profiles
+        results = {}
+        for pid, prof in self._weather_windows_engine.profiles.items():
+            if prof.enabled:
+                res = self._weather_windows_engine.evaluate_profile(prof, hourly, current_data=data, now=now)
+                results[pid] = res.to_dict()
+        return results
+
+    def get_station_summary(self) -> dict[str, Any]:
+        """Return concise, deterministic summary for voice/Assist actions (SupportsResponse.ONLY)."""
+        data = self.data or {}
+        now = dt_util.now()
+        pattern = getattr(self, "_pattern", None)
+        active_alerts = list(data.get("_active_alerts") or [])
+        windows_summary = {}
+        for pid, win in (data.get(KEY_WEATHER_WINDOWS) or {}).items():
+            windows_summary[pid] = {
+                "status": win.get("status"),
+                "next_start": win.get("next_start"),
+                "duration_h": win.get("duration_h"),
+                "reasons": win.get("reasons_text", [])[:1],
+            }
+
+        fc_expired = False
+        if getattr(self, "forecast_provider_id", None):
+            rt = getattr(self, "runtime", None)
+            last_fetch = getattr(rt, "last_forecast_fetch", None) if rt is not None else None
+            if last_fetch is None:
+                fc_expired = True
+            else:
+                max_age_s = max(FORECAST_CACHE_MAX_AGE_S, int(getattr(self, "forecast_interval_min", 30)) * 60 * 6)
+                fc_expired = (now - last_fetch).total_seconds() > max_age_s
+
+        return {
+            "entry_id": self.entry_data.get("entry_id", "station"),
+            "prefix": self.entry_options.get("prefix", "ws"),
+            "evaluated_at": now.astimezone(UTC).isoformat(),
+            "elevation_m": getattr(self, "elevation_m", 0.0),
+            "current_conditions": {
+                "temperature_c": data.get(KEY_NORM_TEMP_C),
+                "humidity_pct": data.get(KEY_NORM_HUMIDITY),
+                "dew_point_c": data.get(KEY_DEW_POINT_C),
+                "feels_like_c": data.get(KEY_FEELS_LIKE_C),
+                "pressure_hpa": data.get(KEY_NORM_PRESSURE_HPA),
+                "pressure_trend_3h_hpa": data.get(KEY_PRESSURE_TREND_HPAH),
+                "pressure_trend_display": data.get(KEY_PRESSURE_TREND_DISPLAY),
+                "wind_speed_ms": data.get(KEY_NORM_WIND_SPEED_MS),
+                "wind_gust_ms": data.get(KEY_NORM_WIND_GUST_MS),
+                "wind_direction_deg": data.get(KEY_NORM_WIND_DIR_DEG),
+                "rain_rate_mmph": data.get(KEY_RAIN_RATE_FILT),
+                "rain_today_mm": data.get(KEY_RAIN_TODAY_MM),
+                "condition": data.get(KEY_CURRENT_CONDITION),
+                "uv_index": data.get(KEY_UV),
+                "solar_radiation_wm2": (
+                    self._get_solar_radiation()
+                    if hasattr(self, "_get_solar_radiation") and getattr(self, "hass", None) is not None
+                    else None
+                ),
+            },
+            "daily_extremes": {
+                "temp_high_24h_c": data.get(KEY_TEMP_HIGH_24H),
+                "temp_low_24h_c": data.get(KEY_TEMP_LOW_24H),
+                "gust_max_24h_ms": data.get(KEY_WIND_GUST_MAX_24H),
+            },
+            "active_alerts": active_alerts,
+            "forecast_validity": {
+                "provider": self.forecast_provider_id,
+                "is_expired": fc_expired,
+                "hourly_horizon_h": len((data.get(KEY_FORECAST) or {}).get("hourly") or []),
+            },
+            "pattern_forecast_maturity": pattern.summary() if pattern is not None else None,
+            "weather_windows": windows_summary,
+        }
 
     def _compute_daily_pm(self, data: dict, now: Any) -> None:
         """Publish FAO-56 PM only for one covered local calendar day."""

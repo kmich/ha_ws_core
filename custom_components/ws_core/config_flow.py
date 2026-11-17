@@ -67,6 +67,7 @@ from .const import (
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_ENABLE_WEATHERCLOUD,
     CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
@@ -106,6 +107,7 @@ from .const import (
     CONF_UNITS_MODE,
     CONF_VIGICRUES_STATION_CODE,
     CONF_VIGICRUES_STATIONS,
+    CONF_WEATHER_WINDOW_PROFILES,
     CONF_WIND_UNIT,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
@@ -150,6 +152,7 @@ from .const import (
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_WEATHER_WINDOWS,
     DEFAULT_ENABLE_WEATHERCLOUD,
     DEFAULT_ENABLE_WINDY,
     DEFAULT_ENABLE_WOW,
@@ -179,6 +182,7 @@ from .const import (
     DEFAULT_THRESH_RAIN_RATE_MMPH,
     DEFAULT_THRESH_WIND_GUST_MS,
     DEFAULT_UNITS_MODE,
+    DEFAULT_WEATHER_WINDOW_PROFILES,
     DEFAULT_WIND_UNIT,
     DEFAULT_WU_INTERVAL_MIN,
     DISTANCE_UNIT_OPTIONS,
@@ -193,6 +197,9 @@ from .const import (
     HEMISPHERE_OPTIONS,
     OPTIONAL_SOURCES,
     PRESSURE_UNIT_OPTIONS,
+    PROFILE_CUSTOM,
+    PROFILE_GARDEN_WORK,
+    PROFILE_OUTDOOR_DRYING,
     PROVIDERS_REQUIRING_API_KEY,
     PROVIDERS_REQUIRING_ENTITY,
     RAIN_UNIT_OPTIONS,
@@ -1697,10 +1704,145 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
     def _get(self, key: str, default: Any) -> Any:
         return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
 
+    def _ensure_opt(self) -> dict[str, Any]:
+        if not hasattr(self, "_opt") or self._opt is None:
+            if hasattr(self, "config_entry") and self.config_entry is not None:
+                self._opt = dict(getattr(self.config_entry, "options", {}))
+            else:
+                self._opt = {}
+        return self._opt
+
     # ------------------------------------------------------------------
-    # Step 1: Core - identity, location, units, forecast, calibration, alerts
+    # Main Menu Hub (v3.0.0 Scope D)
     # ------------------------------------------------------------------
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
+        """Main options hub menu."""
+        self._ensure_opt()
+        if user_input is not None and not isinstance(user_input, str):
+            # Backward-compat: if called with core schema dict directly (legacy callers/tests)
+            return await self.async_step_thresholds(user_input)
+
+        menu_options = [
+            "sources",
+            "forecast",
+            "decision_profiles",
+            "rooms",
+            "thresholds",
+            "uploads",
+            "diagnostics",
+        ]
+        return self.async_show_menu(step_id="init", menu_options=menu_options)
+
+    async def async_step_sources(self, user_input: dict[str, Any] | None = None):
+        """Navigate to required sources, then optional sources."""
+        self._ensure_opt()
+        self._in_menu_sources = True
+        return await self.async_step_required_sources_opt(user_input)
+
+    async def async_step_forecast(self, user_input: dict[str, Any] | None = None):
+        """Configure forecast provider and coordinates."""
+        self._ensure_opt()
+        if user_input is not None:
+            self._opt.update(user_input)
+            if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
+                return await self.async_step_forecast_api_key_opt()
+            return self.async_create_entry(title="", data=self._opt)
+
+        return self.async_show_form(
+            step_id="forecast",
+            data_schema=self._build_forecast_schema(),
+        )
+
+    def _build_forecast_schema(self) -> vol.Schema:
+        """Schema for external forecast provider settings."""
+        g = self._get
+        default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
+        default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_FORECAST_INTERVAL_MIN, default=g(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
+                ),
+                vol.Optional(
+                    CONF_FORECAST_LAT, default=g(CONF_FORECAST_LAT, round(default_lat, 4))
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")),
+                vol.Optional(
+                    CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
+                vol.Optional(
+                    CONF_FORECAST_PROVIDER, default=g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            FORECAST_PROVIDER_OPEN_METEO,
+                            FORECAST_PROVIDER_MET_NO,
+                            FORECAST_PROVIDER_NWS,
+                            FORECAST_PROVIDER_OWM,
+                            FORECAST_PROVIDER_PIRATE,
+                            FORECAST_PROVIDER_METEO_FRANCE,
+                            FORECAST_PROVIDER_HA_ENTITY,
+                        ],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="forecast_provider",
+                    )
+                ),
+                vol.Optional(
+                    CONF_FORECAST_ENTITY,
+                    description={"suggested_value": g(CONF_FORECAST_ENTITY, "") or None},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="weather")),
+            }
+        )
+
+    async def async_step_decision_profiles(self, user_input: dict[str, Any] | None = None):
+        """Configure Decision Profiles & Weather Windows."""
+        self._ensure_opt()
+        if user_input is not None:
+            self._opt.update(user_input)
+            return self.async_create_entry(title="", data=self._opt)
+
+        g = self._get
+        current_profiles = g(CONF_WEATHER_WINDOW_PROFILES, DEFAULT_WEATHER_WINDOW_PROFILES)
+        if isinstance(current_profiles, str):
+            current_profiles = [current_profiles]
+
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_ENABLE_WEATHER_WINDOWS,
+                    default=bool(g(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS)),
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_WEATHER_WINDOW_PROFILES,
+                    default=list(current_profiles),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {"value": PROFILE_OUTDOOR_DRYING, "label": "Outdoor Clothes Drying"},
+                            {"value": PROFILE_GARDEN_WORK, "label": "Garden & Yard Work"},
+                            {"value": PROFILE_CUSTOM, "label": "Custom Window Profile"},
+                        ],
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(step_id="decision_profiles", data_schema=schema)
+
+    async def async_step_rooms(self, user_input: dict[str, Any] | None = None):
+        """Hub menu for managing named indoor rooms."""
+        self._ensure_opt()
+        self._in_menu_rooms = True
+        return await self._rooms_menu()
+
+    async def async_step_thresholds(self, user_input: dict[str, Any] | None = None):
+        """Configure Station identity, units, alerts, and calibration thresholds."""
+        self._ensure_opt()
         units_mode = str(self._get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
         imperial = _is_imperial(units_mode, self.hass)
         wind_unit_conf = str(self._get(CONF_WIND_UNIT, DEFAULT_WIND_UNIT))
@@ -1719,14 +1861,12 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                 elev = float(out.get(CONF_ELEVATION_M, 0))
                 if not (VALID_ELEVATION_MIN_M <= elev <= VALID_ELEVATION_MAX_M):
                     return self.async_show_form(
-                        step_id="init",
-                        data_schema=self._build_core_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
+                        step_id="thresholds",
+                        data_schema=self._build_thresholds_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
                         errors={CONF_ELEVATION_M: "elevation_out_of_range"},
-                        last_step=False,
                     )
             except (TypeError, ValueError):
                 pass
-            # Convert thresholds to canonical metric
             out[CONF_THRESH_WIND_GUST_MS] = _convert_gust_to_ms(
                 float(out.get(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS)), gust_u
             )
@@ -1736,27 +1876,184 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             out[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(
                 float(out.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C)), temp_u == "°F"
             )
-            out[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
-                float(out.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)), rain_meas
-            )
-            out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
-                float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), rain_meas
-            )
-            # Merge into options - source mapping step comes next.
-            self._opt: dict[str, Any] = out
-            return await self.async_step_required_sources_opt()
+            if CONF_RAIN_PENALTY_LIGHT_MMPH in out:
+                out[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
+                    float(out.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)), rain_meas
+                )
+            if CONF_RAIN_PENALTY_HEAVY_MMPH in out:
+                out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
+                    float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), rain_meas
+                )
+            self._opt.update(out)
+            return self.async_create_entry(title="", data=self._opt)
 
         return self.async_show_form(
-            step_id="init",
-            data_schema=self._build_core_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
-            last_step=False,
+            step_id="thresholds",
+            data_schema=self._build_thresholds_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
         )
 
+    def _build_thresholds_schema(
+        self, imperial: bool, gust_u: str, rain_u: str, temp_u: str, rain_meas: str = "mm"
+    ) -> vol.Schema:
+        g = self._get
+        cur_gust_ms = float(g(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
+        cur_rain_mmph = float(g(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
+        cur_freeze_c = float(g(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
+        return vol.Schema(
+            {
+                vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
+                vol.Optional(CONF_HEMISPHERE, default=g(CONF_HEMISPHERE, DEFAULT_HEMISPHERE)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=HEMISPHERE_OPTIONS, mode="list", translation_key="hemisphere")
+                ),
+                vol.Optional(
+                    CONF_CLIMATE_REGION, default=g(CONF_CLIMATE_REGION, DEFAULT_CLIMATE_REGION)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=CLIMATE_REGION_OPTIONS, mode="dropdown", translation_key="climate_region"
+                    )
+                ),
+                vol.Optional(
+                    CONF_ELEVATION_M, default=g(CONF_ELEVATION_M, DEFAULT_ELEVATION_M)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=VALID_ELEVATION_MIN_M,
+                        max=VALID_ELEVATION_MAX_M,
+                        step=1,
+                        mode="box",
+                        unit_of_measurement="m",
+                    )
+                ),
+                vol.Optional(CONF_UNITS_MODE, default=g(CONF_UNITS_MODE, DEFAULT_UNITS_MODE)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=UNITS_MODE_OPTIONS, mode="dropdown", translation_key="units_mode"
+                    )
+                ),
+                vol.Optional(CONF_TEMP_UNIT, default=g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {"value": "auto", "label": "Auto"},
+                            {"value": "C", "label": "Celsius (°C)"},
+                            {"value": "F", "label": "Fahrenheit (°F)"},
+                        ],
+                        mode="list",
+                    )
+                ),
+                vol.Optional(CONF_WIND_UNIT, default=g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[{"value": o, "label": o} for o in WIND_UNIT_OPTIONS], mode="list"
+                    )
+                ),
+                vol.Optional(
+                    CONF_PRESSURE_UNIT, default=g(CONF_PRESSURE_UNIT, DEFAULT_PRESSURE_UNIT)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[{"value": o, "label": o} for o in PRESSURE_UNIT_OPTIONS], mode="list"
+                    )
+                ),
+                vol.Optional(CONF_RAIN_UNIT, default=g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[{"value": o, "label": o} for o in RAIN_UNIT_OPTIONS], mode="list"
+                    )
+                ),
+                vol.Optional(
+                    CONF_DISTANCE_UNIT, default=g(CONF_DISTANCE_UNIT, DEFAULT_DISTANCE_UNIT)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[{"value": o, "label": o} for o in DISTANCE_UNIT_OPTIONS], mode="list"
+                    )
+                ),
+                vol.Optional(
+                    CONF_ALTITUDE_UNIT, default=g(CONF_ALTITUDE_UNIT, DEFAULT_ALTITUDE_UNIT)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[{"value": o, "label": o} for o in ALTITUDE_UNIT_OPTIONS], mode="list"
+                    )
+                ),
+                vol.Optional(
+                    CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, gust_u), 1)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=120, step=0.1, mode="box", unit_of_measurement=gust_u)
+                ),
+                vol.Optional(
+                    CONF_THRESH_RAIN_RATE_MMPH, default=round(_convert_rain_to_display(cur_rain_mmph, rain_meas), 2)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0, max=200, step=0.5, mode="box", unit_of_measurement=rain_u)
+                ),
+                vol.Optional(
+                    CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, temp_u == "°F"), 1)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=round(_convert_temp_to_display(-30.0, temp_u == "°F"), 1),
+                        max=round(_convert_temp_to_display(10.0, temp_u == "°F"), 1),
+                        step=0.5,
+                        mode="box",
+                        unit_of_measurement=temp_u,
+                    )
+                ),
+                vol.Optional(
+                    CONF_STALENESS_S, default=g(CONF_STALENESS_S, DEFAULT_STALENESS_S)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=60, max=86400, step=60, mode="box", unit_of_measurement="s")
+                ),
+                vol.Optional(
+                    CONF_RAIN_FILTER_ALPHA, default=g(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA)
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="slider")),
+                vol.Optional(
+                    CONF_PRESSURE_TREND_WINDOW_H,
+                    default=g(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
+                ),
+                vol.Optional(CONF_CAL_TEMP_C, default=g(CONF_CAL_TEMP_C, DEFAULT_CAL_TEMP_C)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="°C")
+                ),
+                vol.Optional(
+                    CONF_CAL_HUMIDITY, default=g(CONF_CAL_HUMIDITY, DEFAULT_CAL_HUMIDITY)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-20, max=20, step=0.5, mode="box", unit_of_measurement="%")
+                ),
+                vol.Optional(
+                    CONF_CAL_PRESSURE_HPA, default=g(CONF_CAL_PRESSURE_HPA, DEFAULT_CAL_PRESSURE_HPA)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="hPa")
+                ),
+                vol.Optional(
+                    CONF_CAL_WIND_MS, default=g(CONF_CAL_WIND_MS, DEFAULT_CAL_WIND_MS)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=-5, max=5, step=0.1, mode="box", unit_of_measurement="m/s")
+                ),
+            }
+        )
+
+    async def async_step_uploads(self, user_input: dict[str, Any] | None = None):
+        """Configure upload services."""
+        self._ensure_opt()
+        self._in_menu_uploads = True
+        return await self.async_step_upload_services_opt(user_input)
+
+    async def async_step_diagnostics(self, user_input: dict[str, Any] | None = None):
+        """Configure feature toggles & diagnostics."""
+        self._ensure_opt()
+        self._in_menu_diagnostics = True
+        return await self.async_step_features_opt(user_input)
+
+
+
+
+
     def _current_sources_for_options(self) -> dict[str, str]:
-        if CONF_SOURCES in self.config_entry.options:
-            current = dict(self.config_entry.options[CONF_SOURCES] or {})
-        else:
-            current = dict(self.config_entry.data.get(CONF_SOURCES, {}))
+        current: dict[str, str] = {}
+        try:
+            entry = self.config_entry
+            if entry is not None:
+                if CONF_SOURCES in entry.options:
+                    current = dict(entry.options[CONF_SOURCES] or {})
+                else:
+                    current = dict(entry.data.get(CONF_SOURCES, {}))
+        except (ValueError, AttributeError):
+            pass
+        if not current and hasattr(self, '_opt') and self._opt:
+            current = dict(self._opt.get(CONF_SOURCES, {}))
 
         guessed = _guess_defaults(self.hass)
         defaults: dict[str, str] = {}
@@ -1827,6 +2124,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             if not errors:
                 self._opt[CONF_SOURCES] = sources
                 self._opt[CONF_SOIL_MOISTURE_UNIT] = soil_unit
+                if getattr(self, "_in_menu_sources", False):
+                    return self.async_create_entry(title="", data=self._opt)
                 if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
                     return await self.async_step_forecast_api_key_opt()
                 return await self.async_step_features_opt()
@@ -2143,6 +2442,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             return await self.async_step_vigicrues_station_opt()
         if user_input.get(CONF_ENABLE_INDOOR):
             return await self.async_step_indoor_rooms_opt()
+        if getattr(self, "_in_menu_diagnostics", False):
+            return self.async_create_entry(title="", data=self._opt)
         return await self.async_step_upload_services_opt()
 
     async def async_step_pattern_forecast_opt(self, user_input: dict[str, Any] | None = None):
@@ -2264,12 +2565,16 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         return self.async_create_entry(title="", data=self._opt)
 
     async def _rooms_done(self):
+        if getattr(self, "_in_menu_rooms", False):
+            return self.async_create_entry(title="", data=self._opt)
         return await self._finish_or_next("indoor_rooms_opt")
 
     async def async_step_forecast_api_key_opt(self, user_input: dict[str, Any] | None = None):
         """Options step: API key for providers that require one."""
         if user_input is not None:
             self._opt.update(user_input)
+            if not getattr(self, "_in_legacy_flow", False):
+                return self.async_create_entry(title="", data=self._opt)
             return await self.async_step_features_opt()
 
         provider = self._opt.get(CONF_FORECAST_PROVIDER, "")
@@ -2325,6 +2630,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         nxt = self._opt_next_after(after)
         if nxt is not None:
             return await nxt
+        if getattr(self, "_in_menu_diagnostics", False):
+            return self.async_create_entry(title="", data=self._opt)
         return await self.async_step_upload_services_opt()
 
     async def async_step_sea_temp_opt(self, user_input: dict[str, Any] | None = None):
