@@ -2,6 +2,15 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.14.2] - 2026-11-17
+
+### Fixed
+
+- **Fix false "Lightning, rainy" state on weather entity during dry, approaching storm conditions (`pre-storm`) (#203):** When rapidly falling pressure triggers a Zambretti "stormy" outlook, the integration classifies the dry condition ahead of the storm as `pre-storm` (`sensor.ws_current_condition` showing "Storm approaching"). Previously, `_LOCAL_CONDITION_MAP` in `weather.py` mapped `pre-storm` to Home Assistant's `lightning-rainy` condition, causing the weather card to show lightning bolts and raindrops on a dry day with no lightning. `pre-storm` now maps to `cloudy` (matching `mdi:weather-cloudy-alert`).
+- **Standardized severe weather condition mappings:** `severe-storm` and `hurricane` now map to `exceptional` on the weather entity instead of `lightning-rainy`.
+- **Added missing local condition mappings:** Conditions previously missing from `_LOCAL_CONDITION_MAP` (`icy-conditions` &rarr; `snowy`, `sandstorm` &rarr; `exceptional`, `african-dust` &rarr; `exceptional`, `smoke` &rarr; `fog`, `hazy-sun` &rarr; `sunny`) now map to appropriate Home Assistant weather conditions instead of falling back to `partlycloudy`.
+- **Classify active heavy rain with gale gusts as `severe-storm`:** In `determine_current_condition`, measured rain > 5 mm/h accompanied by gusts > 15 m/s previously returned `pre-storm`; it now returns `severe-storm`, keeping `pre-storm` exclusively for dry conditions where a storm is approaching.
+
 ## [2.14.1] - 2026-11-17
 
 ### Fixed

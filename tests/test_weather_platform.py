@@ -156,6 +156,37 @@ def test_weather_condition_fallback(mock_config_entry, mock_coordinator):
     assert entity.condition == "sunny"
 
 
+def test_pre_storm_weather_condition_is_cloudy_not_lightning_rainy(mock_config_entry, mock_coordinator):
+    """Issue #203: pre-storm (approaching storm, dry) must report cloudy, not lightning-rainy."""
+    mock_coordinator.data[KEY_CURRENT_CONDITION] = "pre-storm"
+    entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+    assert entity.condition == "cloudy"
+
+
+def test_all_local_conditions_mapped_to_valid_ha_weather_conditions():
+    """All 31 conditions defined by ws_core must map to valid HA weather conditions."""
+    import homeassistant.components.weather as w
+
+    from custom_components.ws_core.algorithms import CONDITION_DESCRIPTIONS
+
+    valid_ha_conditions = {
+        getattr(w, k) for k in dir(w) if k.startswith("ATTR_CONDITION_") and k != "ATTR_CONDITION_CLASS"
+    }
+
+    local_map = WSStationWeather._LOCAL_CONDITION_MAP
+
+    for cond in CONDITION_DESCRIPTIONS:
+        assert cond in local_map, f"Condition '{cond}' is missing from _LOCAL_CONDITION_MAP"
+        ha_cond = local_map[cond]
+        assert ha_cond in valid_ha_conditions, f"Mapped condition '{ha_cond}' is not a valid HA weather condition"
+
+    # Crucial safety assertions against false lightning/rain warnings
+    assert local_map["pre-storm"] == "cloudy"
+    assert local_map["severe-storm"] == "exceptional"
+    assert local_map["hurricane"] == "exceptional"
+    assert local_map["thunderstorm"] == "lightning-rainy"
+
+
 async def test_weather_forecast_daily_and_hourly(mock_config_entry, mock_coordinator):
     entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
 
