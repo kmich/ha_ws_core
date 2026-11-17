@@ -641,6 +641,144 @@ class TestCoordinatorHooks:
         )
         assert flagged == {"temp", "wind", "gust", "press"}
 
+    def test_stale_sources_flagged_inputs_mapping(self):
+        """Verify _stale_sources and stale_sources are correctly mapped to input groups."""
+        flagged = pattern_runtime.PatternRuntime._flagged_inputs({"_stale_sources": ["temperature", "pressure"]})
+        assert flagged == {"temp", "press"}
+
+        flagged_wind = pattern_runtime.PatternRuntime._flagged_inputs({"_stale_sources": ["wind_speed"]})
+        assert flagged_wind == {"wind", "gust"}
+
+        flagged_all = pattern_runtime.PatternRuntime._flagged_inputs(
+            {
+                "_stale_sources": ["temperature", "humidity", "pressure", "wind_speed", "wind_direction", "rain_total"],
+                "stale_sources": ["lightning_count", "illuminance"],
+            }
+        )
+        assert flagged_all == {"temp", "hum", "press", "wind", "gust", "rain", "lightning", "solar"}
+
+    def test_stale_pressure_blocks_issue_prediction(self):
+        """When pressure is stale, Instant has mslp=None and models waiting for pressure do not predict."""
+        coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True})
+        rt = coord._pattern
+        now = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        data = _data()
+        data["_stale_sources"] = ["pressure"]
+        rt.update(data, now, sample=True)
+        outputs = data.get(const.KEY_PATTERN_OUTPUTS, {})
+        assert outputs.get("rain_3h", {}).get("p") is None
+        assert outputs.get("rain_3h", {}).get("reason") == "waiting_for:mslp"
+
+    def test_stale_sources_excluded_from_observe_issue_201(self):
+        """Stale numeric sources must be excluded from pattern observe (issue #201)."""
+        now = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        old_time = now - timedelta(hours=3)
+        sources = {
+            "temperature": "sensor.t",
+            "humidity": "sensor.h",
+            "pressure": "sensor.p",
+            "wind_speed": "sensor.ws",
+            "wind_gust": "sensor.wg",
+            "wind_direction": "sensor.wd",
+            "rain_total": "sensor.r",
+        }
+        states = {
+            "sensor.t": state(14, unit_of_measurement="°C"),
+            "sensor.h": state(70, unit_of_measurement="%"),
+            "sensor.p": state(1008, unit_of_measurement="hPa"),
+            "sensor.ws": state(3, unit_of_measurement="m/s"),
+            "sensor.wg": state(5, unit_of_measurement="m/s"),
+            "sensor.wd": state(200),
+            "sensor.r": state(10, unit_of_measurement="mm"),
+            "sun.sun": state("above_horizon", elevation=30),
+        }
+        for st in states.values():
+            st.last_updated = old_time
+            st.last_reported = old_time
+
+        coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True}, sources, states)
+        coord.staleness_s = 900
+        seen: list = []
+        original_observe = coord._pattern.engine.observe
+
+        def capture(ts, obs, *a, **kw):
+            seen.append(obs)
+            return original_observe(ts, obs, *a, **kw)
+
+        coord._pattern.engine.observe = capture
+
+        from custom_components.ws_core import coordinator as coordinator_module
+
+        with patch.object(coordinator_module.dt_util, "utcnow", return_value=now):
+            data = coord._compute(sample=True)
+
+        assert data["source_healthy"] is False
+        assert data["model_ready"] is False
+        assert "temperature" in data["_stale_sources"]
+        assert seen
+        assert seen[-1].temp is None
+        assert seen[-1].wind_speed is None
+        assert seen[-1].wind_u is None
+        assert seen[-1].wind_v is None
+        assert seen[-1].gust is None
+        assert seen[-1].dpd is None
+
+    def test_partial_staleness_allows_fresh_targets_to_learn(self):
+        """When only wind is stale, fresh temperature still feeds pattern observe."""
+        now = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
+        old_time = now - timedelta(hours=3)
+        sources = {
+            "temperature": "sensor.t",
+            "humidity": "sensor.h",
+            "pressure": "sensor.p",
+            "wind_speed": "sensor.ws",
+            "wind_gust": "sensor.wg",
+            "wind_direction": "sensor.wd",
+            "rain_total": "sensor.r",
+        }
+        states = {
+            "sensor.t": state(14, unit_of_measurement="°C"),
+            "sensor.h": state(70, unit_of_measurement="%"),
+            "sensor.p": state(1008, unit_of_measurement="hPa"),
+            "sensor.ws": state(3, unit_of_measurement="m/s"),
+            "sensor.wg": state(5, unit_of_measurement="m/s"),
+            "sensor.wd": state(200),
+            "sensor.r": state(10, unit_of_measurement="mm"),
+            "sun.sun": state("above_horizon", elevation=30),
+        }
+        for st in states.values():
+            st.last_updated = now
+            st.last_reported = now
+        states["sensor.ws"].last_reported = states["sensor.ws"].last_updated = old_time
+        states["sensor.wd"].last_reported = states["sensor.wd"].last_updated = old_time
+        states["sensor.wg"].last_reported = states["sensor.wg"].last_updated = old_time
+
+        coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True}, sources, states)
+        coord.staleness_s = 900
+        seen: list = []
+        original_observe = coord._pattern.engine.observe
+
+        def capture(ts, obs, *a, **kw):
+            seen.append(obs)
+            return original_observe(ts, obs, *a, **kw)
+
+        coord._pattern.engine.observe = capture
+
+        from custom_components.ws_core import coordinator as coordinator_module
+
+        with patch.object(coordinator_module.dt_util, "utcnow", return_value=now):
+            data = coord._compute(sample=True)
+
+        assert data["source_healthy"] is False
+        assert "wind_speed" in data["_stale_sources"]
+        assert "temperature" not in data["_stale_sources"]
+        assert seen
+        assert seen[-1].temp == 14.0
+        assert seen[-1].wind_speed is None
+        assert seen[-1].wind_u is None
+        assert seen[-1].wind_v is None
+        assert seen[-1].gust is None
+
     def test_wind_components_follow_the_meteorological_convention(self):
         coord, _ = make_coord({CONF_ENABLE_PATTERN_FORECAST: True})
         rt = coord._pattern

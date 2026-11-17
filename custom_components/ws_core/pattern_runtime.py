@@ -142,13 +142,31 @@ _PERIOD_S = 300.0  # recorder short-term statistics period
 _DIR_MAX_SPREAD_DEG = 90.0
 _RECOVERY_RETRY_S = (60.0, 180.0, 300.0)
 
-# Observation input groups an upstream quality flag can take out
+# Observation input groups an upstream detector or freshness check can take out
 _FLAG_BY_NAME = {
     "temperature": "temp",
     "temp": "temp",
     "humidity": "hum",
+    "hum": "hum",
+    "dew_point": "hum",
     "pressure": "press",
+    "press": "press",
+    "wind_speed": "wind",
+    "wind": "wind",
+    "wind_direction": "wind",
+    "wind_dir": "wind",
+    "wind_gust": "gust",
+    "gust": "gust",
     "rain_rate": "rain",
+    "rain_total": "rain",
+    "rain": "rain",
+    "lightning_count": "lightning",
+    "lightning_dist": "lightning",
+    "lightning": "lightning",
+    "solar_radiation": "solar",
+    "illuminance": "solar",
+    "solar": "solar",
+    "lux": "solar",
 }
 
 
@@ -271,6 +289,14 @@ class PatternRuntime:
                 flagged.add("hum")
             elif g := _FLAG_BY_NAME.get(t.split(" ", 1)[0]):
                 flagged.add(g)
+        for key in ("_stale_sources", "stale_sources"):
+            sources = data.get(key)
+            if sources:
+                for s in sources:
+                    if g := _FLAG_BY_NAME.get(str(s)):
+                        flagged.add(g)
+                        if g == "wind":
+                            flagged.add("gust")
         return flagged
 
     def _num(self, eid: str | None) -> float | None:
@@ -363,6 +389,12 @@ class PatternRuntime:
         eng = self.engine
         ts = now.timestamp()
         flagged = self._flagged_inputs(data)
+        if hasattr(self, "coord") and getattr(self.coord, "_stale_sources", None):
+            for s in self.coord._stale_sources:
+                if g := _FLAG_BY_NAME.get(str(s)):
+                    flagged.add(g)
+                    if g == "wind":
+                        flagged.add("gust")
         tz_off = (dt_util.as_local(now).utcoffset() or dt_util.now().utcoffset()).total_seconds()
 
         def val(key: str, group: str | None = None) -> float | None:
@@ -379,6 +411,8 @@ class PatternRuntime:
             ang = math.radians(direction)
             u, v = -speed * math.sin(ang), -speed * math.cos(ang)
         strikes, strike_km = self._strikes(ts)
+        if "lightning" in flagged:
+            strikes = strike_km = None
         eng.observe(
             ts,
             Observation(
@@ -396,6 +430,8 @@ class PatternRuntime:
         )
 
         elev, kt = self._sun(data)
+        if "solar" in flagged:
+            kt = None
         if kt is not None and elev is not None and elev >= 10.0:
             self._kt_ema = kt if self._kt_ema is None else self._kt_ema + (kt - self._kt_ema) / _KT_EMA_TICKS
 

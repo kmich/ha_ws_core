@@ -847,6 +847,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.event_entities: dict[str, Any] = {}
         # Stuck-value detection reference: label -> (value, since_utc)
         self._stuck_ref: dict[str, tuple[float, datetime]] = {}
+        # Stale source keys diagnosed by the most recent freshness check
+        self._stale_sources: list[str] = []
 
         # v2.0: CWOP upload
         self.cwop_enabled = bool(_get(CONF_ENABLE_CWOP, DEFAULT_ENABLE_CWOP))
@@ -3792,6 +3794,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["configuration_ready"] = not missing
         data["source_healthy"] = not missing and not unavailable and not stale
         data["_stale_sources"] = stale
+        self._stale_sources = list(stale)
         model_inputs = (KEY_NORM_TEMP_C, KEY_NORM_HUMIDITY, KEY_NORM_PRESSURE_HPA, KEY_NORM_WIND_SPEED_MS)
         data["model_ready"] = data["source_healthy"] and all(data.get(key) is not None for key in model_inputs)
         data["model_readiness_reason"] = "ok" if data["model_ready"] else "source readings missing or stale"
