@@ -922,7 +922,7 @@ def determine_current_condition(
     if stormy_outlook and rain_rate_mmph > 10:
         return "thunderstorm"
     if rain_rate_mmph > 5 and wind_gust_ms > 15:
-        return "pre-storm"
+        return "severe-storm"
 
     # Frozen precipitation
     if temp_c < 0 and (rain_rate_mmph > 0 or is_wet):

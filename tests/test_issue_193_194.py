@@ -65,6 +65,11 @@ def test_heavy_rain_under_stormy_outlook_still_thunderstorm():
     assert _condition(zambretti="stormy_much_rain", rain_rate_mmph=12.0) == "thunderstorm"
 
 
+def test_active_rain_and_high_wind_is_severe_storm():
+    """Active rain with gale gusts is severe-storm, not pre-storm."""
+    assert _condition(rain_rate_mmph=6.0, wind_gust_ms=16.0) == "severe-storm"
+
+
 def test_condition_hold_ignores_flicker():
     hold = ConditionHold()
     assert hold.update("overcast-night", 0) == "overcast-night"

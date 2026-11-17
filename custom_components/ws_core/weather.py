@@ -258,9 +258,9 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         "drizzle": "rainy",
         "heavy-rain": "pouring",
         "thunderstorm": "lightning-rainy",
-        "pre-storm": "lightning-rainy",
-        "severe-storm": "lightning-rainy",
-        "hurricane": "lightning-rainy",
+        "pre-storm": "cloudy",
+        "severe-storm": "exceptional",
+        "hurricane": "exceptional",
         "snowy": "snowy",
         "snow-accumulation": "snowy",
         "sleet": "snowy-rainy",
@@ -274,6 +274,11 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         "sunset": "sunny",
         "golden-hour": "sunny",
         "clearing-after-rain": "partlycloudy",
+        "icy-conditions": "snowy",
+        "sandstorm": "exceptional",
+        "african-dust": "exceptional",
+        "smoke": "fog",
+        "hazy-sun": "sunny",
     }
 
     @property
