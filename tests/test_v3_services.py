@@ -298,3 +298,51 @@ class TestV3Services:
         assert len(notify_calls) == 1
         assert notify_calls[0]["title"] == "Weather Window Starting Soon"
         assert "Outdoor Laundry Drying Next Start" in notify_calls[0]["message"]
+
+    def test_get_station_summary_excludes_expired_recommendations(self):
+        from custom_components.ws_core.const import KEY_WEATHER_WINDOWS, PROFILE_GARDEN_WORK
+
+        coord = _make_coordinator()
+        coord.config_entry = None
+        coord.forecast_enabled = True
+        coord.entry_options[CONF_FORECAST_PROVIDER] = "open_meteo"
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+
+        coord.data = {
+            KEY_FORECAST: {
+                "hourly": [{"datetime": (now + timedelta(hours=h)).isoformat(), "temp_c": 22.0} for h in range(4)]
+            },
+            KEY_WEATHER_WINDOWS: {
+                PROFILE_OUTDOOR_DRYING: {
+                    "status": "suitable_now",
+                    "next_start": (now - timedelta(hours=3)).isoformat(),
+                    "next_end": (now - timedelta(minutes=5)).isoformat(),
+                    "duration_h": 3,
+                    "reasons_text": ["Suitable now."],
+                },
+                PROFILE_GARDEN_WORK: {
+                    "status": "window_upcoming",
+                    "next_start": (now + timedelta(hours=1)).isoformat(),
+                    "next_end": (now + timedelta(hours=4)).isoformat(),
+                    "duration_h": 3,
+                    "reasons_text": ["Starts in 1h."],
+                },
+            },
+        }
+
+        # 1. Expired forecast cache -> exclude all cached recommendations and report 0h horizon
+        coord.runtime.last_forecast_fetch = now - timedelta(hours=13)
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=now):
+            expired_summary = coord.get_station_summary()
+        assert expired_summary["forecast_validity"]["is_expired"] is True
+        assert expired_summary["forecast_validity"]["hourly_horizon_h"] == 0
+        assert expired_summary["weather_windows"] == {}
+
+        # 2. Fresh forecast cache -> exclude passed recommendation, keep future/active one
+        coord.runtime.last_forecast_fetch = now - timedelta(minutes=10)
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=now):
+            fresh_summary = coord.get_station_summary()
+        assert fresh_summary["forecast_validity"]["is_expired"] is False
+        assert fresh_summary["forecast_validity"]["hourly_horizon_h"] == 4
+        assert PROFILE_OUTDOOR_DRYING not in fresh_summary["weather_windows"]
+        assert fresh_summary["weather_windows"][PROFILE_GARDEN_WORK]["status"] == "window_upcoming"

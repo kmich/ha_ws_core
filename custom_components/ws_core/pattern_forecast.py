@@ -1730,21 +1730,41 @@ class PatternEngine:
             self.cond[tid] = [list(c) for c in trained.cond[tid]]
         if update_std:
             self.std = trained.std
-        targets = dict((self.history_learn or {}).get("targets") or {})
+        prev_hl = self.history_learn or {}
+        prev_fm = prev_hl.get("features_method")
+        try:
+            prev_fm_val = int(prev_fm) if prev_fm is not None and not isinstance(prev_fm, bool) else 1
+        except (TypeError, ValueError):
+            prev_fm_val = 1
+        targets = dict(prev_hl.get("targets") or {})
         for tid, st in statuses.items():
             if tid in self.models:
                 targets[tid] = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
         oks = [t for t in targets.values() if t.get("status") == "ok"]
+        # Only mark the v3 feature-alignment migration complete when every
+        # already-learned target was either migrated earlier or replayed in this run.
+        all_ok_migrated = prev_fm_val >= PATTERN_HISTORY_FEATURES_METHOD or (
+            bool(oks)
+            and all(
+                report.get(tid, {}).get("samples", 0) > 0
+                for tid, t in targets.items()
+                if isinstance(t, dict) and t.get("status") == "ok"
+            )
+        )
         spans = [r["last"] - r["first"] for r in report.values() if r["first"] is not None]
         failed = [f"{t}: {v.get('reason')}" for t, v in targets.items() if v.get("status") != "ok"]
-        self.history_learn = {
+        new_hl: dict[str, Any] = {
             "done_at": now_ts,
             "span_days": round(max(spans) / 86400.0, 1) if spans else 0.0,
             "status": "ok" if not failed else ("partial" if oks else "unavailable"),
             "reason": "; ".join(failed) if failed else None,
             "targets": targets,
-            "features_method": PATTERN_HISTORY_FEATURES_METHOD,
         }
+        if all_ok_migrated:
+            new_hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+        elif prev_fm is not None:
+            new_hl["features_method"] = prev_fm
+        self.history_learn = new_hl
         for m in self.models.values():
             self._update_maturity(m, now_ts)
 

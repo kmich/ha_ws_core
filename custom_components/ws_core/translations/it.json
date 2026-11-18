@@ -738,7 +738,9 @@
       "station_not_found": "ID stazione Weather Underground non trovato",
       "room_name_required": "Inserisci un nome per la stanza.",
       "invalid_duration": "La durata minima deve essere di almeno 1 ora.",
-      "min_exceeds_max": "Il limite minimo non può superare il limite massimo."
+      "min_exceeds_max": "Il limite minimo non può superare il limite massimo.",
+      "out_of_range": "Il valore è fuori dall'intervallo valido.",
+      "invalid_profiles": "Uno o più profili selezionati non sono validi."
     }
   },
   "issues": {

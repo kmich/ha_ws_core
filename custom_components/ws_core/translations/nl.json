@@ -738,7 +738,9 @@
       "station_not_found": "Weather Underground station-ID niet gevonden",
       "room_name_required": "Voer een naam in voor de ruimte.",
       "invalid_duration": "De minimale duur moet minstens 1 uur zijn.",
-      "min_exceeds_max": "De minimumlimiet mag niet hoger zijn dan de maximumlimiet."
+      "min_exceeds_max": "De minimumlimiet mag niet hoger zijn dan de maximumlimiet.",
+      "out_of_range": "De waarde ligt buiten het geldige bereik.",
+      "invalid_profiles": "Een of meer geselecteerde profielen zijn ongeldig."
     }
   },
   "issues": {

@@ -15,6 +15,7 @@ The Options flow (Configure button) exposes all settings for post-install change
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 import aiohttp
@@ -1829,8 +1830,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
 
     async def async_step_decision_profiles(self, user_input: dict[str, Any] | None = None):
         """Configure Decision Profiles, active Weather Windows, and Custom Profile limits."""
+        from .weather_windows import DEFAULT_PROFILES, resolve_profiles
         from .weather_windows import PROFILE_CUSTOM as _PROFILE_CUSTOM
-        from .weather_windows import resolve_profiles
 
         self._ensure_opt()
         limit_specs: tuple[tuple[str, str, float, float, float, str], ...] = (
@@ -1846,42 +1847,6 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             (CONF_CUSTOM_MAX_CLOUD_COVER_PCT, "max_cloud_cover_pct", 0.0, 100.0, 1.0, "%"),
         )
         errors: dict[str, str] = {}
-
-        if user_input is not None:
-            raw_dur = user_input.get(CONF_CUSTOM_MIN_DURATION_H)
-            if raw_dur is not None:
-                try:
-                    dur_val = int(float(raw_dur))
-                    if dur_val < 1:
-                        errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
-                except (TypeError, ValueError):
-                    errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
-            for min_k, max_k in (
-                (CONF_CUSTOM_MIN_TEMP_C, CONF_CUSTOM_MAX_TEMP_C),
-                (CONF_CUSTOM_MIN_HUMIDITY_PCT, CONF_CUSTOM_MAX_HUMIDITY_PCT),
-                (CONF_CUSTOM_MIN_WIND_KMH, CONF_CUSTOM_MAX_WIND_KMH),
-            ):
-                min_v = user_input.get(min_k)
-                max_v = user_input.get(max_k)
-                if min_v is not None and max_v is not None:
-                    try:
-                        if float(min_v) > float(max_v):
-                            errors[min_k] = "min_exceeds_max"
-                    except (TypeError, ValueError):
-                        errors[min_k] = "min_exceeds_max"
-
-            if not errors:
-                self._opt.update(user_input)
-                if CONF_CUSTOM_MIN_DURATION_H in self._opt and self._opt[CONF_CUSTOM_MIN_DURATION_H] is not None:
-                    self._opt[CONF_CUSTOM_MIN_DURATION_H] = int(round(float(self._opt[CONF_CUSTOM_MIN_DURATION_H])))
-                if any(
-                    k in user_input
-                    for k in (CONF_CUSTOM_MIN_DURATION_H, CONF_CUSTOM_WINDOW_NAME, CONF_CUSTOM_REQUIRE_DAYLIGHT)
-                ):
-                    for conf_key, _attr, _lo, _hi, _step, _unit in limit_specs:
-                        if user_input.get(conf_key) is None:
-                            self._opt[conf_key] = None
-                return self.async_create_entry(title="", data=self._opt)
 
         g = self._get
         sentinel = object()
@@ -1905,6 +1870,102 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                 cfg[key] = val
 
         custom_prof = resolve_profiles(cfg)[_PROFILE_CUSTOM]
+
+        if user_input is not None:
+            raw_profiles = user_input.get(CONF_WEATHER_WINDOW_PROFILES)
+            if raw_profiles is not None and (
+                isinstance(raw_profiles, str)
+                or not isinstance(raw_profiles, (list, tuple, set))
+                or any(p not in DEFAULT_PROFILES for p in raw_profiles)
+            ):
+                errors[CONF_WEATHER_WINDOW_PROFILES] = "invalid_profiles"
+
+            raw_dur = user_input.get(CONF_CUSTOM_MIN_DURATION_H)
+            validated_dur: int | None = None
+            if raw_dur is not None:
+                if isinstance(raw_dur, bool):
+                    errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+                else:
+                    try:
+                        dur_f = float(raw_dur)
+                        if not math.isfinite(dur_f) or not dur_f.is_integer():
+                            errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+                        else:
+                            dur_val = int(dur_f)
+                            if dur_val < 1 or dur_val > 24:
+                                errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+                            else:
+                                validated_dur = dur_val
+                    except (TypeError, ValueError):
+                        errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+
+            validated_limits: dict[str, float] = {}
+            limit_attr_map = {conf_key: attr_name for conf_key, attr_name, *_ in limit_specs}
+            for conf_key, _attr, lo, hi, _step, _unit in limit_specs:
+                raw_val = user_input.get(conf_key)
+                if raw_val is None:
+                    continue
+                if isinstance(raw_val, bool):
+                    errors[conf_key] = "out_of_range"
+                    continue
+                try:
+                    fval = float(raw_val)
+                except (TypeError, ValueError):
+                    errors[conf_key] = "out_of_range"
+                    continue
+                if not math.isfinite(fval) or fval < lo or fval > hi:
+                    errors[conf_key] = "out_of_range"
+                    continue
+                validated_limits[conf_key] = fval
+
+            is_full_form = any(
+                k in user_input
+                for k in (CONF_CUSTOM_MIN_DURATION_H, CONF_CUSTOM_WINDOW_NAME, CONF_CUSTOM_REQUIRE_DAYLIGHT)
+            )
+
+            def _effective_limit(conf_k: str) -> float | None:
+                if conf_k in errors:
+                    return None
+                if conf_k in user_input:
+                    return validated_limits.get(conf_k)
+                if is_full_form:
+                    return None
+                val = getattr(custom_prof, limit_attr_map[conf_k], None)
+                return float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else None
+
+            for min_k, max_k in (
+                (CONF_CUSTOM_MIN_TEMP_C, CONF_CUSTOM_MAX_TEMP_C),
+                (CONF_CUSTOM_MIN_HUMIDITY_PCT, CONF_CUSTOM_MAX_HUMIDITY_PCT),
+                (CONF_CUSTOM_MIN_WIND_KMH, CONF_CUSTOM_MAX_WIND_KMH),
+                (CONF_CUSTOM_MIN_WIND_KMH, CONF_CUSTOM_MAX_WIND_GUST_KMH),
+            ):
+                if min_k not in user_input and max_k not in user_input:
+                    continue
+                eff_min = _effective_limit(min_k)
+                eff_max = _effective_limit(max_k)
+                if eff_min is not None and eff_max is not None and eff_min > eff_max:
+                    err_key = min_k if min_k not in errors else max_k
+                    errors[err_key] = "min_exceeds_max"
+
+            if not errors:
+                self._opt.update(user_input)
+                if validated_dur is not None:
+                    self._opt[CONF_CUSTOM_MIN_DURATION_H] = validated_dur
+                if CONF_WEATHER_WINDOW_PROFILES in self._opt and self._opt[CONF_WEATHER_WINDOW_PROFILES] is not None:
+                    self._opt[CONF_WEATHER_WINDOW_PROFILES] = list(
+                        dict.fromkeys(self._opt[CONF_WEATHER_WINDOW_PROFILES])
+                    )
+                if CONF_CUSTOM_WINDOW_NAME in user_input:
+                    name_val = str(user_input.get(CONF_CUSTOM_WINDOW_NAME) or "").strip()
+                    self._opt[CONF_CUSTOM_WINDOW_NAME] = name_val or DEFAULT_PROFILES[_PROFILE_CUSTOM].name
+                for conf_key, fval in validated_limits.items():
+                    self._opt[conf_key] = fval
+                if is_full_form:
+                    for conf_key, _attr, _lo, _hi, _step, _unit in limit_specs:
+                        if user_input.get(conf_key) is None:
+                            self._opt[conf_key] = None
+                return self.async_create_entry(title="", data=self._opt)
+
         current_profiles = g(CONF_WEATHER_WINDOW_PROFILES, DEFAULT_WEATHER_WINDOW_PROFILES)
         if isinstance(current_profiles, str):
             current_profiles = [current_profiles]

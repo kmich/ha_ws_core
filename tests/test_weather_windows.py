@@ -16,6 +16,7 @@ from custom_components.ws_core.const import (
     CONF_WEATHER_WINDOW_PROFILES,
     KEY_FORECAST,
     KEY_RAIN_RATE_FILT,
+    KEY_WEATHER_WINDOWS,
     PROFILE_CUSTOM,
     PROFILE_GARDEN_WORK,
     PROFILE_OUTDOOR_DRYING,
@@ -683,3 +684,96 @@ class TestWeatherWindowsEngine:
         assert eval_all[PROFILE_CUSTOM]["duration_h"] == 4
         assert eval_all[PROFILE_CUSTOM]["evaluated_limits"]["max_rain_mm"] is None
         assert eval_all[PROFILE_CUSTOM]["evaluated_limits"]["require_daylight"] is False
+
+    async def test_weather_windows_uses_hass_config_coords_fallback_and_preserves_zero(self):
+        from unittest.mock import AsyncMock, patch
+
+        from tests.test_coordinator import _make_coordinator
+
+        coord = _make_coordinator()
+        coord.config_entry = None
+        coord.forecast_enabled = True
+        coord.weather_windows_enabled = True
+        coord._weather_windows_engine = None
+        coord.entry_options["forecast_provider"] = "open_meteo"
+        coord.forecast_lat = None
+        coord.forecast_lon = None
+        coord.hass.config.latitude = 38.0
+        coord.hass.config.longitude = 23.7
+        coord.async_set_updated_data = MagicMock()
+
+        now = datetime(2026, 6, 21, 11, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(now, hours=4)
+        coord.data = {KEY_FORECAST: {"hourly": hourly}}
+
+        assert coord._effective_forecast_coords() == (38.0, 23.7)
+
+        mock_provider = MagicMock()
+        mock_provider.PROVIDER_NAME = "Open-Meteo"
+        mock_provider.async_fetch = AsyncMock(return_value={"hourly": hourly, "daily": []})
+
+        with (
+            patch("custom_components.ws_core.coordinator.async_get_clientsession", return_value=MagicMock()),
+            patch("custom_components.ws_core.coordinator.get_provider", return_value=mock_provider),
+            patch("custom_components.ws_core.coordinator.dt_util.now", return_value=now),
+            patch.object(coord, "_compute", return_value=coord.data),
+        ):
+            coord._compute_weather_windows(coord.data, now)
+            assert coord.data[KEY_WEATHER_WINDOWS][PROFILE_OUTDOOR_DRYING]["status"] == STATUS_SUITABLE_NOW
+            assert coord._get_weather_windows_engine().lat == 38.0
+            assert coord._get_weather_windows_engine().lon == 23.7
+
+            await coord._async_fetch_forecast()
+            assert mock_provider.async_fetch.await_args.args[1:3] == (38.0, 23.7)
+
+            # Explicit 0.0 equator/prime-meridian coordinates must not fall back to hass.config
+            coord.forecast_lat = 0.0
+            coord.forecast_lon = 0.0
+            mock_provider.async_fetch.reset_mock()
+            assert coord._effective_forecast_coords() == (0.0, 0.0)
+            await coord._async_fetch_forecast()
+            assert mock_provider.async_fetch.await_args.args[1:3] == (0.0, 0.0)
+            assert coord._get_weather_windows_engine().lat == 0.0
+            assert coord._get_weather_windows_engine().lon == 0.0
+
+    def test_compute_timing_includes_weather_windows(self):
+        from unittest.mock import patch
+
+        from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+        from custom_components.ws_core.const import CONF_FORECAST_ENABLED
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+        from tests.test_coordinator import _make_coordinator
+
+        base = _make_coordinator()
+        with patch.object(DataUpdateCoordinator, "__init__", lambda self, *a, **kw: None):
+            coord = WSStationCoordinator(
+                base.hass,
+                {
+                    "entry_id": "timing_test",
+                    "sources": base.sources,
+                    CONF_FORECAST_ENABLED: False,
+                    CONF_FORECAST_LAT: 38.0,
+                    CONF_FORECAST_LON: 23.7,
+                },
+                {},
+            )
+
+        clock = [100.0]
+
+        def _fake_monotonic() -> float:
+            return clock[0]
+
+        def _slow_eval(data, now):
+            clock[0] += 0.025
+            data["weather_windows"] = {PROFILE_OUTDOOR_DRYING: {"status": STATUS_UNKNOWN}}
+
+        with (
+            patch("custom_components.ws_core.coordinator.time.monotonic", side_effect=_fake_monotonic),
+            patch.object(coord, "_compute_weather_windows", side_effect=_slow_eval) as mock_ww,
+        ):
+            data = coord._compute(sample=False)
+
+        assert mock_ww.call_count == 1
+        assert "weather_windows" in data
+        assert coord.runtime.last_compute_ms >= 25.0

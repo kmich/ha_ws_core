@@ -388,3 +388,58 @@ class TestOptionsMenuNavigation:
 
             save_res = await flow.async_step_optional_sources_opt({})
             assert save_res["type"] == "create_entry"
+
+    async def test_options_decision_profiles_validation_rejects_invalid_limits(self):
+        from custom_components.ws_core.const import (
+            CONF_CUSTOM_MAX_RAIN_MM,
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+            CONF_CUSTOM_MAX_WIND_GUST_KMH,
+            CONF_CUSTOM_MAX_WIND_KMH,
+            CONF_CUSTOM_MIN_DURATION_H,
+            CONF_CUSTOM_MIN_TEMP_C,
+            CONF_CUSTOM_MIN_WIND_KMH,
+            CONF_WEATHER_WINDOW_PROFILES,
+            PROFILE_CUSTOM,
+        )
+
+        flow = _options_flow(stored={CONF_CUSTOM_MAX_WIND_KMH: 30.0}, opt={})
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {"step_id": kw["step_id"], "errors": kw.get("errors", {})}
+        )
+
+        # Reject fractional, out-of-range, and bool duration
+        for bad_dur in (1.5, 0, 25, True):
+            res = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_DURATION_H: bad_dur})
+            assert res["errors"] == {CONF_CUSTOM_MIN_DURATION_H: "invalid_duration"}
+
+        # Reject single out-of-range / non-finite / bool limit values
+        bad_limits = await flow.async_step_decision_profiles(
+            {
+                CONF_CUSTOM_MAX_RAIN_PROB_PCT: 120.0,
+                CONF_CUSTOM_MAX_RAIN_MM: -1.0,
+                CONF_CUSTOM_MIN_TEMP_C: float("inf"),
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: True,
+                CONF_WEATHER_WINDOW_PROFILES: ["unknown_profile"],
+            }
+        )
+        assert bad_limits["errors"] == {
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT: "out_of_range",
+            CONF_CUSTOM_MAX_RAIN_MM: "out_of_range",
+            CONF_CUSTOM_MIN_TEMP_C: "out_of_range",
+            CONF_CUSTOM_MAX_WIND_GUST_KMH: "out_of_range",
+            CONF_WEATHER_WINDOW_PROFILES: "invalid_profiles",
+        }
+
+        # Reject min_wind > max_wind (using stored max_wind) and min_wind > max_wind_gust
+        wind_err = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_WIND_KMH: 40.0})
+        assert wind_err["errors"] == {CONF_CUSTOM_MIN_WIND_KMH: "min_exceeds_max"}
+
+        gust_err = await flow.async_step_decision_profiles(
+            {
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM],
+                CONF_CUSTOM_MIN_WIND_KMH: 45.0,
+                CONF_CUSTOM_MAX_WIND_KMH: 50.0,
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: 35.0,
+            }
+        )
+        assert gust_err["errors"] == {CONF_CUSTOM_MIN_WIND_KMH: "min_exceeds_max"}

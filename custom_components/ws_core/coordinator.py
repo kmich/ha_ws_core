@@ -5252,15 +5252,37 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._compute_chill_hours(data, now)
             self._compute_clearness_and_cloud(data)
 
-        self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
-
         # v2.0: fire HA Event entities for weather transitions
         self._fire_ws_events(data)
 
         # v3.0: Weather Windows Decision Engine evaluation
         self._compute_weather_windows(data, now)
 
+        self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
+
         return data
+
+    def _effective_forecast_coords(self) -> tuple[float | None, float | None]:
+        """Return (lat, lon) using configured forecast coordinates or HA config fallback."""
+        lat = getattr(self, "forecast_lat", None)
+        lon = getattr(self, "forecast_lon", None)
+        hass_cfg = getattr(getattr(self, "hass", None), "config", None)
+        if lat is None and hass_cfg is not None:
+            raw_lat = getattr(hass_cfg, "latitude", None)
+            if isinstance(raw_lat, (int, float)) and not isinstance(raw_lat, bool):
+                lat = float(raw_lat)
+        if lon is None and hass_cfg is not None:
+            raw_lon = getattr(hass_cfg, "longitude", None)
+            if isinstance(raw_lon, (int, float)) and not isinstance(raw_lon, bool):
+                lon = float(raw_lon)
+        if (
+            not isinstance(lat, (int, float))
+            or isinstance(lat, bool)
+            or not isinstance(lon, (int, float))
+            or isinstance(lon, bool)
+        ):
+            return None, None
+        return float(lat), float(lon)
 
     def _get_weather_windows_engine(self):
         """Return or initialize the WeatherWindowsEngine using resolved station profiles."""
@@ -5269,8 +5291,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         profiles = getattr(self, "weather_window_profiles", None)
         if not isinstance(profiles, Mapping):
             profiles = resolve_profiles(getattr(self, "entry_options", None))
-        lat = float(self.forecast_lat or 0.0)
-        lon = float(self.forecast_lon or 0.0)
+        eff_lat, eff_lon = self._effective_forecast_coords()
+        lat = float(eff_lat if eff_lat is not None else 0.0)
+        lon = float(eff_lon if eff_lon is not None else 0.0)
         elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
         if self._weather_windows_engine is None:
             self._weather_windows_engine = WeatherWindowsEngine(
@@ -5293,7 +5316,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         fc = data.get(KEY_FORECAST) or {}
         hourly = fc.get("hourly") or []
-        if self.forecast_lat is None or self.forecast_lon is None:
+        eff_lat, eff_lon = self._effective_forecast_coords()
+        if eff_lat is None or eff_lon is None:
             return
 
         engine = self._get_weather_windows_engine()
@@ -5317,7 +5341,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data = self.data or {}
         now = dt_util.now()
         now_utc = now.astimezone(UTC) if now.tzinfo is not None else dt_util.as_utc(now)
-        if self.forecast_lat is None or self.forecast_lon is None:
+        eff_lat, eff_lon = self._effective_forecast_coords()
+        if eff_lat is None or eff_lon is None:
             hourly: list[dict[str, Any]] = []
         else:
             raw_fc = data.get(KEY_FORECAST)
@@ -5367,16 +5392,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return concise, deterministic summary for voice/Assist actions (SupportsResponse.ONLY)."""
         data = self.data or {}
         now = dt_util.now()
+        now_utc = now.astimezone(UTC) if now.tzinfo is not None else dt_util.as_utc(now)
         pattern = getattr(self, "_pattern", None)
         active_alerts = list(data.get("_active_alerts") or [])
-        windows_summary = {}
-        for pid, win in (data.get(KEY_WEATHER_WINDOWS) or {}).items():
-            windows_summary[pid] = {
-                "status": win.get("status"),
-                "next_start": win.get("next_start"),
-                "duration_h": win.get("duration_h"),
-                "reasons": win.get("reasons_text", [])[:1],
-            }
 
         fc_enabled = bool(getattr(self, "forecast_enabled", True))
         provider_id = self.forecast_provider if fc_enabled else None
@@ -5387,8 +5405,44 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if last_fetch is None:
                 fc_expired = True
             else:
+                last_fetch_utc = (
+                    last_fetch.astimezone(UTC)
+                    if getattr(last_fetch, "tzinfo", None) is not None
+                    else dt_util.as_utc(last_fetch)
+                )
                 max_age_s = max(FORECAST_CACHE_MAX_AGE_S, int(getattr(self, "forecast_interval_min", 30)) * 60 * 6)
-                fc_expired = (now - last_fetch).total_seconds() > max_age_s
+                fc_expired = (now_utc - last_fetch_utc).total_seconds() > max_age_s
+
+        raw_fc = data.get(KEY_FORECAST)
+        published_fc = (
+            self._published_forecast(raw_fc, now_utc)
+            if (not fc_expired and hasattr(self, "_published_forecast"))
+            else (None if fc_expired else raw_fc)
+        )
+
+        windows_summary: dict[str, dict[str, Any]] = {}
+        if not fc_expired:
+            for pid, win in (data.get(KEY_WEATHER_WINDOWS) or {}).items():
+                if not isinstance(win, Mapping):
+                    continue
+                end_dt = dt_util.parse_datetime(str(win["next_end"])) if win.get("next_end") else None
+                if end_dt is None and win.get("next_start") and win.get("duration_h") is not None:
+                    start_dt = dt_util.parse_datetime(str(win["next_start"]))
+                    if start_dt is not None:
+                        try:
+                            end_dt = start_dt + timedelta(hours=float(win["duration_h"]))
+                        except (TypeError, ValueError):
+                            end_dt = None
+                if end_dt is not None:
+                    end_dt_utc = end_dt.astimezone(UTC) if end_dt.tzinfo is not None else dt_util.as_utc(end_dt)
+                    if end_dt_utc <= now_utc:
+                        continue
+                windows_summary[pid] = {
+                    "status": win.get("status"),
+                    "next_start": win.get("next_start"),
+                    "duration_h": win.get("duration_h"),
+                    "reasons": win.get("reasons_text", [])[:1],
+                }
 
         return {
             "entry_id": self.entry_data.get("entry_id", "station"),
@@ -5425,7 +5479,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "forecast_validity": {
                 "provider": provider_id,
                 "is_expired": fc_expired,
-                "hourly_horizon_h": len((data.get(KEY_FORECAST) or {}).get("hourly") or []),
+                "hourly_horizon_h": 0 if fc_expired else len((published_fc or {}).get("hourly") or []),
                 "capabilities": get_provider_capabilities(provider_id).to_dict() if provider_id else None,
             },
             "pattern_forecast_maturity": pattern.summary() if pattern is not None else None,
@@ -5584,8 +5638,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if not self.forecast_enabled or getattr(self, "_stopped", False):
                 return
             rt.last_forecast_attempt = dt_util.utcnow()
-            lat = self.forecast_lat or float(self.hass.config.latitude)
-            lon = self.forecast_lon or float(self.hass.config.longitude)
+            eff_lat, eff_lon = self._effective_forecast_coords()
+            if eff_lat is None or eff_lon is None:
+                return
+            lat, lon = eff_lat, eff_lon
 
             session = async_get_clientsession(self.hass)
             is_ha_entity = self.forecast_provider == FORECAST_PROVIDER_HA_ENTITY

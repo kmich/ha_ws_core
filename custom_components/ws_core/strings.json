@@ -738,7 +738,9 @@
       "station_not_found": "Weather Underground station ID not found",
       "room_name_required": "Please enter a name for the room.",
       "invalid_duration": "Minimum duration must be at least 1 hour.",
-      "min_exceeds_max": "Minimum limit cannot exceed maximum limit."
+      "min_exceeds_max": "Minimum limit cannot exceed maximum limit.",
+      "out_of_range": "Value is outside the valid range.",
+      "invalid_profiles": "One or more selected profiles are invalid."
     }
   },
   "issues": {
