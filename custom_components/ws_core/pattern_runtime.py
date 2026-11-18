@@ -1098,11 +1098,25 @@ class PatternRuntime:
         names = {x for t in old for x in _HISTORY_NEEDS[eng.models[t].spec.kind]}
         plan = {name: self.history_entity(name, ts) for name in names}
         ids = {eid for eid in plan.values() if eid}
+        reset_seq = self._reset_seq
         try:
             meta = await _recorder_instance(self.coord.hass).async_add_executor_job(self._read_statistic_meta, ids)
         except Exception as err:  # noqa: BLE001 - a short recorder outage is retried
             _LOGGER.debug("ws_core pattern forecast: could not read the units of the statistics: %s", err)
             return True
+
+        # Discard recorder results if learning was reset while the job was in flight
+        if (
+            self._reset_seq != reset_seq
+            or self.engine is not eng
+            or not self.engine.history_learn
+            or not self.engine.history_learn.get("targets")
+        ):
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset during legacy units check; discarding results"
+            )
+            return False
+
         misread = self._misread_inputs(plan, meta)
         if misread:
             _LOGGER.warning(
@@ -1181,14 +1195,10 @@ class PatternRuntime:
         snapshot = eng.to_dict()
         need_night = any(eng.models[t].spec.kind == "frost" for t in ok_targets if t in eng.models)
         dp_slot = POOL_INDEX["dp_3h"]
-        already_trained = any(
-            isinstance(e, dict)
-            and e.get("status") == "ok"
-            and _method_int(e.get("features_method")) >= PATTERN_HISTORY_FEATURES_METHOD
-            for t, e in targets.items()
-            if t not in ok_targets and t in eng.models and "dp_3h" in eng.models[t].spec.features
-        )
-        has_warm_scale = already_trained and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
+        other_pressure_models = [
+            t for t in eng.models if t not in ok_targets and "dp_3h" in eng.models[t].spec.features
+        ]
+        has_warm_scale = bool(other_pressure_models) and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
 
         def _dp3h_job() -> tuple[PatternEngine, dict[str, int]] | None:
             trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)

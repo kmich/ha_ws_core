@@ -1117,6 +1117,152 @@ class TestReplayMaskingAndDp3hAlignment:
         assert eng.history_learn["targets"]["gust_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
         assert eng.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
 
+    async def test_dp3h_migration_preserves_scale_for_live_only_models(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+
+        eng = rt.engine
+        dp_slot = POOL_INDEX["dp_3h"]
+
+        # Suppose the station has warm live standardizer data
+        eng.std.mean[dp_slot] = 1014.2
+        eng.std.var[dp_slot] = 3.8
+        eng.std.n[dp_slot] = 80
+
+        # gust_3h is a live-only model (not in history_learn targets, or status != 'ok')
+        gust_model = eng.models["gust_3h"]
+        gust_dp_idx = gust_model.spec.features.index("dp_3h") + 1
+        gust_model.w[gust_dp_idx] = 0.42
+        gust_model.cp_w[gust_dp_idx] = 0.42
+        gust_model.n_updates = 60
+
+        # rain_3h is the only target that replayed from history and needs migration
+        rain_model = eng.models["rain_3h"]
+        rain_dp_idx = rain_model.spec.features.index("dp_3h") + 1
+        rain_model.w[rain_dp_idx] = 0.0
+
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": 4,  # one-time reset occurred earlier
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                },
+                "gust_3h": {
+                    "status": "unavailable",
+                    "attempted_at": 1000.0,
+                    "reason": "no statistics",
+                    "retryable": False,
+                    "method": PATTERN_HISTORY_METHOD,
+                },
+            },
+        }
+
+        n = 48
+        mslp = [1000.0 + (i * 0.1) for i in range(n)]
+        rain = [2.0 if (i % 6) == 3 else 0.0 for i in range(n)]
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=mslp,
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[5.0] * n,
+            rain=rain,
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        assert retry is False
+        # The established scale in eng.std for the live-only model MUST be preserved!
+        assert eng.std.mean[dp_slot] == 1014.2
+        assert eng.std.var[dp_slot] == 3.8
+        assert eng.std.n[dp_slot] == 80
+
+        # Live-only gust_3h weight is preserved
+        assert gust_model.w[gust_dp_idx] == 0.42
+
+        # rain_3h weight was trained and migrated
+        assert rain_model.w[rain_dp_idx] != 0.0
+        assert eng.history_learn["targets"]["rain_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+
+    async def test_legacy_units_check_discards_stale_results_if_reset_during_execution(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from custom_components.ws_core.const import PATTERN_HISTORY_UNITS_METHOD
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt.store.async_remove = AsyncMock()
+
+        eng = rt.engine
+        eng.history_learn = {
+            "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    # Method 2 is before PATTERN_HISTORY_UNITS_METHOD (3)
+                    "method": PATTERN_HISTORY_UNITS_METHOD - 1,
+                    "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+                },
+            },
+        }
+
+        # Simulate recorder executor job where a reset occurs while job is in-flight
+        class _ResettingRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                # An in-flight reset occurs while reading statistic metadata
+                await rt.async_reset()
+                return {"sensor.press": {"statistic_id": "sensor.press", "unit": "hPa"}}
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_ResettingRecorder()):
+            ret = await rt._async_forget_misread_replay(now)
+
+        # Result is discarded because learning was reset in flight
+        assert ret is False
+        # Store was not re-saved with stale replay state
+        rt.store.async_save.assert_not_called()
+        # Engine remains cleanly reset
+        assert not rt.engine.history_learn
+
 
 class TestDowngradeTolerance:
     """Verify that storage schema remains compatible with earlier versions."""

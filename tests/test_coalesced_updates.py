@@ -207,6 +207,7 @@ class TestBurstCoalescing:
             }
 
         burst_ms: list[float] = []
+        recompute_ms: list[float] = []
         source_events = [MagicMock(data={"entity_id": eid}) for eid in sources.values()]
         current_now = [now]
         with (
@@ -225,7 +226,9 @@ class TestBurstCoalescing:
                 for ev in source_events:
                     coord._handle_source_change(ev)
                 assert len(scheduled) == 1
+                t_recomp = time.perf_counter()
                 scheduled[0](burst_now)
+                recompute_ms.append((time.perf_counter() - t_recomp) * 1000.0)
                 burst_ms.append((time.perf_counter() - t0) * 1000.0)
 
         assert state_writes == 25  # 1 write per 12-sensor burst (vs 12 baseline)
@@ -235,6 +238,12 @@ class TestBurstCoalescing:
         # Verify that all 24 hourly forecast slots were actually evaluated for the profiles
         assert len(ww_eval["outdoor_drying"]["slots"]) == 24
         assert len(ww_eval["garden_work"]["slots"]) == 24
+        recompute_sorted = sorted(recompute_ms)
+        p95_recompute_ms = recompute_sorted[int(0.95 * len(recompute_sorted)) - 1]
+        assert statistics.median(recompute_sorted) > 0.0
+        # Gate: recompute p95 must stay within baseline budget (+10% gate = 10.639 ms)
+        assert p95_recompute_ms <= 10.639
+
         burst_sorted = sorted(burst_ms)
         p95_burst_ms = burst_sorted[int(0.95 * len(burst_sorted)) - 1]
         assert statistics.median(burst_sorted) > 0.0
