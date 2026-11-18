@@ -491,3 +491,27 @@ class TestWeatherWindowsEngine:
         assert result.horizon_hours == 24
         assert result.status == STATUS_UNSUITABLE
         assert result.windows == []
+
+    def test_window_end_clipped_to_24_hour_cutoff(self, engine: WeatherWindowsEngine):
+        slot_start = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+        now = datetime(2026, 6, 21, 10, 30, tzinfo=UTC)  # 24h cutoff is 2026-06-22T10:30:00+00:00
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+
+        # Case A: Only 09:00 (+1d) and 10:00 (+1d) suitable -> clipped at 10:30 (+1d) = 1.5h < 2h -> rejected
+        hourly_short = _make_hourly_forecast(slot_start, hours=25)
+        for i in range(23):
+            hourly_short[i]["precip_prob"] = 90
+        res_short = engine.evaluate_profile(profile, hourly_short, current_data={}, now=now)
+        assert res_short.status == STATUS_UNSUITABLE
+        assert res_short.windows == []
+
+        # Case B: 08:00 (+1d), 09:00 (+1d), 10:00 (+1d) suitable -> clipped end 10:30 (+1d), duration 2.5h, truncated
+        hourly_ok = _make_hourly_forecast(slot_start, hours=25)
+        for i in range(22):
+            hourly_ok[i]["precip_prob"] = 90
+        res_ok = engine.evaluate_profile(profile, hourly_ok, current_data={}, now=now)
+        assert res_ok.horizon_hours == 24
+        assert res_ok.status == STATUS_WINDOW_UPCOMING
+        assert res_ok.next_end == "2026-06-22T10:30:00+00:00"
+        assert res_ok.duration_h == 2.5
+        assert res_ok.is_truncated is True

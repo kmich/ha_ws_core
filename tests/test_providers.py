@@ -230,3 +230,81 @@ async def test_openweathermap_sums_rain_and_snow():
     res = await provider.async_fetch(session, 50.0, 10.0, api_key="secret")
     assert [d["precip_mm"] for d in res["daily"]] == [6.5, 3.0, 1.2, 0.0]
     assert [h["precip_mm"] for h in res["hourly"]] == [2.0, 0.9]
+
+
+@pytest.mark.asyncio
+async def test_open_meteo_provider_timestamps_and_preceding_hour_alignment():
+    from zoneinfo import ZoneInfo
+
+    from homeassistant.util import dt as dt_util
+
+    berlin = ZoneInfo("Europe/Berlin")
+    old_tz = dt_util.get_default_time_zone()
+    dt_util.set_default_time_zone(berlin)
+    try:
+        provider = OpenMeteoProvider()
+        session = MagicMock()
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(
+            return_value={
+                "timezone": "America/New_York",
+                "utc_offset_seconds": -14400,
+                "daily": {},
+                "hourly": {
+                    # 08:00..11:00 EDT (-04:00) == 12:00..15:00Z == 14:00..17:00 CEST (+02:00)
+                    "time": [
+                        "2026-06-21T08:00",
+                        "2026-06-21T09:00",
+                        "2026-06-21T10:00",
+                        "2026-06-21T11:00",
+                    ],
+                    "temperature_2m": [20.0, 21.0, 22.0, 23.0],
+                    # Index 2 (10:00 NY) describes the preceding hour [09:00, 10:00) NY
+                    "precipitation_probability": [0, 0, 85, 0],
+                    "precipitation": [0.0, 0.0, 4.2, 0.0],
+                    "windgusts_10m": [12.0, 14.0, 52.0, 15.0],
+                },
+            }
+        )
+        cm = AsyncMock()
+        cm.__aenter__.return_value = mock_resp
+        cm.__aexit__.return_value = None
+        session.get.return_value = cm
+
+        res = await provider.async_fetch(session, 40.71, -74.01)
+        called_url = session.get.call_args.args[0]
+        assert "&forecast_hours=25" in called_url
+
+        hourly = res["hourly"]
+        assert len(hourly) == 4
+
+        # Slot 0: 08:00 NY = 12:00Z = 14:00 Berlin; gets index 1 values for [08:00, 09:00)
+        assert hourly[0]["datetime"] == "2026-06-21T14:00"
+        assert hourly[0]["utc_datetime"] == "2026-06-21T12:00:00+00:00"
+        assert hourly[0]["precip_prob"] == 0
+        assert hourly[0]["precip_mm"] == 0.0
+        assert hourly[0]["gust_kmh"] == 14.0
+
+        # Slot 1: 09:00 NY = 13:00Z = 15:00 Berlin; gets index 2 spike for [09:00, 10:00)
+        assert hourly[1]["datetime"] == "2026-06-21T15:00"
+        assert hourly[1]["utc_datetime"] == "2026-06-21T13:00:00+00:00"
+        assert hourly[1]["precip_prob"] == 85
+        assert hourly[1]["precip_mm"] == 4.2
+        assert hourly[1]["gust_kmh"] == 52.0
+
+        # Slot 2: 10:00 NY = 14:00Z = 16:00 Berlin; gets index 3 calm values for [10:00, 11:00)
+        assert hourly[2]["datetime"] == "2026-06-21T16:00"
+        assert hourly[2]["utc_datetime"] == "2026-06-21T14:00:00+00:00"
+        assert hourly[2]["precip_prob"] == 0
+        assert hourly[2]["precip_mm"] == 0.0
+        assert hourly[2]["gust_kmh"] == 15.0
+
+        # Slot 3: final timestamp has no 12:00 NY row -> unassessed (None) for preceding-hour fields
+        assert hourly[3]["datetime"] == "2026-06-21T17:00"
+        assert hourly[3]["utc_datetime"] == "2026-06-21T15:00:00+00:00"
+        assert hourly[3]["precip_prob"] is None
+        assert hourly[3]["precip_mm"] is None
+        assert hourly[3]["gust_kmh"] is None
+    finally:
+        dt_util.set_default_time_zone(old_tz)

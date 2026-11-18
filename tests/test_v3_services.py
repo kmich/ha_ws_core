@@ -29,6 +29,7 @@ from custom_components.ws_core.const import (
     DOMAIN,
     KEY_FORECAST,
     KEY_NORM_TEMP_C,
+    PROFILE_CUSTOM,
     PROFILE_OUTDOOR_DRYING,
 )
 from tests.test_coordinator import _make_coordinator
@@ -123,11 +124,20 @@ class TestV3Services:
             "max_cloud_cover_pct": 10.0,
             "require_daylight": False,
         }
-        res = coord.get_weather_windows_evaluation(profile_id="astronomy", custom_limits=custom_limits)
-        assert res["profile_id"] == "astronomy"
+        # Omitted or 'custom' profile_id applies overrides onto PROFILE_CUSTOM
+        res = coord.get_weather_windows_evaluation(profile_id=PROFILE_CUSTOM, custom_limits=custom_limits)
+        assert res["profile_id"] == PROFILE_CUSTOM
         assert res["evaluated_limits"]["min_duration_h"] == 3
         assert res["evaluated_limits"]["max_cloud_cover_pct"] == 10.0
         assert res["evaluated_limits"]["require_daylight"] is False
+
+        res_default = coord.get_weather_windows_evaluation(custom_limits=custom_limits)
+        assert res_default["profile_id"] == PROFILE_CUSTOM
+
+        # Unknown profile_id is rejected even when limits are passed
+        err = coord.get_weather_windows_evaluation(profile_id="astronomy", custom_limits=custom_limits)
+        assert err["error"] == "Unknown profile 'astronomy'"
+        assert PROFILE_OUTDOOR_DRYING in err["available_profiles"]
 
     async def test_registered_v3_services_and_schema_validation(self, hass):
         entry = MockConfigEntry(

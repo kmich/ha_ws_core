@@ -379,7 +379,7 @@ class WeatherWindowsEngine:
             )
 
         evaluated_pairs: list[tuple[datetime, WindowSlotEvaluation]] = []
-        for slot_utc in sorted(deduped)[:MAX_HORIZON_HOURS]:
+        for slot_utc in sorted(deduped):
             item = deduped[slot_utc]
             display_iso = slot_utc.astimezone(display_tz).isoformat()
             slot_eval = self._evaluate_slot(item, slot_utc, display_iso, profile)
@@ -497,6 +497,7 @@ class WeatherWindowsEngine:
 
         slot_evals = [s for _, s in evaluated_pairs]
         windows = [w for _, _, w in window_bounds]
+        horizon_hours = min(len(slot_evals), MAX_HORIZON_HOURS)
         return WeatherDecisionResult(
             profile_id=profile.profile_id,
             status=status,
@@ -504,7 +505,7 @@ class WeatherWindowsEngine:
             next_start=next_start,
             next_end=next_end,
             duration_h=duration_h,
-            horizon_hours=len(slot_evals),
+            horizon_hours=horizon_hours,
             is_truncated=is_truncated,
             reason_codes=reasons,
             reasons_text=reasons_text,
@@ -512,7 +513,7 @@ class WeatherWindowsEngine:
             windows=[asdict(w) for w in windows],
             slots=[asdict(s) for s in slot_evals],
             data_quality={
-                "horizon_hours": len(slot_evals),
+                "horizon_hours": horizon_hours,
                 "is_truncated": is_truncated,
                 "unassessed_slots": sum(1 for s in slot_evals if s.unassessed_limits),
             },
@@ -613,6 +614,7 @@ class WeatherWindowsEngine:
             return []
 
         last_slot_utc = evaluated_pairs[-1][0]
+        horizon_end_utc = now_utc + timedelta(hours=MAX_HORIZON_HOURS)
         windows: list[tuple[datetime, datetime, IdentifiedWindow]] = []
         current_streak: list[tuple[datetime, WindowSlotEvaluation]] = []
 
@@ -620,18 +622,15 @@ class WeatherWindowsEngine:
             if not streak:
                 return
             start_utc = streak[0][0]
-            end_utc = streak[-1][0] + timedelta(hours=1)
-            if start_utc <= now_utc < end_utc:
-                remaining_s = (end_utc - now_utc).total_seconds()
-                if remaining_s < min_duration_h * 3600.0 - 1e-3:
-                    return
-                raw_h = round(remaining_s / 3600.0, 2)
-                duration_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
-            else:
-                duration_h = round((end_utc - start_utc).total_seconds() / 3600.0)
-                if duration_h < min_duration_h:
-                    return
-            is_truncated = streak[-1][0] == last_slot_utc
+            raw_end_utc = streak[-1][0] + timedelta(hours=1)
+            end_utc = min(raw_end_utc, horizon_end_utc)
+            effective_start_utc = max(start_utc, now_utc)
+            span_s = (end_utc - effective_start_utc).total_seconds()
+            if span_s < min_duration_h * 3600.0 - 1e-3:
+                return
+            raw_h = round(span_s / 3600.0, 2)
+            duration_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
+            is_truncated = streak[-1][0] == last_slot_utc or raw_end_utc > horizon_end_utc
             windows.append(
                 (
                     start_utc,

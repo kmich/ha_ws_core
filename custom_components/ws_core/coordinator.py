@@ -5320,28 +5320,30 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hourly = fc.get("hourly") or []
         now = dt_util.now()
 
+        # Reject unknown profile_id before applying custom overrides
+        if profile_id is not None and profile_id not in engine.profiles:
+            return {
+                "error": f"Unknown profile '{profile_id}'",
+                "available_profiles": list(engine.profiles.keys()),
+            }
+
         # If custom limits provided, apply partial overrides onto the selected base profile
         if custom_limits:
             base_profile = (
-                (engine.profiles.get(profile_id) if profile_id else None)
-                or engine.profiles.get(PROFILE_CUSTOM)
-                or DEFAULT_PROFILES[PROFILE_CUSTOM]
+                engine.profiles[profile_id]
+                if profile_id
+                else (engine.profiles.get(PROFILE_CUSTOM) or DEFAULT_PROFILES[PROFILE_CUSTOM])
             )
             target_profile = apply_profile_overrides(
                 base_profile,
                 custom_limits,
-                profile_id=profile_id or base_profile.profile_id,
+                profile_id=base_profile.profile_id,
             )
             res = engine.evaluate_profile(target_profile, hourly, current_data=data, now=now)
             return res.to_dict()
 
         if profile_id:
-            prof = engine.profiles.get(profile_id)
-            if prof is None:
-                return {
-                    "error": f"Unknown profile '{profile_id}'",
-                    "available_profiles": list(engine.profiles.keys()),
-                }
+            prof = engine.profiles[profile_id]
             res = engine.evaluate_profile(prof, hourly, current_data=data, now=now)
             return res.to_dict()
 
