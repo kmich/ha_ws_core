@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
+from custom_components.ws_core import pattern_runtime
 from custom_components.ws_core.const import (
     PATTERN_CORRUPTED_FEATURES,
     PATTERN_HISTORY_FEATURES_METHOD,
@@ -17,6 +20,7 @@ from custom_components.ws_core.pattern_forecast import (
     PatternEngine,
     Thresholds,
 )
+from custom_components.ws_core.pattern_runtime import PatternRuntime
 
 
 def _make_engine() -> PatternEngine:
@@ -376,6 +380,188 @@ class TestReplayMaskingAndDp3hAlignment:
         assert rt.engine.std.n[dp_slot] > 0
         assert rain_model.w[dp_idx] != 0.0
         assert rt.store.async_save.await_count == 2
+
+    async def test_dp3h_migration_discards_results_if_reset_occurs_during_replay(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt.store.async_remove = AsyncMock()
+
+        rt.engine.history_learn = {
+            "status": "ok",
+            "targets": {
+                "rain_3h": {"status": "ok", "attempted_at": 1000.0, "reason": None, "method": PATTERN_HISTORY_METHOD}
+            },
+        }
+
+        n = 96
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=[1018.0 - (1.5 * (i % 24) if (i % 24) <= 12 else 0.0) for i in range(n)],
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[6.0] * n,
+            rain=[2.0 if 12 <= (i % 24) <= 14 else 0.0 for i in range(n)],
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+
+        class _ResettingRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                res = fn(*args)
+                # User or service calls reset while in flight
+                await rt.async_reset()
+                return res
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_ResettingRecorder()):
+            result = await rt._async_migrate_feature_replay(now)
+
+        assert result is False
+        assert rt.engine.history_learn == {}
+        assert all(m.maturity == "collecting" and m.n_updates == 0 for m in rt.engine.models.values())
+        assert rt.store.async_remove.await_count == 1
+        assert rt.store.async_save.await_count == 0
+
+    async def test_dp3h_migration_retries_when_replay_yields_no_usable_statistics(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+
+        rt.engine.history_learn = {
+            "status": "ok",
+            "targets": {
+                "rain_3h": {"status": "ok", "attempted_at": 1000.0, "reason": None, "method": PATTERN_HISTORY_METHOD}
+            },
+        }
+
+        n = 96
+        empty_hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=[None] * n,
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[6.0] * n,
+            rain=[0.0] * n,
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        class _FakeRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                return fn(*args)
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: empty_hist  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            needs_retry = await rt._async_migrate_feature_replay(now)
+
+        assert needs_retry is True
+        assert "features_method" not in rt.engine.history_learn
+        assert rt.engine.history_learn["targets"]["rain_3h"].get("features_method") != PATTERN_HISTORY_FEATURES_METHOD
+        assert rt.engine.history_learn["features_reset_method"] == PATTERN_HISTORY_FEATURES_METHOD
+
+    async def test_dp3h_migration_avoids_adding_live_and_historical_coefficients(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+
+        rain_model = rt.engine.models["rain_3h"]
+        dp_slot = POOL_INDEX["dp_3h"]
+        dp_idx = rain_model.spec.features.index("dp_3h") + 1
+
+        rt.engine.history_learn = {
+            "status": "ok",
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "targets": {
+                "rain_3h": {"status": "ok", "attempted_at": 1000.0, "reason": None, "method": PATTERN_HISTORY_METHOD}
+            },
+        }
+
+        live_w = 0.25
+        live_g2 = 0.06
+        rain_model.w[dp_idx] = live_w
+        rain_model.g2[dp_idx] = live_g2
+        rain_model.cp_w[dp_idx] = live_w
+        rain_model.cp_g2[dp_idx] = live_g2
+        rt.engine.std.update(dp_slot, -1.0)
+
+        n = 96
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=[1018.0 - (1.5 * (i % 24) if (i % 24) <= 12 else 0.0) for i in range(n)],
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[6.0] * n,
+            rain=[2.0 if 12 <= (i % 24) <= 14 else 0.0 for i in range(n)],
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        class _FakeRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                return fn(*args)
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        assert retry is False
+        assert rt.engine.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        replayed_w = rain_model.w[dp_idx]
+        assert replayed_w != 0.0
+        assert replayed_w != live_w
+        assert rain_model.g2[dp_idx] != (live_g2 + rain_model.g2[dp_idx])
 
     async def test_full_startup_migration_preserves_live_learning_across_outage_replay_restart_and_retry(self):
         import inspect

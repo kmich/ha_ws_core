@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -161,27 +162,7 @@ class TestBurstCoalescing:
                 {},
             )
 
-        coord._forecast_cache = {
-            "provider": "open_meteo",
-            "daily": [{"date": "2026-06-21", "tmax_c": 28.0, "tmin_c": 18.0, "precip_prob": 10}],
-            "hourly": [
-                {
-                    "datetime": (now + timedelta(hours=h)).isoformat(),
-                    "temp_c": 22.0,
-                    "apparent_temp_c": 22.0,
-                    "dewpoint_c": 12.0,
-                    "precip_prob": 5,
-                    "precip_mm": 0.0,
-                    "wind_kmh": 12.0,
-                    "gust_kmh": 18.0,
-                    "humidity": 50.0,
-                    "cloud_cover": 20.0,
-                }
-                for h in range(25)
-            ],
-        }
         coord.data = {}
-        coord.runtime.last_forecast_fetch = now
         state_writes = 0
 
         def _record_write(data):
@@ -197,23 +178,50 @@ class TestBurstCoalescing:
             scheduled.append(cb)
             return MagicMock()
 
+        def _make_fresh_forecast(fetch_time: datetime) -> dict[str, Any]:
+            return {
+                "provider": "open_meteo",
+                "daily": [
+                    {
+                        "date": fetch_time.strftime("%Y-%m-%d"),
+                        "tmax_c": 28.0,
+                        "tmin_c": 18.0,
+                        "precip_prob": 10,
+                    }
+                ],
+                "hourly": [
+                    {
+                        "datetime": (fetch_time + timedelta(hours=h)).isoformat(),
+                        "temp_c": 22.0 + (h % 5) * 0.2,
+                        "apparent_temp_c": 22.0,
+                        "dewpoint_c": 12.0,
+                        "precip_prob": 5,
+                        "precip_mm": 0.0,
+                        "wind_kmh": 12.0,
+                        "gust_kmh": 18.0,
+                        "humidity": 50.0,
+                        "cloud_cover": 20.0,
+                    }
+                    for h in range(25)
+                ],
+            }
+
         burst_ms: list[float] = []
         source_events = [MagicMock(data={"entity_id": eid}) for eid in sources.values()]
         with (
             patch("custom_components.ws_core.coordinator.async_call_later", side_effect=_fake_call_later),
-            patch.object(coord, "_get_cached_or_schedule_forecast", return_value=coord._forecast_cache),
+            patch.object(coord, "_get_cached_or_schedule_forecast", side_effect=lambda t: coord._forecast_cache),
         ):
-            # Warm caches before measuring
-            coord._handle_source_change(None)
-            state_writes = 0
-
-            for _ in range(25):
+            for i in range(25):
+                burst_now = now + timedelta(minutes=i * 15)
+                coord.runtime.last_forecast_fetch = burst_now
+                coord._forecast_cache = _make_fresh_forecast(burst_now)
                 scheduled.clear()
                 t0 = time.perf_counter()
                 for ev in source_events:
                     coord._handle_source_change(ev)
                 assert len(scheduled) == 1
-                scheduled[0](now)
+                scheduled[0](burst_now)
                 burst_ms.append((time.perf_counter() - t0) * 1000.0)
 
         assert state_writes == 25  # 1 write per 12-sensor burst (vs 12 baseline)

@@ -200,6 +200,8 @@ def _iso(ts: float | None) -> str | None:
 class PatternRuntime:
     """One per coordinator when ``enable_pattern_forecast`` is on."""
 
+    _reset_seq: int = 0
+
     def __init__(self, coord: WSStationCoordinator) -> None:
         self.coord = coord
         opts = coord.entry_options
@@ -218,6 +220,7 @@ class PatternRuntime:
         self._published: dict[str, Any] = {}
         self._error_logged = False
         self._history_running = False
+        self._reset_seq = 0
         self._warm_start: dict[str, Any] = {}
         self._recent_failed = False
         self._retry_count = 0
@@ -258,6 +261,7 @@ class PatternRuntime:
 
     async def async_reset(self) -> None:
         """Delete the store and return every target to ``collecting``."""
+        self._reset_seq += 1
         self.engine.reset_all()
         self._published = {}
         self._last_bucket = None
@@ -1188,6 +1192,7 @@ class PatternRuntime:
             counts = trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"})
             return trainer, counts
 
+        reset_seq = self._reset_seq
         try:
             job_res = await _recorder_instance(self.coord.hass).async_add_executor_job(_dp3h_job)
         except Exception as err:  # noqa: BLE001 - transient recorder failure should retry
@@ -1195,48 +1200,58 @@ class PatternRuntime:
             await self.async_save()
             return True
 
+        # Discard recorder results if learning was reset while the job was in flight
+        if (
+            self._reset_seq != reset_seq
+            or self.engine is not eng
+            or not self.engine.history_learn
+            or not self.engine.history_learn.get("targets")
+        ):
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset during dp_3h migration replay; discarding results"
+            )
+            return False
+
         if job_res is None:
             _LOGGER.debug("ws_core pattern forecast: no statistics metadata for dp_3h migration, will retry")
             await self.async_save()
             return True
 
-        trained, _counts = job_res
+        trained, counts = job_res
         dp_slot = POOL_INDEX["dp_3h"]
         n_h = trained.std.n[dp_slot]
-        if n_h > 0:
-            mean_h = trained.std.mean[dp_slot]
-            var_h = trained.std.var[dp_slot]
-            n_l = eng.std.n[dp_slot]
-            if n_l <= 0:
-                eng.std.mean[dp_slot] = mean_h
-                eng.std.var[dp_slot] = var_h
-                eng.std.n[dp_slot] = n_h
-            else:
-                mean_l = eng.std.mean[dp_slot]
-                var_l = eng.std.var[dp_slot]
-                n_total = n_h + n_l
-                delta = mean_l - mean_h
-                eng.std.mean[dp_slot] = (n_h * mean_h + n_l * mean_l) / n_total
-                eng.std.var[dp_slot] = max(
-                    0.0, ((n_h * var_h) + (n_l * var_l) + (delta * delta * n_h * n_l / n_total)) / n_total
-                )
-                eng.std.n[dp_slot] = n_total
+        if n_h <= 0:
+            _LOGGER.debug("ws_core pattern forecast: no usable dp_3h statistics in recorder history, will retry")
+            await self.async_save()
+            return True
+
+        mean_h = trained.std.mean[dp_slot]
+        var_h = trained.std.var[dp_slot]
+        n_l = eng.std.n[dp_slot]
+        if n_l <= 0:
+            eng.std.mean[dp_slot] = mean_h
+            eng.std.var[dp_slot] = var_h
+            eng.std.n[dp_slot] = n_h
+        else:
+            mean_l = eng.std.mean[dp_slot]
+            var_l = eng.std.var[dp_slot]
+            n_total = n_h + n_l
+            delta = mean_l - mean_h
+            eng.std.mean[dp_slot] = (n_h * mean_h + n_l * mean_l) / n_total
+            eng.std.var[dp_slot] = max(
+                0.0, ((n_h * var_h) + (n_l * var_l) + (delta * delta * n_h * n_l / n_total)) / n_total
+            )
+            eng.std.n[dp_slot] = n_total
 
         for tid in ok_targets:
             live = eng.models.get(tid)
             src = trained.models.get(tid)
             if live is not None and src is not None and "dp_3h" in live.spec.features:
                 idx = live.spec.features.index("dp_3h") + 1
-                if live.w[idx] == 0.0 and live.g2[idx] == 0.0:
-                    live.w[idx] = src.w[idx]
-                    live.g2[idx] = src.g2[idx]
-                    live.cp_w[idx] = src.cp_w[idx]
-                    live.cp_g2[idx] = src.cp_g2[idx]
-                else:
-                    live.w[idx] = src.w[idx] + live.w[idx]
-                    live.g2[idx] = src.g2[idx] + live.g2[idx]
-                    live.cp_w[idx] = live.w[idx]
-                    live.cp_g2[idx] = live.g2[idx]
+                live.w[idx] = src.w[idx]
+                live.g2[idx] = src.g2[idx]
+                live.cp_w[idx] = src.cp_w[idx]
+                live.cp_g2[idx] = src.cp_g2[idx]
             if isinstance(targets.get(tid), dict):
                 targets[tid]["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
 
@@ -1312,6 +1327,7 @@ class PatternRuntime:
         self._history_running = True
         retry_needed = False
         cancelled = False
+        reset_seq = self._reset_seq
         try:
             now = dt_util.utcnow()
             retry_needed = await self._async_forget_misread_replay(now)
@@ -1353,6 +1369,11 @@ class PatternRuntime:
                         for t in targets
                     },
                 }
+            if self._reset_seq != reset_seq or self.engine is not eng:
+                _LOGGER.debug(
+                    "ws_core pattern forecast: learning state was reset during history replay; discarding results"
+                )
+                return
             eng.adopt_replay(result["trained"], result["report"], result["statuses"], update_std, now.timestamp())
             # The 24 h pressure change needs a reading from a day ago; seed it from the
             # replayed hours so forecasts do not wait a day after being switched on.
