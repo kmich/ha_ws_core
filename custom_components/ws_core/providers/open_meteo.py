@@ -89,12 +89,8 @@ class OpenMeteoProvider(ForecastProvider):
         tz_name = js.get("timezone")
         if isinstance(utc_offset_s, (int, float)) and not isinstance(utc_offset_s, bool):
             om_tz = timezone(timedelta(seconds=int(utc_offset_s)))
-        if tz_name and (
-            om_tz is None or (utc_offset_s == 0 and str(tz_name).upper() not in ("UTC", "GMT", "ETC/UTC", "ETC/GMT"))
-        ):
-            resolved_tz = dt_util.get_time_zone(str(tz_name))
-            if resolved_tz is not None:
-                om_tz = resolved_tz
+        elif tz_name:
+            om_tz = dt_util.get_time_zone(str(tz_name))
 
         hourly = js.get("hourly") or {}
         h_times = hourly.get("time") or []

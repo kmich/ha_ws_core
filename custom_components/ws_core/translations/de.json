@@ -407,7 +407,20 @@
         "description": "Wetter-Entscheidungs-Engine konfigurieren und automatisierte Aktivitätsfenster auswählen.",
         "data": {
           "enable_weather_windows": "Wetterfenster-Entscheidungs-Engine aktivieren",
-          "weather_window_profiles": "Aktive Entscheidungsprofile"
+          "weather_window_profiles": "Aktive Entscheidungsprofile",
+          "custom_window_name": "Name des benutzerdefinierten Profils",
+          "custom_min_duration_h": "Benutzerdefinierte Mindestdauer (Stunden)",
+          "custom_max_rain_prob_pct": "Benutzerdefinierte max. Regenwahrscheinlichkeit (%)",
+          "custom_max_rain_mm": "Benutzerdefinierter max. Niederschlag (mm/h)",
+          "custom_min_temp_c": "Benutzerdefinierte Mindesttemperatur (°C)",
+          "custom_max_temp_c": "Benutzerdefinierte Höchsttemperatur (°C)",
+          "custom_min_humidity_pct": "Benutzerdefinierte min. Luftfeuchtigkeit (%)",
+          "custom_max_humidity_pct": "Benutzerdefinierte max. Luftfeuchtigkeit (%)",
+          "custom_min_wind_kmh": "Benutzerdefinierte min. Windgeschwindigkeit (km/h)",
+          "custom_max_wind_kmh": "Benutzerdefinierte max. Windgeschwindigkeit (km/h)",
+          "custom_max_wind_gust_kmh": "Benutzerdefinierte max. Windböe (km/h)",
+          "custom_max_cloud_cover_pct": "Benutzerdefinierte max. Bewölkung (%)",
+          "custom_require_daylight": "Tageslicht für benutzerdefiniertes Profil erforderlich"
         }
       },
       "thresholds": {
@@ -723,7 +736,9 @@
       "invalid_api_key": "Ungültiger API-Schlüssel oder Zugangsdaten abgelehnt",
       "cannot_connect": "Verbindung zur API konnte nicht hergestellt werden – Netzwerk prüfen und erneut versuchen",
       "station_not_found": "Weather Underground Stations-ID nicht gefunden",
-      "room_name_required": "Bitte geben Sie einen Namen für den Raum ein."
+      "room_name_required": "Bitte geben Sie einen Namen für den Raum ein.",
+      "invalid_duration": "Die Mindestdauer muss mindestens 1 Stunde betragen.",
+      "min_exceeds_max": "Der Minimalwert darf den Maximalwert nicht überschreiten."
     }
   },
   "issues": {

@@ -17,6 +17,19 @@ from homeassistant.util import dt as dt_util
 
 from .algorithms import solar_elevation_deg
 from .const import (
+    CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
+    CONF_CUSTOM_MAX_HUMIDITY_PCT,
+    CONF_CUSTOM_MAX_RAIN_MM,
+    CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+    CONF_CUSTOM_MAX_TEMP_C,
+    CONF_CUSTOM_MAX_WIND_GUST_KMH,
+    CONF_CUSTOM_MAX_WIND_KMH,
+    CONF_CUSTOM_MIN_DURATION_H,
+    CONF_CUSTOM_MIN_HUMIDITY_PCT,
+    CONF_CUSTOM_MIN_TEMP_C,
+    CONF_CUSTOM_MIN_WIND_KMH,
+    CONF_CUSTOM_REQUIRE_DAYLIGHT,
+    CONF_CUSTOM_WINDOW_NAME,
     CONF_WEATHER_WINDOW_PROFILES,
     DEFAULT_WEATHER_WINDOW_PROFILES,
     KEY_NORM_WIND_GUST_MS,
@@ -151,7 +164,7 @@ DEFAULT_PROFILES: dict[str, WeatherWindowProfile] = {
 
 
 def resolve_profiles(config: Mapping[str, Any] | None = None) -> dict[str, WeatherWindowProfile]:
-    """Resolve enabled weather window profiles from config/options."""
+    """Resolve enabled weather window profiles and configured custom limits from config/options."""
     if (
         config is not None
         and CONF_WEATHER_WINDOW_PROFILES in config
@@ -161,7 +174,52 @@ def resolve_profiles(config: Mapping[str, Any] | None = None) -> dict[str, Weath
     else:
         raw = DEFAULT_WEATHER_WINDOW_PROFILES
     selected = {raw} if isinstance(raw, str) else set(raw)
-    return {pid: replace(prof, enabled=(pid in selected)) for pid, prof in DEFAULT_PROFILES.items()}
+
+    base_custom = DEFAULT_PROFILES[PROFILE_CUSTOM]
+    custom_profile = base_custom
+    if config is not None:
+        overrides: dict[str, Any] = {}
+        for nested_key in ("custom_profile", "custom_window_limits", "custom_limits"):
+            nested = config.get(nested_key)
+            if isinstance(nested, Mapping):
+                overrides.update(nested)
+        for flat_key, target_key in (
+            ("custom_name", "name"),
+            (CONF_CUSTOM_WINDOW_NAME, "name"),
+            ("min_duration_h", "min_duration_h"),
+            (CONF_CUSTOM_MIN_DURATION_H, "min_duration_h"),
+            ("require_daylight", "require_daylight"),
+            (CONF_CUSTOM_REQUIRE_DAYLIGHT, "require_daylight"),
+        ):
+            if flat_key in config:
+                overrides[target_key] = config[flat_key]
+        prefixed_numeric = {
+            "max_rain_prob_pct": CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+            "max_rain_mm": CONF_CUSTOM_MAX_RAIN_MM,
+            "min_temp_c": CONF_CUSTOM_MIN_TEMP_C,
+            "max_temp_c": CONF_CUSTOM_MAX_TEMP_C,
+            "min_humidity_pct": CONF_CUSTOM_MIN_HUMIDITY_PCT,
+            "max_humidity_pct": CONF_CUSTOM_MAX_HUMIDITY_PCT,
+            "min_wind_kmh": CONF_CUSTOM_MIN_WIND_KMH,
+            "max_wind_kmh": CONF_CUSTOM_MAX_WIND_KMH,
+            "max_wind_gust_kmh": CONF_CUSTOM_MAX_WIND_GUST_KMH,
+            "max_cloud_cover_pct": CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
+        }
+        for field_name, conf_key in prefixed_numeric.items():
+            if conf_key in config:
+                overrides[field_name] = config[conf_key]
+            elif field_name in config:
+                overrides[field_name] = config[field_name]
+        if overrides:
+            try:
+                custom_profile = apply_profile_overrides(base_custom, overrides, profile_id=PROFILE_CUSTOM)
+            except ValueError as err:
+                _LOGGER.debug("Ignoring invalid stored custom profile overrides (%s): %s", overrides, err)
+                custom_profile = base_custom
+
+    resolved = {pid: replace(prof, enabled=(pid in selected)) for pid, prof in DEFAULT_PROFILES.items()}
+    resolved[PROFILE_CUSTOM] = replace(custom_profile, enabled=(PROFILE_CUSTOM in selected))
+    return resolved
 
 
 def _coerce_positive_int(val: Any) -> int:
@@ -196,7 +254,9 @@ def apply_profile_overrides(
     if profile_id is not None:
         changes["profile_id"] = profile_id
     if "name" in overrides and overrides["name"] is not None:
-        changes["name"] = str(overrides["name"])
+        cleaned_name = str(overrides["name"]).strip()
+        if cleaned_name:
+            changes["name"] = cleaned_name
     if "min_duration_h" in overrides and overrides["min_duration_h"] is not None:
         changes["min_duration_h"] = _coerce_positive_int(overrides["min_duration_h"])
     for field_name in _NUMERIC_LIMIT_FIELDS:
@@ -378,11 +438,19 @@ class WeatherWindowsEngine:
                 data_quality={"available_slots": 0},
             )
 
+        horizon_end_utc = now_utc + timedelta(hours=MAX_HORIZON_HOURS)
         evaluated_pairs: list[tuple[datetime, WindowSlotEvaluation]] = []
         for slot_utc in sorted(deduped):
             item = deduped[slot_utc]
             display_iso = slot_utc.astimezone(display_tz).isoformat()
-            slot_eval = self._evaluate_slot(item, slot_utc, display_iso, profile)
+            slot_eval = self._evaluate_slot(
+                item,
+                slot_utc,
+                display_iso,
+                profile,
+                now_utc=now_utc,
+                horizon_end_utc=horizon_end_utc,
+            )
             evaluated_pairs.append((slot_utc, slot_eval))
 
         # 2. Check live observations at station now and apply them to the current interval
@@ -454,10 +522,17 @@ class WeatherWindowsEngine:
                     f"Conditions meet all limits for {profile.name} starting now for at least {duration_h} hours."
                 )
             elif potential_bounds and not live_blockers and potential_bounds[0][0] <= now_utc < potential_bounds[0][1]:
-                # Current slot is unassessed due solely to missing inputs; cannot claim upcoming vs now safely.
+                # Current slot is unassessed due solely to missing inputs; keep status unknown
+                # while still publishing the confirmed future window for timestamp sensors/notifications.
                 status = STATUS_UNKNOWN
+                next_start = w0.start_iso
+                next_end = w0.end_iso
+                duration_h = w0.duration_h
+                is_truncated = w0.is_truncated
                 reasons.append(REASON_MISSING_DATA)
                 reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
+                reasons.append(REASON_WINDOW_UPCOMING)
+                reasons_text.append(f"Next suitable window starts at {next_start} for {duration_h} hours.")
             else:
                 status = STATUS_WINDOW_UPCOMING
                 next_start = w0.start_iso
@@ -546,6 +621,9 @@ class WeatherWindowsEngine:
         slot_utc: datetime,
         display_iso: str,
         profile: WeatherWindowProfile,
+        *,
+        now_utc: datetime | None = None,
+        horizon_end_utc: datetime | None = None,
     ) -> WindowSlotEvaluation:
         """Evaluate a single hourly slot against every enabled profile limit."""
         temp_c = _as_finite_float(item.get("temp_c"))
@@ -556,11 +634,16 @@ class WeatherWindowsEngine:
         gust_kmh = _as_finite_float(item.get("gust_kmh"))
         cloud_cover = _as_finite_float(item.get("cloud_cover"))
 
-        sol_elev = solar_elevation_deg(self.lat, self.lon, slot_utc)
+        effective_start_utc = max(slot_utc, now_utc) if now_utc is not None else slot_utc
+        raw_end_utc = slot_utc + timedelta(hours=1)
+        effective_end_utc = min(raw_end_utc, horizon_end_utc) if horizon_end_utc is not None else raw_end_utc
+        sol_elev_start = solar_elevation_deg(self.lat, self.lon, effective_start_utc)
+        sol_elev_end = solar_elevation_deg(self.lat, self.lon, effective_end_utc)
+        sol_elev = min(sol_elev_start, sol_elev_end)
         reasons: list[str] = []
 
-        # 1. Daylight requirement
-        if profile.require_daylight and sol_elev <= 0.0:
+        # 1. Daylight requirement across the full effective window interval [start, end]
+        if profile.require_daylight and (sol_elev_start <= 0.0 or sol_elev_end <= 0.0):
             reasons.append(REASON_NIGHTTIME)
 
         # 2. Evaluate every enabled numeric limit uniformly; missing inputs mark slot unassessed.

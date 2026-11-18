@@ -407,7 +407,20 @@
         "description": "Configure the Weather Decision Engine and select automated activity windows.",
         "data": {
           "enable_weather_windows": "Enable Weather Windows Decision Engine",
-          "weather_window_profiles": "Active Decision Profiles"
+          "weather_window_profiles": "Active Decision Profiles",
+          "custom_window_name": "Custom profile name",
+          "custom_min_duration_h": "Custom minimum duration (hours)",
+          "custom_max_rain_prob_pct": "Custom max rain probability (%)",
+          "custom_max_rain_mm": "Custom max precipitation (mm/h)",
+          "custom_min_temp_c": "Custom min temperature (°C)",
+          "custom_max_temp_c": "Custom max temperature (°C)",
+          "custom_min_humidity_pct": "Custom min humidity (%)",
+          "custom_max_humidity_pct": "Custom max humidity (%)",
+          "custom_min_wind_kmh": "Custom min wind speed (km/h)",
+          "custom_max_wind_kmh": "Custom max wind speed (km/h)",
+          "custom_max_wind_gust_kmh": "Custom max wind gust (km/h)",
+          "custom_max_cloud_cover_pct": "Custom max cloud cover (%)",
+          "custom_require_daylight": "Custom profile requires daylight"
         }
       },
       "thresholds": {
@@ -723,7 +736,9 @@
       "invalid_api_key": "Invalid API key or credentials rejected",
       "cannot_connect": "Could not connect to API - check network and try again",
       "station_not_found": "Weather Underground station ID not found",
-      "room_name_required": "Please enter a name for the room."
+      "room_name_required": "Please enter a name for the room.",
+      "invalid_duration": "Minimum duration must be at least 1 hour.",
+      "min_exceeds_max": "Minimum limit cannot exceed maximum limit."
     }
   },
   "issues": {

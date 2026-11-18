@@ -360,14 +360,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 await coord.async_reset_pattern_forecast()
             _LOGGER.info("ws_core: learning state reset (target=%s)", target)
 
-    async def _export_learning(call: ServiceCall) -> dict[str, Any]:
+    async def _export_learning(call: ServiceCall) -> dict[str, Any] | None:
         """Export learning state with response support (SupportsResponse.OPTIONAL)."""
         is_full = bool(call.data.get("full", False))
+        wants_response = bool(getattr(call, "return_response", False))
         out: dict[str, Any] = {}
         for coord in _get_targets(call):
             eid = coord.entry_data.get("entry_id", "station")
             ls = coord._learning_state
             pattern = getattr(coord, "_pattern", None)
+            if not wants_response:
+                _LOGGER.info("ws_core learning state export (%s): %s", eid, ls.to_dict())
+                if pattern is not None:
+                    _LOGGER.info("ws_core pattern forecast export (%s): %s", eid, pattern.summary())
+                continue
             if is_full:
                 payload = ls.to_dict()
                 if pattern is not None:
@@ -389,7 +395,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "pattern_forecast": pattern.summary() if pattern is not None else None,
                 }
             _LOGGER.debug("ws_core learning state export (%s): %s", eid, out[eid])
-        return out
+        return out if wants_response else None
 
     async def _get_weather_windows(call: ServiceCall) -> dict[str, Any]:
         """Evaluate weather windows (SupportsResponse.ONLY)."""

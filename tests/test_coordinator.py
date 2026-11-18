@@ -1764,6 +1764,18 @@ class TestForecastValidity:
             (full.get(KEY_FORECAST) or {}).get("daily")
         )
 
+        # Fresh cache across midnight where daily rows aged out still retains valid hourly rows
+        recent_fc = {
+            "provider": "open_meteo",
+            "daily": [{"date": "2026-11-16", "tmax_c": 15.0, "tmin_c": 8.0, "precip_prob": 20}],
+            "hourly": [{"datetime": "2026-11-17T01:00", "temp_c": 12.0}],
+        }
+        real_coord.runtime.last_forecast_fetch = now - timedelta(hours=1)
+        published = real_coord._published_forecast(recent_fc, now=now)
+        assert published is not None
+        assert published["daily"] == []
+        assert published["hourly"] == [{"datetime": "2026-11-17T01:00", "temp_c": 12.0}]
+
 
 class TestSoilMoistureUnits:
     """Soil moisture unit handling and ambiguous_soil_moisture_unit Repairs issue."""

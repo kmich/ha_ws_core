@@ -407,7 +407,20 @@
         "description": "Configura il motore decisionale meteo e seleziona le finestre di attività.",
         "data": {
           "enable_weather_windows": "Abilita motore decisionale finestre meteo",
-          "weather_window_profiles": "Profili decisionali attivi"
+          "weather_window_profiles": "Profili decisionali attivi",
+          "custom_window_name": "Nome del profilo personalizzato",
+          "custom_min_duration_h": "Durata minima personalizzata (ore)",
+          "custom_max_rain_prob_pct": "Probabilità max pioggia personalizzata (%)",
+          "custom_max_rain_mm": "Precipitazione max personalizzata (mm/h)",
+          "custom_min_temp_c": "Temperatura min personalizzata (°C)",
+          "custom_max_temp_c": "Temperatura max personalizzata (°C)",
+          "custom_min_humidity_pct": "Umidità min personalizzata (%)",
+          "custom_max_humidity_pct": "Umidità max personalizzata (%)",
+          "custom_min_wind_kmh": "Velocità vento min personalizzata (km/h)",
+          "custom_max_wind_kmh": "Velocità vento max personalizzata (km/h)",
+          "custom_max_wind_gust_kmh": "Raffica di vento max personalizzata (km/h)",
+          "custom_max_cloud_cover_pct": "Copertura nuvolosa max personalizzata (%)",
+          "custom_require_daylight": "Il profilo personalizzato richiede luce diurna"
         }
       },
       "thresholds": {
@@ -723,7 +736,9 @@
       "invalid_api_key": "Chiave API non valida o credenziali rifiutate",
       "cannot_connect": "Impossibile connettersi all'API - controlla la rete e riprova",
       "station_not_found": "ID stazione Weather Underground non trovato",
-      "room_name_required": "Inserisci un nome per la stanza."
+      "room_name_required": "Inserisci un nome per la stanza.",
+      "invalid_duration": "La durata minima deve essere di almeno 1 ora.",
+      "min_exceeds_max": "Il limite minimo non può superare il limite massimo."
     }
   },
   "issues": {

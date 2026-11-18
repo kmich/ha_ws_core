@@ -431,3 +431,53 @@ def test_capability_matrix_covers_every_registered_provider():
     # Alias compatibility
     assert get_provider_capabilities("open_weather_map").provider_id == "openweathermap"
     assert get_provider_capabilities("nonexistent").provider_id == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_open_meteo_honors_zero_utc_offset_across_dst():
+    """Open-Meteo uses the static response utc_offset_seconds (even 0) across DST transitions."""
+    provider = OpenMeteoProvider()
+    session = MagicMock()
+    mock_resp = AsyncMock()
+    mock_resp.status = 200
+    # 2026-03-29 Europe/London springs forward at 01:00 UTC -> 02:00 BST, yet Open-Meteo
+    # stamps the entire response using its fixed header offset (utc_offset_seconds = 0).
+    mock_resp.json = AsyncMock(
+        return_value={
+            "timezone": "Europe/London",
+            "utc_offset_seconds": 0,
+            "daily": {},
+            "hourly": {
+                "time": [
+                    "2026-03-29T00:00",
+                    "2026-03-29T01:00",
+                    "2026-03-29T02:00",
+                    "2026-03-29T03:00",
+                ],
+                "temperature_2m": [8.0, 7.5, 7.0, 6.5],
+                "precipitation_probability": [0, 10, 80, 0],
+                "precipitation": [0.0, 0.2, 3.5, 0.0],
+                "windgusts_10m": [10.0, 18.0, 48.0, 12.0],
+            },
+        }
+    )
+    cm = AsyncMock()
+    cm.__aenter__.return_value = mock_resp
+    cm.__aexit__.return_value = None
+    session.get.return_value = cm
+
+    res = await provider.async_fetch(session, 51.50, -0.12)
+    hourly = res["hourly"]
+    assert [h["utc_datetime"] for h in hourly] == [
+        "2026-03-29T00:00:00+00:00",
+        "2026-03-29T01:00:00+00:00",
+        "2026-03-29T02:00:00+00:00",
+        "2026-03-29T03:00:00+00:00",
+    ]
+    # All three intervals [00..01), [01..02), [02..03) retain exact 1h spacing and shifted metrics
+    assert hourly[1]["precip_prob"] == 80
+    assert hourly[1]["precip_mm"] == 3.5
+    assert hourly[1]["gust_kmh"] == 48.0
+    assert hourly[2]["precip_prob"] == 0
+    assert hourly[2]["precip_mm"] == 0.0
+    assert hourly[2]["gust_kmh"] == 12.0

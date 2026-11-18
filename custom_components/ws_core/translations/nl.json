@@ -407,7 +407,20 @@
         "description": "Configureer de weerbeslissingsengine en selecteer automatische activiteitenvensters.",
         "data": {
           "enable_weather_windows": "Weervensters beslissingsengine inschakelen",
-          "weather_window_profiles": "Actieve beslissingsprofielen"
+          "weather_window_profiles": "Actieve beslissingsprofielen",
+          "custom_window_name": "Naam aangepast profiel",
+          "custom_min_duration_h": "Aangepaste minimale duur (uren)",
+          "custom_max_rain_prob_pct": "Aangepaste max. regenkans (%)",
+          "custom_max_rain_mm": "Aangepaste max. neerslag (mm/u)",
+          "custom_min_temp_c": "Aangepaste min. temperatuur (°C)",
+          "custom_max_temp_c": "Aangepaste max. temperatuur (°C)",
+          "custom_min_humidity_pct": "Aangepaste min. luchtvochtigheid (%)",
+          "custom_max_humidity_pct": "Aangepaste max. luchtvochtigheid (%)",
+          "custom_min_wind_kmh": "Aangepaste min. windsnelheid (km/u)",
+          "custom_max_wind_kmh": "Aangepaste max. windsnelheid (km/u)",
+          "custom_max_wind_gust_kmh": "Aangepaste max. windstoot (km/u)",
+          "custom_max_cloud_cover_pct": "Aangepaste max. bewolking (%)",
+          "custom_require_daylight": "Aangepast profiel vereist daglicht"
         }
       },
       "thresholds": {
@@ -723,7 +736,9 @@
       "invalid_api_key": "Ongeldige API-sleutel of inloggegevens geweigerd",
       "cannot_connect": "Kan geen verbinding maken met API - controleer het netwerk en probeer opnieuw",
       "station_not_found": "Weather Underground station-ID niet gevonden",
-      "room_name_required": "Voer een naam in voor de ruimte."
+      "room_name_required": "Voer een naam in voor de ruimte.",
+      "invalid_duration": "De minimale duur moet minstens 1 uur zijn.",
+      "min_exceeds_max": "De minimumlimiet mag niet hoger zijn dan de maximumlimiet."
     }
   },
   "issues": {

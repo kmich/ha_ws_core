@@ -280,24 +280,73 @@ class TestOptionsMenuNavigation:
 
     async def test_options_decision_profiles_step(self):
         from custom_components.ws_core.const import (
+            CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
+            CONF_CUSTOM_MAX_TEMP_C,
+            CONF_CUSTOM_MIN_DURATION_H,
+            CONF_CUSTOM_MIN_TEMP_C,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT,
+            CONF_CUSTOM_WINDOW_NAME,
             CONF_ENABLE_WEATHER_WINDOWS,
             CONF_WEATHER_WINDOW_PROFILES,
+            PROFILE_CUSTOM,
             PROFILE_OUTDOOR_DRYING,
         )
+        from custom_components.ws_core.weather_windows import resolve_profiles
 
-        flow = _options_flow(stored={}, opt={})
+        flow = _options_flow(stored={CONF_CUSTOM_MAX_CLOUD_COVER_PCT: 50.0}, opt={})
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {
+                "step_id": kw["step_id"],
+                "schema": kw["data_schema"],
+                "errors": kw.get("errors", {}),
+            }
+        )
         res = await flow.async_step_decision_profiles(None)
         assert res["step_id"] == "decision_profiles"
+        schema_keys = {str(getattr(k, "schema", k)) for k in res["schema"].schema}
+        assert CONF_CUSTOM_WINDOW_NAME in schema_keys
+        assert CONF_CUSTOM_MIN_DURATION_H in schema_keys
+        assert CONF_CUSTOM_MIN_TEMP_C in schema_keys
+        assert CONF_CUSTOM_REQUIRE_DAYLIGHT in schema_keys
 
+        # Invalid min > max range returns form error
+        err_res = await flow.async_step_decision_profiles(
+            {
+                CONF_ENABLE_WEATHER_WINDOWS: True,
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM],
+                CONF_CUSTOM_MIN_DURATION_H: 2,
+                CONF_CUSTOM_MIN_TEMP_C: 25.0,
+                CONF_CUSTOM_MAX_TEMP_C: 10.0,
+            }
+        )
+        assert err_res["errors"] == {CONF_CUSTOM_MIN_TEMP_C: "min_exceeds_max"}
+
+        # Saving custom limits persists values and sets omitted optional numeric limits to None
         save_res = await flow.async_step_decision_profiles(
             {
                 CONF_ENABLE_WEATHER_WINDOWS: True,
-                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_OUTDOOR_DRYING],
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_OUTDOOR_DRYING, PROFILE_CUSTOM],
+                CONF_CUSTOM_WINDOW_NAME: "Running",
+                CONF_CUSTOM_MIN_DURATION_H: 3,
+                CONF_CUSTOM_MIN_TEMP_C: 8.0,
+                CONF_CUSTOM_MAX_TEMP_C: 24.0,
+                CONF_CUSTOM_REQUIRE_DAYLIGHT: False,
             }
         )
         assert save_res["type"] == "create_entry"
-        assert save_res["data"][CONF_ENABLE_WEATHER_WINDOWS] is True
-        assert save_res["data"][CONF_WEATHER_WINDOW_PROFILES] == [PROFILE_OUTDOOR_DRYING]
+        saved = save_res["data"]
+        assert saved[CONF_ENABLE_WEATHER_WINDOWS] is True
+        assert saved[CONF_WEATHER_WINDOW_PROFILES] == [PROFILE_OUTDOOR_DRYING, PROFILE_CUSTOM]
+        assert saved[CONF_CUSTOM_MAX_CLOUD_COVER_PCT] is None
+
+        resolved = resolve_profiles(saved)
+        assert resolved[PROFILE_CUSTOM].enabled is True
+        assert resolved[PROFILE_CUSTOM].name == "Running"
+        assert resolved[PROFILE_CUSTOM].min_duration_h == 3
+        assert resolved[PROFILE_CUSTOM].min_temp_c == 8.0
+        assert resolved[PROFILE_CUSTOM].max_temp_c == 24.0
+        assert resolved[PROFILE_CUSTOM].max_cloud_cover_pct is None
+        assert resolved[PROFILE_CUSTOM].require_daylight is False
 
     async def test_options_thresholds_step_validates_and_saves(self):
         from custom_components.ws_core.const import CONF_PREFIX

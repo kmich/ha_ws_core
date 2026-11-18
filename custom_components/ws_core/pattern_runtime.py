@@ -1165,9 +1165,12 @@ class PatternRuntime:
 
             try:
                 trained = await _recorder_instance(self.coord.hass).async_add_executor_job(_dp3h_job)
-            except Exception as err:  # noqa: BLE001 - best-effort scoped replay during migration
-                _LOGGER.debug("ws_core pattern forecast: skipped dp_3h migration replay: %s", err)
-                trained = None
+            except Exception as err:  # noqa: BLE001 - transient recorder failure should retry
+                _LOGGER.debug("ws_core pattern forecast: dp_3h migration replay failed, will retry: %s", err)
+                eng.history_learn = hl
+                self._published = {}
+                await self.async_save()
+                return True
 
             if trained is not None:
                 dp_slot = POOL_INDEX["dp_3h"]

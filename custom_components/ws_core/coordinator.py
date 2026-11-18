@@ -2577,8 +2577,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for row in daily
             if isinstance(row, dict) and (not row.get("date") or str(row["date"])[:10] >= today_str)
         ]
-        if daily and not valid_daily:
-            return {**fc, "daily": [], "hourly": []}
         return {**fc, "daily": valid_daily}
 
     def _compute_rain_probability(

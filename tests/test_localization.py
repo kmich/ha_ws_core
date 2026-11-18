@@ -123,6 +123,24 @@ class TestPR6LocalizationCompleteness:
             assert set(opt_steps["init"]["menu_options"]) == expected_menu, lang
             assert opt_steps["decision_profiles"]["data"]["enable_weather_windows"]
             assert opt_steps["decision_profiles"]["data"]["weather_window_profiles"]
+            for custom_key in (
+                "custom_window_name",
+                "custom_min_duration_h",
+                "custom_max_rain_prob_pct",
+                "custom_max_rain_mm",
+                "custom_min_temp_c",
+                "custom_max_temp_c",
+                "custom_min_humidity_pct",
+                "custom_max_humidity_pct",
+                "custom_min_wind_kmh",
+                "custom_max_wind_kmh",
+                "custom_max_wind_gust_kmh",
+                "custom_max_cloud_cover_pct",
+                "custom_require_daylight",
+            ):
+                assert opt_steps["decision_profiles"]["data"][custom_key], (lang, custom_key)
+            assert d["options"]["error"]["invalid_duration"]
+            assert d["options"]["error"]["min_exceeds_max"]
 
             sensors = d["entity"]["sensor"]
             assert expected_window_sensors <= set(sensors), (lang, expected_window_sensors - set(sensors))

@@ -34,6 +34,19 @@ from .const import (
     CONF_CAL_TEMP_C,
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
+    CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
+    CONF_CUSTOM_MAX_HUMIDITY_PCT,
+    CONF_CUSTOM_MAX_RAIN_MM,
+    CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+    CONF_CUSTOM_MAX_TEMP_C,
+    CONF_CUSTOM_MAX_WIND_GUST_KMH,
+    CONF_CUSTOM_MAX_WIND_KMH,
+    CONF_CUSTOM_MIN_DURATION_H,
+    CONF_CUSTOM_MIN_HUMIDITY_PCT,
+    CONF_CUSTOM_MIN_TEMP_C,
+    CONF_CUSTOM_MIN_WIND_KMH,
+    CONF_CUSTOM_REQUIRE_DAYLIGHT,
+    CONF_CUSTOM_WINDOW_NAME,
     CONF_DISTANCE_UNIT,
     CONF_ELEVATION_M,
     CONF_ENABLE_ADVANCED_SENSORS,
@@ -1815,40 +1828,121 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         )
 
     async def async_step_decision_profiles(self, user_input: dict[str, Any] | None = None):
-        """Configure Decision Profiles & Weather Windows."""
+        """Configure Decision Profiles, active Weather Windows, and Custom Profile limits."""
+        from .weather_windows import PROFILE_CUSTOM as _PROFILE_CUSTOM
+        from .weather_windows import resolve_profiles
+
         self._ensure_opt()
+        limit_specs: tuple[tuple[str, str, float, float, float, str], ...] = (
+            (CONF_CUSTOM_MAX_RAIN_PROB_PCT, "max_rain_prob_pct", 0.0, 100.0, 1.0, "%"),
+            (CONF_CUSTOM_MAX_RAIN_MM, "max_rain_mm", 0.0, 200.0, 0.1, "mm"),
+            (CONF_CUSTOM_MIN_TEMP_C, "min_temp_c", -40.0, 50.0, 0.5, "°C"),
+            (CONF_CUSTOM_MAX_TEMP_C, "max_temp_c", -40.0, 60.0, 0.5, "°C"),
+            (CONF_CUSTOM_MIN_HUMIDITY_PCT, "min_humidity_pct", 0.0, 100.0, 1.0, "%"),
+            (CONF_CUSTOM_MAX_HUMIDITY_PCT, "max_humidity_pct", 0.0, 100.0, 1.0, "%"),
+            (CONF_CUSTOM_MIN_WIND_KMH, "min_wind_kmh", 0.0, 150.0, 1.0, "km/h"),
+            (CONF_CUSTOM_MAX_WIND_KMH, "max_wind_kmh", 0.0, 150.0, 1.0, "km/h"),
+            (CONF_CUSTOM_MAX_WIND_GUST_KMH, "max_wind_gust_kmh", 0.0, 250.0, 1.0, "km/h"),
+            (CONF_CUSTOM_MAX_CLOUD_COVER_PCT, "max_cloud_cover_pct", 0.0, 100.0, 1.0, "%"),
+        )
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-            self._opt.update(user_input)
-            return self.async_create_entry(title="", data=self._opt)
+            raw_dur = user_input.get(CONF_CUSTOM_MIN_DURATION_H)
+            if raw_dur is not None:
+                try:
+                    dur_val = int(float(raw_dur))
+                    if dur_val < 1:
+                        errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+                except (TypeError, ValueError):
+                    errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+            for min_k, max_k in (
+                (CONF_CUSTOM_MIN_TEMP_C, CONF_CUSTOM_MAX_TEMP_C),
+                (CONF_CUSTOM_MIN_HUMIDITY_PCT, CONF_CUSTOM_MAX_HUMIDITY_PCT),
+                (CONF_CUSTOM_MIN_WIND_KMH, CONF_CUSTOM_MAX_WIND_KMH),
+            ):
+                min_v = user_input.get(min_k)
+                max_v = user_input.get(max_k)
+                if min_v is not None and max_v is not None:
+                    try:
+                        if float(min_v) > float(max_v):
+                            errors[min_k] = "min_exceeds_max"
+                    except (TypeError, ValueError):
+                        errors[min_k] = "min_exceeds_max"
+
+            if not errors:
+                self._opt.update(user_input)
+                if CONF_CUSTOM_MIN_DURATION_H in self._opt and self._opt[CONF_CUSTOM_MIN_DURATION_H] is not None:
+                    self._opt[CONF_CUSTOM_MIN_DURATION_H] = int(round(float(self._opt[CONF_CUSTOM_MIN_DURATION_H])))
+                if any(
+                    k in user_input
+                    for k in (CONF_CUSTOM_MIN_DURATION_H, CONF_CUSTOM_WINDOW_NAME, CONF_CUSTOM_REQUIRE_DAYLIGHT)
+                ):
+                    for conf_key, _attr, _lo, _hi, _step, _unit in limit_specs:
+                        if user_input.get(conf_key) is None:
+                            self._opt[conf_key] = None
+                return self.async_create_entry(title="", data=self._opt)
 
         g = self._get
+        sentinel = object()
+        cfg: dict[str, Any] = {}
+        try:
+            entry = self.config_entry
+            if entry is not None:
+                cfg.update(getattr(entry, "data", {}) or {})
+                cfg.update(getattr(entry, "options", {}) or {})
+        except (ValueError, AttributeError):
+            pass
+        for key in (
+            CONF_WEATHER_WINDOW_PROFILES,
+            CONF_CUSTOM_WINDOW_NAME,
+            CONF_CUSTOM_MIN_DURATION_H,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT,
+            *(k for k, *_ in limit_specs),
+        ):
+            val = self._flow_default(key, sentinel)
+            if val is not sentinel:
+                cfg[key] = val
+
+        custom_prof = resolve_profiles(cfg)[_PROFILE_CUSTOM]
         current_profiles = g(CONF_WEATHER_WINDOW_PROFILES, DEFAULT_WEATHER_WINDOW_PROFILES)
         if isinstance(current_profiles, str):
             current_profiles = [current_profiles]
 
-        schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_ENABLE_WEATHER_WINDOWS,
-                    default=bool(g(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS)),
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_WEATHER_WINDOW_PROFILES,
-                    default=list(current_profiles),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            {"value": PROFILE_OUTDOOR_DRYING, "label": "Outdoor Clothes Drying"},
-                            {"value": PROFILE_GARDEN_WORK, "label": "Garden & Yard Work"},
-                            {"value": PROFILE_CUSTOM, "label": "Custom Window Profile"},
-                        ],
-                        multiple=True,
-                        mode=selector.SelectSelectorMode.LIST,
-                    )
-                ),
-            }
+        fields: dict[Any, Any] = {
+            vol.Optional(
+                CONF_ENABLE_WEATHER_WINDOWS,
+                default=bool(g(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS)),
+            ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_WEATHER_WINDOW_PROFILES,
+                default=list(current_profiles),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        {"value": PROFILE_OUTDOOR_DRYING, "label": "Outdoor Clothes Drying"},
+                        {"value": PROFILE_GARDEN_WORK, "label": "Garden & Yard Work"},
+                        {"value": PROFILE_CUSTOM, "label": "Custom Window Profile"},
+                    ],
+                    multiple=True,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Optional(CONF_CUSTOM_WINDOW_NAME, default=custom_prof.name): selector.TextSelector(),
+            vol.Optional(CONF_CUSTOM_MIN_DURATION_H, default=custom_prof.min_duration_h): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=24, step=1, mode="box", unit_of_measurement="h")
+            ),
+        }
+        for conf_key, attr_name, lo, hi, step, unit in limit_specs:
+            fields[vol.Optional(conf_key, description={"suggested_value": getattr(custom_prof, attr_name)})] = (
+                selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=lo, max=hi, step=step, mode="box", unit_of_measurement=unit)
+                )
+            )
+        fields[vol.Optional(CONF_CUSTOM_REQUIRE_DAYLIGHT, default=custom_prof.require_daylight)] = (
+            selector.BooleanSelector()
         )
-        return self.async_show_form(step_id="decision_profiles", data_schema=schema)
+        return self.async_show_form(step_id="decision_profiles", data_schema=vol.Schema(fields), errors=errors)
 
     async def async_step_rooms(self, user_input: dict[str, Any] | None = None):
         """Hub menu for managing named indoor rooms."""

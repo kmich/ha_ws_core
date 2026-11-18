@@ -1331,3 +1331,18 @@ PROFILE_GARDEN_WORK = "garden_work"
 PROFILE_CUSTOM = "custom"
 
 DEFAULT_WEATHER_WINDOW_PROFILES = [PROFILE_OUTDOOR_DRYING, PROFILE_GARDEN_WORK]
+
+# Automated Custom Weather Window profile options
+CONF_CUSTOM_WINDOW_NAME = "custom_window_name"
+CONF_CUSTOM_MIN_DURATION_H = "custom_min_duration_h"
+CONF_CUSTOM_MAX_RAIN_PROB_PCT = "custom_max_rain_prob_pct"
+CONF_CUSTOM_MAX_RAIN_MM = "custom_max_rain_mm"
+CONF_CUSTOM_MIN_TEMP_C = "custom_min_temp_c"
+CONF_CUSTOM_MAX_TEMP_C = "custom_max_temp_c"
+CONF_CUSTOM_MIN_HUMIDITY_PCT = "custom_min_humidity_pct"
+CONF_CUSTOM_MAX_HUMIDITY_PCT = "custom_max_humidity_pct"
+CONF_CUSTOM_MIN_WIND_KMH = "custom_min_wind_kmh"
+CONF_CUSTOM_MAX_WIND_KMH = "custom_max_wind_kmh"
+CONF_CUSTOM_MAX_WIND_GUST_KMH = "custom_max_wind_gust_kmh"
+CONF_CUSTOM_MAX_CLOUD_COVER_PCT = "custom_max_cloud_cover_pct"
+CONF_CUSTOM_REQUIRE_DAYLIGHT = "custom_require_daylight"

@@ -139,7 +139,7 @@ class TestV3Services:
         assert err["error"] == "Unknown profile 'astronomy'"
         assert PROFILE_OUTDOOR_DRYING in err["available_profiles"]
 
-    async def test_registered_v3_services_and_schema_validation(self, hass):
+    async def test_registered_v3_services_and_schema_validation(self, hass, caplog):
         entry = MockConfigEntry(
             domain=DOMAIN,
             entry_id="station",
@@ -204,6 +204,18 @@ class TestV3Services:
         )
         assert "streaks" in compact["station"]
         assert "forecast_outcomes" in full["station"]
+
+        # 2b. Calling export_learning_state without return_response preserves INFO log export
+        with caplog.at_level("INFO", logger="custom_components.ws_core"):
+            await hass.services.async_call(
+                DOMAIN,
+                SERVICE_EXPORT_LEARNING,
+                {},
+                blocking=True,
+                return_response=False,
+            )
+        assert "ws_core learning state export" in caplog.text
+        assert "forecast_outcomes" in caplog.text
 
         # 3. Registered get_weather_windows rejects zero, negative, fractional, and bool min_duration_h
         for bad_duration in (0, -2, 1.5, "1.5", True):

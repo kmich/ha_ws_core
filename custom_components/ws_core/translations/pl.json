@@ -407,7 +407,20 @@
         "description": "Skonfiguruj silnik decyzji pogodowych i wybierz aktywne profile aktywności.",
         "data": {
           "enable_weather_windows": "Włącz silnik decyzji okien pogodowych",
-          "weather_window_profiles": "Aktywne profile decyzji"
+          "weather_window_profiles": "Aktywne profile decyzji",
+          "custom_window_name": "Nazwa własnego profilu",
+          "custom_min_duration_h": "Własny minimalny czas trwania (godziny)",
+          "custom_max_rain_prob_pct": "Własne maks. prawdopodobieństwo opadów (%)",
+          "custom_max_rain_mm": "Własne maks. opady (mm/h)",
+          "custom_min_temp_c": "Własna min. temperatura (°C)",
+          "custom_max_temp_c": "Własna maks. temperatura (°C)",
+          "custom_min_humidity_pct": "Własna min. wilgotność (%)",
+          "custom_max_humidity_pct": "Własna maks. wilgotność (%)",
+          "custom_min_wind_kmh": "Własna min. prędkość wiatru (km/h)",
+          "custom_max_wind_kmh": "Własna maks. prędkość wiatru (km/h)",
+          "custom_max_wind_gust_kmh": "Własne maks. porywy wiatru (km/h)",
+          "custom_max_cloud_cover_pct": "Własne maks. zachmurzenie (%)",
+          "custom_require_daylight": "Własny profil wymaga światła dziennego"
         }
       },
       "thresholds": {
@@ -723,7 +736,9 @@
       "invalid_api_key": "Nieprawidłowy klucz API lub odrzucone dane logowania",
       "cannot_connect": "Nie można połączyć się z API - sprawdź sieć i spróbuj ponownie",
       "station_not_found": "Nie znaleziono identyfikatora stacji Weather Underground",
-      "room_name_required": "Wprowadź nazwę pomieszczenia."
+      "room_name_required": "Wprowadź nazwę pomieszczenia.",
+      "invalid_duration": "Minimalny czas trwania musi wynosić co najmniej 1 godzinę.",
+      "min_exceeds_max": "Dolny limit nie może przekraczać górnego limitu."
     }
   },
   "issues": {

@@ -296,6 +296,85 @@ class TestReplayMaskingAndDp3hAlignment:
         assert rain_model.n_updates == 88
         assert rt.store.async_save.await_count == 1
 
+    async def test_migrate_feature_replay_retries_after_recorder_failure(self):
+        from datetime import UTC, datetime
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from custom_components.ws_core import pattern_runtime
+        from custom_components.ws_core.const import (
+            PATTERN_HISTORY_FEATURES_METHOD,
+            PATTERN_HISTORY_METHOD,
+        )
+        from custom_components.ws_core.pattern_runtime import PatternRuntime
+
+        rt = PatternRuntime.__new__(PatternRuntime)
+        rt.engine = _make_engine()
+        rt.fingerprint = rt.engine.source_fingerprint
+        rt.coord = MagicMock()
+        rt.coord.elevation_m = 0.0
+        rt.coord.sources = {"temperature": "sensor.t", "humidity": "sensor.h", "pressure": "sensor.p"}
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt._published = {}
+
+        rain_model = rt.engine.models["rain_3h"]
+        dp_slot = POOL_INDEX["dp_3h"]
+        dp_idx = rain_model.spec.features.index("dp_3h") + 1
+        rt.engine.history_learn = {
+            "status": "ok",
+            "targets": {
+                "rain_3h": {"status": "ok", "attempted_at": 1000.0, "reason": None, "method": PATTERN_HISTORY_METHOD}
+            },
+        }
+
+        n = 96
+        mslp = [1018.0 - (1.5 * (i % 24) if (i % 24) <= 12 else 0.0) for i in range(n)]
+        rain = [2.0 if 12 <= (i % 24) <= 14 else 0.0 for i in range(n)]
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=mslp,
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[6.0] * n,
+            rain=rain,
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        class _FakeRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                return fn(*args)
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+
+        # 1. Recorder raises -> scoped reset saved, features_method NOT marked complete, returns True to retry
+        rt._fetch_statistics = MagicMock(side_effect=RuntimeError("database is locked"))  # type: ignore[method-assign]
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry_first = await rt._async_migrate_feature_replay(now)
+
+        assert retry_first is True
+        assert "features_method" not in rt.engine.history_learn
+        assert rt.engine.std.n[dp_slot] == 0
+        assert rain_model.w[dp_idx] == 0.0
+
+        # 2. Recorder recovers -> dp_3h is relearned, features_method stamped, returns False
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry_second = await rt._async_migrate_feature_replay(now)
+
+        assert retry_second is False
+        assert rt.engine.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert rt.engine.std.n[dp_slot] > 0
+        assert rain_model.w[dp_idx] != 0.0
+        assert rt.store.async_save.await_count == 2
+
     def test_dp3h_scale_in_replay(self):
         eng = _make_engine()
         n = 30

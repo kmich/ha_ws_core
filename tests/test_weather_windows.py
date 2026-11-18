@@ -581,3 +581,105 @@ class TestWeatherWindowsEngine:
         assert res_cold.status == STATUS_UNSUITABLE
         assert REASON_TOO_COLD in res_cold.reason_codes
         assert REASON_MISSING_DATA not in res_cold.reason_codes
+
+    def test_daylight_checked_through_end_of_slot(self, engine: WeatherWindowsEngine):
+        # Athens (38.0, 23.7) on 2026-06-21: sunset occurs ~17:51 UTC (17:00 is +8.05 deg, 18:00 is -2.38 deg).
+        # Starting at 16:00 UTC with 2 suitable-weather hours [16:00..18:00) must reject 17:00..18:00 for sunset.
+        start_time = datetime(2026, 6, 21, 16, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(start_time, hours=3)
+        drying = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+
+        result = engine.evaluate_profile(drying, hourly, current_data={}, now=start_time)
+        assert result.status == STATUS_UNSUITABLE
+        assert REASON_NIGHTTIME in result.reason_codes
+        assert result.slots[0]["suitable"] is True
+        assert REASON_NIGHTTIME in result.slots[1]["reasons"]
+
+    def test_publishes_confirmed_future_window_when_current_slot_is_unknown(self, engine: WeatherWindowsEngine):
+        from custom_components.ws_core.weather_windows import REASON_WINDOW_UPCOMING
+
+        now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(now, hours=4)
+        # Current and +1h slots have missing wind gust -> unassessed, while [12:00..14:00) is confirmed suitable
+        hourly[0]["gust_kmh"] = None
+        hourly[1]["gust_kmh"] = None
+
+        drying = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        result = engine.evaluate_profile(drying, hourly, current_data={}, now=now)
+
+        assert result.status == STATUS_UNKNOWN
+        assert REASON_MISSING_DATA in result.reason_codes
+        assert REASON_WINDOW_UPCOMING in result.reason_codes
+        assert result.next_start == (now + timedelta(hours=2)).isoformat()
+        assert result.next_end == (now + timedelta(hours=4)).isoformat()
+        assert result.duration_h == 2
+
+    def test_resolve_profiles_applies_configured_custom_limits_and_drives_coordinator(self):
+        from unittest.mock import patch
+
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        from custom_components.ws_core.const import (
+            CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
+            CONF_CUSTOM_MAX_RAIN_MM,
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+            CONF_CUSTOM_MIN_DURATION_H,
+            CONF_CUSTOM_MIN_TEMP_C,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT,
+            CONF_CUSTOM_WINDOW_NAME,
+            CONF_ENABLE_WEATHER_WINDOWS,
+            CONF_PREFIX,
+            DOMAIN,
+        )
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+
+        opts = {
+            CONF_PREFIX: "ws",
+            CONF_ENABLE_WEATHER_WINDOWS: True,
+            CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM],
+            CONF_FORECAST_LAT: 38.0,
+            CONF_FORECAST_LON: 23.7,
+            CONF_CUSTOM_WINDOW_NAME: "Midnight Stargazing",
+            CONF_CUSTOM_MIN_DURATION_H: 3,
+            CONF_CUSTOM_MIN_TEMP_C: 5.0,
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT: 15.0,
+            CONF_CUSTOM_MAX_RAIN_MM: None,
+            CONF_CUSTOM_MAX_CLOUD_COVER_PCT: 20.0,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT: False,
+        }
+        profiles = resolve_profiles(opts)
+        custom = profiles[PROFILE_CUSTOM]
+        assert custom.enabled is True
+        assert custom.name == "Midnight Stargazing"
+        assert custom.min_duration_h == 3
+        assert custom.max_rain_mm is None
+        assert custom.max_cloud_cover_pct == 20.0
+        assert custom.require_daylight is False
+
+        entry = MockConfigEntry(domain=DOMAIN, entry_id="custom1", data=opts, options={})
+        coord = WSStationCoordinator(MagicMock(), entry)
+        night = datetime(2026, 6, 21, 23, 0, tzinfo=UTC)
+        coord.data = {
+            KEY_FORECAST: {
+                "hourly": [
+                    {
+                        "datetime": (night + timedelta(hours=h)).isoformat(),
+                        "temp_c": 14.0,
+                        "precip_prob": 5,
+                        "precip_mm": None,  # allowed because custom_max_rain_mm was cleared to None
+                        "humidity": 65.0,
+                        "wind_kmh": 8.0,
+                        "gust_kmh": 15.0,
+                        "cloud_cover": 10.0,
+                    }
+                    for h in range(4)
+                ]
+            }
+        }
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=night):
+            eval_all = coord.get_weather_windows_evaluation()
+        assert list(eval_all.keys()) == [PROFILE_CUSTOM]
+        assert eval_all[PROFILE_CUSTOM]["status"] == STATUS_SUITABLE_NOW
+        assert eval_all[PROFILE_CUSTOM]["duration_h"] == 4
+        assert eval_all[PROFILE_CUSTOM]["evaluated_limits"]["max_rain_mm"] is None
+        assert eval_all[PROFILE_CUSTOM]["evaluated_limits"]["require_daylight"] is False
