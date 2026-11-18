@@ -515,3 +515,69 @@ class TestWeatherWindowsEngine:
         assert res_ok.next_end == "2026-06-22T10:30:00+00:00"
         assert res_ok.duration_h == 2.5
         assert res_ok.is_truncated is True
+
+    def test_expired_forecast_returns_unknown_from_evaluation_action(self):
+        from unittest.mock import patch
+
+        from custom_components.ws_core.const import PROFILE_OUTDOOR_DRYING
+        from tests.test_coordinator import _make_coordinator
+
+        coord = _make_coordinator()
+        coord.forecast_lat = 38.0
+        coord.forecast_lon = 23.7
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        coord.data = {
+            KEY_FORECAST: {
+                "daily": [{"date": "2026-06-21", "tmax_c": 25.0}],
+                "hourly": _make_hourly_forecast(now, hours=4),
+            }
+        }
+
+        coord.runtime.last_forecast_fetch = now - timedelta(minutes=10)
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=now):
+            fresh = coord.get_weather_windows_evaluation(profile_id=PROFILE_OUTDOOR_DRYING)
+        assert fresh["status"] == STATUS_SUITABLE_NOW
+
+        coord.runtime.last_forecast_fetch = now - timedelta(hours=13)
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=now):
+            res = coord.get_weather_windows_evaluation(profile_id=PROFILE_OUTDOOR_DRYING)
+        assert res["status"] == STATUS_UNKNOWN
+        assert res["windows"] == []
+
+    def test_live_rain_respects_disabled_limits_and_unsuitable_prioritizes_real_blockers(
+        self, engine: WeatherWindowsEngine
+    ):
+        start_time = datetime(2026, 6, 21, 11, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(start_time, hours=4)
+
+        # Profile with rain limits disabled -> live rain does not block
+        no_rain_limit_profile = WeatherWindowProfile(
+            profile_id=PROFILE_CUSTOM,
+            name="Rain Tolerant",
+            description="No rain limits",
+            enabled=True,
+            min_duration_h=2,
+            max_rain_prob_pct=None,
+            max_rain_mm=None,
+            require_daylight=False,
+        )
+        res_ok = engine.evaluate_profile(
+            no_rain_limit_profile,
+            hourly,
+            current_data={KEY_RAIN_RATE_FILT: 1.5},
+            now=start_time,
+        )
+        assert res_ok.status == STATUS_SUITABLE_NOW
+        assert REASON_CURRENTLY_RAINING not in res_ok.reason_codes
+
+        # Unsuitable due to real threshold failures (too cold + nighttime) + missing gust_kmh (e.g. Met.no):
+        # top_blockers must report real threshold failures, not REASON_MISSING_DATA.
+        night_start = datetime(2026, 6, 21, 22, 0, tzinfo=UTC)
+        cold_hourly = _make_hourly_forecast(night_start, hours=4, temp_c=2.0)
+        for slot in cold_hourly:
+            slot["gust_kmh"] = None
+        drying = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        res_cold = engine.evaluate_profile(drying, cold_hourly, current_data={}, now=night_start)
+        assert res_cold.status == STATUS_UNSUITABLE
+        assert REASON_TOO_COLD in res_cold.reason_codes
+        assert REASON_MISSING_DATA not in res_cold.reason_codes

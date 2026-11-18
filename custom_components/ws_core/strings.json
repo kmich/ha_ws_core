@@ -2664,6 +2664,51 @@
       },
       "vigicrues_river_flow": {
         "name": "{river} - River Flow"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Outdoor Drying Status",
+        "state": {
+          "suitable_now": "Suitable now",
+          "window_upcoming": "Window upcoming",
+          "unsuitable": "Unsuitable",
+          "unknown": "Unknown"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Outdoor Drying Next Start"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Outdoor Drying Next End"
+      },
+      "window_garden_work_status": {
+        "name": "Garden Work Status",
+        "state": {
+          "suitable_now": "Suitable now",
+          "window_upcoming": "Window upcoming",
+          "unsuitable": "Unsuitable",
+          "unknown": "Unknown"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Garden Work Next Start"
+      },
+      "window_garden_work_next_end": {
+        "name": "Garden Work Next End"
+      },
+      "window_custom_status": {
+        "name": "Custom Window Status",
+        "state": {
+          "suitable_now": "Suitable now",
+          "window_upcoming": "Window upcoming",
+          "unsuitable": "Unsuitable",
+          "unknown": "Unknown"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "Custom Window Next Start"
+      },
+      "window_custom_next_end": {
+        "name": "Custom Window Next End"
       }
     },
     "select": {

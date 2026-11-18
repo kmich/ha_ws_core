@@ -374,8 +374,45 @@
   "options": {
     "step": {
       "init": {
-        "title": "Definições principais",
-        "description": "Identidade, unidades, previsão, alertas e calibração.",
+        "title": "Menu de configuração",
+        "description": "Escolha uma secção para configurar.",
+        "menu_options": {
+          "sources": "Fontes de sensores (mapeamentos de hardware)",
+          "forecast": "Previsão meteorológica e localização",
+          "decision_profiles": "Motor de decisão e janelas meteorológicas",
+          "rooms": "Divisões interiores",
+          "thresholds": "Limites, unidades e calibração",
+          "uploads": "Serviços meteorológicos e uploads",
+          "diagnostics": "Funcionalidades e diagnósticos"
+        }
+      },
+      "sources": {
+        "title": "Fontes de sensores",
+        "description": "Configure os mapeamentos de entidades de sensores físicos."
+      },
+      "forecast": {
+        "title": "Previsão meteorológica",
+        "description": "Configure o fornecedor externo de previsão, intervalo de atualização e coordenadas.",
+        "data": {
+          "forecast_enabled": "Ativar previsão",
+          "forecast_interval_min": "Intervalo de atualização da previsão",
+          "forecast_lat": "Latitude da previsão",
+          "forecast_lon": "Longitude da previsão",
+          "forecast_provider": "Fornecedor de previsão",
+          "forecast_entity": "Entidade meteorológica HA (para o fornecedor Home Assistant)"
+        }
+      },
+      "decision_profiles": {
+        "title": "Perfis de decisão e janelas meteorológicas",
+        "description": "Configure o motor de decisão meteorológica e selecione janelas de atividade.",
+        "data": {
+          "enable_weather_windows": "Ativar motor de decisão de janelas meteorológicas",
+          "weather_window_profiles": "Perfis de decisão ativos"
+        }
+      },
+      "thresholds": {
+        "title": "Limites, unidades e calibração",
+        "description": "Identidade da estação, unidades, limites de alerta e desvios de calibração.",
         "data": {
           "prefix": "Prefixo da entidade",
           "hemisphere": "Hemisfério",
@@ -388,52 +425,6 @@
           "rain_unit": "Unidade de precipitação",
           "distance_unit": "Unidade de distância",
           "altitude_unit": "Unidade de altitude",
-          "forecast_enabled": "Ativar previsão",
-          "forecast_interval_min": "Intervalo de atualização da previsão",
-          "forecast_lat": "Latitude da previsão",
-          "forecast_lon": "Longitude da previsão",
-          "forecast_provider": "Fornecedor de previsão",
-          "forecast_api_key": "Chave API da previsão",
-          "forecast_entity": "Entidade meteorológica HA (para o fornecedor Home Assistant)",
-          "thresh_wind_gust_ms": "Limite de alerta de rajada de vento",
-          "thresh_rain_rate_mmph": "Limite de alerta de intensidade de chuva",
-          "thresh_freeze_c": "Limite de aviso de gelo",
-          "staleness_s": "Tempo limite de inatividade do sensor",
-          "rain_filter_alpha": "Suavização do filtro de intensidade de chuva",
-          "pressure_trend_window_h": "Janela de tendência de pressão",
-          "cal_temp_c": "Deslocamento de calibração de temperatura",
-          "cal_humidity": "Deslocamento de calibração de humidade",
-          "cal_pressure_hpa": "Deslocamento de calibração de pressão",
-          "cal_wind_ms": "Deslocamento de calibração de velocidade do vento",
-          "enable_display_sensors": "Sensores de visualização (níveis, tendências, saúde)",
-          "enable_fire_risk_score": "Pontuação de risco de incêndio",
-          "enable_sea_temp": "Temperatura da superfície do mar",
-          "sea_temp_lat": "Latitude da temperatura do mar",
-          "sea_temp_lon": "Longitude da temperatura do mar",
-          "enable_wunderground": "Upload para Weather Underground",
-          "wu_station_id": "ID da estação WU",
-          "wu_api_key": "Chave de estação WU (palavra-passe)",
-          "wu_interval_min": "Intervalo de upload WU"
-        },
-        "data_description": {
-          "prefix": "Prefixo da entidade",
-          "hemisphere": "Hemisfério",
-          "climate_region": "Região climática",
-          "elevation_m": "Altitude da estação",
-          "units_mode": "Define um sistema de unidades base. As substituições de unidades individuais abaixo têm precedência.",
-          "temp_unit": "Substituir visualização de temperatura. 'Automático' segue o sistema de unidades do HA.",
-          "wind_unit": "Substituir visualização de velocidade do vento. 'Automático' segue o sistema de unidades do HA.",
-          "pressure_unit": "Substituir visualização de pressão. 'Automático' segue o sistema de unidades do HA.",
-          "rain_unit": "Substituir visualização de precipitação. 'Automático' segue o sistema de unidades do HA.",
-          "distance_unit": "Substituir visualização de distância (ex. distância de relâmpago). 'Automático' segue o sistema de unidades do HA.",
-          "altitude_unit": "Substituir visualização de altitude (ex. base das nuvens, nível de congelamento). 'Automático' segue o sistema de unidades do HA.",
-          "forecast_enabled": "Ativar previsão",
-          "forecast_interval_min": "Intervalo de atualização da previsão",
-          "forecast_lat": "Latitude da previsão",
-          "forecast_lon": "Longitude da previsão",
-          "forecast_provider": "Fonte de dados meteorológicos. Open-Meteo e Met.no são gratuitos sem chave API. NWS/NOAA é gratuito mas apenas para os EUA. OpenWeatherMap, Pirate Weather e Météo France requerem uma chave API gratuita. 'Entidade meteorológica do Home Assistant' utiliza uma entidade weather.* existente - sem chamadas API externas.",
-          "forecast_api_key": "Chave API para o fornecedor de previsão selecionado (necessária para OpenWeatherMap, Pirate Weather e Météo France).",
-          "forecast_entity": "Obrigatório quando 'Entidade meteorológica do Home Assistant' está selecionada. Escolha qualquer entidade weather.* já configurada no Home Assistant.",
           "thresh_wind_gust_ms": "Limite de alerta de rajada de vento",
           "thresh_rain_rate_mmph": "Limite de alerta de intensidade de chuva",
           "thresh_freeze_c": "Limite de aviso de gelo",
@@ -2673,6 +2664,51 @@
       },
       "indoor_room_comfort": {
         "name": "Comfort - {room_name}"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Secagem Exterior Estado",
+        "state": {
+          "suitable_now": "Adequado agora",
+          "window_upcoming": "Janela em breve",
+          "unsuitable": "Inadequado",
+          "unknown": "Desconhecido"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Secagem Exterior Próximo Início"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Secagem Exterior Próximo Fim"
+      },
+      "window_garden_work_status": {
+        "name": "Trabalho de Jardim Estado",
+        "state": {
+          "suitable_now": "Adequado agora",
+          "window_upcoming": "Janela em breve",
+          "unsuitable": "Inadequado",
+          "unknown": "Desconhecido"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Trabalho de Jardim Próximo Início"
+      },
+      "window_garden_work_next_end": {
+        "name": "Trabalho de Jardim Próximo Fim"
+      },
+      "window_custom_status": {
+        "name": "Janela Personalizada Estado",
+        "state": {
+          "suitable_now": "Adequado agora",
+          "window_upcoming": "Janela em breve",
+          "unsuitable": "Inadequado",
+          "unknown": "Desconhecido"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "Janela Personalizada Próximo Início"
+      },
+      "window_custom_next_end": {
+        "name": "Janela Personalizada Próximo Fim"
       }
     },
     "select": {

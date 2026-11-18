@@ -194,7 +194,7 @@ class HaWeatherEntityProvider(ForecastProvider):
 
     def _normalise_hourly(self, raw: list[dict]) -> list[dict]:
         out: list[dict] = []
-        for entry in raw[:24]:
+        for entry in raw[:25]:
             out.append(
                 {
                     "datetime": self._parse_dt(entry.get("datetime")) or "",

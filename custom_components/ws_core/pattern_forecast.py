@@ -877,6 +877,110 @@ class PatternEngine:
                 reset_targets.add(tid)
         return reset_targets
 
+    @staticmethod
+    def _iter_replay_vectors(hist: HourlyHistory):
+        """Yield ``(k, j, ts, vec, highs, lows)`` feature vectors across replayable hourly history."""
+
+        def diff(a: list[float | None], i: int, b: int) -> float | None:
+            return None if a[i] is None or a[b] is None else a[i] - a[b]
+
+        n = hist.n
+        last_wet: int | None = None
+        for k in range(1, n + 1):
+            j = k - 1
+            if hist.rain[j] is not None and hist.rain[j] >= 0.1:
+                last_wet = j
+            if k < 25:
+                continue
+            ts = hist.start_ts + k * 3600.0
+            vec: list[float | None] = [None] * N_POOL
+            vec[POOL_INDEX["mslp"]] = hist.mslp[j]
+            dp3 = diff(hist.mslp, j, j - 3)
+            vec[POOL_INDEX["dp_3h"]] = dp3
+            vec[POOL_INDEX["dp_24h"]] = diff(hist.mslp, j, j - 24)
+            vec[POOL_INDEX["temp"]] = hist.temp[j]
+            vec[POOL_INDEX["dpd"]] = hist.dpd[j]
+            vec[POOL_INDEX["dpd_1h"]] = diff(hist.dpd, j, j - 1)
+            vec[POOL_INDEX["t_1h"]] = diff(hist.temp, j, j - 1)
+            vec[POOL_INDEX["t_3h"]] = diff(hist.temp, j, j - 3)
+            highs = [v for v in hist.temp_max[j - 23 : j + 1] if v is not None]
+            lows = [v for v in hist.temp_min[j - 23 : j + 1] if v is not None]
+            vec[POOL_INDEX["t_max_24h"]] = max(highs) if len(highs) >= 20 else None
+            vec[POOL_INDEX["wind_speed"]] = hist.wind[j]
+            vec[POOL_INDEX["gust_1h"]] = hist.gust[j]
+            vec[POOL_INDEX["rain_1h"]] = None if hist.rain[j] is None else math.log1p(max(0.0, hist.rain[j]))
+            dry = (j - last_wet) if last_wet is not None else min(PATTERN_DRY_HOURS_CAP, float(j + 1))
+            vec[POOL_INDEX["dry_hours"]] = math.log1p(min(PATTERN_DRY_HOURS_CAP, float(dry)))
+            vec[POOL_INDEX["cloud_deficit"]] = 0.0
+            vec[POOL_INDEX["solar_ok"]] = 0.0
+            vec[POOL_INDEX["last_day_clearness"]] = 0.0
+            vec[POOL_INDEX["last_day_clearness_ok"]] = 0.0
+            vec[POOL_INDEX["night_frac_12h"]] = hist.night_frac[j]
+            local_hour = ((ts + hist.tz_offset[j]) / 3600.0) % 24.0
+            vec[POOL_INDEX["hour_sin"]] = math.sin(2.0 * math.pi * local_hour / 24.0)
+            vec[POOL_INDEX["hour_cos"]] = math.cos(2.0 * math.pi * local_hour / 24.0)
+            vec[POOL_INDEX["lightning_1h"]] = None if hist.strikes[j] is None else math.log1p(max(0.0, hist.strikes[j]))
+            yield k, j, ts, vec, highs, lows
+
+    def replay_scoped_features(
+        self,
+        hist: HourlyHistory,
+        targets: list[str],
+        feature_names: set[str] | frozenset[str] = frozenset({"dp_3h"}),
+    ) -> dict[str, int]:
+        """Re-standardize and re-train only ``feature_names`` from hourly history.
+
+        Preserves all other feature weights, bias (w[0]), base/conditional rates,
+        sample counts, events, scoring, reliability, and history_learn metadata.
+        """
+        masked = frozenset(POOL_INDEX[f] for f in REPLAY_MASKED_FEATURES)
+        active_feats = [f for f in feature_names if f in POOL_INDEX and POOL_INDEX[f] not in masked]
+        active_slots = [POOL_INDEX[f] for f in active_feats]
+        specs = [TARGET_BY_ID[t] for t in targets if t in self.models]
+        counts: dict[str, int] = {s.target_id: 0 for s in specs}
+        if not active_slots or not specs:
+            return counts
+
+        target_feat_indices: dict[str, list[int]] = {}
+        for spec in specs:
+            indices = [spec.features.index(f) + 1 for f in active_feats if f in spec.features]
+            if indices:
+                target_feat_indices[spec.target_id] = indices
+        if not target_feat_indices:
+            return counts
+
+        for k, _j, _ts, vec, _highs, _lows in self._iter_replay_vectors(hist):
+            for slot in active_slots:
+                val = vec[slot]
+                if val is not None:
+                    self.std.update(slot, float(val), PATTERN_HISTORY_STD_WEIGHT)
+            for spec in specs:
+                feat_indices = target_feat_indices.get(spec.target_id)
+                if not feat_indices:
+                    continue
+                m = self.models[spec.target_id]
+                if any(vec[i] is None and i not in masked for i in m.idx):
+                    continue
+                label = self._replay_label(hist, spec, k)
+                if label is None:
+                    continue
+                y = 1.0 if label else 0.0
+                z = m.zvec(self.std, vec, masked)
+                s = m.w[0] + sum(w * v for w, v in zip(m.w[1:], z, strict=True))
+                err = _sigmoid(s) - y
+                for idx in feat_indices:
+                    zj = z[idx - 1]
+                    g = max(-PATTERN_GRAD_CLIP, min(PATTERN_GRAD_CLIP, err * zj + PATTERN_L2 * m.w[idx]))
+                    m._step(idx, g)
+                    if not (math.isfinite(m.w[idx]) and math.isfinite(m.g2[idx])):
+                        m.w[idx] = m.cp_w[idx]
+                        m.g2[idx] = m.cp_g2[idx]
+                    else:
+                        m.cp_w[idx] = m.w[idx]
+                        m.cp_g2[idx] = m.g2[idx]
+                counts[spec.target_id] += 1
+        return counts
+
     # -- 60 s tick: tallies, events, label resolution -----------------------
 
     @staticmethod
@@ -1537,45 +1641,8 @@ class PatternEngine:
                     ids["heat"] = ident
                     events["heat"] += 1
 
-        def diff(a: list[float | None], i: int, b: int) -> float | None:
-            return None if a[i] is None or a[b] is None else a[i] - a[b]
-
         # ---- samples: one per hour boundary, features from the hours before it
-        last_wet: int | None = None
-        for k in range(1, n + 1):
-            j = k - 1
-            if hist.rain[j] is not None and hist.rain[j] >= 0.1:
-                last_wet = j
-            if k < 25:
-                continue
-            ts = hist.start_ts + k * 3600.0
-            vec: list[float | None] = [None] * N_POOL
-            vec[POOL_INDEX["mslp"]] = hist.mslp[j]
-            dp3 = diff(hist.mslp, j, j - 3)
-            vec[POOL_INDEX["dp_3h"]] = dp3
-            vec[POOL_INDEX["dp_24h"]] = diff(hist.mslp, j, j - 24)
-            vec[POOL_INDEX["temp"]] = hist.temp[j]
-            vec[POOL_INDEX["dpd"]] = hist.dpd[j]
-            vec[POOL_INDEX["dpd_1h"]] = diff(hist.dpd, j, j - 1)
-            vec[POOL_INDEX["t_1h"]] = diff(hist.temp, j, j - 1)
-            vec[POOL_INDEX["t_3h"]] = diff(hist.temp, j, j - 3)
-            highs = [v for v in hist.temp_max[j - 23 : j + 1] if v is not None]
-            lows = [v for v in hist.temp_min[j - 23 : j + 1] if v is not None]
-            vec[POOL_INDEX["t_max_24h"]] = max(highs) if len(highs) >= 20 else None
-            vec[POOL_INDEX["wind_speed"]] = hist.wind[j]
-            vec[POOL_INDEX["gust_1h"]] = hist.gust[j]
-            vec[POOL_INDEX["rain_1h"]] = None if hist.rain[j] is None else math.log1p(max(0.0, hist.rain[j]))
-            dry = (j - last_wet) if last_wet is not None else min(PATTERN_DRY_HOURS_CAP, float(j + 1))
-            vec[POOL_INDEX["dry_hours"]] = math.log1p(min(PATTERN_DRY_HOURS_CAP, float(dry)))
-            vec[POOL_INDEX["cloud_deficit"]] = 0.0
-            vec[POOL_INDEX["solar_ok"]] = 0.0
-            vec[POOL_INDEX["last_day_clearness"]] = 0.0
-            vec[POOL_INDEX["last_day_clearness_ok"]] = 0.0
-            vec[POOL_INDEX["night_frac_12h"]] = hist.night_frac[j]
-            local_hour = ((ts + hist.tz_offset[j]) / 3600.0) % 24.0
-            vec[POOL_INDEX["hour_sin"]] = math.sin(2.0 * math.pi * local_hour / 24.0)
-            vec[POOL_INDEX["hour_cos"]] = math.cos(2.0 * math.pi * local_hour / 24.0)
-            vec[POOL_INDEX["lightning_1h"]] = None if hist.strikes[j] is None else math.log1p(max(0.0, hist.strikes[j]))
+        for k, j, ts, vec, highs, lows in self._iter_replay_vectors(hist):
             if update_std:
                 for i, x in enumerate(vec):
                     if x is not None and i not in masked:

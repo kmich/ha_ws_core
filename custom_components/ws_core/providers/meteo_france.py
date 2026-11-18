@@ -136,7 +136,7 @@ class MeteoFranceProvider(ForecastProvider):
             )
 
         hourly_out: list[dict[str, Any]] = []
-        for h in (hourly_data.get("forecast") or [])[:24]:
+        for h in (hourly_data.get("forecast") or [])[:25]:
             mf_code = h.get("weather")
             hourly_out.append(
                 {

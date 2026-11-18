@@ -96,6 +96,7 @@ from .const import (
 )
 from .pattern_forecast import (
     POOL,
+    POOL_INDEX,
     TARGETS,
     HourlyHistory,
     Instant,
@@ -1112,7 +1113,8 @@ class PatternRuntime:
         """Migrate targets replayed under older methods (< PATTERN_HISTORY_FEATURES_METHOD).
 
         Resets standardizer slots and weights for corrupted solar features and dp_3h,
-        keeping all other weights, rates, and history intact.
+        re-learns dp_3h from recorder history where available, and keeps all other
+        weights, rates, and history intact.
         """
         eng = self.engine
         hl = eng.history_learn or {}
@@ -1120,7 +1122,10 @@ class PatternRuntime:
         if not targets:
             return False
         fm = hl.get("features_method")
-        fm_val = int(fm) if fm is not None and str(fm).isdigit() else 1
+        try:
+            fm_val = int(fm) if fm is not None and not isinstance(fm, bool) else 1
+        except (TypeError, ValueError):
+            fm_val = 1
         if fm_val >= PATTERN_HISTORY_FEATURES_METHOD:
             return False
         ok_targets = [t for t, e in targets.items() if isinstance(e, dict) and e.get("status") == "ok"]
@@ -1132,6 +1137,54 @@ class PatternRuntime:
             "ws_core pattern forecast: migrating pattern state for v3.0 feature alignment (dp_3h and solar replay masking)"
         )
         eng.scoped_reset_features(PATTERN_CORRUPTED_FEATURES)
+
+        end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
+        n = PATTERN_HISTORY_DAYS * 24
+        start_ts = end_ts - n * 3600.0
+        needed_names = sorted(
+            {x for t in ok_targets if t in eng.models for x in _HISTORY_NEEDS[eng.models[t].spec.kind]}
+        )
+        plan = {name: self.history_entity(name, end_ts) for name in needed_names}
+        ids = {e for e in plan.values() if e}
+        if ids:
+            snapshot = eng.to_dict()
+            need_night = any(eng.models[t].spec.kind == "frost" for t in ok_targets if t in eng.models)
+
+            def _dp3h_job() -> PatternEngine | None:
+                trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)
+                meta, rows = self._fetch_statistics(
+                    ids,
+                    datetime.fromtimestamp(start_ts, UTC),
+                    datetime.fromtimestamp(end_ts, UTC),
+                )
+                if not meta:
+                    return None
+                hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
+                trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"})
+                return trainer
+
+            try:
+                trained = await _recorder_instance(self.coord.hass).async_add_executor_job(_dp3h_job)
+            except Exception as err:  # noqa: BLE001 - best-effort scoped replay during migration
+                _LOGGER.debug("ws_core pattern forecast: skipped dp_3h migration replay: %s", err)
+                trained = None
+
+            if trained is not None:
+                dp_slot = POOL_INDEX["dp_3h"]
+                eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
+                eng.std.var[dp_slot] = trained.std.var[dp_slot]
+                eng.std.n[dp_slot] = trained.std.n[dp_slot]
+                for tid in ok_targets:
+                    live = eng.models.get(tid)
+                    src = trained.models.get(tid)
+                    if live is None or src is None or "dp_3h" not in live.spec.features:
+                        continue
+                    idx = live.spec.features.index("dp_3h") + 1
+                    live.w[idx] = src.w[idx]
+                    live.g2[idx] = src.g2[idx]
+                    live.cp_w[idx] = src.cp_w[idx]
+                    live.cp_g2[idx] = src.cp_g2[idx]
+
         hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
         eng.history_learn = hl
         self._published = {}

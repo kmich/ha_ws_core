@@ -374,8 +374,45 @@
   "options": {
     "step": {
       "init": {
-        "title": "Kerninstellingen",
-        "description": "Identiteit, eenheden, verwachting, waarschuwingen en kalibratie.",
+        "title": "Configuratiemenu",
+        "description": "Kies een sectie om te configureren.",
+        "menu_options": {
+          "sources": "Sensorbronnen (hardware-koppelingen)",
+          "forecast": "Weersverwachting & locatie",
+          "decision_profiles": "Beslissingsengine & weervensters",
+          "rooms": "Binnenkamers",
+          "thresholds": "Drempels, eenheden & kalibratie",
+          "uploads": "Weerdiensten & uploads",
+          "diagnostics": "Functies & diagnostiek"
+        }
+      },
+      "sources": {
+        "title": "Sensorbronnen",
+        "description": "Configureer fysieke sensorentiteit-koppelingen."
+      },
+      "forecast": {
+        "title": "Weersverwachting",
+        "description": "Configureer externe weersverwachting-leverancier, verversingsinterval en coördinaten.",
+        "data": {
+          "forecast_enabled": "Verwachting inschakelen",
+          "forecast_interval_min": "Verversingsinterval verwachting",
+          "forecast_lat": "Breedtegraad verwachting",
+          "forecast_lon": "Lengtegraad verwachting",
+          "forecast_provider": "Weergegevensleverancier",
+          "forecast_entity": "HA weereentiteit (voor Home Assistant-leverancier)"
+        }
+      },
+      "decision_profiles": {
+        "title": "Beslissingsprofielen & weervensters",
+        "description": "Configureer de weerbeslissingsengine en selecteer automatische activiteitenvensters.",
+        "data": {
+          "enable_weather_windows": "Weervensters beslissingsengine inschakelen",
+          "weather_window_profiles": "Actieve beslissingsprofielen"
+        }
+      },
+      "thresholds": {
+        "title": "Drempels, eenheden & kalibratie",
+        "description": "Stationsidentiteit, eenheden, waarschuwingsdrempels en sensorkalibratie-offsets.",
         "data": {
           "prefix": "Entiteit-voorvoegsel",
           "hemisphere": "Halfrond",
@@ -388,52 +425,6 @@
           "rain_unit": "Neerslagseenheid",
           "distance_unit": "Afstandseenheid",
           "altitude_unit": "Hoogte-eenheid",
-          "forecast_enabled": "Verwachting inschakelen",
-          "forecast_interval_min": "Verversingsinterval verwachting",
-          "forecast_lat": "Breedtegraad verwachting",
-          "forecast_lon": "Lengtegraad verwachting",
-          "forecast_provider": "Weergegevensleverancier",
-          "forecast_api_key": "API-sleutel verwachting",
-          "forecast_entity": "HA weereentiteit (voor Home Assistant-leverancier)",
-          "thresh_wind_gust_ms": "Drempelwaarde windvlaagwaarschuwing",
-          "thresh_rain_rate_mmph": "Drempelwaarde regenwaarschuwing",
-          "thresh_freeze_c": "Drempelwaarde vorswaarschuwing",
-          "staleness_s": "Time-out sensorverouderd",
-          "rain_filter_alpha": "Filterafvlakking regenintensiteit",
-          "pressure_trend_window_h": "Venster luchtdruktrend",
-          "cal_temp_c": "Kalibratie-offset temperatuur",
-          "cal_humidity": "Kalibratie-offset luchtvochtigheid",
-          "cal_pressure_hpa": "Kalibratie-offset luchtdruk",
-          "cal_wind_ms": "Kalibratie-offset windsnelheid",
-          "enable_display_sensors": "Weergavesensoren (niveaus, trends, gezondheid)",
-          "enable_fire_risk_score": "Brandrisicoscore",
-          "enable_sea_temp": "Zeewateroppervlaktetemperatuur",
-          "sea_temp_lat": "Breedtegraad zeewatertemperatuur",
-          "sea_temp_lon": "Lengtegraad zeewatertemperatuur",
-          "enable_wunderground": "Weather Underground upload",
-          "wu_station_id": "WU station-ID",
-          "wu_api_key": "WU stationcijfercode (wachtwoord)",
-          "wu_interval_min": "WU uploadinterval"
-        },
-        "data_description": {
-          "prefix": "Entiteit-voorvoegsel",
-          "hemisphere": "Halfrond",
-          "climate_region": "Klimaatregio",
-          "elevation_m": "Stationshoogte",
-          "units_mode": "Stelt een basiseenheidssysteem in. Afzonderlijke eenheidsoverschrijvingen hieronder hebben voorrang.",
-          "temp_unit": "Temperatuurweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "wind_unit": "Windsnelheidsweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "pressure_unit": "Drukweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "rain_unit": "Neerslagweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "distance_unit": "Afstandsweergave overschrijven (bijv. bliksemafstand). 'Automatisch' volgt je HA-eenheidssysteem.",
-          "altitude_unit": "Hoogteweergave overschrijven (bijv. wolkenbasis, vriesniveau). 'Automatisch' volgt je HA-eenheidssysteem.",
-          "forecast_enabled": "Verwachting inschakelen",
-          "forecast_interval_min": "Verversingsinterval verwachting",
-          "forecast_lat": "Breedtegraad verwachting",
-          "forecast_lon": "Lengtegraad verwachting",
-          "forecast_provider": "Weergegevensbron. Open-Meteo en Met.no zijn gratis zonder API-sleutel. NWS/NOAA is gratis maar alleen voor de VS. OpenWeatherMap, Pirate Weather en Météo France vereisen een gratis API-sleutel. 'Home Assistant weereentiteit' gebruikt een bestaande weather.*-entiteit - geen extra API-aanroepen.",
-          "forecast_api_key": "API-sleutel voor de geselecteerde weergegevensleverancier (vereist voor OpenWeatherMap, Pirate Weather en Météo France).",
-          "forecast_entity": "Vereist wanneer 'Home Assistant weereentiteit' is geselecteerd. Kies een willekeurige weather.*-entiteit die al is ingesteld in Home Assistant.",
           "thresh_wind_gust_ms": "Drempelwaarde windvlaagwaarschuwing",
           "thresh_rain_rate_mmph": "Drempelwaarde regenwaarschuwing",
           "thresh_freeze_c": "Drempelwaarde vorswaarschuwing",
@@ -2673,6 +2664,51 @@
       },
       "indoor_room_comfort": {
         "name": "Comfort - {room_name}"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Buiten Drogen Status",
+        "state": {
+          "suitable_now": "Nu geschikt",
+          "window_upcoming": "Venster op komst",
+          "unsuitable": "Ongeschikt",
+          "unknown": "Onbekend"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Buiten Drogen Volgende Start"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Buiten Drogen Volgend Einde"
+      },
+      "window_garden_work_status": {
+        "name": "Tuinwerk Status",
+        "state": {
+          "suitable_now": "Nu geschikt",
+          "window_upcoming": "Venster op komst",
+          "unsuitable": "Ongeschikt",
+          "unknown": "Onbekend"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Tuinwerk Volgende Start"
+      },
+      "window_garden_work_next_end": {
+        "name": "Tuinwerk Volgend Einde"
+      },
+      "window_custom_status": {
+        "name": "Aangepast Venster Status",
+        "state": {
+          "suitable_now": "Nu geschikt",
+          "window_upcoming": "Venster op komst",
+          "unsuitable": "Ongeschikt",
+          "unknown": "Onbekend"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "Aangepast Venster Volgende Start"
+      },
+      "window_custom_next_end": {
+        "name": "Aangepast Venster Volgend Einde"
       }
     },
     "select": {

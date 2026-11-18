@@ -394,8 +394,45 @@
   "options": {
     "step": {
       "init": {
-        "title": "Paramètres généraux",
-        "description": "Configurez les paramètres de base de votre station : unités de mesure, localisation des prévisions, seuils d'alerte et ajustements des capteurs.",
+        "title": "Menu de configuration",
+        "description": "Choisissez une section à configurer.",
+        "menu_options": {
+          "sources": "Sources de capteurs (mappages matériels)",
+          "forecast": "Prévisions météo et localisation",
+          "decision_profiles": "Moteur de décision et créneaux météo",
+          "rooms": "Pièces intérieures",
+          "thresholds": "Seuils, unités et calibration",
+          "uploads": "Services météo et envois",
+          "diagnostics": "Fonctionnalités et diagnostics"
+        }
+      },
+      "sources": {
+        "title": "Sources de capteurs",
+        "description": "Configurez les mappages d'entités des capteurs physiques."
+      },
+      "forecast": {
+        "title": "Prévisions météo",
+        "description": "Configurez le fournisseur externe de prévisions, l'intervalle d'actualisation et les coordonnées.",
+        "data": {
+          "forecast_enabled": "Activer les prévisions",
+          "forecast_interval_min": "Intervalle de rafraîchissement",
+          "forecast_lat": "Latitude des prévisions",
+          "forecast_lon": "Longitude des prévisions",
+          "forecast_provider": "Fournisseur météo",
+          "forecast_entity": "Entité météo Home Assistant"
+        }
+      },
+      "decision_profiles": {
+        "title": "Profils de décision et créneaux météo",
+        "description": "Configurez le moteur de décision météo et sélectionnez les profils d'activité.",
+        "data": {
+          "enable_weather_windows": "Activer le moteur de décision des créneaux météo",
+          "weather_window_profiles": "Profils de décision actifs"
+        }
+      },
+      "thresholds": {
+        "title": "Seuils, unités et calibration",
+        "description": "Identité de la station, unités, seuils d'alerte et décalages de calibration.",
         "data": {
           "prefix": "Préfixe des entités",
           "hemisphere": "Hémisphère",
@@ -408,13 +445,6 @@
           "rain_unit": "Unité de précipitation",
           "distance_unit": "Unité de distance",
           "altitude_unit": "Unité d'altitude",
-          "forecast_enabled": "Activer les prévisions",
-          "forecast_interval_min": "Intervalle de rafraîchissement",
-          "forecast_lat": "Latitude des prévisions",
-          "forecast_lon": "Longitude des prévisions",
-          "forecast_provider": "Fournisseur météo",
-          "forecast_api_key": "Clé API de prévisions",
-          "forecast_entity": "Entité météo Home Assistant",
           "thresh_wind_gust_ms": "Seuil d'alerte des rafales",
           "thresh_rain_rate_mmph": "Seuil d'alerte pluie",
           "thresh_freeze_c": "Seuil d'alerte de gel",
@@ -424,55 +454,7 @@
           "cal_temp_c": "Correction de température",
           "cal_humidity": "Correction de l'humidité",
           "cal_pressure_hpa": "Correction de la pression atmosphérique",
-          "cal_wind_ms": "Correction de la vitesse du vent",
-          "enable_display_sensors": "États textuels et tendances",
-          "enable_fire_risk_score": "Indice de risque d'incendie",
-          "enable_sea_temp": "Température de la mer",
-          "sea_temp_lat": "Latitude (mer)",
-          "sea_temp_lon": "Longitude (mer)",
-          "enable_wunderground": "Partage Weather Underground",
-          "wu_station_id": "ID de la station WU",
-          "wu_api_key": "Clé API WU",
-          "wu_interval_min": "Intervalle d'envoi WU"
-        },
-        "data_description": {
-          "prefix": "Ajoute un préfixe personnalisé au début du nom de chaque entité créée.",
-          "hemisphere": "Détermine la logique des saisons et des calculs astronomiques.",
-          "climate_region": "Ajuste les algorithmes d'évapotranspiration et de risques selon votre climat local.",
-          "elevation_m": "Altitude exacte de votre station (utilisée pour le calcul de la pression brute au niveau de la mer).",
-          "units_mode": "Définit le système d'unités par défaut. Les réglages individuels ci-dessous restent prioritaires.",
-          "temp_unit": "Force l'unité de température. L'option « Auto » hérite de la configuration globale de Home Assistant.",
-          "wind_unit": "Force l'unité de vitesse du vent. L'option « Auto » hérite de la configuration globale de Home Assistant.",
-          "pressure_unit": "Force l'unité de pression atmosphérique. L'option « Auto » hérite de la configuration globale de Home Assistant.",
-          "rain_unit": "Force l'unité de pluviométrie. L'option « Auto » hérite de la configuration globale de Home Assistant.",
-          "distance_unit": "Force l'unité des distances (ex: portée de la foudre). L'option « Auto » suit Home Assistant.",
-          "altitude_unit": "Force l'unité de hauteur (ex: plafond nuageux, niveau de gel). L'option « Auto » suit Home Assistant.",
-          "forecast_enabled": "Télécharge des prévisions horaires et quotidiennes pour alimenter vos capteurs avancés.",
-          "forecast_interval_min": "Fréquence de mise à jour des données météo (évitez les valeurs trop basses pour ne pas saturer l'API).",
-          "forecast_lat": "Latitude géographique pour la localisation des prévisions (laisse vide pour utiliser les coordonnées de HA).",
-          "forecast_lon": "Longitude géographique pour la localisation des prévisions (laisse vide pour utiliser les coordonnées de HA).",
-          "forecast_provider": "Open-Meteo et Met.no sont gratuits sans clé. NWS est réservé aux USA. OpenWeatherMap, Pirate Weather et Météo France requièrent une clé API.",
-          "forecast_api_key": "Clé d'authentification obligatoire pour le fournisseur sélectionné (Météo France, OWM, Pirate Weather).",
-          "forecast_entity": "Associe une entité météo native (weather.*) existante pour en extraire des données locales.",
-          "thresh_wind_gust_ms": "Déclenche l'indicateur d'alerte si les rafales instantanées dépassent cette valeur.",
-          "thresh_rain_rate_mmph": "Déclenche l'indicateur d'alerte si l'intensité de la pluie dépasse ce seuil horaire.",
-          "thresh_freeze_c": "Déclenche l'indicateur d'alerte de gel si la température descend sous ce seuil.",
-          "staleness_s": "Durée maximale autorisée sans signal avant qu'un capteur ne passe en état 'Indisponible'.",
-          "rain_filter_alpha": "Coefficient de lissage (filtre passe-bas) pour gommer les variations trop brutales du pluviomètre.",
-          "pressure_trend_window_h": "Période de temps glissante utilisée pour calculer la tendance barométrique (ex: hausse/baisse sur 3 heures).",
-          "cal_temp_c": "Valeur d'ajustement fixe (offset) à ajouter ou soustraire à la température mesurée.",
-          "cal_humidity": "Valeur d'ajustement fixe à appliquer sur la mesure d'humidité relative.",
-          "cal_pressure_hpa": "Valeur d'ajustement fixe pour calibrer la pression atmosphérique absolue.",
-          "cal_wind_ms": "Multiplicateur ou offset pour ajuster la vitesse du vent rapportée par l'anémomètre.",
-          "enable_display_sensors": "Génère des capteurs textuels d'état et de tendances (ex: conditions actuelles en clair).",
-          "enable_fire_risk_score": "Calcule l'Indice Forêt Météo (IFM) standard pour évaluer le danger d'incendie local.",
-          "enable_sea_temp": "Récupère la température de l'eau pour le point côtier le plus proche.",
-          "sea_temp_lat": "Coordonnée de latitude spécifique pour le point d'observation maritime.",
-          "sea_temp_lon": "Coordonnée de longitude spécifique pour le point d'observation maritime.",
-          "enable_wunderground": "Transmet automatiquement vos relevés locaux au réseau mondial Weather Underground.",
-          "wu_station_id": "L'identifiant unique attribué à votre station météo personnelle sur Weather Underground.",
-          "wu_api_key": "Clé secrète API fournie par Weather Underground pour autoriser les envois.",
-          "wu_interval_min": "Fréquence d'envoi des paquets de données vers les serveurs de Weather Underground."
+          "cal_wind_ms": "Correction de la vitesse du vent"
         }
       },
       "forecast_api_key_opt": {
@@ -2706,6 +2688,51 @@
       },
       "vigicrues_river_flow": {
         "name": "{river} - Débit"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Séchage Extérieur Statut",
+        "state": {
+          "suitable_now": "Favorable maintenant",
+          "window_upcoming": "Créneau à venir",
+          "unsuitable": "Défavorable",
+          "unknown": "Inconnu"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Séchage Extérieur Prochain Début"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Séchage Extérieur Prochaine Fin"
+      },
+      "window_garden_work_status": {
+        "name": "Jardinage Statut",
+        "state": {
+          "suitable_now": "Favorable maintenant",
+          "window_upcoming": "Créneau à venir",
+          "unsuitable": "Défavorable",
+          "unknown": "Inconnu"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Jardinage Prochain Début"
+      },
+      "window_garden_work_next_end": {
+        "name": "Jardinage Prochaine Fin"
+      },
+      "window_custom_status": {
+        "name": "Créneau Personnalisé Statut",
+        "state": {
+          "suitable_now": "Favorable maintenant",
+          "window_upcoming": "Créneau à venir",
+          "unsuitable": "Défavorable",
+          "unknown": "Inconnu"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "Créneau Personnalisé Prochain Début"
+      },
+      "window_custom_next_end": {
+        "name": "Créneau Personnalisé Prochaine Fin"
       }
     },
     "select": {

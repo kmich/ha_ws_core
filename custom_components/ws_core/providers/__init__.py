@@ -8,6 +8,11 @@ To register a new provider:
 from __future__ import annotations
 
 from .base import ForecastProvider
+from .capabilities import (
+    PROVIDER_CAPABILITY_MATRIX,
+    ProviderCapabilities,
+    get_provider_capabilities,
+)
 from .ha_weather_entity import HaWeatherEntityProvider
 from .met_no import MetNoProvider
 from .meteo_france import MeteoFranceProvider
@@ -25,8 +30,11 @@ __all__ = [
     "OpenWeatherMapProvider",
     "PirateWeatherProvider",
     "MeteoFranceProvider",
+    "PROVIDER_CAPABILITY_MATRIX",
+    "ProviderCapabilities",
     "PROVIDERS",
     "get_provider",
+    "get_provider_capabilities",
 ]
 
 PROVIDERS: dict[str, type[ForecastProvider]] = {

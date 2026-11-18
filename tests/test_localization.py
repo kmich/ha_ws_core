@@ -103,3 +103,38 @@ class TestPR6LocalizationCompleteness:
                 tr["config"]["step"]["optional_sources"]["data"][CONF_SOIL_MOISTURE_UNIT]
                 != en["config"]["step"]["optional_sources"]["data"][CONF_SOIL_MOISTURE_UNIT]
             )
+
+    def test_v3_options_menu_and_weather_window_sensors_present_in_all_languages(self):
+        en = self._load("en")
+        assert self._load("strings") == en
+
+        expected_menu = {"sources", "forecast", "decision_profiles", "rooms", "thresholds", "uploads", "diagnostics"}
+        expected_steps = {"init", "sources", "forecast", "decision_profiles", "thresholds"}
+        expected_window_sensors = {
+            f"window_{pid}_{suffix}"
+            for pid in ("outdoor_drying", "garden_work", "custom")
+            for suffix in ("status", "next_start", "next_end")
+        }
+
+        for lang in ("strings", "en", "de", "es", "fr", "it", "nl", "pl", "pt"):
+            d = self._load(lang)
+            opt_steps = d["options"]["step"]
+            assert expected_steps <= set(opt_steps), (lang, expected_steps - set(opt_steps))
+            assert set(opt_steps["init"]["menu_options"]) == expected_menu, lang
+            assert opt_steps["decision_profiles"]["data"]["enable_weather_windows"]
+            assert opt_steps["decision_profiles"]["data"]["weather_window_profiles"]
+
+            sensors = d["entity"]["sensor"]
+            assert expected_window_sensors <= set(sensors), (lang, expected_window_sensors - set(sensors))
+            for pid in ("outdoor_drying", "garden_work", "custom"):
+                st = sensors[f"window_{pid}_status"]
+                assert set(st["state"]) == {"suitable_now", "window_upcoming", "unsuitable", "unknown"}
+                assert all(st["state"].values())
+
+        for lang in ("de", "es", "fr", "it", "nl", "pl", "pt"):
+            tr = self._load(lang)
+            assert tr["options"]["step"]["init"]["title"] != en["options"]["step"]["init"]["title"], lang
+            assert (
+                tr["entity"]["sensor"]["window_outdoor_drying_status"]["name"]
+                != en["entity"]["sensor"]["window_outdoor_drying_status"]["name"]
+            ), lang

@@ -30,6 +30,7 @@ import math
 import pathlib as _pathlib
 import time
 from collections import deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -626,7 +627,7 @@ from .const import (
 )
 from .models import WsData
 from .pattern_runtime import PatternRuntime
-from .providers import get_provider
+from .providers import get_provider, get_provider_capabilities
 from .uploaders import (
     _redact_secrets,
     async_upload_awekas,
@@ -5268,7 +5269,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         from .weather_windows import WeatherWindowsEngine, resolve_profiles
 
         profiles = getattr(self, "weather_window_profiles", None)
-        if profiles is None:
+        if not isinstance(profiles, Mapping):
             profiles = resolve_profiles(getattr(self, "entry_options", None))
         lat = float(self.forecast_lat or 0.0)
         lon = float(self.forecast_lon or 0.0)
@@ -5316,9 +5317,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         engine = self._get_weather_windows_engine()
         data = self.data or {}
-        fc = data.get(KEY_FORECAST) or {}
-        hourly = fc.get("hourly") or []
         now = dt_util.now()
+        now_utc = now.astimezone(UTC) if now.tzinfo is not None else dt_util.as_utc(now)
+        if self.forecast_lat is None or self.forecast_lon is None:
+            hourly: list[dict[str, Any]] = []
+        else:
+            raw_fc = data.get(KEY_FORECAST)
+            fc = (
+                (self._published_forecast(raw_fc, now_utc) or {})
+                if hasattr(self, "_published_forecast")
+                else (raw_fc or {})
+            )
+            hourly = fc.get("hourly") or []
 
         # Reject unknown profile_id before applying custom overrides
         if profile_id is not None and profile_id not in engine.profiles:
@@ -5418,6 +5428,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "provider": provider_id,
                 "is_expired": fc_expired,
                 "hourly_horizon_h": len((data.get(KEY_FORECAST) or {}).get("hourly") or []),
+                "capabilities": get_provider_capabilities(provider_id).to_dict() if provider_id else None,
             },
             "pattern_forecast_maturity": pattern.summary() if pattern is not None else None,
             "weather_windows": windows_summary,

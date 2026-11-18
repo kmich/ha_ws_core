@@ -1,6 +1,6 @@
 # Weather Station Core (`ws_core`): Deep Code Audit, Ecosystem Comparison & v3.0 Roadmap
 
-> **Review snapshot:** Current branch `HEAD` (`v2.13.14`), cross-checked against `origin/main` (`v2.13.17`, commit `915cf66`) in `.codex-work/v3-review-latest` and [docs/v3-review-2026-11-17.md](v3-review-2026-11-17.md).
+> **Review snapshot:** Current branch `HEAD` (`v2.13.14`), cross-checked against `origin/main` (`v2.13.17`, commit `915cf66`) and [docs/v3-review-2026-11-17.md](v3-review-2026-11-17.md).
 
 ---
 

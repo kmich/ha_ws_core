@@ -374,8 +374,45 @@
   "options": {
     "step": {
       "init": {
-        "title": "Impostazioni principali",
-        "description": "Identità, unità, previsioni, avvisi e calibrazione.",
+        "title": "Menu di configurazione",
+        "description": "Scegli una sezione da configurare.",
+        "menu_options": {
+          "sources": "Sorgenti sensori (mappature hardware)",
+          "forecast": "Previsioni meteo e posizione",
+          "decision_profiles": "Motore decisionale e finestre meteo",
+          "rooms": "Stanze interne",
+          "thresholds": "Soglie, unità e calibrazione",
+          "uploads": "Servizi meteo e caricamenti",
+          "diagnostics": "Funzionalità e diagnostica"
+        }
+      },
+      "sources": {
+        "title": "Sorgenti sensori",
+        "description": "Configura le mappature delle entità dei sensori fisici."
+      },
+      "forecast": {
+        "title": "Previsioni meteo",
+        "description": "Configura il fornitore di previsioni esterno, l'intervallo di aggiornamento e le coordinate.",
+        "data": {
+          "forecast_enabled": "Abilita previsioni",
+          "forecast_interval_min": "Intervallo di aggiornamento previsioni",
+          "forecast_lat": "Latitudine previsioni",
+          "forecast_lon": "Longitudine previsioni",
+          "forecast_provider": "Fornitore previsioni",
+          "forecast_entity": "Entità meteo HA (per fornitore Home Assistant)"
+        }
+      },
+      "decision_profiles": {
+        "title": "Profili decisionali e finestre meteo",
+        "description": "Configura il motore decisionale meteo e seleziona le finestre di attività.",
+        "data": {
+          "enable_weather_windows": "Abilita motore decisionale finestre meteo",
+          "weather_window_profiles": "Profili decisionali attivi"
+        }
+      },
+      "thresholds": {
+        "title": "Soglie, unità e calibrazione",
+        "description": "Identità della stazione, unità, soglie di avviso e offset di calibrazione.",
         "data": {
           "prefix": "Prefisso entità",
           "hemisphere": "Emisfero",
@@ -388,52 +425,6 @@
           "rain_unit": "Unità precipitazioni",
           "distance_unit": "Unità di distanza",
           "altitude_unit": "Unità di altitudine",
-          "forecast_enabled": "Abilita previsioni",
-          "forecast_interval_min": "Intervallo di aggiornamento previsioni",
-          "forecast_lat": "Latitudine previsioni",
-          "forecast_lon": "Longitudine previsioni",
-          "forecast_provider": "Fornitore previsioni",
-          "forecast_api_key": "Chiave API previsioni",
-          "forecast_entity": "Entità meteo HA (per fornitore Home Assistant)",
-          "thresh_wind_gust_ms": "Soglia avviso raffica di vento",
-          "thresh_rain_rate_mmph": "Soglia avviso intensità pioggia",
-          "thresh_freeze_c": "Soglia avviso gelo",
-          "staleness_s": "Timeout obsolescenza sensore",
-          "rain_filter_alpha": "Lisciamento filtro intensità pioggia",
-          "pressure_trend_window_h": "Finestra tendenza pressione",
-          "cal_temp_c": "Offset calibrazione temperatura",
-          "cal_humidity": "Offset calibrazione umidità",
-          "cal_pressure_hpa": "Offset calibrazione pressione",
-          "cal_wind_ms": "Offset calibrazione velocità del vento",
-          "enable_display_sensors": "Sensori di visualizzazione (livelli, tendenze, salute)",
-          "enable_fire_risk_score": "Punteggio rischio incendio",
-          "enable_sea_temp": "Temperatura superficiale del mare",
-          "sea_temp_lat": "Latitudine temperatura del mare",
-          "sea_temp_lon": "Longitudine temperatura del mare",
-          "enable_wunderground": "Upload Weather Underground",
-          "wu_station_id": "ID stazione WU",
-          "wu_api_key": "Chiave stazione WU (password)",
-          "wu_interval_min": "Intervallo upload WU"
-        },
-        "data_description": {
-          "prefix": "Prefisso entità",
-          "hemisphere": "Emisfero",
-          "climate_region": "Regione climatica",
-          "elevation_m": "Altitudine stazione",
-          "units_mode": "Imposta un sistema di unità di base. Le sostituzioni individuali qui sotto hanno la precedenza.",
-          "temp_unit": "Sostituisci visualizzazione temperatura. 'Auto' segue il sistema di unità HA.",
-          "wind_unit": "Sostituisci visualizzazione velocità del vento. 'Auto' segue il sistema di unità HA.",
-          "pressure_unit": "Sostituisci visualizzazione pressione. 'Auto' segue il sistema di unità HA.",
-          "rain_unit": "Sostituisci visualizzazione precipitazioni. 'Auto' segue il sistema di unità HA.",
-          "distance_unit": "Sostituisci visualizzazione distanza (es. distanza fulmini). 'Auto' segue il sistema di unità HA.",
-          "altitude_unit": "Sostituisci visualizzazione altitudine (es. base nubi, livello di congelamento). 'Auto' segue il sistema di unità HA.",
-          "forecast_enabled": "Abilita previsioni",
-          "forecast_interval_min": "Intervallo di aggiornamento previsioni",
-          "forecast_lat": "Latitudine previsioni",
-          "forecast_lon": "Longitudine previsioni",
-          "forecast_provider": "Sorgente dati meteo. Open-Meteo e Met.no sono gratuiti senza chiave API. NWS/NOAA è gratuito ma solo per gli USA. OpenWeatherMap, Pirate Weather e Météo France richiedono una chiave API gratuita. 'Entità meteo Home Assistant' usa un'entità weather.* esistente - nessuna chiamata API aggiuntiva.",
-          "forecast_api_key": "Chiave API per il fornitore di previsioni selezionato (richiesta per OpenWeatherMap, Pirate Weather e Météo France).",
-          "forecast_entity": "Richiesto quando è selezionata 'Entità meteo Home Assistant'. Scegli qualsiasi entità weather.* già configurata in Home Assistant.",
           "thresh_wind_gust_ms": "Soglia avviso raffica di vento",
           "thresh_rain_rate_mmph": "Soglia avviso intensità pioggia",
           "thresh_freeze_c": "Soglia avviso gelo",
@@ -2673,6 +2664,51 @@
       },
       "indoor_room_comfort": {
         "name": "Comfort - {room_name}"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Asciugatura Esterna Stato",
+        "state": {
+          "suitable_now": "Adatto ora",
+          "window_upcoming": "Finestra in arrivo",
+          "unsuitable": "Non adatto",
+          "unknown": "Sconosciuto"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Asciugatura Esterna Prossimo Inizio"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Asciugatura Esterna Prossima Fine"
+      },
+      "window_garden_work_status": {
+        "name": "Lavori in Giardino Stato",
+        "state": {
+          "suitable_now": "Adatto ora",
+          "window_upcoming": "Finestra in arrivo",
+          "unsuitable": "Non adatto",
+          "unknown": "Sconosciuto"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Lavori in Giardino Prossimo Inizio"
+      },
+      "window_garden_work_next_end": {
+        "name": "Lavori in Giardino Prossima Fine"
+      },
+      "window_custom_status": {
+        "name": "Finestra Personalizzata Stato",
+        "state": {
+          "suitable_now": "Adatto ora",
+          "window_upcoming": "Finestra in arrivo",
+          "unsuitable": "Non adatto",
+          "unknown": "Sconosciuto"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "Finestra Personalizzata Prossimo Inizio"
+      },
+      "window_custom_next_end": {
+        "name": "Finestra Personalizzata Prossima Fine"
       }
     },
     "select": {

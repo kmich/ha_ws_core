@@ -245,18 +245,38 @@ class TestOptionsMenuNavigation:
     async def test_options_forecast_step_saves_and_exposes_schema(self):
         from custom_components.ws_core.const import (
             CONF_FORECAST_ENABLED,
+            CONF_FORECAST_ENTITY,
             CONF_FORECAST_INTERVAL_MIN,
             CONF_FORECAST_PROVIDER,
+            FORECAST_PROVIDER_HA_ENTITY,
         )
 
-        flow = _options_flow(stored={CONF_FORECAST_PROVIDER: "open_meteo"}, opt={})
+        flow = _options_flow(
+            stored={CONF_FORECAST_PROVIDER: "open_meteo", CONF_FORECAST_ENTITY: "weather.old"},
+            opt={CONF_FORECAST_ENTITY: "weather.old"},
+        )
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {
+                "step_id": kw["step_id"],
+                "schema": kw["data_schema"],
+                "errors": kw.get("errors", {}),
+            }
+        )
         res = await flow.async_step_forecast(None)
         assert res["step_id"] == "forecast"
 
+        # Selecting ha_weather_entity without forecast_entity returns required error
+        err_res = await flow.async_step_forecast(
+            {CONF_FORECAST_ENABLED: True, CONF_FORECAST_PROVIDER: FORECAST_PROVIDER_HA_ENTITY}
+        )
+        assert err_res["errors"] == {CONF_FORECAST_ENTITY: "required"}
+
+        # Clearing forecast_entity explicitly resets _opt[CONF_FORECAST_ENTITY] to ""
         save_res = await flow.async_step_forecast({CONF_FORECAST_ENABLED: False, CONF_FORECAST_INTERVAL_MIN: 60})
         assert save_res["type"] == "create_entry"
         assert save_res["data"][CONF_FORECAST_ENABLED] is False
         assert save_res["data"][CONF_FORECAST_INTERVAL_MIN] == 60
+        assert save_res["data"][CONF_FORECAST_ENTITY] == ""
 
     async def test_options_decision_profiles_step(self):
         from custom_components.ws_core.const import (

@@ -374,8 +374,45 @@
   "options": {
     "step": {
       "init": {
-        "title": "Grundeinstellungen",
-        "description": "Identität, Einheiten, Vorhersage, Warnungen und Kalibrierung.",
+        "title": "Konfigurationsmenü",
+        "description": "Wähle einen Bereich zum Konfigurieren.",
+        "menu_options": {
+          "sources": "Sensorquellen (Hardware-Zuordnungen)",
+          "forecast": "Wettervorhersage & Standort",
+          "decision_profiles": "Entscheidungs-Engine & Zeitfenster",
+          "rooms": "Innenräume",
+          "thresholds": "Schwellenwerte, Einheiten & Kalibrierung",
+          "uploads": "Wetterdienste & Uploads",
+          "diagnostics": "Funktionen & Diagnose"
+        }
+      },
+      "sources": {
+        "title": "Sensorquellen",
+        "description": "Physische Sensor-Entitätszuordnungen konfigurieren."
+      },
+      "forecast": {
+        "title": "Wettervorhersage",
+        "description": "Externen Vorhersageanbieter, Aktualisierungsintervall und Koordinaten konfigurieren.",
+        "data": {
+          "forecast_enabled": "Vorhersage aktivieren",
+          "forecast_interval_min": "Vorhersage-Aktualisierungsintervall",
+          "forecast_lat": "Vorhersage-Breitengrad",
+          "forecast_lon": "Vorhersage-Längengrad",
+          "forecast_provider": "Vorhersageanbieter",
+          "forecast_entity": "HA-Wetterentität (für Home Assistant Anbieter)"
+        }
+      },
+      "decision_profiles": {
+        "title": "Entscheidungsprofile & Wetterfenster",
+        "description": "Wetter-Entscheidungs-Engine konfigurieren und automatisierte Aktivitätsfenster auswählen.",
+        "data": {
+          "enable_weather_windows": "Wetterfenster-Entscheidungs-Engine aktivieren",
+          "weather_window_profiles": "Aktive Entscheidungsprofile"
+        }
+      },
+      "thresholds": {
+        "title": "Schwellenwerte, Einheiten & Kalibrierung",
+        "description": "Stationsidentität, Einheiten, Warnschwellen und Sensorkalibrierungs-Offsets.",
         "data": {
           "prefix": "Entitätspräfix",
           "hemisphere": "Hemisphäre",
@@ -388,52 +425,6 @@
           "rain_unit": "Niederschlagseinheit",
           "distance_unit": "Entfernungseinheit",
           "altitude_unit": "Höheneinheit",
-          "forecast_enabled": "Vorhersage aktivieren",
-          "forecast_interval_min": "Vorhersage-Aktualisierungsintervall",
-          "forecast_lat": "Vorhersage-Breitengrad",
-          "forecast_lon": "Vorhersage-Längengrad",
-          "forecast_provider": "Vorhersageanbieter",
-          "forecast_api_key": "Vorhersage API-Schlüssel",
-          "forecast_entity": "HA-Wetterentität (für Home Assistant Anbieter)",
-          "thresh_wind_gust_ms": "Böenwarnschwelle",
-          "thresh_rain_rate_mmph": "Regenratenschwelle",
-          "thresh_freeze_c": "Frostwarnschwelle",
-          "staleness_s": "Sensor-Veralterungstimeout",
-          "rain_filter_alpha": "Regen-Filter-Glättung",
-          "pressure_trend_window_h": "Luftdrucktrendfenster",
-          "cal_temp_c": "Temperatur-Kalibrierungsoffset",
-          "cal_humidity": "Luftfeuchtigkeit-Kalibrierungsoffset",
-          "cal_pressure_hpa": "Luftdruck-Kalibrierungsoffset",
-          "cal_wind_ms": "Windgeschwindigkeit-Kalibrierungsoffset",
-          "enable_display_sensors": "Anzeigesensoren (Niveaus, Trends, Gesundheit)",
-          "enable_fire_risk_score": "Brandrisikowert",
-          "enable_sea_temp": "Meeresoberflächentemperatur",
-          "sea_temp_lat": "Meerestemperatur-Breitengrad",
-          "sea_temp_lon": "Meerestemperatur-Längengrad",
-          "enable_wunderground": "Weather Underground Upload",
-          "wu_station_id": "WU Stations-ID",
-          "wu_api_key": "WU Stationsschlüssel (Passwort)",
-          "wu_interval_min": "WU Upload-Intervall"
-        },
-        "data_description": {
-          "prefix": "Entitätspräfix",
-          "hemisphere": "Hemisphäre",
-          "climate_region": "Klimaregion",
-          "elevation_m": "Stationshöhe",
-          "units_mode": "Legt das Basiseinheitensystem fest. Individuelle Einheitsüberschreibungen unten haben Vorrang.",
-          "temp_unit": "Temperaturanzeige überschreiben. 'Auto' folgt dem HA-Einheitensystem.",
-          "wind_unit": "Windgeschwindigkeitsanzeige überschreiben. 'Auto' folgt dem HA-Einheitensystem.",
-          "pressure_unit": "Druckanzeige überschreiben. 'Auto' folgt dem HA-Einheitensystem.",
-          "rain_unit": "Niederschlagsanzeige überschreiben. 'Auto' folgt dem HA-Einheitensystem.",
-          "distance_unit": "Entfernungsanzeige überschreiben (z. B. Blitzabstand). 'Auto' folgt dem HA-Einheitensystem.",
-          "altitude_unit": "Höhenanzeige überschreiben (z. B. Wolkenuntergrenze, Nullgradgrenze). 'Auto' folgt dem HA-Einheitensystem.",
-          "forecast_enabled": "Vorhersage aktivieren",
-          "forecast_interval_min": "Vorhersage-Aktualisierungsintervall",
-          "forecast_lat": "Vorhersage-Breitengrad",
-          "forecast_lon": "Vorhersage-Längengrad",
-          "forecast_provider": "Wetterdatenquelle. Open-Meteo und Met.no sind kostenlos ohne API-Schlüssel. NWS/NOAA ist kostenlos, aber nur für die USA. OpenWeatherMap, Pirate Weather und Météo France erfordern einen kostenlosen API-Schlüssel. 'Home Assistant Wetterentität' verwendet eine vorhandene weather.*-Entität – keine zusätzlichen API-Anfragen.",
-          "forecast_api_key": "API-Schlüssel für den ausgewählten Vorhersageanbieter (erforderlich für OpenWeatherMap, Pirate Weather und Météo France).",
-          "forecast_entity": "Erforderlich, wenn 'Home Assistant Wetterentität' ausgewählt ist. Wähle eine beliebige in Home Assistant eingerichtete weather.*-Entität.",
           "thresh_wind_gust_ms": "Böenwarnschwelle",
           "thresh_rain_rate_mmph": "Regenratenschwelle",
           "thresh_freeze_c": "Frostwarnschwelle",
@@ -2673,6 +2664,51 @@
       },
       "indoor_room_comfort": {
         "name": "Comfort - {room_name}"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Wäschetrocknung Status",
+        "state": {
+          "suitable_now": "Jetzt geeignet",
+          "window_upcoming": "Zeitfenster bevorstehend",
+          "unsuitable": "Ungeeignet",
+          "unknown": "Unbekannt"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Wäschetrocknung Nächster Beginn"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Wäschetrocknung Nächstes Ende"
+      },
+      "window_garden_work_status": {
+        "name": "Gartenarbeit Status",
+        "state": {
+          "suitable_now": "Jetzt geeignet",
+          "window_upcoming": "Zeitfenster bevorstehend",
+          "unsuitable": "Ungeeignet",
+          "unknown": "Unbekannt"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Gartenarbeit Nächster Beginn"
+      },
+      "window_garden_work_next_end": {
+        "name": "Gartenarbeit Nächstes Ende"
+      },
+      "window_custom_status": {
+        "name": "Benutzerdefiniertes Fenster Status",
+        "state": {
+          "suitable_now": "Jetzt geeignet",
+          "window_upcoming": "Zeitfenster bevorstehend",
+          "unsuitable": "Ungeeignet",
+          "unknown": "Unbekannt"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "Benutzerdefiniertes Fenster Nächster Beginn"
+      },
+      "window_custom_next_end": {
+        "name": "Benutzerdefiniertes Fenster Nächstes Ende"
       }
     },
     "select": {

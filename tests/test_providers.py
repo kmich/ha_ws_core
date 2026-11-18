@@ -274,7 +274,7 @@ async def test_open_meteo_provider_timestamps_and_preceding_hour_alignment():
 
         res = await provider.async_fetch(session, 40.71, -74.01)
         called_url = session.get.call_args.args[0]
-        assert "&forecast_hours=25" in called_url
+        assert "&forecast_hours=26" in called_url
 
         hourly = res["hourly"]
         assert len(hourly) == 4
@@ -308,3 +308,126 @@ async def test_open_meteo_provider_timestamps_and_preceding_hour_alignment():
         assert hourly[3]["gust_kmh"] is None
     finally:
         dt_util.set_default_time_zone(old_tz)
+
+
+@pytest.mark.asyncio
+async def test_owm_and_pirate_weather_preserve_zero_wind_gust():
+    session = MagicMock()
+    cm = AsyncMock()
+    cm.__aexit__.return_value = None
+    session.get.return_value = cm
+
+    # OpenWeatherMap: wind_gust == 0.0 must stay 0.0, not None
+    owm_resp = AsyncMock()
+    owm_resp.status = 200
+    owm_resp.json = AsyncMock(
+        return_value={
+            "daily": [
+                {"dt": 1763337600, "temp": {"max": 12.0, "min": 5.0}, "wind_speed": 0.0, "wind_gust": 0.0, "pop": 0.0}
+            ],
+            "hourly": [{"dt": 1763337600, "temp": 10.0, "wind_speed": 0.0, "wind_gust": 0.0, "pop": 0.0}],
+        }
+    )
+    cm.__aenter__.return_value = owm_resp
+    owm_res = await OpenWeatherMapProvider().async_fetch(session, 50.0, 10.0, api_key="secret")
+    assert owm_res["daily"][0]["gust_kmh"] == 0.0
+    assert owm_res["daily"][0]["wind_kmh"] == 0.0
+    assert owm_res["hourly"][0]["gust_kmh"] == 0.0
+    assert owm_res["hourly"][0]["wind_kmh"] == 0.0
+
+    # Pirate Weather: windGust == 0.0 must stay 0.0, not None
+    pw_resp = AsyncMock()
+    pw_resp.status = 200
+    pw_resp.json = AsyncMock(
+        return_value={
+            "daily": {"data": [{"time": 1763337600, "windSpeed": 0.0, "windGust": 0.0, "precipProbability": 0.0}]},
+            "hourly": {"data": [{"time": 1763337600, "windSpeed": 0.0, "windGust": 0.0, "precipProbability": 0.0}]},
+        }
+    )
+    cm.__aenter__.return_value = pw_resp
+    pw_res = await PirateWeatherProvider().async_fetch(session, 50.0, 10.0, api_key="secret")
+    assert pw_res["daily"][0]["gust_kmh"] == 0.0
+    assert pw_res["daily"][0]["wind_kmh"] == 0.0
+    assert pw_res["hourly"][0]["gust_kmh"] == 0.0
+    assert pw_res["hourly"][0]["wind_kmh"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_met_no_and_nws_keep_current_in_progress_hour():
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import patch
+
+    fixed_now = datetime(2026, 6, 21, 12, 15, tzinfo=UTC)
+    current_hr_iso = "2026-06-21T12:00:00Z"
+    next_hr_iso = "2026-06-21T13:00:00Z"
+
+    session = MagicMock()
+    cm = AsyncMock()
+    cm.__aexit__.return_value = None
+    session.get.return_value = cm
+
+    # Met.no keeps 12:00Z even when fetched at 12:15Z
+    met_resp = AsyncMock()
+    met_resp.status = 200
+    met_resp.json = AsyncMock(
+        return_value={
+            "properties": {
+                "timeseries": [
+                    {"time": current_hr_iso, "data": {"instant": {"details": {"air_temperature": 21.0}}}},
+                    {"time": next_hr_iso, "data": {"instant": {"details": {"air_temperature": 22.0}}}},
+                ]
+            }
+        }
+    )
+    cm.__aenter__.return_value = met_resp
+    with patch("custom_components.ws_core.providers.met_no.datetime") as mock_dt:
+        mock_dt.now.return_value = fixed_now
+        mock_dt.fromisoformat.side_effect = datetime.fromisoformat
+        met_res = await MetNoProvider().async_fetch(session, 59.91, 10.75)
+    assert [h["utc_datetime"] for h in met_res["hourly"]] == ["2026-06-21T12:00:00+00:00", "2026-06-21T13:00:00+00:00"]
+
+    # NWS/NOAA keeps 12:00Z even when fetched at 12:15Z
+    points_resp = AsyncMock()
+    points_resp.status = 200
+    points_resp.json = AsyncMock(
+        return_value={
+            "properties": {"forecast": "https://api.weather.gov/f", "forecastHourly": "https://api.weather.gov/h"}
+        }
+    )
+    daily_resp = AsyncMock()
+    daily_resp.status = 200
+    daily_resp.json = AsyncMock(return_value={"properties": {"periods": []}})
+    hourly_resp = AsyncMock()
+    hourly_resp.status = 200
+    hourly_resp.json = AsyncMock(
+        return_value={
+            "properties": {
+                "periods": [
+                    {"startTime": (fixed_now - timedelta(minutes=15)).isoformat(), "temperature": 70},
+                    {"startTime": (fixed_now + timedelta(minutes=45)).isoformat(), "temperature": 72},
+                ]
+            }
+        }
+    )
+    cm.__aenter__.side_effect = [points_resp, daily_resp, hourly_resp]
+    with patch("custom_components.ws_core.providers.nws_noaa.datetime") as mock_nws_dt:
+        mock_nws_dt.now.return_value = fixed_now
+        mock_nws_dt.fromisoformat.side_effect = datetime.fromisoformat
+        nws_res = await NwsNoaaProvider().async_fetch(session, 40.71, -74.01)
+    assert [h["utc_datetime"] for h in nws_res["hourly"]] == ["2026-06-21T12:00:00+00:00", "2026-06-21T13:00:00+00:00"]
+
+
+def test_capability_matrix_covers_every_registered_provider():
+    from custom_components.ws_core.providers import PROVIDERS, get_provider_capabilities
+
+    assert "ha_weather_entity" in PROVIDERS
+    for pid, cls in PROVIDERS.items():
+        caps = get_provider_capabilities(pid)
+        assert caps.provider_id == pid
+        assert caps.provider_id != "unknown"
+        assert caps.requires_api_key is cls.REQUIRES_API_KEY
+        assert caps.to_dict()["provider_id"] == pid
+
+    # Alias compatibility
+    assert get_provider_capabilities("open_weather_map").provider_id == "openweathermap"
+    assert get_provider_capabilities("nonexistent").provider_id == "unknown"

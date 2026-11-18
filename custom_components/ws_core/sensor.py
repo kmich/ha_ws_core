@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+from collections.abc import Mapping
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
@@ -444,7 +445,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             return dt_util.parse_datetime(str(val))
 
         profiles = getattr(coordinator, "weather_window_profiles", None)
-        if profiles is None:
+        if not isinstance(profiles, Mapping):
             profiles = resolve_profiles(opts)
 
         for pid, prof in profiles.items():

@@ -52,7 +52,7 @@ class OpenMeteoProvider(ForecastProvider):
             "precipitation_probability,precipitation,"
             "weathercode,windspeed_10m,windgusts_10m,"
             "relativehumidity_2m,cloudcover"
-            "&forecast_hours=25"
+            "&forecast_hours=26"
             "&timezone=auto"
         )
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
@@ -111,7 +111,7 @@ class OpenMeteoProvider(ForecastProvider):
 
         parsed_dts = [_parse_om_time(t, om_tz) for t in h_times]
         hourly_out: list[dict[str, Any]] = []
-        for i in range(min(len(h_times), 24)):
+        for i in range(min(len(h_times), 25)):
             dt_i = parsed_dts[i]
             dt_next = parsed_dts[i + 1] if (i + 1) < len(parsed_dts) else None
             has_next_hour = (

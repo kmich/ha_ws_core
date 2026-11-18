@@ -1722,6 +1722,10 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             # Backward-compat: if called with core schema dict directly (legacy callers/tests)
             return await self.async_step_thresholds(user_input)
 
+        self._in_menu_sources = False
+        self._in_menu_uploads = False
+        self._in_menu_diagnostics = False
+        self._in_menu_rooms = False
         menu_options = [
             "sources",
             "forecast",
@@ -1742,15 +1746,27 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
     async def async_step_forecast(self, user_input: dict[str, Any] | None = None):
         """Configure forecast provider and coordinates."""
         self._ensure_opt()
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._opt.update(user_input)
-            if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
-                return await self.async_step_forecast_api_key_opt()
-            return self.async_create_entry(title="", data=self._opt)
+            provider = user_input.get(
+                CONF_FORECAST_PROVIDER, self._get(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
+            )
+            enabled = user_input.get(CONF_FORECAST_ENABLED, self._get(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED))
+            forecast_entity = str(user_input.get(CONF_FORECAST_ENTITY) or "").strip()
+            if enabled and provider == FORECAST_PROVIDER_HA_ENTITY and not forecast_entity:
+                errors[CONF_FORECAST_ENTITY] = "required"
+            else:
+                self._opt.update(user_input)
+                # Persist explicit "" when EntitySelector is cleared so entry.data does not bleed through
+                self._opt[CONF_FORECAST_ENTITY] = forecast_entity
+                if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
+                    return await self.async_step_forecast_api_key_opt()
+                return self.async_create_entry(title="", data=self._opt)
 
         return self.async_show_form(
             step_id="forecast",
             data_schema=self._build_forecast_schema(),
+            errors=errors,
         )
 
     def _build_forecast_schema(self) -> vol.Schema:
@@ -1867,6 +1883,13 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     )
             except (TypeError, ValueError):
                 pass
+            alert_errors = WSStationConfigFlow._validate_alert_inputs(out, gust_u, temp_u)
+            if alert_errors:
+                return self.async_show_form(
+                    step_id="thresholds",
+                    data_schema=self._build_thresholds_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
+                    errors=alert_errors,
+                )
             out[CONF_THRESH_WIND_GUST_MS] = _convert_gust_to_ms(
                 float(out.get(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS)), gust_u
             )
@@ -2135,181 +2158,6 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             data_schema=vol.Schema(fields),
             errors=errors,
             last_step=False,
-        )
-
-    def _build_core_schema(
-        self, imperial: bool, gust_u: str, rain_u: str, temp_u: str, rain_meas: str = "mm"
-    ) -> vol.Schema:
-        g = self._get
-        default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
-        default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
-        cur_gust_ms = float(g(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
-        cur_rain_mmph = float(g(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
-        cur_freeze_c = float(g(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
-        return vol.Schema(
-            {
-                vol.Optional(CONF_PREFIX, default=g(CONF_PREFIX, DEFAULT_PREFIX)): str,
-                vol.Optional(CONF_HEMISPHERE, default=g(CONF_HEMISPHERE, DEFAULT_HEMISPHERE)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=HEMISPHERE_OPTIONS, mode="list", translation_key="hemisphere")
-                ),
-                vol.Optional(
-                    CONF_CLIMATE_REGION, default=g(CONF_CLIMATE_REGION, DEFAULT_CLIMATE_REGION)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=CLIMATE_REGION_OPTIONS, mode="dropdown", translation_key="climate_region"
-                    )
-                ),
-                vol.Optional(
-                    CONF_ELEVATION_M, default=g(CONF_ELEVATION_M, DEFAULT_ELEVATION_M)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=VALID_ELEVATION_MIN_M,
-                        max=VALID_ELEVATION_MAX_M,
-                        step=1,
-                        mode="box",
-                        unit_of_measurement="m",
-                    )
-                ),
-                vol.Optional(CONF_UNITS_MODE, default=g(CONF_UNITS_MODE, DEFAULT_UNITS_MODE)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=UNITS_MODE_OPTIONS, mode="dropdown", translation_key="units_mode"
-                    )
-                ),
-                vol.Optional(CONF_TEMP_UNIT, default=g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            {"value": "auto", "label": "Auto"},
-                            {"value": "C", "label": "Celsius (°C)"},
-                            {"value": "F", "label": "Fahrenheit (°F)"},
-                        ],
-                        mode="list",
-                    )
-                ),
-                vol.Optional(CONF_WIND_UNIT, default=g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in WIND_UNIT_OPTIONS], mode="list"
-                    )
-                ),
-                vol.Optional(
-                    CONF_PRESSURE_UNIT, default=g(CONF_PRESSURE_UNIT, DEFAULT_PRESSURE_UNIT)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in PRESSURE_UNIT_OPTIONS], mode="list"
-                    )
-                ),
-                vol.Optional(CONF_RAIN_UNIT, default=g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT)): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in RAIN_UNIT_OPTIONS], mode="list"
-                    )
-                ),
-                vol.Optional(
-                    CONF_DISTANCE_UNIT, default=g(CONF_DISTANCE_UNIT, DEFAULT_DISTANCE_UNIT)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in DISTANCE_UNIT_OPTIONS], mode="list"
-                    )
-                ),
-                vol.Optional(
-                    CONF_ALTITUDE_UNIT, default=g(CONF_ALTITUDE_UNIT, DEFAULT_ALTITUDE_UNIT)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[{"value": o, "label": o} for o in ALTITUDE_UNIT_OPTIONS], mode="list"
-                    )
-                ),
-                vol.Optional(
-                    CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_FORECAST_INTERVAL_MIN, default=g(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
-                ),
-                vol.Optional(
-                    CONF_FORECAST_LAT, default=g(CONF_FORECAST_LAT, round(default_lat, 4))
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")),
-                vol.Optional(
-                    CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
-                vol.Optional(
-                    CONF_FORECAST_PROVIDER, default=g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            FORECAST_PROVIDER_OPEN_METEO,
-                            FORECAST_PROVIDER_MET_NO,
-                            FORECAST_PROVIDER_NWS,
-                            FORECAST_PROVIDER_OWM,
-                            FORECAST_PROVIDER_PIRATE,
-                            FORECAST_PROVIDER_METEO_FRANCE,
-                            FORECAST_PROVIDER_HA_ENTITY,
-                        ],
-                        mode=selector.SelectSelectorMode.LIST,
-                        translation_key="forecast_provider",
-                    )
-                ),
-                # Optional weather entity used only by the HA-entity forecast provider.
-                # Must NOT carry a default of "" — an empty string fails the weather
-                # EntitySelector ("Entity is neither a valid entity ID nor a valid UUID")
-                # and blocked the whole options dialog (issue #71). Use a suggested value
-                # so it pre-fills when set but is simply omitted (no validation) when blank.
-                vol.Optional(
-                    CONF_FORECAST_ENTITY,
-                    description={"suggested_value": g(CONF_FORECAST_ENTITY, "") or None},
-                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="weather")),
-                vol.Optional(
-                    CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, gust_u), 1)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=120, step=0.1, mode="box", unit_of_measurement=gust_u)
-                ),
-                vol.Optional(
-                    CONF_THRESH_RAIN_RATE_MMPH, default=round(_convert_rain_to_display(cur_rain_mmph, rain_meas), 2)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=0, max=200, step=0.5, mode="box", unit_of_measurement=rain_u)
-                ),
-                vol.Optional(
-                    CONF_THRESH_FREEZE_C, default=round(_convert_temp_to_display(cur_freeze_c, temp_u == "°F"), 1)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=round(_convert_temp_to_display(-30.0, temp_u == "°F"), 1),
-                        max=round(_convert_temp_to_display(10.0, temp_u == "°F"), 1),
-                        step=0.5,
-                        mode="box",
-                        unit_of_measurement=temp_u,
-                    )
-                ),
-                vol.Optional(
-                    CONF_STALENESS_S, default=g(CONF_STALENESS_S, DEFAULT_STALENESS_S)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=60, max=86400, step=60, mode="box", unit_of_measurement="s")
-                ),
-                vol.Optional(
-                    CONF_RAIN_FILTER_ALPHA, default=g(CONF_RAIN_FILTER_ALPHA, DEFAULT_RAIN_FILTER_ALPHA)
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=0.05, max=1.0, step=0.05, mode="slider")),
-                vol.Optional(
-                    CONF_PRESSURE_TREND_WINDOW_H,
-                    default=g(CONF_PRESSURE_TREND_WINDOW_H, DEFAULT_PRESSURE_TREND_WINDOW_H),
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=1, max=12, step=1, mode="box", unit_of_measurement="h")
-                ),
-                vol.Optional(CONF_CAL_TEMP_C, default=g(CONF_CAL_TEMP_C, DEFAULT_CAL_TEMP_C)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="°C")
-                ),
-                vol.Optional(
-                    CONF_CAL_HUMIDITY, default=g(CONF_CAL_HUMIDITY, DEFAULT_CAL_HUMIDITY)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-20, max=20, step=0.5, mode="box", unit_of_measurement="%")
-                ),
-                vol.Optional(
-                    CONF_CAL_PRESSURE_HPA, default=g(CONF_CAL_PRESSURE_HPA, DEFAULT_CAL_PRESSURE_HPA)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-10, max=10, step=0.1, mode="box", unit_of_measurement="hPa")
-                ),
-                vol.Optional(
-                    CONF_CAL_WIND_MS, default=g(CONF_CAL_WIND_MS, DEFAULT_CAL_WIND_MS)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=-5, max=5, step=0.1, mode="box", unit_of_measurement="m/s")
-                ),
-            }
         )
 
     # ------------------------------------------------------------------

@@ -391,7 +391,11 @@ class WeatherWindowsEngine:
         live_blockers: list[str] = []
         live_blocker_texts: list[str] = []
 
-        if live_rain_rate is not None and live_rain_rate > 0.05:
+        if (
+            live_rain_rate is not None
+            and (profile.max_rain_mm is not None or profile.max_rain_prob_pct is not None)
+            and live_rain_rate > max(0.05, float(profile.max_rain_mm or 0.0))
+        ):
             live_blockers.append(REASON_CURRENTLY_RAINING)
             live_blocker_texts.append(f"Rain is currently falling at the station ({live_rain_rate:.1f} mm/h).")
 
@@ -478,7 +482,7 @@ class WeatherWindowsEngine:
             blocker_counts: dict[str, int] = {}
             for _, s in evaluated_pairs:
                 for r in s.reasons:
-                    if r == REASON_SUITABLE or r in live_blockers:
+                    if r in (REASON_SUITABLE, REASON_MISSING_DATA) or r in live_blockers:
                         continue
                     blocker_counts[r] = blocker_counts.get(r, 0) + 1
             top_blockers = sorted(blocker_counts.keys(), key=lambda k: -blocker_counts[k])[:3]
@@ -486,6 +490,10 @@ class WeatherWindowsEngine:
                 if b not in reasons:
                     reasons.append(b)
                     reasons_text.append(self._format_blocker_text(b, profile))
+
+            if not reasons and any(REASON_MISSING_DATA in s.reasons for _, s in evaluated_pairs):
+                reasons.append(REASON_MISSING_DATA)
+                reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
 
             if not reasons:
                 reasons.append(REASON_INSUFFICIENT_HORIZON)
