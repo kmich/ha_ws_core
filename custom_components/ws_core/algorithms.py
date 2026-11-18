@@ -940,10 +940,6 @@ def determine_current_condition(
     if rain_rate_mmph > 0 or is_wet:
         return "drizzle"
 
-    # Dry, but the barometer points to a storm: it is still on its way.
-    if stormy_outlook:
-        return "pre-storm"
-
     # Temperature extremes & ice
     if temp_c < -5 and wind_speed_ms > 10:
         return "icy-conditions"

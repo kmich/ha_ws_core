@@ -24,6 +24,7 @@ from custom_components.ws_core.const import (
     CONF_STALENESS_S,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
+    KEY_CURRENT_CONDITION,
     KEY_DATA_QUALITY,
     KEY_LIGHTNING_CLEARANCE_MIN,
     KEY_LIGHTNING_COUNT_1H,
@@ -33,6 +34,7 @@ from custom_components.ws_core.const import (
     KEY_RAIN_RATE_FILT,
     KEY_SENSOR_QUALITY_FLAGS,
     KEY_THUNDERSTORM_RISK,
+    KEY_ZAMBRETTI_FORECAST,
     SRC_GUST,
     SRC_HUM,
     SRC_PRESS,
@@ -132,6 +134,35 @@ def _make_coordinator(**overrides):
     coord.nowcast_interval_min = 15
     coord._nowcast_cache = None
     return coord, hass, states
+
+
+def test_stormy_outlook_keeps_weather_entity_sunny_until_rain_persists():
+    from custom_components.ws_core.algorithms import CONDITION_DWELL_S
+    from custom_components.ws_core.weather import WSStationWeather
+
+    coord, _, _ = _make_coordinator()
+    coord.data = {KEY_ZAMBRETTI_FORECAST: "fine_weather"}
+    entity = WSStationWeather(coord, MagicMock(entry_id="test"), "ws")
+    readings = dict(tc=22.0, rh=55.0, wind_ms=3.5, gust_ms=6.0, dew_c=12.0, lux=40000.0, uv=4.0)
+
+    with patch("custom_components.ws_core.coordinator.time.monotonic") as monotonic:
+        monotonic.return_value = 0
+        coord._compute_condition(coord.data, **readings, rain_rate=0.0)
+        assert coord.data[KEY_CURRENT_CONDITION] == entity.condition == "sunny"
+
+        coord.data[KEY_ZAMBRETTI_FORECAST] = "stormy_much_rain"
+        for stamp in (1, 1 + CONDITION_DWELL_S):
+            monotonic.return_value = stamp
+            coord._compute_condition(coord.data, **readings, rain_rate=0.0)
+            assert coord.data[KEY_CURRENT_CONDITION] == entity.condition == "sunny"
+
+        monotonic.return_value += 1
+        coord._compute_condition(coord.data, **readings, rain_rate=3.0)
+        assert coord.data[KEY_CURRENT_CONDITION] == entity.condition == "sunny"
+
+        monotonic.return_value += CONDITION_DWELL_S
+        coord._compute_condition(coord.data, **readings, rain_rate=3.0)
+        assert coord.data[KEY_CURRENT_CONDITION] == entity.condition == "rainy"
 
 
 # ===========================================================================
