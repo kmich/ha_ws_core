@@ -1746,8 +1746,11 @@ class PatternEngine:
         for tid, st in statuses.items():
             if tid in self.models:
                 entry = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
-                if st.get("status") == "ok" and report.get(tid, {}).get("samples", 0) > 0 and dp_warm:
+                needs_dp = "dp_3h" in self.models[tid].spec.features
+                if st.get("status") == "ok" and report.get(tid, {}).get("samples", 0) > 0 and (not needs_dp or dp_warm):
                     entry["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+                elif tid in targets and "features_method" in targets[tid]:
+                    entry["features_method"] = targets[tid]["features_method"]
                 targets[tid] = entry
         oks = [t for t in targets.values() if t.get("status") == "ok"]
         # Only mark the v3 feature-alignment migration complete when every

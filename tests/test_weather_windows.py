@@ -783,3 +783,23 @@ class TestWeatherWindowsEngine:
         assert mock_ww.call_count == 1
         assert "weather_windows" in data
         assert coord.runtime.last_compute_ms >= 25.0
+
+    def test_parse_slot_utc_handles_datetime_objects_and_numeric_timestamps(self, engine: WeatherWindowsEngine):
+        tz = UTC
+        dt_aware = datetime(2026, 6, 21, 14, 0, tzinfo=UTC)
+        dt_naive = datetime(2026, 6, 21, 14, 0)
+        ts_num = 1782050400.0  # 2026-06-21T14:00:00Z
+
+        # Datetime objects
+        assert engine._parse_slot_utc({"datetime": dt_aware}, tz) == dt_aware
+        assert engine._parse_slot_utc({"datetime": dt_naive}, tz) == dt_aware
+        assert engine._parse_slot_utc({"utc_datetime": dt_aware}, tz) == dt_aware
+
+        # Numeric timestamps
+        assert engine._parse_slot_utc({"datetime": ts_num}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
+        assert engine._parse_slot_utc({"utc_datetime": int(ts_num)}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
+
+        # Invalid/empty
+        assert engine._parse_slot_utc({"datetime": None}, tz) is None
+        assert engine._parse_slot_utc({"datetime": "invalid-date"}, tz) is None
+        assert engine._parse_slot_utc({"datetime": True}, tz) is None

@@ -650,6 +650,12 @@ class WeatherWindowsEngine:
         raw_dt = item.get("utc_datetime") or item.get("datetime")
         if not raw_dt:
             return None
+        if isinstance(raw_dt, datetime):
+            if raw_dt.tzinfo is None:
+                raw_dt = raw_dt.replace(tzinfo=display_tz)
+            return raw_dt.astimezone(UTC)
+        if isinstance(raw_dt, (int, float)) and not isinstance(raw_dt, bool):
+            return datetime.fromtimestamp(raw_dt, tz=UTC)
         key = str(raw_dt)
         parsed = self._parse_dt_cache.get(key)
         if key not in self._parse_dt_cache:

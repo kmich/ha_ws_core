@@ -1263,6 +1263,61 @@ class TestReplayMaskingAndDp3hAlignment:
         # Engine remains cleanly reset
         assert not rt.engine.history_learn
 
+    def test_adopt_replay_migrates_non_pressure_models_without_dp_warm(self):
+        eng = _make_engine()
+        trained = _make_engine()
+        dp_slot = POOL_INDEX["dp_3h"]
+        trained.std.n[dp_slot] = 0
+        eng.std.n[dp_slot] = 0
+
+        # heat_24h is a non-pressure model (does not use dp_3h)
+        assert "dp_3h" not in eng.models["heat_24h"].spec.features
+
+        report = {"heat_24h": {"samples": 120, "events": 4, "first": 1000.0, "last": 2000.0}}
+        statuses = {"heat_24h": {"status": "ok", "reason": None, "samples": 120, "events": 4}}
+
+        eng.adopt_replay(trained, report, statuses, update_std=False, now_ts=3000.0)
+
+        # Non-pressure model gets stamped with PATTERN_HISTORY_FEATURES_METHOD even when dp_warm is False
+        heat_entry = eng.history_learn["targets"]["heat_24h"]
+        assert heat_entry.get("features_method") == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn.get("features_method") == PATTERN_HISTORY_FEATURES_METHOD
+
+    def test_adopt_replay_preserves_existing_features_method_on_prior_targets(self):
+        eng = _make_engine()
+        trained = _make_engine()
+        dp_slot = POOL_INDEX["dp_3h"]
+        trained.std.n[dp_slot] = 0
+        eng.std.n[dp_slot] = 0
+
+        # Prior target rain_3h was already migrated
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+                },
+            },
+        }
+
+        # Another pressure target gust_3h replays but dp_3h is not warm (n=0)
+        report = {"gust_3h": {"samples": 50, "events": 2, "first": 1000.0, "last": 2000.0}}
+        statuses = {"gust_3h": {"status": "ok", "reason": None, "samples": 50, "events": 2}}
+
+        eng.adopt_replay(trained, report, statuses, update_std=False, now_ts=3000.0)
+
+        # Prior rain_3h MUST preserve its features_method marker
+        assert eng.history_learn["targets"]["rain_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        # gust_3h remains pending because it uses dp_3h and dp is not warm
+        assert "features_method" not in eng.history_learn["targets"]["gust_3h"]
+        # Overall features_method remains pending (< 4)
+        assert eng.history_learn.get("features_method") == 3
+
 
 class TestDowngradeTolerance:
     """Verify that storage schema remains compatible with earlier versions."""
