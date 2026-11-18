@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
@@ -49,6 +50,44 @@ SERVICE_GET_WEATHER_WINDOWS = "get_weather_windows"
 SERVICE_GET_STATION_SUMMARY = "get_station_summary"
 ATTR_ENTRY_ID = "entry_id"
 
+
+def _positive_int(value: Any) -> int:
+    """Validate integer >= 1, rejecting booleans, fractions, and non-finite floats."""
+    if isinstance(value, bool):
+        raise vol.Invalid("Expected an integer >= 1, got boolean")
+    if isinstance(value, int):
+        out = value
+    elif isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise vol.Invalid("Expected a whole integer >= 1")
+        out = int(value)
+    elif isinstance(value, str):
+        try:
+            out = int(value.strip())
+        except ValueError as err:
+            raise vol.Invalid("Expected a whole integer >= 1") from err
+    else:
+        raise vol.Invalid("Expected a whole integer >= 1")
+    if out < 1:
+        raise vol.Invalid("Value must be at least 1")
+    return out
+
+
+def _optional_finite_float(value: Any) -> float | None:
+    """Validate an optional finite float, rejecting booleans and NaN/Infinity."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise vol.Invalid("Expected a finite number, got boolean")
+    try:
+        num = float(value)
+    except (TypeError, ValueError) as err:
+        raise vol.Invalid("Expected a finite number") from err
+    if not math.isfinite(num):
+        raise vol.Invalid("Number must be finite")
+    return num
+
+
 SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema(
     {
@@ -64,17 +103,17 @@ SERVICE_GET_WEATHER_WINDOWS_SCHEMA = vol.Schema(
         vol.Optional("limits"): vol.Schema(
             {
                 vol.Optional("name"): cv.string,
-                vol.Optional("min_duration_h"): vol.All(vol.Coerce(int), vol.Range(min=1)),
-                vol.Optional("max_rain_prob_pct"): vol.Coerce(float),
-                vol.Optional("max_rain_mm"): vol.Coerce(float),
-                vol.Optional("min_temp_c"): vol.Coerce(float),
-                vol.Optional("max_temp_c"): vol.Coerce(float),
-                vol.Optional("min_humidity_pct"): vol.Coerce(float),
-                vol.Optional("max_humidity_pct"): vol.Coerce(float),
-                vol.Optional("min_wind_kmh"): vol.Coerce(float),
-                vol.Optional("max_wind_kmh"): vol.Coerce(float),
-                vol.Optional("max_wind_gust_kmh"): vol.Coerce(float),
-                vol.Optional("max_cloud_cover_pct"): vol.Coerce(float),
+                vol.Optional("min_duration_h"): _positive_int,
+                vol.Optional("max_rain_prob_pct"): _optional_finite_float,
+                vol.Optional("max_rain_mm"): _optional_finite_float,
+                vol.Optional("min_temp_c"): _optional_finite_float,
+                vol.Optional("max_temp_c"): _optional_finite_float,
+                vol.Optional("min_humidity_pct"): _optional_finite_float,
+                vol.Optional("max_humidity_pct"): _optional_finite_float,
+                vol.Optional("min_wind_kmh"): _optional_finite_float,
+                vol.Optional("max_wind_kmh"): _optional_finite_float,
+                vol.Optional("max_wind_gust_kmh"): _optional_finite_float,
+                vol.Optional("max_cloud_cover_pct"): _optional_finite_float,
                 vol.Optional("require_daylight"): cv.boolean,
             }
         ),

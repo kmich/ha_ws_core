@@ -427,3 +427,67 @@ class TestWeatherWindowsEngine:
         ]
         assert win_keys_none == []
         assert coord_none.get_weather_windows_evaluation() == {}
+
+    def test_sensors_and_actions_use_same_local_timezone_for_naive_forecasts(self):
+        berlin = ZoneInfo("Europe/Berlin")
+        old_tz = dt_util.get_default_time_zone()
+        dt_util.set_default_time_zone(berlin)
+        try:
+            # Naive local forecast timestamps (e.g. Open-Meteo timezone=auto): 12:00..14:00 Berlin (+02:00)
+            hourly = [
+                {
+                    "datetime": f"2026-06-21T{hr:02d}:00",
+                    "temp_c": 22.0,
+                    "precip_prob": 0,
+                    "precip_mm": 0.0,
+                    "wind_kmh": 10.0,
+                    "gust_kmh": 15.0,
+                    "humidity": 50.0,
+                    "cloud_cover": 10.0,
+                }
+                for hr in (12, 13, 14)
+            ]
+            engine = WeatherWindowsEngine(lat=52.52, lon=13.40)
+            profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+
+            # _compute path passes UTC time; action path passes local dt_util.now()
+            utc_now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+            local_now = datetime(2026, 6, 21, 12, 0, tzinfo=berlin)
+
+            sensor_res = engine.evaluate_profile(profile, hourly, now=utc_now)
+            action_res = engine.evaluate_profile(profile, hourly, now=local_now)
+
+            for res in (sensor_res, action_res):
+                assert res.status == STATUS_SUITABLE_NOW
+                assert res.next_start == "2026-06-21T12:00:00+02:00"
+                assert res.next_end == "2026-06-21T15:00:00+02:00"
+                assert res.duration_h == 3
+        finally:
+            dt_util.set_default_time_zone(old_tz)
+
+    def test_active_window_reports_remaining_duration(self, engine: WeatherWindowsEngine):
+        slot_start = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(slot_start, hours=3)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+
+        now = datetime(2026, 6, 21, 10, 30, tzinfo=UTC)
+        result = engine.evaluate_profile(profile, hourly, current_data={}, now=now)
+
+        assert result.status == STATUS_SUITABLE_NOW
+        assert result.duration_h == 2.5
+        assert result.windows[0]["duration_h"] == 2.5
+        assert "2.5 hours" in result.reasons_text[0]
+
+    def test_enforces_24_hour_horizon_cutoff(self, engine: WeatherWindowsEngine):
+        start_time = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(start_time, hours=36)
+        # First 24h all rainy, hours 26..30 sunny (>= 24h ahead)
+        for i in range(24):
+            hourly[i]["precip_prob"] = 90
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+
+        result = engine.evaluate_profile(profile, hourly, current_data={}, now=start_time)
+
+        assert result.horizon_hours == 24
+        assert result.status == STATUS_UNSUITABLE
+        assert result.windows == []

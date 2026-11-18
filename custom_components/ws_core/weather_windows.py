@@ -28,6 +28,21 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+MAX_HORIZON_HOURS = 24
+
+_NUMERIC_LIMIT_FIELDS: tuple[str, ...] = (
+    "max_rain_prob_pct",
+    "max_rain_mm",
+    "min_temp_c",
+    "max_temp_c",
+    "min_humidity_pct",
+    "max_humidity_pct",
+    "min_wind_kmh",
+    "max_wind_kmh",
+    "max_wind_gust_kmh",
+    "max_cloud_cover_pct",
+)
+
 # Decision status outcomes
 STATUS_SUITABLE_NOW = "suitable_now"
 STATUS_WINDOW_UPCOMING = "window_upcoming"
@@ -149,6 +164,62 @@ def resolve_profiles(config: Mapping[str, Any] | None = None) -> dict[str, Weath
     return {pid: replace(prof, enabled=(pid in selected)) for pid, prof in DEFAULT_PROFILES.items()}
 
 
+def _coerce_positive_int(val: Any) -> int:
+    """Validate integer >= 1, rejecting booleans, fractions, and non-finite floats."""
+    if isinstance(val, bool):
+        raise ValueError("min_duration_h must be an integer >= 1")
+    if isinstance(val, int):
+        out = val
+    elif isinstance(val, float):
+        if not math.isfinite(val) or not val.is_integer():
+            raise ValueError("min_duration_h must be a whole integer >= 1")
+        out = int(val)
+    elif isinstance(val, str):
+        try:
+            out = int(val.strip())
+        except ValueError as err:
+            raise ValueError("min_duration_h must be a whole integer >= 1") from err
+    else:
+        raise ValueError("min_duration_h must be a whole integer >= 1")
+    if out < 1:
+        raise ValueError("min_duration_h must be >= 1")
+    return out
+
+
+def apply_profile_overrides(
+    base: WeatherWindowProfile,
+    overrides: Mapping[str, Any],
+    profile_id: str | None = None,
+) -> WeatherWindowProfile:
+    """Create a profile by applying partial overrides onto ``base`` while keeping omitted limits."""
+    changes: dict[str, Any] = {"enabled": True}
+    if profile_id is not None:
+        changes["profile_id"] = profile_id
+    if "name" in overrides and overrides["name"] is not None:
+        changes["name"] = str(overrides["name"])
+    if "min_duration_h" in overrides and overrides["min_duration_h"] is not None:
+        changes["min_duration_h"] = _coerce_positive_int(overrides["min_duration_h"])
+    for field_name in _NUMERIC_LIMIT_FIELDS:
+        if field_name not in overrides:
+            continue
+        raw_val = overrides[field_name]
+        if raw_val is None:
+            changes[field_name] = None
+            continue
+        if isinstance(raw_val, bool):
+            raise ValueError(f"{field_name} must be a finite number")
+        try:
+            num = float(raw_val)
+        except (TypeError, ValueError) as err:
+            raise ValueError(f"{field_name} must be a finite number") from err
+        if not math.isfinite(num):
+            raise ValueError(f"{field_name} must be finite")
+        changes[field_name] = num
+    if "require_daylight" in overrides and overrides["require_daylight"] is not None:
+        changes["require_daylight"] = bool(overrides["require_daylight"])
+    return replace(base, **changes)
+
+
 def _as_finite_float(val: Any) -> float | None:
     """Convert non-bool numeric inputs to finite float, else None."""
     if val is None or isinstance(val, bool):
@@ -184,7 +255,7 @@ class IdentifiedWindow:
 
     start_iso: str
     end_iso: str
-    duration_h: int
+    duration_h: int | float
     is_truncated: bool = False
 
 
@@ -197,7 +268,7 @@ class WeatherDecisionResult:
     evaluated_at: str
     next_start: str | None = None
     next_end: str | None = None
-    duration_h: int | None = None
+    duration_h: int | float | None = None
     horizon_hours: int = 0
     is_truncated: bool = False
     reason_codes: list[str] = field(default_factory=list)
@@ -235,14 +306,25 @@ class WeatherWindowsEngine:
         now: datetime | None = None,
     ) -> WeatherDecisionResult:
         """Evaluate a profile against forecast and live station conditions."""
-        if profile.min_duration_h < 1:
-            raise ValueError("min_duration_h must be >= 1")
+        if (
+            isinstance(profile.min_duration_h, bool)
+            or not isinstance(profile.min_duration_h, int)
+            or profile.min_duration_h < 1
+        ):
+            raise ValueError("min_duration_h must be an integer >= 1")
+        for field_name in _NUMERIC_LIMIT_FIELDS:
+            threshold = getattr(profile, field_name)
+            if threshold is not None and (isinstance(threshold, bool) or not math.isfinite(float(threshold))):
+                raise ValueError(f"{field_name} must be finite")
 
         eval_now = now or dt_util.now()
-        display_tz = eval_now.tzinfo or dt_util.get_default_time_zone()
+        local_tz = dt_util.get_default_time_zone()
+        if eval_now.tzinfo is not None and eval_now.tzinfo is not UTC:
+            local_tz = eval_now.tzinfo
         now_utc = (
-            eval_now.replace(tzinfo=display_tz).astimezone(UTC) if eval_now.tzinfo is None else eval_now.astimezone(UTC)
+            eval_now.replace(tzinfo=local_tz).astimezone(UTC) if eval_now.tzinfo is None else eval_now.astimezone(UTC)
         )
+        display_tz = local_tz
         evaluated_at_iso = now_utc.isoformat()
         current = current_data or {}
 
@@ -272,14 +354,16 @@ class WeatherWindowsEngine:
                 data_quality={"available_slots": len(hourly_forecast) if hourly_forecast else 0},
             )
 
-        # 1. Parse timestamps in UTC, skip finished intervals, deduplicate, and sort ascending
+        # 1. Parse timestamps in UTC, enforce active 24h horizon, deduplicate, and sort ascending
         deduped: dict[datetime, dict[str, Any]] = {}
         for item in hourly_forecast:
             slot_utc = self._parse_slot_utc(item, display_tz)
             if slot_utc is None:
                 continue
-            # Keep current in-progress hour and future hours; discard intervals ended at/before now
+            # Keep current in-progress hour and future hours within the 24-hour evaluation window
             if (slot_utc + timedelta(hours=1) - now_utc).total_seconds() <= 0.0:
+                continue
+            if (slot_utc - now_utc).total_seconds() >= MAX_HORIZON_HOURS * 3600.0:
                 continue
             deduped.setdefault(slot_utc, item)
 
@@ -289,13 +373,13 @@ class WeatherWindowsEngine:
                 status=STATUS_UNKNOWN,
                 evaluated_at=evaluated_at_iso,
                 reason_codes=[REASON_INSUFFICIENT_HORIZON],
-                reasons_text=["All forecast hours are in the past."],
+                reasons_text=["No forecast hours within the 24-hour evaluation window."],
                 evaluated_limits=limits_dict,
                 data_quality={"available_slots": 0},
             )
 
         evaluated_pairs: list[tuple[datetime, WindowSlotEvaluation]] = []
-        for slot_utc in sorted(deduped):
+        for slot_utc in sorted(deduped)[:MAX_HORIZON_HOURS]:
             item = deduped[slot_utc]
             display_iso = slot_utc.astimezone(display_tz).isoformat()
             slot_eval = self._evaluate_slot(item, slot_utc, display_iso, profile)
@@ -348,7 +432,7 @@ class WeatherWindowsEngine:
         status = STATUS_UNSUITABLE
         next_start: str | None = None
         next_end: str | None = None
-        duration_h: int | None = None
+        duration_h: int | float | None = None
         is_truncated = False
         reasons: list[str] = []
         reasons_text: list[str] = []
@@ -537,12 +621,15 @@ class WeatherWindowsEngine:
                 return
             start_utc = streak[0][0]
             end_utc = streak[-1][0] + timedelta(hours=1)
-            duration_h = round((end_utc - start_utc).total_seconds() / 3600.0)
-            if duration_h < min_duration_h:
-                return
             if start_utc <= now_utc < end_utc:
                 remaining_s = (end_utc - now_utc).total_seconds()
                 if remaining_s < min_duration_h * 3600.0 - 1e-3:
+                    return
+                raw_h = round(remaining_s / 3600.0, 2)
+                duration_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
+            else:
+                duration_h = round((end_utc - start_utc).total_seconds() / 3600.0)
+                if duration_h < min_duration_h:
                     return
             is_truncated = streak[-1][0] == last_slot_utc
             windows.append(

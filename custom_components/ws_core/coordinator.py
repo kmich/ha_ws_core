@@ -5299,9 +5299,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         engine = self._get_weather_windows_engine()
         eval_dict = {}
+        local_now = dt_util.as_local(now)
         for pid, prof in engine.profiles.items():
             if prof.enabled:
-                res = engine.evaluate_profile(prof, hourly, current_data=data, now=now)
+                res = engine.evaluate_profile(prof, hourly, current_data=data, now=local_now)
                 eval_dict[pid] = res.to_dict()
 
         self._weather_windows_eval = eval_dict
@@ -5311,7 +5312,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, profile_id: str | None = None, custom_limits: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Return structured weather windows response for actions (SupportsResponse.ONLY)."""
-        from .weather_windows import WeatherWindowProfile
+        from .weather_windows import DEFAULT_PROFILES, apply_profile_overrides
 
         engine = self._get_weather_windows_engine()
         data = self.data or {}
@@ -5319,41 +5320,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hourly = fc.get("hourly") or []
         now = dt_util.now()
 
-        # If custom limits provided, create an ad-hoc profile
+        # If custom limits provided, apply partial overrides onto the selected base profile
         if custom_limits:
-            target_profile = WeatherWindowProfile(
-                profile_id=profile_id or PROFILE_CUSTOM,
-                name=str(custom_limits.get("name", "Custom")),
-                description="Custom request",
-                enabled=True,
-                min_duration_h=int(custom_limits.get("min_duration_h", 2)),
-                max_rain_prob_pct=float(custom_limits["max_rain_prob_pct"])
-                if custom_limits.get("max_rain_prob_pct") is not None
-                else None,
-                max_rain_mm=float(custom_limits["max_rain_mm"])
-                if custom_limits.get("max_rain_mm") is not None
-                else None,
-                min_temp_c=float(custom_limits["min_temp_c"]) if custom_limits.get("min_temp_c") is not None else None,
-                max_temp_c=float(custom_limits["max_temp_c"]) if custom_limits.get("max_temp_c") is not None else None,
-                min_humidity_pct=float(custom_limits["min_humidity_pct"])
-                if custom_limits.get("min_humidity_pct") is not None
-                else None,
-                max_humidity_pct=float(custom_limits["max_humidity_pct"])
-                if custom_limits.get("max_humidity_pct") is not None
-                else None,
-                min_wind_kmh=float(custom_limits["min_wind_kmh"])
-                if custom_limits.get("min_wind_kmh") is not None
-                else None,
-                max_wind_kmh=float(custom_limits["max_wind_kmh"])
-                if custom_limits.get("max_wind_kmh") is not None
-                else None,
-                max_wind_gust_kmh=float(custom_limits["max_wind_gust_kmh"])
-                if custom_limits.get("max_wind_gust_kmh") is not None
-                else None,
-                max_cloud_cover_pct=float(custom_limits["max_cloud_cover_pct"])
-                if custom_limits.get("max_cloud_cover_pct") is not None
-                else None,
-                require_daylight=bool(custom_limits.get("require_daylight", True)),
+            base_profile = (
+                (engine.profiles.get(profile_id) if profile_id else None)
+                or engine.profiles.get(PROFILE_CUSTOM)
+                or DEFAULT_PROFILES[PROFILE_CUSTOM]
+            )
+            target_profile = apply_profile_overrides(
+                base_profile,
+                custom_limits,
+                profile_id=profile_id or base_profile.profile_id,
             )
             res = engine.evaluate_profile(target_profile, hourly, current_data=data, now=now)
             return res.to_dict()

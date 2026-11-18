@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import pathlib
 import shutil
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -65,11 +65,12 @@ class TestV3Services:
         coord = _make_coordinator()
         coord.forecast_lat = 38.0
         coord.forecast_lon = 23.7
+        base_dt = datetime(2026, 6, 21, 11, 0, tzinfo=UTC)
         coord.data = {
             KEY_FORECAST: {
                 "hourly": [
                     {
-                        "datetime": "2026-06-21T12:00:00+00:00",
+                        "datetime": (base_dt + timedelta(hours=h)).isoformat(),
                         "temp_c": 22.0,
                         "apparent_temp_c": 22.0,
                         "precip_prob": 0,
@@ -78,31 +79,37 @@ class TestV3Services:
                         "gust_kmh": 15.0,
                         "humidity": 45.0,
                         "cloud_cover": 10.0,
-                    },
-                    {
-                        "datetime": "2026-06-21T13:00:00+00:00",
-                        "temp_c": 23.0,
-                        "apparent_temp_c": 23.0,
-                        "precip_prob": 0,
-                        "precip_mm": 0.0,
-                        "wind_kmh": 12.0,
-                        "gust_kmh": 16.0,
-                        "humidity": 42.0,
-                        "cloud_cover": 10.0,
-                    },
+                    }
+                    for h in range(4)
                 ]
             }
         }
 
-        eval_result = coord.get_weather_windows_evaluation(profile_id=PROFILE_OUTDOOR_DRYING)
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=base_dt):
+            eval_result = coord.get_weather_windows_evaluation(profile_id=PROFILE_OUTDOOR_DRYING)
         assert eval_result["profile_id"] == PROFILE_OUTDOOR_DRYING
-        assert "status" in eval_result
+        assert eval_result["status"] == "suitable_now"
         assert "evaluated_limits" in eval_result
-        assert "slots" in eval_result
+        assert len(eval_result["slots"]) == 4
 
         # Must be strictly JSON-serializable
         serialized = json.dumps(eval_result)
         assert len(serialized) > 50
+
+        # Partial limits override preserves all non-overridden limits on outdoor_drying
+        for slot in coord.data[KEY_FORECAST]["hourly"]:
+            slot["precip_prob"] = 80
+            slot["precip_mm"] = 2.0
+
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=base_dt):
+            partial = coord.get_weather_windows_evaluation(
+                profile_id=PROFILE_OUTDOOR_DRYING,
+                custom_limits={"min_duration_h": 3},
+            )
+        assert partial["evaluated_limits"]["min_duration_h"] == 3
+        assert partial["evaluated_limits"]["max_rain_prob_pct"] == 20.0
+        assert partial["evaluated_limits"]["max_rain_mm"] == 0.0
+        assert partial["status"] == "unsuitable"
 
     def test_custom_limits_in_get_weather_windows(self):
         coord = _make_coordinator()
@@ -188,13 +195,24 @@ class TestV3Services:
         assert "streaks" in compact["station"]
         assert "forecast_outcomes" in full["station"]
 
-        # 3. Registered get_weather_windows rejects zero and negative min_duration_h
-        for bad_duration in (0, -2):
+        # 3. Registered get_weather_windows rejects zero, negative, fractional, and bool min_duration_h
+        for bad_duration in (0, -2, 1.5, "1.5", True):
             with pytest.raises(vol.Invalid):
                 await hass.services.async_call(
                     DOMAIN,
                     SERVICE_GET_WEATHER_WINDOWS,
                     {"limits": {"min_duration_h": bad_duration}},
+                    blocking=True,
+                    return_response=True,
+                )
+
+        # 4. Registered get_weather_windows rejects non-finite limit values
+        for bad_limit in (float("nan"), float("inf"), float("-inf"), "nan", "inf"):
+            with pytest.raises(vol.Invalid):
+                await hass.services.async_call(
+                    DOMAIN,
+                    SERVICE_GET_WEATHER_WINDOWS,
+                    {"limits": {"max_rain_prob_pct": bad_limit}},
                     blocking=True,
                     return_response=True,
                 )
