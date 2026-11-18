@@ -1104,9 +1104,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._pattern: PatternRuntime | None = PatternRuntime(self) if self.pattern_enabled else None
 
         # v3.0 Update coalescing and Weather Windows Decision Engine
+        from .weather_windows import resolve_profiles
+
         self._debounce_handle: Any = None
         self._burst_debounce_delay_s: float = COALESCE_BURST_DELAY_S
         self.weather_windows_enabled = bool(_get(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS))
+        self.weather_window_profiles = resolve_profiles(self.entry_options)
         self._weather_windows_engine: Any = None
         self._weather_windows_eval: dict[str, Any] = {}
 
@@ -1491,6 +1494,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _spawn(self, coro: Any, name: str) -> None:
         """Start a background task that is cancelled when the entry unloads."""
         task = self.hass.async_create_background_task(coro, name)
+        if not isinstance(task, asyncio.Future) and hasattr(coro, "close"):
+            coro.close()
         self._unsubs.append(task.cancel)
 
     def _create_bg_task(self, coro: Any) -> asyncio.Task[Any] | None:
@@ -1504,6 +1509,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             tasks = set()
             self._bg_tasks = tasks
         task = self.hass.async_create_task(coro)
+        if not isinstance(task, asyncio.Future) and hasattr(coro, "close"):
+            coro.close()
         if hasattr(task, "add_done_callback"):
             tasks.add(task)
             task.add_done_callback(tasks.discard)
@@ -1598,11 +1605,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Prompt hazard handling: lightning events bypass debounce
         eid = getattr(event, "data", {}).get("entity_id") if hasattr(event, "data") else None
         is_hazard = bool(
-            eid
-            and (
-                eid == self.sources.get(SRC_LIGHTNING_COUNT)
-                or eid == self.sources.get(SRC_LIGHTNING_DISTANCE)
-            )
+            eid and (eid == self.sources.get(SRC_LIGHTNING_COUNT) or eid == self.sources.get(SRC_LIGHTNING_DISTANCE))
         )
         if is_hazard:
             self._cancel_debounce()
@@ -5260,6 +5263,30 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return data
 
+    def _get_weather_windows_engine(self):
+        """Return or initialize the WeatherWindowsEngine using resolved station profiles."""
+        from .weather_windows import WeatherWindowsEngine, resolve_profiles
+
+        profiles = getattr(self, "weather_window_profiles", None)
+        if profiles is None:
+            profiles = resolve_profiles(getattr(self, "entry_options", None))
+        lat = float(self.forecast_lat or 0.0)
+        lon = float(self.forecast_lon or 0.0)
+        elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
+        if self._weather_windows_engine is None:
+            self._weather_windows_engine = WeatherWindowsEngine(
+                lat=lat,
+                lon=lon,
+                elevation_m=elev,
+                profiles=profiles,
+            )
+        else:
+            self._weather_windows_engine.lat = lat
+            self._weather_windows_engine.lon = lon
+            self._weather_windows_engine.elevation_m = elev
+            self._weather_windows_engine.profiles = dict(profiles)
+        return self._weather_windows_engine
+
     def _compute_weather_windows(self, data: dict, now: Any) -> None:
         """Evaluate enabled activity profiles for the next 24 hours (v3.0)."""
         if not getattr(self, "weather_windows_enabled", DEFAULT_ENABLE_WEATHER_WINDOWS):
@@ -5267,27 +5294,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         fc = data.get(KEY_FORECAST) or {}
         hourly = fc.get("hourly") or []
-        lat = self.forecast_lat
-        lon = self.forecast_lon
-        if lat is None or lon is None:
+        if self.forecast_lat is None or self.forecast_lon is None:
             return
 
-        if self._weather_windows_engine is None:
-            from .weather_windows import DEFAULT_PROFILES, WeatherWindowsEngine
-
-            self._weather_windows_engine = WeatherWindowsEngine(
-                lat=float(lat),
-                lon=float(lon),
-                elevation_m=float(getattr(self, "elevation_m", 0.0) or 0.0),
-                profiles=DEFAULT_PROFILES,
-            )
-
+        engine = self._get_weather_windows_engine()
         eval_dict = {}
-        for pid, prof in self._weather_windows_engine.profiles.items():
+        for pid, prof in engine.profiles.items():
             if prof.enabled:
-                res = self._weather_windows_engine.evaluate_profile(
-                    prof, hourly, current_data=data, now=now
-                )
+                res = engine.evaluate_profile(prof, hourly, current_data=data, now=now)
                 eval_dict[pid] = res.to_dict()
 
         self._weather_windows_eval = eval_dict
@@ -5297,16 +5311,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, profile_id: str | None = None, custom_limits: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Return structured weather windows response for actions (SupportsResponse.ONLY)."""
-        lat = self.forecast_lat or 0.0
-        lon = self.forecast_lon or 0.0
-        elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
-        from .weather_windows import DEFAULT_PROFILES, WeatherWindowProfile, WeatherWindowsEngine
+        from .weather_windows import WeatherWindowProfile
 
-        if self._weather_windows_engine is None:
-            self._weather_windows_engine = WeatherWindowsEngine(
-                lat=float(lat), lon=float(lon), elevation_m=elev, profiles=DEFAULT_PROFILES
-            )
-
+        engine = self._get_weather_windows_engine()
         data = self.data or {}
         fc = data.get(KEY_FORECAST) or {}
         hourly = fc.get("hourly") or []
@@ -5320,36 +5327,52 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 description="Custom request",
                 enabled=True,
                 min_duration_h=int(custom_limits.get("min_duration_h", 2)),
-                max_rain_prob_pct=float(custom_limits["max_rain_prob_pct"]) if custom_limits.get("max_rain_prob_pct") is not None else None,
-                max_rain_mm=float(custom_limits["max_rain_mm"]) if custom_limits.get("max_rain_mm") is not None else None,
+                max_rain_prob_pct=float(custom_limits["max_rain_prob_pct"])
+                if custom_limits.get("max_rain_prob_pct") is not None
+                else None,
+                max_rain_mm=float(custom_limits["max_rain_mm"])
+                if custom_limits.get("max_rain_mm") is not None
+                else None,
                 min_temp_c=float(custom_limits["min_temp_c"]) if custom_limits.get("min_temp_c") is not None else None,
                 max_temp_c=float(custom_limits["max_temp_c"]) if custom_limits.get("max_temp_c") is not None else None,
-                min_humidity_pct=float(custom_limits["min_humidity_pct"]) if custom_limits.get("min_humidity_pct") is not None else None,
-                max_humidity_pct=float(custom_limits["max_humidity_pct"]) if custom_limits.get("max_humidity_pct") is not None else None,
-                min_wind_kmh=float(custom_limits["min_wind_kmh"]) if custom_limits.get("min_wind_kmh") is not None else None,
-                max_wind_kmh=float(custom_limits["max_wind_kmh"]) if custom_limits.get("max_wind_kmh") is not None else None,
-                max_wind_gust_kmh=float(custom_limits["max_wind_gust_kmh"]) if custom_limits.get("max_wind_gust_kmh") is not None else None,
-                max_cloud_cover_pct=float(custom_limits["max_cloud_cover_pct"]) if custom_limits.get("max_cloud_cover_pct") is not None else None,
+                min_humidity_pct=float(custom_limits["min_humidity_pct"])
+                if custom_limits.get("min_humidity_pct") is not None
+                else None,
+                max_humidity_pct=float(custom_limits["max_humidity_pct"])
+                if custom_limits.get("max_humidity_pct") is not None
+                else None,
+                min_wind_kmh=float(custom_limits["min_wind_kmh"])
+                if custom_limits.get("min_wind_kmh") is not None
+                else None,
+                max_wind_kmh=float(custom_limits["max_wind_kmh"])
+                if custom_limits.get("max_wind_kmh") is not None
+                else None,
+                max_wind_gust_kmh=float(custom_limits["max_wind_gust_kmh"])
+                if custom_limits.get("max_wind_gust_kmh") is not None
+                else None,
+                max_cloud_cover_pct=float(custom_limits["max_cloud_cover_pct"])
+                if custom_limits.get("max_cloud_cover_pct") is not None
+                else None,
                 require_daylight=bool(custom_limits.get("require_daylight", True)),
             )
-            res = self._weather_windows_engine.evaluate_profile(target_profile, hourly, current_data=data, now=now)
+            res = engine.evaluate_profile(target_profile, hourly, current_data=data, now=now)
             return res.to_dict()
 
         if profile_id:
-            prof = self._weather_windows_engine.profiles.get(profile_id)
+            prof = engine.profiles.get(profile_id)
             if prof is None:
                 return {
                     "error": f"Unknown profile '{profile_id}'",
-                    "available_profiles": list(self._weather_windows_engine.profiles.keys()),
+                    "available_profiles": list(engine.profiles.keys()),
                 }
-            res = self._weather_windows_engine.evaluate_profile(prof, hourly, current_data=data, now=now)
+            res = engine.evaluate_profile(prof, hourly, current_data=data, now=now)
             return res.to_dict()
 
         # Return all enabled profiles
         results = {}
-        for pid, prof in self._weather_windows_engine.profiles.items():
+        for pid, prof in engine.profiles.items():
             if prof.enabled:
-                res = self._weather_windows_engine.evaluate_profile(prof, hourly, current_data=data, now=now)
+                res = engine.evaluate_profile(prof, hourly, current_data=data, now=now)
                 results[pid] = res.to_dict()
         return results
 
@@ -5368,8 +5391,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "reasons": win.get("reasons_text", [])[:1],
             }
 
+        fc_enabled = bool(getattr(self, "forecast_enabled", True))
+        provider_id = self.forecast_provider if fc_enabled else None
         fc_expired = False
-        if getattr(self, "forecast_provider_id", None):
+        if provider_id:
             rt = getattr(self, "runtime", None)
             last_fetch = getattr(rt, "last_forecast_fetch", None) if rt is not None else None
             if last_fetch is None:
@@ -5411,7 +5436,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             },
             "active_alerts": active_alerts,
             "forecast_validity": {
-                "provider": self.forecast_provider_id,
+                "provider": provider_id,
                 "is_expired": fc_expired,
                 "hourly_horizon_h": len((data.get(KEY_FORECAST) or {}).get("hourly") or []),
             },

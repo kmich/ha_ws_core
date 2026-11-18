@@ -227,7 +227,9 @@ class TestOptionsMenuNavigation:
 
     async def test_options_init_displays_main_menu(self):
         flow = _options_flow(stored={}, opt={})
-        flow.async_show_menu = MagicMock(side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]})
+        flow.async_show_menu = MagicMock(
+            side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]}
+        )
         res = await flow.async_step_init(None)
         assert res["menu"] == "init"
         assert res["options"] == [
@@ -267,10 +269,12 @@ class TestOptionsMenuNavigation:
         res = await flow.async_step_decision_profiles(None)
         assert res["step_id"] == "decision_profiles"
 
-        save_res = await flow.async_step_decision_profiles({
-            CONF_ENABLE_WEATHER_WINDOWS: True,
-            CONF_WEATHER_WINDOW_PROFILES: [PROFILE_OUTDOOR_DRYING],
-        })
+        save_res = await flow.async_step_decision_profiles(
+            {
+                CONF_ENABLE_WEATHER_WINDOWS: True,
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_OUTDOOR_DRYING],
+            }
+        )
         assert save_res["type"] == "create_entry"
         assert save_res["data"][CONF_ENABLE_WEATHER_WINDOWS] is True
         assert save_res["data"][CONF_WEATHER_WINDOW_PROFILES] == [PROFILE_OUTDOOR_DRYING]
@@ -288,7 +292,9 @@ class TestOptionsMenuNavigation:
 
     async def test_options_rooms_menu_routes_and_done_creates_entry(self):
         flow = _options_flow(stored={CONF_INDOOR_ROOMS: []}, opt={})
-        flow.async_show_menu = MagicMock(side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]})
+        flow.async_show_menu = MagicMock(
+            side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]}
+        )
         menu = await flow.async_step_rooms(None)
         assert menu["menu"] == "indoor_rooms_opt"
         assert flow._in_menu_rooms is True
@@ -313,4 +319,3 @@ class TestOptionsMenuNavigation:
 
             save_res = await flow.async_step_optional_sources_opt({})
             assert save_res["type"] == "create_entry"
-

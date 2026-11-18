@@ -7,7 +7,7 @@ from typing import Any
 
 import aiohttp
 
-from .base import ForecastProvider, local_date_str, local_datetime_str
+from .base import ForecastProvider, local_date_str, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,6 +92,7 @@ class PirateWeatherProvider(ForecastProvider):
             hourly_out.append(
                 {
                     "datetime": dt_str,
+                    "utc_datetime": utc_datetime_str(dt),
                     "temp_c": hour.get("temperature"),
                     "apparent_temp_c": hour.get("apparentTemperature"),
                     "dewpoint_c": hour.get("dewPoint"),

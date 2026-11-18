@@ -2037,10 +2037,6 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         self._in_menu_diagnostics = True
         return await self.async_step_features_opt(user_input)
 
-
-
-
-
     def _current_sources_for_options(self) -> dict[str, str]:
         current: dict[str, str] = {}
         try:
@@ -2052,7 +2048,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     current = dict(entry.data.get(CONF_SOURCES, {}))
         except (ValueError, AttributeError):
             pass
-        if not current and hasattr(self, '_opt') and self._opt:
+        if not current and hasattr(self, "_opt") and self._opt:
             current = dict(self._opt.get(CONF_SOURCES, {}))
 
         guessed = _guess_defaults(self.hass)

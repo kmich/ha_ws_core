@@ -50,6 +50,12 @@ SERVICE_GET_STATION_SUMMARY = "get_station_summary"
 ATTR_ENTRY_ID = "entry_id"
 
 SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY_ID): cv.string,
+        vol.Optional("full", default=False): cv.boolean,
+    }
+)
 SERVICE_GET_STATION_SUMMARY_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 SERVICE_GET_WEATHER_WINDOWS_SCHEMA = vol.Schema(
     {
@@ -58,7 +64,7 @@ SERVICE_GET_WEATHER_WINDOWS_SCHEMA = vol.Schema(
         vol.Optional("limits"): vol.Schema(
             {
                 vol.Optional("name"): cv.string,
-                vol.Optional("min_duration_h"): vol.Coerce(int),
+                vol.Optional("min_duration_h"): vol.All(vol.Coerce(int), vol.Range(min=1)),
                 vol.Optional("max_rain_prob_pct"): vol.Coerce(float),
                 vol.Optional("max_rain_mm"): vol.Coerce(float),
                 vol.Optional("min_temp_c"): vol.Coerce(float),
@@ -282,7 +288,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             vol.Optional("target", default="all"): vol.In(["all", "solar", "forecast", "streaks", "pattern_forecast"]),
         }
     )
-    SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
 
     def _get_targets(call: ServiceCall) -> list:
         return _loaded_coordinators(hass, call.data.get(ATTR_ENTRY_ID))

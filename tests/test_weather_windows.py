@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
+from homeassistant.util import dt as dt_util
 
 from custom_components.ws_core.const import (
+    CONF_ENABLE_WEATHER_WINDOWS,
+    CONF_FORECAST_LAT,
+    CONF_FORECAST_LON,
+    CONF_WEATHER_WINDOW_PROFILES,
+    KEY_FORECAST,
     KEY_RAIN_RATE_FILT,
     PROFILE_CUSTOM,
+    PROFILE_GARDEN_WORK,
     PROFILE_OUTDOOR_DRYING,
 )
 from custom_components.ws_core.weather_windows import (
@@ -24,10 +33,12 @@ from custom_components.ws_core.weather_windows import (
     REASON_SUITABLE,
     REASON_TOO_COLD,
     STATUS_SUITABLE_NOW,
+    STATUS_UNKNOWN,
     STATUS_UNSUITABLE,
     STATUS_WINDOW_UPCOMING,
     WeatherWindowProfile,
     WeatherWindowsEngine,
+    resolve_profiles,
 )
 
 
@@ -195,7 +206,7 @@ class TestWeatherWindowsEngine:
         profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
         result = engine.evaluate_profile(profile, hourly, current_data={}, now=start_time)
 
-        assert result.status == STATUS_UNSUITABLE
+        assert result.status == STATUS_UNKNOWN
         assert REASON_MISSING_DATA in result.reason_codes
 
     def test_custom_profile_limits(self, engine: WeatherWindowsEngine):
@@ -222,3 +233,197 @@ class TestWeatherWindowsEngine:
         result = engine.evaluate_profile(custom_profile, hourly, current_data={}, now=start_time)
         assert result.status == STATUS_SUITABLE_NOW
         assert result.duration_h == 4
+
+    def test_future_only_forecast_returns_window_upcoming_not_suitable_now(self, engine: WeatherWindowsEngine):
+        now = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+        forecast_start = now + timedelta(hours=2)
+        hourly = _make_hourly_forecast(forecast_start, hours=4)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+
+        result = engine.evaluate_profile(profile, hourly, current_data={}, now=now)
+
+        assert result.status == STATUS_WINDOW_UPCOMING
+        assert result.next_start == forecast_start.isoformat()
+        assert result.duration_h == 4
+
+    def test_active_window_remaining_duration_below_minimum_is_not_suitable_now(self, engine: WeatherWindowsEngine):
+        # 2-hour window [10:00, 12:00), followed by rain at 12:00 and sunny later [13:00, 15:00)
+        slot_start = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(slot_start, hours=5)
+        hourly[2]["precip_prob"] = 90  # 12:00 unsuitable
+
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        # Evaluated at 10:45 -> only 1.25h remaining before 12:00 rain (< min_duration_h=2h)
+        now = datetime(2026, 6, 21, 10, 45, tzinfo=UTC)
+        result = engine.evaluate_profile(profile, hourly, current_data={}, now=now)
+
+        assert result.status == STATUS_WINDOW_UPCOMING
+        assert result.next_start == (slot_start + timedelta(hours=3)).isoformat()
+        assert result.duration_h == 2
+
+    def test_missing_and_duplicate_forecast_hours_split_windows(self, engine: WeatherWindowsEngine):
+        # Unsorted, duplicate 12:00, missing 13:00 and 14:00, contiguous [15:00, 17:00)
+        t12 = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        t15 = datetime(2026, 6, 21, 15, 0, tzinfo=UTC)
+        hourly = [
+            _make_hourly_forecast(t15, hours=2)[1],  # 16:00 out of order
+            _make_hourly_forecast(t12, hours=1)[0],  # 12:00
+            _make_hourly_forecast(t12, hours=1)[0],  # duplicate 12:00
+            _make_hourly_forecast(t15, hours=2)[0],  # 15:00
+        ]
+        # Make 12:00 unsuitable? Wait: even if 12:00 AND 15:00 are dry, a gap MUST NOT bridge!
+        # Also test two 1h dry slots separated by missing hours (12:00 and 15:00 only):
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        gap_only = [_make_hourly_forecast(t12, hours=1)[0], _make_hourly_forecast(t15, hours=1)[0]]
+        gap_res = engine.evaluate_profile(profile, gap_only, current_data={}, now=t12)
+        assert gap_res.status == STATUS_UNSUITABLE
+        assert gap_res.windows == []
+
+        # Out-of-order + duplicate + gap between 12:00 and [15:00, 17:00)
+        res = engine.evaluate_profile(profile, hourly, current_data={}, now=t12)
+        assert len(res.slots) == 3  # deduplicated to [12:00, 15:00, 16:00]
+        assert res.status == STATUS_WINDOW_UPCOMING
+        assert res.next_start == t15.isoformat()
+        assert res.next_end == (t15 + timedelta(hours=2)).isoformat()
+        assert res.duration_h == 2
+
+    @pytest.mark.parametrize(
+        ("field", "expected_limit"),
+        [
+            ("gust_kmh", "max_wind_gust_kmh"),
+            ("humidity", "max_humidity_pct"),
+            ("wind_kmh", "min_wind_kmh"),
+            ("temp_c", "min_temp_c"),
+            ("precip_prob", "max_rain_prob_pct"),
+            ("precip_mm", "max_rain_mm"),
+            ("cloud_cover", "max_cloud_cover_pct"),
+        ],
+    )
+    def test_every_enabled_limit_reports_missing_input_as_unassessed(
+        self, engine: WeatherWindowsEngine, field: str, expected_limit: str
+    ):
+        start_time = datetime(2026, 6, 21, 11, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(start_time, hours=4)
+        for slot in hourly:
+            slot[field] = None
+
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        result = engine.evaluate_profile(profile, hourly, current_data={}, now=start_time)
+
+        assert result.status == STATUS_UNKNOWN
+        assert REASON_MISSING_DATA in result.reason_codes
+        assert all(slot["suitable"] is False for slot in result.slots)
+        assert all(expected_limit in slot["unassessed_limits"] for slot in result.slots)
+        assert result.data_quality["unassessed_slots"] == 4
+
+    def test_repeated_dst_fall_back_hour_preserved(self):
+        berlin = ZoneInfo("Europe/Berlin")
+        old_tz = dt_util.get_default_time_zone()
+        dt_util.set_default_time_zone(berlin)
+        try:
+            # 2026-10-25 in Berlin falls back at 03:00 CEST (+02:00) -> 02:00 CET (+01:00).
+            # 00:00Z = 02:00+02:00, 01:00Z = 02:00+01:00.
+            t0_utc = datetime(2026, 10, 25, 0, 0, tzinfo=UTC)
+            t1_utc = datetime(2026, 10, 25, 1, 0, tzinfo=UTC)
+            hourly = [
+                {
+                    "datetime": "2026-10-25T02:00",
+                    "utc_datetime": t0_utc.isoformat(),
+                    "temp_c": 18.0,
+                    "precip_prob": 0,
+                    "precip_mm": 0.0,
+                    "wind_kmh": 12.0,
+                    "gust_kmh": 18.0,
+                    "humidity": 60.0,
+                    "cloud_cover": 10.0,
+                },
+                {
+                    "datetime": "2026-10-25T02:00",
+                    "utc_datetime": t1_utc.isoformat(),
+                    "temp_c": 18.0,
+                    "precip_prob": 0,
+                    "precip_mm": 0.0,
+                    "wind_kmh": 12.0,
+                    "gust_kmh": 18.0,
+                    "humidity": 60.0,
+                    "cloud_cover": 10.0,
+                },
+            ]
+            engine = WeatherWindowsEngine(lat=52.52, lon=13.40)
+            custom_night_profile = WeatherWindowProfile(
+                profile_id=PROFILE_CUSTOM,
+                name="Night",
+                description="DST test",
+                enabled=True,
+                min_duration_h=2,
+                require_daylight=False,
+            )
+            res = engine.evaluate_profile(custom_night_profile, hourly, now=t0_utc.astimezone(berlin))
+
+            assert res.status == STATUS_SUITABLE_NOW
+            assert len(res.slots) == 2
+            assert res.slots[0]["datetime_iso"] == "2026-10-25T02:00:00+02:00"
+            assert res.slots[1]["datetime_iso"] == "2026-10-25T02:00:00+01:00"
+            assert res.duration_h == 2
+            assert res.next_start == "2026-10-25T02:00:00+02:00"
+            assert res.next_end == "2026-10-25T03:00:00+01:00"
+        finally:
+            dt_util.set_default_time_zone(old_tz)
+
+    async def test_profile_selection_custom_only_and_none_selected(self):
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+        from custom_components.ws_core import sensor as sensor_platform
+        from custom_components.ws_core.const import CONF_PREFIX, DOMAIN
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+
+        # 1. Custom profile only
+        custom_opts = {
+            CONF_PREFIX: "ws",
+            CONF_ENABLE_WEATHER_WINDOWS: True,
+            CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM],
+            CONF_FORECAST_LAT: 38.0,
+            CONF_FORECAST_LON: 23.7,
+        }
+        resolved_custom = resolve_profiles(custom_opts)
+        assert resolved_custom[PROFILE_CUSTOM].enabled is True
+        assert resolved_custom[PROFILE_OUTDOOR_DRYING].enabled is False
+        assert resolved_custom[PROFILE_GARDEN_WORK].enabled is False
+
+        hass = MagicMock()
+        entry_custom = MockConfigEntry(domain=DOMAIN, entry_id="c1", data=custom_opts, options={})
+        coord_custom = WSStationCoordinator(hass, entry_custom)
+        entry_custom.runtime_data = coord_custom
+        now_hr = dt_util.now().replace(minute=0, second=0, microsecond=0)
+        coord_custom.data = {KEY_FORECAST: {"hourly": _make_hourly_forecast(now_hr, 4)}}
+
+        created_custom = []
+        await sensor_platform.async_setup_entry(hass, entry_custom, lambda ents: created_custom.extend(ents))
+        win_keys_custom = [
+            e._desc.key for e in created_custom if getattr(e, "_desc", None) and e._desc.key.startswith("window_")
+        ]
+        assert win_keys_custom == [
+            "window_custom_status",
+            "window_custom_next_start",
+            "window_custom_next_end",
+        ]
+        eval_custom = coord_custom.get_weather_windows_evaluation()
+        assert list(eval_custom.keys()) == [PROFILE_CUSTOM]
+
+        # 2. No profiles selected
+        none_opts = {
+            **custom_opts,
+            CONF_WEATHER_WINDOW_PROFILES: [],
+        }
+        entry_none = MockConfigEntry(domain=DOMAIN, entry_id="c2", data=none_opts, options={})
+        coord_none = WSStationCoordinator(hass, entry_none)
+        entry_none.runtime_data = coord_none
+        coord_none.data = coord_custom.data
+
+        created_none = []
+        await sensor_platform.async_setup_entry(hass, entry_none, lambda ents: created_none.extend(ents))
+        win_keys_none = [
+            e._desc.key for e in created_none if getattr(e, "_desc", None) and e._desc.key.startswith("window_")
+        ]
+        assert win_keys_none == []
+        assert coord_none.get_weather_windows_evaluation() == {}

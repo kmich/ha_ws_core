@@ -436,14 +436,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if opts.get(CONF_ENABLE_WEATHER_WINDOWS, False):
         from homeassistant.util import dt as dt_util
 
-        from .weather_windows import DEFAULT_PROFILES
+        from .weather_windows import resolve_profiles
 
         def _parse_ts(val: Any):
             if not val:
                 return None
             return dt_util.parse_datetime(str(val))
 
-        for pid, prof in DEFAULT_PROFILES.items():
+        profiles = getattr(coordinator, "weather_window_profiles", None)
+        if profiles is None:
+            profiles = resolve_profiles(opts)
+
+        for pid, prof in profiles.items():
             if not prof.enabled:
                 continue
 
@@ -481,7 +485,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         translation_key=f"window_{pid}_next_start",
                         icon="mdi:play-circle-outline",
                         device_class=SensorDeviceClass.TIMESTAMP,
-                        value_fn=lambda d, _pid=pid: _parse_ts((d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_start")),
+                        value_fn=lambda d, _pid=pid: _parse_ts(
+                            (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_start")
+                        ),
                     ),
                     prefix,
                 )
@@ -498,7 +504,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         translation_key=f"window_{pid}_next_end",
                         icon="mdi:stop-circle-outline",
                         device_class=SensorDeviceClass.TIMESTAMP,
-                        value_fn=lambda d, _pid=pid: _parse_ts((d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_end")),
+                        value_fn=lambda d, _pid=pid: _parse_ts(
+                            (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_end")
+                        ),
                     ),
                     prefix,
                 )

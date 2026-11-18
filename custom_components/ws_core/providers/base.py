@@ -33,6 +33,16 @@ def local_date_str(value: datetime | str | int | float | None) -> str | None:
     return dt_util.as_local(dt).strftime("%Y-%m-%d")
 
 
+def utc_datetime_str(value: datetime | str | int | float | None) -> str | None:
+    """ISO UTC timestamp preserving exact instant across DST transitions."""
+    if value is None or value == "":
+        return None
+    dt = _to_datetime(value)
+    if dt is None or dt.tzinfo is None:
+        return None
+    return dt.astimezone(UTC).isoformat()
+
+
 def _to_datetime(value: datetime | str | int | float | None) -> datetime | None:
     if value is None or value == "":
         return None

@@ -9,7 +9,7 @@ from typing import Any
 import aiohttp
 
 from ..const import _INTEGRATION_VERSION
-from .base import ForecastProvider, local_datetime_str
+from .base import ForecastProvider, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -187,6 +187,7 @@ class NwsNoaaProvider(ForecastProvider):
             hourly_out.append(
                 {
                     "datetime": local_datetime_str(dt),
+                    "utc_datetime": utc_datetime_str(dt),
                     "temp_c": temp_c,
                     "apparent_temp_c": None,
                     "dewpoint_c": None,

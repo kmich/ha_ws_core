@@ -101,7 +101,9 @@ class TestReplayMaskingAndDp3hAlignment:
 
     def test_replay_does_not_train_solar_features_as_zeros(self):
         eng = _make_engine()
-        solar_slots = [POOL_INDEX[f] for f in ("cloud_deficit", "solar_ok", "last_day_clearness", "last_day_clearness_ok")]
+        solar_slots = [
+            POOL_INDEX[f] for f in ("cloud_deficit", "solar_ok", "last_day_clearness", "last_day_clearness_ok")
+        ]
 
         # Record standardizer before replay
         n_before = [eng.std.n[s] for s in solar_slots]

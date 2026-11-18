@@ -13,7 +13,7 @@ from homeassistant.util.unit_conversion import (
     TemperatureConverter,
 )
 
-from .base import ForecastProvider, local_date_str, local_datetime_str
+from .base import ForecastProvider, local_date_str, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -198,6 +198,7 @@ class HaWeatherEntityProvider(ForecastProvider):
             out.append(
                 {
                     "datetime": self._parse_dt(entry.get("datetime")) or "",
+                    "utc_datetime": utc_datetime_str(entry.get("datetime")),
                     "temp_c": self._temp_c(entry, "temperature", "native_temperature"),
                     "apparent_temp_c": self._temp_c(entry, "apparent_temperature", "native_apparent_temperature"),
                     "dewpoint_c": self._temp_c(entry, "dew_point", "native_dew_point"),

@@ -3,7 +3,7 @@ blueprint:
   description: >
     Notifies you ahead of an upcoming suitable weather window (for outdoor laundry
     drying, garden work, or custom activity). Triggers accurately using Home Assistant's
-    native time trigger at the timestamp entity.
+    native time trigger at the timestamp sensor with a configurable lead-time offset.
   domain: automation
   input:
     next_start_sensor:
@@ -13,22 +13,30 @@ blueprint:
         entity:
           domain: sensor
           device_class: timestamp
-    notify_device:
-      name: Device to notify
-      description: Device that receives the alert notification
+    lead_time_offset:
+      name: Lead Time Offset
+      description: How early to trigger before the window start time (e.g. -00:15:00 for 15 minutes before)
+      default: "-00:15:00"
       selector:
-        device:
-          integration: mobile_app
-    lead_time_minutes:
-      name: Lead Time Notification (Minutes Before Start)
-      description: How many minutes before the window start time to send the alert (negative offset)
-      default: 15
+        select:
+          custom_value: true
+          options:
+            - label: At window start (0 min)
+              value: "00:00:00"
+            - label: 5 minutes before
+              value: "-00:05:00"
+            - label: 15 minutes before
+              value: "-00:15:00"
+            - label: 30 minutes before
+              value: "-00:30:00"
+            - label: 1 hour before
+              value: "-01:00:00"
+    notify_service:
+      name: Notification Service
+      description: Home Assistant notify action to invoke (e.g. notify.persistent_notification or notify.mobile_app_phone)
+      default: "notify.persistent_notification"
       selector:
-        number:
-          min: 0
-          max: 120
-          step: 5
-          unit_of_measurement: "min"
+        text:
     custom_message:
       name: Custom Message (Optional)
       description: Optional extra text to include in the notification
@@ -39,12 +47,15 @@ blueprint:
 mode: restart
 max_exceeded: silent
 
+variables:
+  next_start_sensor: !input next_start_sensor
+  custom_message: !input custom_message
+
 trigger:
   - platform: time
-    at: !input next_start_sensor
-    offset: >-
-      {% set mins = (-1 * (lead_time_minutes | int(15))) %}
-      {{ "%+03d:%02d:00" | format((mins // 60), ((-mins) % 60)) if mins < 0 else "00:00:00" }}
+    at:
+      entity_id: !input next_start_sensor
+      offset: !input lead_time_offset
 
 condition:
   - condition: template
@@ -52,11 +63,10 @@ condition:
       {{ states(next_start_sensor) not in ['unknown', 'unavailable', 'none', ''] }}
 
 action:
-  - domain: mobile_app
-    type: notify
-    device_id: !input notify_device
-    title: "Weather Window Starting Soon"
-    message: >-
-      A suitable weather window for {{ state_attr(next_start_sensor, 'friendly_name') | default('your activity') }}
-      is scheduled to begin at {{ as_timestamp(states(next_start_sensor)) | timestamp_custom('%H:%M', true) }}.
-      {% if custom_message %}{{ custom_message }}{% endif %}
+  - service: !input notify_service
+    data:
+      title: "Weather Window Starting Soon"
+      message: >-
+        A suitable weather window for {{ state_attr(next_start_sensor, 'friendly_name') | default('your activity') }}
+        is scheduled to begin at {{ as_timestamp(states(next_start_sensor)) | timestamp_custom('%H:%M', true) }}.
+        {% if custom_message %}{{ custom_message }}{% endif %}

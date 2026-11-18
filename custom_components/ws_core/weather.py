@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.weather import WeatherEntity
@@ -369,44 +369,44 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         local_condition = d.get(KEY_CURRENT_CONDITION)
         local_rain_rate = d.get(KEY_RAIN_RATE_FILT)  # mm/h  → approx mm in 1h
         now_local = dt_util.now().replace(minute=0, second=0, microsecond=0)
+        now_utc = now_local.astimezone(UTC)
         now_hour_iso = now_local.strftime("%Y-%m-%dT%H")
 
         out: list[dict[str, Any]] = []
         for item in hourly:
             dt_s = item.get("datetime")
-            if not dt_s:
+            utc_s = item.get("utc_datetime")
+            if not dt_s and not utc_s:
                 continue
-            dt = _local_iso(str(dt_s))
-            slot_dt = dt_util.parse_datetime(dt)
+            slot_dt = dt_util.parse_datetime(str(utc_s)) if utc_s else None
+            if slot_dt is None and dt_s:
+                dt = _local_iso(str(dt_s))
+                slot_dt = dt_util.parse_datetime(dt)
+                if slot_dt is not None and slot_dt.tzinfo is None:
+                    slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
+            else:
+                dt = _local_iso(str(dt_s or utc_s))
+
+            lead_h: int | None = None
             if slot_dt is not None:
                 if slot_dt.tzinfo is None:
                     slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
-                else:
-                    slot_dt = dt_util.as_local(slot_dt)
-                # Past hours are discarded; timestamp-aware comparison handles DST safely
-                if (slot_dt - now_local).total_seconds() < -1e-3:
+                slot_utc = slot_dt.astimezone(UTC)
+                dt = dt_util.as_local(slot_utc).isoformat()
+                # Past hours are discarded and lead times are compared in UTC so repeated DST hours never collide.
+                lead_f = (slot_utc - now_utc).total_seconds() / 3600.0
+                if lead_f < -1e-3:
                     continue
+                if abs(lead_f - round(lead_f)) < 1e-3:
+                    lead_h = int(round(lead_f))
+                elif lead_f >= 0:
+                    lead_h = int(lead_f)
             elif str(dt_s)[:13] < now_hour_iso:
                 continue
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
-
-            # Determine lead hours from valid timestamp so sparse/future slots
-            # outside the 0-2h window never receive current local observations.
-            lead_h: int | None = None
-            slot_dt = dt_util.parse_datetime(dt)
-            if slot_dt is not None:
-                if slot_dt.tzinfo is None:
-                    slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
-                else:
-                    slot_dt = dt_util.as_local(slot_dt)
-                lead_f = (slot_dt - now_local).total_seconds() / 3600.0
-                if abs(lead_f - round(lead_f)) < 1e-3:
-                    lead_h = int(round(lead_f))
-                elif lead_f >= 0:
-                    lead_h = int(lead_f)
 
             if lead_h is not None and 0 <= lead_h < len(_NOWCAST_LOCAL_WEIGHTS):
                 lw = _NOWCAST_LOCAL_WEIGHTS[lead_h]

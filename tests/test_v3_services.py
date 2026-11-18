@@ -1,10 +1,32 @@
-"""Tests for v3.0.0 Home Assistant services and actions."""
+"""Tests for v3.0.0 Home Assistant services, actions, and notification blueprint."""
 
 from __future__ import annotations
 
 import json
+import pathlib
+import shutil
+from datetime import timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+import voluptuous as vol
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.setup import async_setup_component
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
+
+from custom_components.ws_core import (
+    SERVICE_EXPORT_LEARNING,
+    SERVICE_GET_STATION_SUMMARY,
+    SERVICE_GET_WEATHER_WINDOWS,
+    async_setup_entry,
+)
 from custom_components.ws_core.const import (
+    CONF_FORECAST_LAT,
+    CONF_FORECAST_LON,
+    CONF_FORECAST_PROVIDER,
+    CONF_PREFIX,
+    DOMAIN,
     KEY_FORECAST,
     KEY_NORM_TEMP_C,
     PROFILE_OUTDOOR_DRYING,
@@ -13,20 +35,22 @@ from tests.test_coordinator import _make_coordinator
 
 
 class TestV3Services:
-    """Test get_weather_windows, get_station_summary, and export_learning_state."""
+    """Test get_weather_windows, get_station_summary, export_learning_state, and blueprint."""
 
     def test_get_station_summary_returns_json_serializable_contract(self):
         coord = _make_coordinator()
+        coord.config_entry = None
+        coord.forecast_enabled = True
         coord.data = {
             KEY_NORM_TEMP_C: 22.5,
             "pressure_trend_hpah": 0.5,
             "rain_rate_filt": 0.0,
             "rain_today_mm": 1.2,
         }
-        coord.forecast_provider_id = "open_meteo"
 
         summary = coord.get_station_summary()
         assert summary["entry_id"] == "station"
+        assert summary["forecast_validity"]["provider"] == "open_meteo"
         assert summary["current_conditions"]["temperature_c"] == 22.5
         assert summary["current_conditions"]["rain_today_mm"] == 1.2
         assert "daily_extremes" in summary
@@ -97,3 +121,140 @@ class TestV3Services:
         assert res["evaluated_limits"]["min_duration_h"] == 3
         assert res["evaluated_limits"]["max_cloud_cover_pct"] == 10.0
         assert res["evaluated_limits"]["require_daylight"] is False
+
+    async def test_registered_v3_services_and_schema_validation(self, hass):
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            entry_id="station",
+            data={
+                CONF_PREFIX: "ws",
+                CONF_FORECAST_PROVIDER: "open_meteo",
+                CONF_FORECAST_LAT: 38.0,
+                CONF_FORECAST_LON: 23.7,
+            },
+            options={},
+        )
+        entry.add_to_hass(hass)
+
+        mock_integration = MagicMock()
+        mock_integration.version = "3.0.0"
+
+        with (
+            patch("custom_components.ws_core.async_get_integration", return_value=mock_integration),
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator.async_start", AsyncMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock(return_value=True)),
+        ):
+            assert await async_setup_entry(hass, entry) is True
+
+        entry.mock_state(hass, ConfigEntryState.LOADED)
+        coord = entry.runtime_data
+        coord.data = {
+            KEY_NORM_TEMP_C: 21.0,
+            KEY_FORECAST: {
+                "hourly": [
+                    {"datetime": "2026-06-21T12:00:00+00:00", "temp_c": 22.0},
+                    {"datetime": "2026-06-21T13:00:00+00:00", "temp_c": 23.0},
+                ]
+            },
+        }
+
+        # 1. Registered get_station_summary runs cleanly on a real coordinator
+        summary_resp = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_GET_STATION_SUMMARY,
+            {},
+            blocking=True,
+            return_response=True,
+        )
+        assert "station" in summary_resp
+        assert summary_resp["station"]["forecast_validity"]["provider"] == "open_meteo"
+        assert summary_resp["station"]["current_conditions"]["temperature_c"] == 21.0
+
+        # 2. Registered export_learning_state accepts full=False and full=True
+        compact = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_EXPORT_LEARNING,
+            {"full": False},
+            blocking=True,
+            return_response=True,
+        )
+        full = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_EXPORT_LEARNING,
+            {"full": True},
+            blocking=True,
+            return_response=True,
+        )
+        assert "streaks" in compact["station"]
+        assert "forecast_outcomes" in full["station"]
+
+        # 3. Registered get_weather_windows rejects zero and negative min_duration_h
+        for bad_duration in (0, -2):
+            with pytest.raises(vol.Invalid):
+                await hass.services.async_call(
+                    DOMAIN,
+                    SERVICE_GET_WEATHER_WINDOWS,
+                    {"limits": {"min_duration_h": bad_duration}},
+                    blocking=True,
+                    return_response=True,
+                )
+
+    async def test_weather_window_notification_blueprint_fires_15_min_before_start(self, hass):
+        src_bp = (
+            pathlib.Path(__file__).resolve().parents[1]
+            / "blueprints/automation/ws_core/weather_window_notification.yaml"
+        )
+        dst_bp = pathlib.Path(hass.config.path("blueprints/automation/ws_core/weather_window_notification.yaml"))
+        dst_bp.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_bp, dst_bp)
+
+        notify_calls = []
+
+        async def _capture_notify(call):
+            notify_calls.append(dict(call.data))
+
+        hass.services.async_register("notify", "persistent_notification", _capture_notify)
+
+        now = dt_util.utcnow().replace(second=0, microsecond=0)
+        window_start = now + timedelta(minutes=20)
+        hass.states.async_set(
+            "sensor.ws_window_outdoor_drying_next_start",
+            window_start.isoformat(),
+            {
+                "device_class": "timestamp",
+                "friendly_name": "Outdoor Laundry Drying Next Start",
+            },
+        )
+
+        ok = await async_setup_component(
+            hass,
+            "automation",
+            {
+                "automation": [
+                    {
+                        "id": "weather_window_alert",
+                        "alias": "Weather Window Alert",
+                        "use_blueprint": {
+                            "path": "ws_core/weather_window_notification.yaml",
+                            "input": {
+                                "next_start_sensor": "sensor.ws_window_outdoor_drying_next_start",
+                            },
+                        },
+                    }
+                ]
+            },
+        )
+        assert ok is True
+        await hass.async_block_till_done()
+
+        # 16 minutes before start -> must not have fired yet
+        async_fire_time_changed(hass, window_start - timedelta(minutes=16))
+        await hass.async_block_till_done()
+        assert notify_calls == []
+
+        # 15 minutes before start -> default -00:15:00 offset fires notification
+        async_fire_time_changed(hass, window_start - timedelta(minutes=15))
+        await hass.async_block_till_done()
+        assert len(notify_calls) == 1
+        assert notify_calls[0]["title"] == "Weather Window Starting Soon"
+        assert "Outdoor Laundry Drying Next Start" in notify_calls[0]["message"]

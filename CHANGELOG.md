@@ -12,7 +12,7 @@ All notable changes to Weather Station Core are documented here.
   - `custom`: Flexible user-defined window criteria with configurable limits and minimum required duration.
   - **Sensors:** When enabled (`enable_weather_windows`), adds `status`, `next_start` (`SensorDeviceClass.TIMESTAMP`), and `next_end` (`SensorDeviceClass.TIMESTAMP`) sensors for enabled profiles. Zero entities created when disabled.
   - **Truncation detection:** Automatically marks windows reaching the end of the forecast horizon as horizon-truncated (`is_truncated: True`) to avoid open-ended assumptions.
-  - **Automation Blueprint:** Added `blueprints/automation/ws_core/weather_window_notification.yaml` to notify users when an activity window opens or when rain threatens an active window.
+  - **Automation Blueprint:** Added `blueprints/automation/ws_core/weather_window_notification.yaml` to notify users ahead of an upcoming activity window using a configurable lead-time offset on the window start timestamp sensor.
 - **Provider Capability Matrix (`capabilities.py`):** Added capability and coverage definitions across all 7 forecast providers (Open-Meteo, Met.no, NWS/NOAA, OpenWeatherMap, Pirate Weather, Météo-France, and HA Weather Entity) to track assessable horizon and variable availability without fabricating missing series.
 - **New Read-Only Service Actions:**
   - `ws_core.get_weather_windows` (`SupportsResponse.ONLY`): Evaluates weather windows on demand with structured reasons, assessed intervals, and horizon limits.
