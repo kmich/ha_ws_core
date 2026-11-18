@@ -372,7 +372,10 @@ class TestWeatherWindowsEngine:
             dt_util.set_default_time_zone(old_tz)
 
     async def test_profile_selection_custom_only_and_none_selected(self):
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
+        try:
+            from pytest_homeassistant.common import MockConfigEntry
+        except ImportError:
+            from pytest_homeassistant_custom_component.common import MockConfigEntry
 
         from custom_components.ws_core import sensor as sensor_platform
         from custom_components.ws_core.const import CONF_PREFIX, DOMAIN
@@ -618,7 +621,10 @@ class TestWeatherWindowsEngine:
     def test_resolve_profiles_applies_configured_custom_limits_and_drives_coordinator(self):
         from unittest.mock import patch
 
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
+        try:
+            from pytest_homeassistant.common import MockConfigEntry
+        except ImportError:
+            from pytest_homeassistant_custom_component.common import MockConfigEntry
 
         from custom_components.ws_core.const import (
             CONF_CUSTOM_MAX_CLOUD_COVER_PCT,

@@ -94,3 +94,132 @@ class TestBurstCoalescing:
         assert coord._debounce_handle is None
         coord._compute.assert_called_once_with(sample=False)
         coord.async_set_updated_data.assert_called_once_with({"hazard": True})
+
+    def test_v3_burst_coalescing_and_weather_windows_performance_gate(self):
+        """Replay 25x12-sensor bursts with Weather Windows ON: assert 1 write/burst & <10% burst budget."""
+        import statistics
+        import time
+        from datetime import UTC, datetime, timedelta
+
+        from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+        from custom_components.ws_core.const import (
+            CONF_ENABLE_WEATHER_WINDOWS,
+            CONF_FORECAST_ENABLED,
+            CONF_FORECAST_LAT,
+            CONF_FORECAST_LON,
+            KEY_WEATHER_WINDOWS,
+            SRC_DEW_POINT,
+            SRC_GUST,
+            SRC_HUM,
+            SRC_LUX,
+            SRC_PRESS,
+            SRC_RAIN_TOTAL,
+            SRC_RAIN_YEAR,
+            SRC_SOLAR_RADIATION,
+            SRC_TEMP,
+            SRC_UV,
+            SRC_WIND,
+            SRC_WIND_DIR,
+        )
+        from custom_components.ws_core.coordinator import WSStationCoordinator
+        from tests.test_coordinator import _make_state
+
+        now = datetime(2026, 6, 21, 11, 0, tzinfo=UTC)
+        sources = {
+            SRC_TEMP: "sensor.temp",
+            SRC_HUM: "sensor.hum",
+            SRC_PRESS: "sensor.press",
+            SRC_WIND: "sensor.wind",
+            SRC_GUST: "sensor.gust",
+            SRC_WIND_DIR: "sensor.wind_dir",
+            SRC_RAIN_TOTAL: "sensor.rain",
+            SRC_RAIN_YEAR: "sensor.rain_y",
+            SRC_LUX: "sensor.lux",
+            SRC_UV: "sensor.uv",
+            SRC_DEW_POINT: "sensor.dew",
+            SRC_SOLAR_RADIATION: "sensor.solar",
+        }
+        states = {eid: _make_state("20.0", "", now) for eid in sources.values()}
+        states["sun.sun"] = MagicMock(state="above_horizon", attributes={"elevation": 45, "azimuth": 180})
+        hass = MagicMock()
+        hass.config.latitude = 37.9
+        hass.config.longitude = 23.7
+        hass.states.get = lambda eid: states.get(eid)
+
+        with patch.object(DataUpdateCoordinator, "__init__", lambda self, *a, **kw: None):
+            coord = WSStationCoordinator(
+                hass,
+                {
+                    "entry_id": "bench_gate",
+                    "sources": sources,
+                    CONF_FORECAST_ENABLED: True,
+                    CONF_ENABLE_WEATHER_WINDOWS: True,
+                    CONF_FORECAST_LAT: 37.9,
+                    CONF_FORECAST_LON: 23.7,
+                },
+                {},
+            )
+
+        coord._forecast_cache = {
+            "provider": "open_meteo",
+            "daily": [{"date": "2026-06-21", "tmax_c": 28.0, "tmin_c": 18.0, "precip_prob": 10}],
+            "hourly": [
+                {
+                    "datetime": (now + timedelta(hours=h)).isoformat(),
+                    "temp_c": 22.0,
+                    "apparent_temp_c": 22.0,
+                    "dewpoint_c": 12.0,
+                    "precip_prob": 5,
+                    "precip_mm": 0.0,
+                    "wind_kmh": 12.0,
+                    "gust_kmh": 18.0,
+                    "humidity": 50.0,
+                    "cloud_cover": 20.0,
+                }
+                for h in range(25)
+            ],
+        }
+        coord.data = {}
+        coord.runtime.last_forecast_fetch = now
+        state_writes = 0
+
+        def _record_write(data):
+            nonlocal state_writes
+            coord.data = data
+            state_writes += 1
+
+        coord.async_set_updated_data = _record_write  # type: ignore[method-assign]
+
+        scheduled: list = []
+
+        def _fake_call_later(_hass, _delay, cb):
+            scheduled.append(cb)
+            return MagicMock()
+
+        burst_ms: list[float] = []
+        source_events = [MagicMock(data={"entity_id": eid}) for eid in sources.values()]
+        with (
+            patch("custom_components.ws_core.coordinator.async_call_later", side_effect=_fake_call_later),
+            patch.object(coord, "_get_cached_or_schedule_forecast", return_value=coord._forecast_cache),
+        ):
+            # Warm caches before measuring
+            coord._handle_source_change(None)
+            state_writes = 0
+
+            for _ in range(25):
+                scheduled.clear()
+                t0 = time.perf_counter()
+                for ev in source_events:
+                    coord._handle_source_change(ev)
+                assert len(scheduled) == 1
+                scheduled[0](now)
+                burst_ms.append((time.perf_counter() - t0) * 1000.0)
+
+        assert state_writes == 25  # 1 write per 12-sensor burst (vs 12 baseline)
+        assert KEY_WEATHER_WINDOWS in coord.data
+        burst_sorted = sorted(burst_ms)
+        p95_burst_ms = burst_sorted[int(0.95 * len(burst_sorted)) - 1]
+        assert statistics.median(burst_sorted) > 0.0
+        # M0 baseline was 9.672 ms p95 per 12-sensor burst (+10% gate = 10.639 ms)
+        assert p95_burst_ms <= 10.639

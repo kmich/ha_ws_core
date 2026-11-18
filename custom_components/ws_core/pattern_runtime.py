@@ -1112,31 +1112,51 @@ class PatternRuntime:
     async def _async_migrate_feature_replay(self, now: datetime) -> bool:
         """Migrate targets replayed under older methods (< PATTERN_HISTORY_FEATURES_METHOD).
 
-        Resets standardizer slots and weights for corrupted solar features and dp_3h,
-        re-learns dp_3h from recorder history where available, and keeps all other
-        weights, rates, and history intact.
+        Performs the one-time scoped reset of corrupted solar features and dp_3h once
+        per upgrade (persisted under ``features_reset_method``) so transient recorder
+        outages, retries, or restarts preserve any live learning accumulated after the
+        reset, then replays ``dp_3h`` from recorder history once available.
         """
         eng = self.engine
-        hl = eng.history_learn or {}
-        targets = hl.get("targets")
+        hl = dict(eng.history_learn or {})
+        targets = dict(hl.get("targets") or {})
         if not targets:
             return False
-        fm = hl.get("features_method")
-        try:
-            fm_val = int(fm) if fm is not None and not isinstance(fm, bool) else 1
-        except (TypeError, ValueError):
-            fm_val = 1
+
+        def _method_int(val: Any) -> int:
+            try:
+                return int(val) if val is not None and not isinstance(val, bool) else 1
+            except (TypeError, ValueError):
+                return 1
+
+        fm_val = _method_int(hl.get("features_method"))
         if fm_val >= PATTERN_HISTORY_FEATURES_METHOD:
             return False
-        ok_targets = [t for t, e in targets.items() if isinstance(e, dict) and e.get("status") == "ok"]
+        reset_val = _method_int(hl.get("features_reset_method", hl.get("features_method")))
+        ok_targets = [
+            t
+            for t, e in targets.items()
+            if isinstance(e, dict)
+            and e.get("status") == "ok"
+            and _method_int(e.get("features_method")) < PATTERN_HISTORY_FEATURES_METHOD
+        ]
         if not ok_targets:
+            hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
             hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            hl["targets"] = targets
+            eng.history_learn = hl
             return False
 
-        _LOGGER.info(
-            "ws_core pattern forecast: migrating pattern state for v3.0 feature alignment (dp_3h and solar replay masking)"
-        )
-        eng.scoped_reset_features(PATTERN_CORRUPTED_FEATURES)
+        did_reset = reset_val < PATTERN_HISTORY_FEATURES_METHOD
+        if did_reset:
+            _LOGGER.info(
+                "ws_core pattern forecast: migrating pattern state for v3.0 feature alignment (dp_3h and solar replay masking)"
+            )
+            eng.scoped_reset_features(PATTERN_CORRUPTED_FEATURES)
+            hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            hl["targets"] = targets
+            eng.history_learn = hl
+            self._published = {}
 
         end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
         n = PATTERN_HISTORY_DAYS * 24
@@ -1146,48 +1166,82 @@ class PatternRuntime:
         )
         plan = {name: self.history_entity(name, end_ts) for name in needed_names}
         ids = {e for e in plan.values() if e}
-        if ids:
-            snapshot = eng.to_dict()
-            need_night = any(eng.models[t].spec.kind == "frost" for t in ok_targets if t in eng.models)
+        if not ids:
+            await self.async_save()
+            return True
 
-            def _dp3h_job() -> PatternEngine | None:
-                trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)
-                meta, rows = self._fetch_statistics(
-                    ids,
-                    datetime.fromtimestamp(start_ts, UTC),
-                    datetime.fromtimestamp(end_ts, UTC),
+        snapshot = eng.to_dict()
+        need_night = any(eng.models[t].spec.kind == "frost" for t in ok_targets if t in eng.models)
+
+        def _dp3h_job() -> tuple[PatternEngine, dict[str, int]] | None:
+            trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)
+            # Replay dp_3h from a clean slot so historical stats merge cleanly with any post-reset live samples.
+            trainer.scoped_reset_features(("dp_3h",))
+            meta, rows = self._fetch_statistics(
+                ids,
+                datetime.fromtimestamp(start_ts, UTC),
+                datetime.fromtimestamp(end_ts, UTC),
+            )
+            if not meta:
+                return None
+            hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
+            counts = trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"})
+            return trainer, counts
+
+        try:
+            job_res = await _recorder_instance(self.coord.hass).async_add_executor_job(_dp3h_job)
+        except Exception as err:  # noqa: BLE001 - transient recorder failure should retry
+            _LOGGER.debug("ws_core pattern forecast: dp_3h migration replay failed, will retry: %s", err)
+            await self.async_save()
+            return True
+
+        if job_res is None:
+            _LOGGER.debug("ws_core pattern forecast: no statistics metadata for dp_3h migration, will retry")
+            await self.async_save()
+            return True
+
+        trained, _counts = job_res
+        dp_slot = POOL_INDEX["dp_3h"]
+        n_h = trained.std.n[dp_slot]
+        if n_h > 0:
+            mean_h = trained.std.mean[dp_slot]
+            var_h = trained.std.var[dp_slot]
+            n_l = eng.std.n[dp_slot]
+            if n_l <= 0:
+                eng.std.mean[dp_slot] = mean_h
+                eng.std.var[dp_slot] = var_h
+                eng.std.n[dp_slot] = n_h
+            else:
+                mean_l = eng.std.mean[dp_slot]
+                var_l = eng.std.var[dp_slot]
+                n_total = n_h + n_l
+                delta = mean_l - mean_h
+                eng.std.mean[dp_slot] = (n_h * mean_h + n_l * mean_l) / n_total
+                eng.std.var[dp_slot] = max(
+                    0.0, ((n_h * var_h) + (n_l * var_l) + (delta * delta * n_h * n_l / n_total)) / n_total
                 )
-                if not meta:
-                    return None
-                hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
-                trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"})
-                return trainer
+                eng.std.n[dp_slot] = n_total
 
-            try:
-                trained = await _recorder_instance(self.coord.hass).async_add_executor_job(_dp3h_job)
-            except Exception as err:  # noqa: BLE001 - transient recorder failure should retry
-                _LOGGER.debug("ws_core pattern forecast: dp_3h migration replay failed, will retry: %s", err)
-                eng.history_learn = hl
-                self._published = {}
-                await self.async_save()
-                return True
-
-            if trained is not None:
-                dp_slot = POOL_INDEX["dp_3h"]
-                eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
-                eng.std.var[dp_slot] = trained.std.var[dp_slot]
-                eng.std.n[dp_slot] = trained.std.n[dp_slot]
-                for tid in ok_targets:
-                    live = eng.models.get(tid)
-                    src = trained.models.get(tid)
-                    if live is None or src is None or "dp_3h" not in live.spec.features:
-                        continue
-                    idx = live.spec.features.index("dp_3h") + 1
+        for tid in ok_targets:
+            live = eng.models.get(tid)
+            src = trained.models.get(tid)
+            if live is not None and src is not None and "dp_3h" in live.spec.features:
+                idx = live.spec.features.index("dp_3h") + 1
+                if live.w[idx] == 0.0 and live.g2[idx] == 0.0:
                     live.w[idx] = src.w[idx]
                     live.g2[idx] = src.g2[idx]
                     live.cp_w[idx] = src.cp_w[idx]
                     live.cp_g2[idx] = src.cp_g2[idx]
+                else:
+                    live.w[idx] = src.w[idx] + live.w[idx]
+                    live.g2[idx] = src.g2[idx] + live.g2[idx]
+                    live.cp_w[idx] = live.w[idx]
+                    live.cp_g2[idx] = live.g2[idx]
+            if isinstance(targets.get(tid), dict):
+                targets[tid]["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
 
+        hl["targets"] = targets
+        hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
         hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
         eng.history_learn = hl
         self._published = {}

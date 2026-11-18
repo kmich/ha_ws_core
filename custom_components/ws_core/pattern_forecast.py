@@ -1732,22 +1732,30 @@ class PatternEngine:
             self.std = trained.std
         prev_hl = self.history_learn or {}
         prev_fm = prev_hl.get("features_method")
-        try:
-            prev_fm_val = int(prev_fm) if prev_fm is not None and not isinstance(prev_fm, bool) else 1
-        except (TypeError, ValueError):
-            prev_fm_val = 1
+        prev_reset_fm = prev_hl.get("features_reset_method")
+        prev_fm_val = int(prev_fm) if _finite(prev_fm) else 1
+        dp_warm = (
+            self.std.n[POOL_INDEX["dp_3h"]] >= PATTERN_STD_MIN_N
+            and trained.std.n[POOL_INDEX["dp_3h"]] >= PATTERN_STD_MIN_N
+        )
         targets = dict(prev_hl.get("targets") or {})
         for tid, st in statuses.items():
             if tid in self.models:
-                targets[tid] = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
+                entry = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
+                if st.get("status") == "ok" and report.get(tid, {}).get("samples", 0) > 0 and dp_warm:
+                    entry["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+                targets[tid] = entry
         oks = [t for t in targets.values() if t.get("status") == "ok"]
         # Only mark the v3 feature-alignment migration complete when every
-        # already-learned target was either migrated earlier or replayed in this run.
+        # already-learned target was either migrated earlier or replayed in this run
+        # against a warm dp_3h standardizer.
         all_ok_migrated = prev_fm_val >= PATTERN_HISTORY_FEATURES_METHOD or (
             bool(oks)
             and all(
-                report.get(tid, {}).get("samples", 0) > 0
-                for tid, t in targets.items()
+                isinstance(t, dict)
+                and _finite(t.get("features_method"))
+                and int(t["features_method"]) >= PATTERN_HISTORY_FEATURES_METHOD
+                for t in targets.values()
                 if isinstance(t, dict) and t.get("status") == "ok"
             )
         )
@@ -1762,8 +1770,12 @@ class PatternEngine:
         }
         if all_ok_migrated:
             new_hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
-        elif prev_fm is not None:
-            new_hl["features_method"] = prev_fm
+            new_hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
+        else:
+            if prev_fm is not None:
+                new_hl["features_method"] = prev_fm
+            if prev_reset_fm is not None:
+                new_hl["features_reset_method"] = prev_reset_fm
         self.history_learn = new_hl
         for m in self.models.values():
             self._update_maturity(m, now_ts)
@@ -2032,14 +2044,18 @@ class PatternEngine:
                     and _finite(e.get("attempted_at"))
                     and isinstance(e.get("reason"), (str, type(None)))
                 ):
-                    clean[tid] = dict(e)
+                    clean_entry = dict(e)
+                    if _finite(e.get("features_method")):
+                        clean_entry["features_method"] = int(e["features_method"])
+                    clean[tid] = clean_entry
         out: dict[str, Any] = {}
         for key in ("done_at", "span_days"):
             if _opt_ok(hl.get(key)):
                 out[key] = hl.get(key)
-        fm = hl.get("features_method")
-        if _finite(fm):
-            out["features_method"] = int(fm)
+        for key in ("features_method", "features_reset_method"):
+            fm = hl.get(key)
+            if _finite(fm):
+                out[key] = int(fm)
         for key in ("status", "reason"):
             if isinstance(hl.get(key), (str, type(None))):
                 out[key] = hl.get(key)

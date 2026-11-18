@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
@@ -308,6 +308,23 @@ class WindowSlotEvaluation:
     cloud_cover: float | None = None
     solar_elevation: float | None = None
 
+    def to_dict(self) -> dict[str, Any]:
+        """Convert slot evaluation to dictionary without recursive asdict copies."""
+        return {
+            "datetime_iso": self.datetime_iso,
+            "suitable": self.suitable,
+            "reasons": self.reasons,
+            "unassessed_limits": self.unassessed_limits,
+            "temp_c": self.temp_c,
+            "rain_prob": self.rain_prob,
+            "rain_mm": self.rain_mm,
+            "humidity": self.humidity,
+            "wind_kmh": self.wind_kmh,
+            "gust_kmh": self.gust_kmh,
+            "cloud_cover": self.cloud_cover,
+            "solar_elevation": self.solar_elevation,
+        }
+
 
 @dataclass
 class IdentifiedWindow:
@@ -317,6 +334,15 @@ class IdentifiedWindow:
     end_iso: str
     duration_h: int | float
     is_truncated: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert identified window to dictionary without recursive asdict copies."""
+        return {
+            "start_iso": self.start_iso,
+            "end_iso": self.end_iso,
+            "duration_h": self.duration_h,
+            "is_truncated": self.is_truncated,
+        }
 
 
 @dataclass
@@ -340,7 +366,22 @@ class WeatherDecisionResult:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert result to JSON-serializable dictionary."""
-        return asdict(self)
+        return {
+            "profile_id": self.profile_id,
+            "status": self.status,
+            "evaluated_at": self.evaluated_at,
+            "next_start": self.next_start,
+            "next_end": self.next_end,
+            "duration_h": self.duration_h,
+            "horizon_hours": self.horizon_hours,
+            "is_truncated": self.is_truncated,
+            "reason_codes": self.reason_codes,
+            "reasons_text": self.reasons_text,
+            "evaluated_limits": self.evaluated_limits,
+            "windows": self.windows,
+            "slots": self.slots,
+            "data_quality": self.data_quality,
+        }
 
 
 class WeatherWindowsEngine:
@@ -357,6 +398,8 @@ class WeatherWindowsEngine:
         self.lon = lon
         self.elevation_m = elevation_m
         self.profiles: dict[str, WeatherWindowProfile] = dict(profiles if profiles is not None else DEFAULT_PROFILES)
+        self._solar_cache: dict[tuple[float, float, datetime], float] = {}
+        self._parse_dt_cache: dict[str, datetime | None] = {}
 
     def evaluate_profile(
         self,
@@ -593,8 +636,8 @@ class WeatherWindowsEngine:
             reason_codes=reasons,
             reasons_text=reasons_text,
             evaluated_limits=limits_dict,
-            windows=[asdict(w) for w in windows],
-            slots=[asdict(s) for s in slot_evals],
+            windows=[w.to_dict() for w in windows],
+            slots=[s.to_dict() for s in slot_evals],
             data_quality={
                 "horizon_hours": horizon_hours,
                 "is_truncated": is_truncated,
@@ -602,18 +645,34 @@ class WeatherWindowsEngine:
             },
         )
 
-    @staticmethod
-    def _parse_slot_utc(item: dict[str, Any], display_tz: tzinfo) -> datetime | None:
+    def _parse_slot_utc(self, item: dict[str, Any], display_tz: tzinfo) -> datetime | None:
         """Parse an hourly forecast item timestamp into UTC, preserving DST distinct hours."""
         raw_dt = item.get("utc_datetime") or item.get("datetime")
         if not raw_dt:
             return None
-        parsed = dt_util.parse_datetime(str(raw_dt))
+        key = str(raw_dt)
+        parsed = self._parse_dt_cache.get(key)
+        if key not in self._parse_dt_cache:
+            parsed = dt_util.parse_datetime(key)
+            if len(self._parse_dt_cache) > 512:
+                self._parse_dt_cache.clear()
+            self._parse_dt_cache[key] = parsed
         if parsed is None:
             return None
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=display_tz)
         return parsed.astimezone(UTC)
+
+    def _cached_solar_elevation(self, dt_utc: datetime) -> float:
+        """Cache solar elevation by rounded coordinates and UTC timestamp across profiles."""
+        cache_key = (round(float(self.lat), 5), round(float(self.lon), 5), dt_utc)
+        val = self._solar_cache.get(cache_key)
+        if val is None:
+            val = solar_elevation_deg(self.lat, self.lon, dt_utc)
+            if len(self._solar_cache) > 512:
+                self._solar_cache.clear()
+            self._solar_cache[cache_key] = val
+        return val
 
     def _evaluate_slot(
         self,
@@ -637,8 +696,8 @@ class WeatherWindowsEngine:
         effective_start_utc = max(slot_utc, now_utc) if now_utc is not None else slot_utc
         raw_end_utc = slot_utc + timedelta(hours=1)
         effective_end_utc = min(raw_end_utc, horizon_end_utc) if horizon_end_utc is not None else raw_end_utc
-        sol_elev_start = solar_elevation_deg(self.lat, self.lon, effective_start_utc)
-        sol_elev_end = solar_elevation_deg(self.lat, self.lon, effective_end_utc)
+        sol_elev_start = self._cached_solar_elevation(effective_start_utc)
+        sol_elev_end = self._cached_solar_elevation(effective_end_utc)
         sol_elev = min(sol_elev_start, sol_elev_end)
         reasons: list[str] = []
 
