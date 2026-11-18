@@ -16,6 +16,7 @@ from custom_components.ws_core import pattern_runtime
 from custom_components.ws_core.const import (
     CONF_ENABLE_PATTERN_FORECAST,
     CONF_PATTERN_STORM_INTERNET_LIGHTNING,
+    PATTERN_HISTORY_FEATURES_METHOD,
     PATTERN_HISTORY_METHOD,
     PATTERN_HISTORY_RETRY_S,
     PATTERN_PRESSURE_SLOTS,
@@ -737,10 +738,17 @@ class TestPressureSeed:
         }
         coord, rt = make_runtime(stats=(meta, rows))
         rt.engine.history_learn = {
+            "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
             "targets": {
-                tid: {"status": "ok", "method": PATTERN_HISTORY_METHOD, "attempted_at": NOW.timestamp()}
+                tid: {
+                    "status": "ok",
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+                    "attempted_at": NOW.timestamp(),
+                }
                 for tid in rt.engine.active_target_ids()
-            }
+            },
         }
         return coord, rt
 

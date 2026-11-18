@@ -208,12 +208,16 @@ class TestBurstCoalescing:
 
         burst_ms: list[float] = []
         source_events = [MagicMock(data={"entity_id": eid}) for eid in sources.values()]
+        current_now = [now]
         with (
             patch("custom_components.ws_core.coordinator.async_call_later", side_effect=_fake_call_later),
+            patch("custom_components.ws_core.coordinator.dt_util.utcnow", side_effect=lambda: current_now[0]),
+            patch("custom_components.ws_core.coordinator.dt_util.now", side_effect=lambda: current_now[0]),
             patch.object(coord, "_get_cached_or_schedule_forecast", side_effect=lambda t: coord._forecast_cache),
         ):
             for i in range(25):
                 burst_now = now + timedelta(minutes=i * 15)
+                current_now[0] = burst_now
                 coord.runtime.last_forecast_fetch = burst_now
                 coord._forecast_cache = _make_fresh_forecast(burst_now)
                 scheduled.clear()
@@ -226,6 +230,11 @@ class TestBurstCoalescing:
 
         assert state_writes == 25  # 1 write per 12-sensor burst (vs 12 baseline)
         assert KEY_WEATHER_WINDOWS in coord.data
+        ww_eval = coord.data[KEY_WEATHER_WINDOWS]
+        assert "outdoor_drying" in ww_eval
+        # Verify that all 24 hourly forecast slots were actually evaluated for the profiles
+        assert len(ww_eval["outdoor_drying"]["slots"]) == 24
+        assert len(ww_eval["garden_work"]["slots"]) == 24
         burst_sorted = sorted(burst_ms)
         p95_burst_ms = burst_sorted[int(0.95 * len(burst_sorted)) - 1]
         assert statistics.median(burst_sorted) > 0.0

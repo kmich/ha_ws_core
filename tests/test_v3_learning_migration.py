@@ -562,6 +562,44 @@ class TestReplayMaskingAndDp3hAlignment:
         assert replayed_w != 0.0
         assert replayed_w != live_w
         assert rain_model.g2[dp_idx] != (live_g2 + rain_model.g2[dp_idx])
+        assert rt.engine.std.n[dp_slot] > 0
+        assert rt.engine.std.var[dp_slot] > 0.0
+
+    async def test_replacement_replay_remains_queued_when_reset_during_replay(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+        coord._start_once = MagicMock()
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt.store.async_remove = AsyncMock()
+
+        # Simulate replay currently running
+        rt._history_running = True
+        assert rt._history_queued is False
+
+        # Reset occurs while replay is running -> replacement replay is queued
+        await rt.async_reset()
+        assert rt._history_queued is True
+
+        # Replay attempt during active replay also preserves queued status
+        await rt.async_learn_history()
+        assert rt._history_queued is True
+
+        # When running replay finishes, finally block launches the queued replacement replay
+        rt._history_running = False
+        if rt._history_queued:
+            rt._history_queued = False
+            coord._start_once(rt.async_learn_history, 0, "ws_core_pattern_history")
+
+        coord._start_once.assert_called_once_with(rt.async_learn_history, 0, "ws_core_pattern_history")
+        assert rt._history_queued is False
 
     async def test_full_startup_migration_preserves_live_learning_across_outage_replay_restart_and_retry(self):
         import inspect

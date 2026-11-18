@@ -220,6 +220,7 @@ class PatternRuntime:
         self._published: dict[str, Any] = {}
         self._error_logged = False
         self._history_running = False
+        self._history_queued = False
         self._reset_seq = 0
         self._warm_start: dict[str, Any] = {}
         self._recent_failed = False
@@ -262,6 +263,8 @@ class PatternRuntime:
     async def async_reset(self) -> None:
         """Delete the store and return every target to ``collecting``."""
         self._reset_seq += 1
+        if self._history_running:
+            self._history_queued = True
         self.engine.reset_all()
         self._published = {}
         self._last_bucket = None
@@ -1220,28 +1223,19 @@ class PatternRuntime:
         trained, counts = job_res
         dp_slot = POOL_INDEX["dp_3h"]
         n_h = trained.std.n[dp_slot]
-        if n_h <= 0:
-            _LOGGER.debug("ws_core pattern forecast: no usable dp_3h statistics in recorder history, will retry")
+        pressure_targets = [t for t in ok_targets if t in eng.models and "dp_3h" in eng.models[t].spec.features]
+        if n_h <= 0 or any(counts.get(t, 0) <= 0 for t in pressure_targets):
+            _LOGGER.debug(
+                "ws_core pattern forecast: dp_3h migration replay lacked usable samples (%s, n=%d), will retry",
+                {t: counts.get(t, 0) for t in pressure_targets},
+                n_h,
+            )
             await self.async_save()
             return True
 
-        mean_h = trained.std.mean[dp_slot]
-        var_h = trained.std.var[dp_slot]
-        n_l = eng.std.n[dp_slot]
-        if n_l <= 0:
-            eng.std.mean[dp_slot] = mean_h
-            eng.std.var[dp_slot] = var_h
-            eng.std.n[dp_slot] = n_h
-        else:
-            mean_l = eng.std.mean[dp_slot]
-            var_l = eng.std.var[dp_slot]
-            n_total = n_h + n_l
-            delta = mean_l - mean_h
-            eng.std.mean[dp_slot] = (n_h * mean_h + n_l * mean_l) / n_total
-            eng.std.var[dp_slot] = max(
-                0.0, ((n_h * var_h) + (n_l * var_l) + (delta * delta * n_h * n_l / n_total)) / n_total
-            )
-            eng.std.n[dp_slot] = n_total
+        eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
+        eng.std.var[dp_slot] = trained.std.var[dp_slot]
+        eng.std.n[dp_slot] = trained.std.n[dp_slot]
 
         for tid in ok_targets:
             live = eng.models.get(tid)
@@ -1323,6 +1317,7 @@ class PatternRuntime:
         loop. Replayed samples never count toward ``skilled``.
         """
         if self._history_running:
+            self._history_queued = True
             return
         self._history_running = True
         retry_needed = False
@@ -1394,7 +1389,13 @@ class PatternRuntime:
             raise
         finally:
             self._history_running = False
-            if not cancelled:
+            if self._history_queued:
+                self._history_queued = False
+                if hasattr(self.coord, "_start_once"):
+                    self.coord._start_once(self.async_learn_history, 0, "ws_core_pattern_history")
+                elif hasattr(self.coord, "_spawn"):
+                    self.coord._spawn(self.async_learn_history(), "ws_core_pattern_history")
+            elif not cancelled:
                 if retry_needed:
                     self._schedule_recovery_retry()
                 else:
