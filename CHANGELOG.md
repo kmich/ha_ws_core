@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [2.14.3] - 2026-11-18
+
+### Fixed
+
+- **Keep current conditions tied to station readings (#205).** A stormy Zambretti outlook no longer replaces dry current conditions with `pre-storm`. WS Current Condition and the weather entity can continue to show conditions such as clear skies, fog, or wind. The outlook remains available on WS Zambretti Forecast. If an automation matched `pre-storm`, update it to use the stormy outlook on the forecast sensor.
+
 ## [2.14.2] - 2026-11-17
 
 ### Fixed

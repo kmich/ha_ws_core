@@ -52,8 +52,17 @@ def test_stormy_outlook_in_rain_is_not_a_hurricane(z_text):
     assert _condition(zambretti=z_text, rain_rate_mmph=3.0, pressure_trend=-2.0) == "rainy"
 
 
-def test_stormy_outlook_when_dry_is_pre_storm():
-    assert _condition(zambretti="stormy_much_rain", pressure_trend=-2.0) == "pre-storm"
+@pytest.mark.parametrize(
+    ("readings", "expected"),
+    [
+        ({"humidity": 40.0}, "clear-night"),
+        ({"wind_gust_ms": 19.0}, "windy-night"),
+        ({"humidity": 98.0, "dew_point_c": 8.5, "wind_speed_ms": 0.5}, "fog"),
+    ],
+)
+def test_stormy_outlook_does_not_override_dry_conditions(readings, expected):
+    assert _condition(**readings, pressure_trend=-2.0) == expected
+    assert _condition(**readings, pressure_trend=-2.0, zambretti="stormy_much_rain") == expected
 
 
 def test_hurricane_needs_measured_hurricane_gusts():
