@@ -927,6 +927,7 @@ class PatternEngine:
         hist: HourlyHistory,
         targets: list[str],
         feature_names: set[str] | frozenset[str] = frozenset({"dp_3h"}),
+        update_std: bool = True,
     ) -> dict[str, int]:
         """Re-standardize and re-train only ``feature_names`` from hourly history.
 
@@ -950,10 +951,13 @@ class PatternEngine:
             return counts
 
         for k, _j, _ts, vec, _highs, _lows in self._iter_replay_vectors(hist):
-            for slot in active_slots:
-                val = vec[slot]
-                if val is not None:
-                    self.std.update(slot, float(val), PATTERN_HISTORY_STD_WEIGHT)
+            if update_std:
+                for slot in active_slots:
+                    val = vec[slot]
+                    if val is not None:
+                        self.std.update(slot, float(val), PATTERN_HISTORY_STD_WEIGHT)
+            if any(self.std.n[s] < PATTERN_STD_MIN_N for s in active_slots):
+                continue
             for spec in specs:
                 feat_indices = target_feat_indices.get(spec.target_id)
                 if not feat_indices:

@@ -10,6 +10,7 @@ from custom_components.ws_core.const import (
     PATTERN_HISTORY_FEATURES_METHOD,
     PATTERN_HISTORY_METHOD,
     PATTERN_SCHEMA_VERSION,
+    PATTERN_STD_MIN_N,
 )
 from custom_components.ws_core.pattern_forecast import (
     N_POOL,
@@ -21,6 +22,11 @@ from custom_components.ws_core.pattern_forecast import (
     Thresholds,
 )
 from custom_components.ws_core.pattern_runtime import PatternRuntime
+
+
+class _FakeRecorder:
+    async def async_add_executor_job(self, fn, *args):
+        return fn(*args)
 
 
 def _make_engine() -> PatternEngine:
@@ -662,7 +668,9 @@ class TestReplayMaskingAndDp3hAlignment:
             coord._to_hpa = lambda v, _u=None: float(v)
             coord._to_ms = lambda v, _u=None: float(v)
             coord._to_mm = lambda v, _u=None: float(v)
-            coord._spawn = MagicMock()
+            coord._spawn = MagicMock(
+                side_effect=lambda coro, _name=None: coro.close() if hasattr(coro, "close") else None
+            )
             return coord
 
         now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
@@ -858,6 +866,256 @@ class TestReplayMaskingAndDp3hAlignment:
         std_before = eng.std.n[dp_slot]
         eng.replay(hist, ["rain_3h"], update_std=True)
         assert eng.std.n[dp_slot] > std_before
+
+    async def test_queued_replay_dropped_when_entry_unloads_or_cancels(self):
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+        coord._stopped = False
+        coord._start_once = MagicMock()
+        coord._spawn = MagicMock()
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt.store.async_remove = AsyncMock()
+
+        # Case 1: CancelledError raised during async_learn_history
+        rt._history_queued = True
+        with patch.object(rt, "_async_forget_misread_replay", side_effect=asyncio.CancelledError()):
+            import pytest
+
+            with pytest.raises(asyncio.CancelledError):
+                await rt.async_learn_history()
+
+        assert rt._history_running is False
+        assert rt._history_queued is False
+        coord._start_once.assert_not_called()
+        coord._spawn.assert_not_called()
+
+        # Case 2: Coordinator stopped when async_learn_history is called
+        coord._stopped = True
+        rt._history_queued = True
+        await rt.async_learn_history()
+        assert rt._history_running is False
+        assert rt._history_queued is False
+        coord._start_once.assert_not_called()
+        coord._spawn.assert_not_called()
+
+        # Case 3: Coordinator stopped during async_learn_history run
+        coord._stopped = False
+        rt._history_queued = True
+
+        async def _stop_coord(*_args, **_kwargs):
+            coord._stopped = True
+            return False
+
+        with (
+            patch.object(rt, "_async_forget_misread_replay", side_effect=_stop_coord),
+            patch.object(rt, "_async_migrate_feature_replay", return_value=False),
+            patch.object(rt, "_async_seed_recent", return_value=0),
+            patch.object(rt, "_async_seed_pressure", return_value=(0, False)),
+        ):
+            await rt.async_learn_history()
+
+        assert rt._history_running is False
+        assert rt._history_queued is False
+        coord._start_once.assert_not_called()
+        coord._spawn.assert_not_called()
+
+    async def test_dp3h_migration_requires_samples_after_scaler_warms_up(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+
+        eng = rt.engine
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": 3,
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                },
+            },
+        }
+
+        # Case A: history length is 35 (yields 11 vectors, < PATTERN_STD_MIN_N = 20) -> standardizer cold, 0 samples trained
+        n_short = 35
+        hist_short = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n_short,
+            mslp=[1013.0] * n_short,
+            temp=[15.0] * n_short,
+            temp_min=[12.0] * n_short,
+            temp_max=[18.0] * n_short,
+            dpd=[3.0] * n_short,
+            wind=[4.0] * n_short,
+            gust=[6.0] * n_short,
+            rain=[2.0] * n_short,
+            strikes=[0.0] * n_short,
+            night_frac=[0.5] * n_short,
+            tz_offset=[0.0] * n_short,
+        )
+
+        counts_short = eng.replay_scoped_features(hist_short, ["rain_3h"], {"dp_3h"})
+        assert counts_short["rain_3h"] == 0
+        assert eng.std.n[POOL_INDEX["dp_3h"]] == (n_short - 24)
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist_short  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        assert retry is True
+        assert rt.engine.history_learn["targets"]["rain_3h"].get("features_method") != PATTERN_HISTORY_FEATURES_METHOD
+        assert rt.engine.history_learn.get("features_method") != PATTERN_HISTORY_FEATURES_METHOD
+
+        # Case B: history length is 60 (yields 36 vectors, >= PATTERN_STD_MIN_N = 20) -> warm standardizer, samples trained after row 20
+        n_long = 60
+        mslp_long = [1015.0 - (0.5 * (i % 6)) for i in range(n_long)]
+        rain_long = [2.0 if (i % 6) == 3 else 0.0 for i in range(n_long)]
+        hist_long = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n_long,
+            mslp=mslp_long,
+            temp=[15.0] * n_long,
+            temp_min=[12.0] * n_long,
+            temp_max=[18.0] * n_long,
+            dpd=[3.0] * n_long,
+            wind=[4.0] * n_long,
+            gust=[6.0] * n_long,
+            rain=rain_long,
+            strikes=[0.0] * n_long,
+            night_frac=[0.5] * n_long,
+            tz_offset=[0.0] * n_long,
+        )
+
+        counts_long = eng.replay_scoped_features(hist_long, ["rain_3h"], {"dp_3h"})
+        # 36 vectors total, first 20 vectors warm up the scaler, remaining 16 vectors train
+        assert counts_long["rain_3h"] > 0
+        assert eng.std.n[POOL_INDEX["dp_3h"]] >= PATTERN_STD_MIN_N
+
+        rt.build_history = lambda *a, **kw: hist_long  # type: ignore[method-assign]
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry_long = await rt._async_migrate_feature_replay(now)
+
+        assert retry_long is False
+        assert rt.engine.history_learn["targets"]["rain_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert rt.engine.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+
+    async def test_dp3h_migration_preserves_scale_used_by_already_trained_targets(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+
+        eng = rt.engine
+        dp_slot = POOL_INDEX["dp_3h"]
+
+        # Suppose rain_3h was already trained/migrated to method 4 with an established standardizer scale
+        eng.std.mean[dp_slot] = 1012.5
+        eng.std.var[dp_slot] = 4.2
+        eng.std.n[dp_slot] = 100
+
+        rain_model = eng.models["rain_3h"]
+        rain_dp_idx = rain_model.spec.features.index("dp_3h") + 1
+        rain_model.w[rain_dp_idx] = -0.35
+        rain_model.cp_w[rain_dp_idx] = -0.35
+
+        # gust_3h needs migration (features_method = 3)
+        gust_model = eng.models["gust_3h"]
+        gust_dp_idx = gust_model.spec.features.index("dp_3h") + 1
+        gust_model.w[gust_dp_idx] = 0.0
+
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": 4,  # one-time reset already occurred earlier
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+                },
+                "gust_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                },
+            },
+        }
+
+        # Provide a 48h history with different pressure dynamics
+        n = 48
+        mslp = [1000.0 + (i * 0.1) for i in range(n)]
+        gust = [15.0 if (i % 6) == 0 else 5.0 for i in range(n)]
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=mslp,
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=gust,
+            rain=[0.0] * n,
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        assert retry is False
+        # The established scale in eng.std used by rain_3h MUST be preserved exactly!
+        assert eng.std.mean[dp_slot] == 1012.5
+        assert eng.std.var[dp_slot] == 4.2
+        assert eng.std.n[dp_slot] == 100
+
+        # rain_3h weight is preserved
+        assert rain_model.w[rain_dp_idx] == -0.35
+
+        # gust_3h weight was trained and migrated
+        assert gust_model.w[gust_dp_idx] != 0.0
+        assert eng.history_learn["targets"]["gust_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
 
 
 class TestDowngradeTolerance:

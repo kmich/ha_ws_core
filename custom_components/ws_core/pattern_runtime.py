@@ -80,6 +80,7 @@ from .const import (
     PATTERN_SKILLED_BSS_MIN,
     PATTERN_SOURCE_INTERNET,
     PATTERN_SOURCE_LOCAL,
+    PATTERN_STD_MIN_N,
     PATTERN_STORE_VERSION,
     PATTERN_STRIKE_JUMP_CAP,
     PATTERN_TARGET_KEYS,
@@ -1179,11 +1180,31 @@ class PatternRuntime:
 
         snapshot = eng.to_dict()
         need_night = any(eng.models[t].spec.kind == "frost" for t in ok_targets if t in eng.models)
+        dp_slot = POOL_INDEX["dp_3h"]
+        already_trained = any(
+            isinstance(e, dict)
+            and e.get("status") == "ok"
+            and _method_int(e.get("features_method")) >= PATTERN_HISTORY_FEATURES_METHOD
+            for t, e in targets.items()
+            if t not in ok_targets and t in eng.models and "dp_3h" in eng.models[t].spec.features
+        )
+        has_warm_scale = already_trained and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
 
         def _dp3h_job() -> tuple[PatternEngine, dict[str, int]] | None:
             trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)
-            # Replay dp_3h from a clean slot so historical stats merge cleanly with any post-reset live samples.
-            trainer.scoped_reset_features(("dp_3h",))
+            if not has_warm_scale:
+                # Replay dp_3h from a clean slot so historical stats merge cleanly with any post-reset live samples.
+                trainer.scoped_reset_features(("dp_3h",))
+            else:
+                # Reset only target weights for ok_targets, preserving the established standardizer scale
+                for tid in ok_targets:
+                    m = trainer.models.get(tid)
+                    if m is not None and "dp_3h" in m.spec.features:
+                        idx = m.spec.features.index("dp_3h") + 1
+                        m.w[idx] = 0.0
+                        m.g2[idx] = 0.0
+                        m.cp_w[idx] = 0.0
+                        m.cp_g2[idx] = 0.0
             meta, rows = self._fetch_statistics(
                 ids,
                 datetime.fromtimestamp(start_ts, UTC),
@@ -1192,7 +1213,7 @@ class PatternRuntime:
             if not meta:
                 return None
             hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
-            counts = trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"})
+            counts = trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"}, update_std=not has_warm_scale)
             return trainer, counts
 
         reset_seq = self._reset_seq
@@ -1221,10 +1242,9 @@ class PatternRuntime:
             return True
 
         trained, counts = job_res
-        dp_slot = POOL_INDEX["dp_3h"]
         n_h = trained.std.n[dp_slot]
         pressure_targets = [t for t in ok_targets if t in eng.models and "dp_3h" in eng.models[t].spec.features]
-        if n_h <= 0 or any(counts.get(t, 0) <= 0 for t in pressure_targets):
+        if (pressure_targets and n_h < PATTERN_STD_MIN_N) or any(counts.get(t, 0) <= 0 for t in pressure_targets):
             _LOGGER.debug(
                 "ws_core pattern forecast: dp_3h migration replay lacked usable samples (%s, n=%d), will retry",
                 {t: counts.get(t, 0) for t in pressure_targets},
@@ -1233,9 +1253,10 @@ class PatternRuntime:
             await self.async_save()
             return True
 
-        eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
-        eng.std.var[dp_slot] = trained.std.var[dp_slot]
-        eng.std.n[dp_slot] = trained.std.n[dp_slot]
+        if not has_warm_scale:
+            eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
+            eng.std.var[dp_slot] = trained.std.var[dp_slot]
+            eng.std.n[dp_slot] = trained.std.n[dp_slot]
 
         for tid in ok_targets:
             live = eng.models.get(tid)
@@ -1289,6 +1310,8 @@ class PatternRuntime:
 
     def _schedule_recovery_retry(self) -> None:
         """Retry recorder warm start at most three times; unload cancels the task."""
+        if getattr(self.coord, "_stopped", False) is True:
+            return
         if self._retry_scheduled or self._retry_count >= len(_RECOVERY_RETRY_S):
             if self._retry_count >= len(_RECOVERY_RETRY_S):
                 self._warm_start["retry_exhausted"] = True
@@ -1316,6 +1339,9 @@ class PatternRuntime:
         against a copy of the engine, and the result is swapped in here on the event
         loop. Replayed samples never count toward ``skilled``.
         """
+        if getattr(self.coord, "_stopped", False) is True:
+            self._history_queued = False
+            return
         if self._history_running:
             self._history_queued = True
             return
@@ -1389,17 +1415,19 @@ class PatternRuntime:
             raise
         finally:
             self._history_running = False
-            if self._history_queued:
+            stopped = getattr(self.coord, "_stopped", False) is True
+            if cancelled or stopped:
+                self._history_queued = False
+            elif self._history_queued:
                 self._history_queued = False
                 if hasattr(self.coord, "_start_once"):
                     self.coord._start_once(self.async_learn_history, 0, "ws_core_pattern_history")
                 elif hasattr(self.coord, "_spawn"):
                     self.coord._spawn(self.async_learn_history(), "ws_core_pattern_history")
-            elif not cancelled:
-                if retry_needed:
-                    self._schedule_recovery_retry()
-                else:
-                    self._retry_count = 0
+            elif retry_needed:
+                self._schedule_recovery_retry()
+            else:
+                self._retry_count = 0
 
     # ------------------------------------------------------------------
     # services / diagnostics
