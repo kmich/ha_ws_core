@@ -1676,6 +1676,147 @@ class TestReplayMaskingAndDp3hAlignment:
         assert eng.history_learn["targets"]["gust_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
         assert eng.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
 
+    async def test_dp3h_migration_preserves_live_updates_during_executor_job(self):
+        import math
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from custom_components.ws_core.const import PATTERN_CHECKPOINT_INTERVAL_S
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        eng = rt.engine
+        dp_slot = POOL_INDEX["dp_3h"]
+
+        # Warm dp_3h scaler and pre-existing live weights before executor replay launches
+        eng.std.mean[dp_slot] = 0.0
+        eng.std.var[dp_slot] = 2.0
+        eng.std.n[dp_slot] = 80
+
+        rain_model = eng.models["rain_3h"]
+        rain_dp_idx = rain_model.spec.features.index("dp_3h") + 1
+        pre_w = 0.25
+        pre_g2 = 40.0
+        rain_model.w[rain_dp_idx] = pre_w
+        rain_model.g2[rain_dp_idx] = pre_g2
+        rain_model.cp_w[rain_dp_idx] = pre_w
+        rain_model.cp_g2[rain_dp_idx] = pre_g2
+        rain_model.cp_at = 1700000000.0
+
+        gust_model = eng.models["gust_3h"]
+        gust_dp_idx = gust_model.spec.features.index("dp_3h") + 1
+        gust_model.w[gust_dp_idx] = 0.15
+        gust_model.g2[gust_dp_idx] = 20.0
+
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                },
+                "gust_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                },
+            },
+        }
+
+        n = 60
+        mslp = [1015.0 - (0.6 * (i % 6)) for i in range(n)]
+        rain = [3.0 if (i % 6) == 3 else 0.0 for i in range(n)]
+        # rain_3h can replay; gust_3h lacks gust history so it remains pending
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=mslp,
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[None] * n,
+            rain=rain,
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+
+        captured: dict[str, float] = {}
+
+        class _InFlightLiveRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                res = fn(*args)
+                trained, _counts = res
+                src_rain = trained.models["rain_3h"]
+                captured["src_w"] = src_rain.w[rain_dp_idx]
+                captured["src_g2"] = src_rain.g2[rain_dp_idx]
+                captured["src_cp_w"] = src_rain.cp_w[rain_dp_idx]
+                captured["src_cp_g2"] = src_rain.cp_g2[rain_dp_idx]
+
+                # Simulate live observations and model training on the event loop while replay ran
+                eng.std.update(dp_slot, -3.5)
+                feat: list[float | None] = [None] * N_POOL
+                feat[dp_slot] = -3.5
+                live_ts = 1700000000.0 + PATTERN_CHECKPOINT_INTERVAL_S + 60.0
+                rain_model.train(eng.std, feat, 1.0, live_ts)
+                # Also train a second step after the checkpoint so w != cp_w
+                feat2: list[float | None] = [None] * N_POOL
+                feat2[dp_slot] = -2.5
+                rain_model.train(eng.std, feat2, 1.0, live_ts + 60.0)
+
+                captured["live_w"] = rain_model.w[rain_dp_idx]
+                captured["live_g2"] = rain_model.g2[rain_dp_idx]
+                captured["live_cp_w"] = rain_model.cp_w[rain_dp_idx]
+                captured["live_cp_g2"] = rain_model.cp_g2[rain_dp_idx]
+                captured["live_bias"] = rain_model.w[0]
+                captured["live_n_updates"] = rain_model.n_updates
+
+                # Also update missing gust_3h concurrently; migration must not overwrite it
+                gust_model.train(eng.std, feat, 1.0, live_ts)
+                captured["gust_live_w"] = gust_model.w[gust_dp_idx]
+                return res
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_InFlightLiveRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        assert retry is True
+        expected_w = captured["src_w"] + (captured["live_w"] - pre_w)
+        expected_g2 = captured["src_g2"] + (captured["live_g2"] - pre_g2)
+        expected_cp_w = captured["src_cp_w"] + (captured["live_cp_w"] - pre_w)
+        expected_cp_g2 = captured["src_cp_g2"] + (captured["live_cp_g2"] - pre_g2)
+
+        assert captured["live_w"] != pre_w
+        assert captured["src_w"] != pre_w
+        assert math.isclose(rain_model.w[rain_dp_idx], expected_w, rel_tol=0.0, abs_tol=1e-12)
+        assert math.isclose(rain_model.g2[rain_dp_idx], expected_g2, rel_tol=0.0, abs_tol=1e-12)
+        assert math.isclose(rain_model.cp_w[rain_dp_idx], expected_cp_w, rel_tol=0.0, abs_tol=1e-12)
+        assert math.isclose(rain_model.cp_g2[rain_dp_idx], expected_cp_g2, rel_tol=0.0, abs_tol=1e-12)
+        assert rain_model.w[0] == captured["live_bias"]
+        assert rain_model.n_updates == captured["live_n_updates"]
+        assert eng.std.n[dp_slot] == 81
+        assert gust_model.w[gust_dp_idx] == captured["gust_live_w"]
+        assert eng.history_learn["targets"]["rain_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn["targets"]["gust_3h"]["features_method"] == 3
+
 
 class TestDowngradeTolerance:
     """Verify that storage schema remains compatible with earlier versions."""

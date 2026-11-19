@@ -1113,12 +1113,13 @@ class PatternRuntime:
             _LOGGER.debug("ws_core pattern forecast: could not read the units of the statistics: %s", err)
             return True
 
-        # Discard recorder results if learning was reset while the job was in flight
+        # Discard recorder results if learning was reset or stopped while the job was in flight
         if (
             self._reset_seq != reset_seq
             or self.engine is not eng
             or not self.engine.history_learn
             or not self.engine.history_learn.get("targets")
+            or getattr(self.coord, "_stopped", False) is True
         ):
             _LOGGER.debug(
                 "ws_core pattern forecast: learning state was reset during legacy units check; discarding results"
@@ -1138,6 +1139,41 @@ class PatternRuntime:
             eng.mark_replay_current(old)
             await self.async_save()
         return False
+
+    @staticmethod
+    def _merge_dp3h_replay_weight(
+        live: Any,
+        src: Any,
+        idx: int,
+        pre: tuple[float, float, float, float] | None,
+    ) -> None:
+        """Apply replayed dp_3h weight/accumulator while preserving in-flight live updates."""
+        if pre is None:
+            live.w[idx] = src.w[idx]
+            live.g2[idx] = src.g2[idx]
+            live.cp_w[idx] = src.cp_w[idx]
+            live.cp_g2[idx] = src.cp_g2[idx]
+            return
+
+        pre_w, pre_g2, pre_cp_w, pre_cp_g2 = pre
+        merged_w = src.w[idx] + (live.w[idx] - pre_w)
+        merged_g2 = src.g2[idx] + max(0.0, live.g2[idx] - pre_g2)
+        if math.isfinite(merged_w) and math.isfinite(merged_g2):
+            live.w[idx] = merged_w
+            live.g2[idx] = merged_g2
+        else:
+            live.w[idx] = src.w[idx]
+            live.g2[idx] = src.g2[idx]
+
+        if live.cp_w[idx] != pre_cp_w or live.cp_g2[idx] != pre_cp_g2:
+            merged_cp_w = src.cp_w[idx] + (live.cp_w[idx] - pre_w)
+            merged_cp_g2 = src.cp_g2[idx] + max(0.0, live.cp_g2[idx] - pre_g2)
+            if math.isfinite(merged_cp_w) and math.isfinite(merged_cp_g2):
+                live.cp_w[idx] = merged_cp_w
+                live.cp_g2[idx] = merged_cp_g2
+                return
+        live.cp_w[idx] = src.cp_w[idx]
+        live.cp_g2[idx] = src.cp_g2[idx]
 
     async def _async_migrate_feature_replay(self, now: datetime) -> bool:
         """Migrate targets replayed under older methods (< PATTERN_HISTORY_FEATURES_METHOD).
@@ -1220,6 +1256,13 @@ class PatternRuntime:
         # Preserve the dp_3h standardizer (and any post-reset live weights on that scale)
         # once live learning has warmed up the scaler, even if every pressure target is pending.
         has_warm_scale = eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
+        pre_dp: dict[str, tuple[float, float, float, float]] = {}
+        if has_warm_scale:
+            for tid in ok_targets:
+                live = eng.models.get(tid)
+                if live is not None and "dp_3h" in live.spec.features:
+                    idx = live.spec.features.index("dp_3h") + 1
+                    pre_dp[tid] = (live.w[idx], live.g2[idx], live.cp_w[idx], live.cp_g2[idx])
 
         def _dp3h_job() -> tuple[PatternEngine, dict[str, int]] | None:
             trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)
@@ -1245,12 +1288,13 @@ class PatternRuntime:
             await self.async_save()
             return True
 
-        # Discard recorder results if learning was reset while the job was in flight
+        # Discard recorder results if learning was reset or stopped while the job was in flight
         if (
             self._reset_seq != reset_seq
             or self.engine is not eng
             or not self.engine.history_learn
             or not self.engine.history_learn.get("targets")
+            or getattr(self.coord, "_stopped", False) is True
         ):
             _LOGGER.debug(
                 "ws_core pattern forecast: learning state was reset during dp_3h migration replay; discarding results"
@@ -1296,10 +1340,7 @@ class PatternRuntime:
             src = trained.models.get(tid)
             if live is not None and src is not None and "dp_3h" in live.spec.features:
                 idx = live.spec.features.index("dp_3h") + 1
-                live.w[idx] = src.w[idx]
-                live.g2[idx] = src.g2[idx]
-                live.cp_w[idx] = src.cp_w[idx]
-                live.cp_g2[idx] = src.cp_g2[idx]
+                self._merge_dp3h_replay_weight(live, src, idx, pre_dp.get(tid))
             if isinstance(targets.get(tid), dict):
                 targets[tid]["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
 
