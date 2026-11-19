@@ -611,7 +611,8 @@ async def test_meteo_france_documented_routes_and_wind_units():
                 "rh2m": 60,
                 "wind10m": 0 if k == 2 else 18,
                 "gust10m": 0 if k == 2 else 36,
-                "rr1": 0.0,
+                "rr10": 0.0,
+                "rr1": 1.2,
                 "probarain": 10,
                 "weather": 0,
             }
@@ -626,7 +627,8 @@ async def test_meteo_france_documented_routes_and_wind_units():
                 "rh2m": 75,
                 "wind10m": 12,
                 "gust10m": 28,
-                "rr1": 0.5,
+                "rr10": 0.5,
+                "rr1": 2.4,
                 "probarain": 40,
                 "weather": 10,
             }
@@ -656,15 +658,18 @@ async def test_meteo_france_documented_routes_and_wind_units():
     assert called[2][1]["hourly"] == "true"
     assert not any(url.endswith("/forecast/hourly") for url, _ in called)
 
-    # Wind/gust values stay in km/h (NOT multiplied by 3.6) and keep 0.0
+    # Wind/gust values stay in km/h (NOT multiplied by 3.6) and keep 0.0;
+    # hourly precip_mm uses accumulated rr10 rather than upper-bound convective rr1.
     assert res["daily"][0]["wind_kmh"] == 20.0
     assert res["daily"][0]["gust_kmh"] == 45.0
     assert len(res["hourly"]) == 25
     assert res["hourly"][0]["utc_datetime"] == "2026-06-21T18:00:00+00:00"
+    assert res["hourly"][0]["precip_mm"] == 0.0
     assert res["hourly"][0]["wind_kmh"] == 0.0
     assert res["hourly"][0]["gust_kmh"] == 0.0
     assert res["hourly"][1]["wind_kmh"] == 18.0
     assert res["hourly"][1]["gust_kmh"] == 36.0
+    assert res["hourly"][4]["precip_mm"] == 0.5
 
     # When daily/{day}/hourly is forbidden, falls back to documented /forecast/nextHours?hourly=true
     session2 = MagicMock()
@@ -680,6 +685,8 @@ async def test_meteo_france_documented_routes_and_wind_units():
                     {
                         "datetime": "2026-06-21T20:00:00+0200",
                         "temp2m": 22,
+                        "rr10": 0.2,
+                        "rr1": 1.8,
                         "wind10m": 15,
                         "gust10m": 32,
                         "weather": 1,
@@ -697,5 +704,6 @@ async def test_meteo_france_documented_routes_and_wind_units():
     assert fallback_urls[1][0].endswith("/forecast/daily/0/hourly")
     assert fallback_urls[2][0].endswith("/forecast/nextHours")
     assert fallback_urls[2][1]["hourly"] == "true"
+    assert fallback_res["hourly"][0]["precip_mm"] == 0.2
     assert fallback_res["hourly"][0]["wind_kmh"] == 15.0
     assert fallback_res["hourly"][0]["gust_kmh"] == 32.0

@@ -188,7 +188,7 @@ class MeteoFranceProvider(ForecastProvider):
                     "apparent_temp_c": None,  # not provided by Météo Concept
                     "dewpoint_c": None,  # not provided by Météo Concept
                     "precip_prob": h.get("probarain"),
-                    "precip_mm": h.get("rr1"),
+                    "precip_mm": h.get("rr10"),
                     "weathercode": _MF_TO_WMO.get(mf_code) if mf_code is not None else None,
                     "wind_kmh": round(float(h["wind10m"]), 1) if h.get("wind10m") is not None else None,
                     "gust_kmh": round(float(h["gust10m"]), 1) if h.get("gust10m") is not None else None,

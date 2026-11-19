@@ -5,6 +5,8 @@ blueprint:
     drying, garden work, or custom activity). Triggers accurately using Home Assistant's
     native time trigger at the timestamp sensor with a configurable lead-time offset.
   domain: automation
+  homeassistant:
+    min_version: "2024.10.0"
   input:
     next_start_sensor:
       name: Weather Window Next Start Sensor

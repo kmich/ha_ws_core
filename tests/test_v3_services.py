@@ -303,6 +303,25 @@ class TestV3Services:
         assert notify_calls[0]["title"] == "Weather Window Starting Soon"
         assert "Outdoor Laundry Drying Next Start" in notify_calls[0]["message"]
 
+    def test_weather_window_notification_blueprint_gates_min_ha_version(self):
+        from homeassistant.components.automation.config import AUTOMATION_BLUEPRINT_SCHEMA
+        from homeassistant.components.blueprint.models import Blueprint
+        from homeassistant.util.yaml import load_yaml
+
+        bp_path = (
+            pathlib.Path(__file__).resolve().parents[1]
+            / "blueprints/automation/ws_core/weather_window_notification.yaml"
+        )
+        raw = load_yaml(str(bp_path))
+        bp = Blueprint(raw, expected_domain="automation", schema=AUTOMATION_BLUEPRINT_SCHEMA)
+        assert bp.metadata["homeassistant"]["min_version"] == "2024.10.0"
+        assert bp.validate() is None
+
+        with patch("homeassistant.components.blueprint.models.__version__", "2024.6.0"):
+            assert bp.validate() == ["Requires at least Home Assistant 2024.10.0"]
+        with patch("homeassistant.components.blueprint.models.__version__", "2024.9.3"):
+            assert bp.validate() == ["Requires at least Home Assistant 2024.10.0"]
+
     def test_get_station_summary_excludes_expired_recommendations(self):
         from custom_components.ws_core.const import KEY_WEATHER_WINDOWS, PROFILE_GARDEN_WORK
 
