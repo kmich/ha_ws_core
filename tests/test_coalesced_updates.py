@@ -96,8 +96,9 @@ class TestBurstCoalescing:
         coord._compute.assert_called_once_with(sample=False)
         coord.async_set_updated_data.assert_called_once_with({"hazard": True})
 
-    def test_v3_burst_coalescing_and_weather_windows_performance_gate(self):
-        """Replay 25x12-sensor bursts with Weather Windows ON: assert 1 write/burst & <10% burst budget."""
+    @pytest.mark.asyncio
+    async def test_v3_burst_coalescing_and_weather_windows_performance_gate(self, hass):
+        """Replay 25x12-sensor bursts with Weather Windows ON: assert 1 write/burst & <10% budget."""
         import statistics
         import time
         from datetime import UTC, datetime, timedelta
@@ -124,7 +125,6 @@ class TestBurstCoalescing:
             SRC_WIND_DIR,
         )
         from custom_components.ws_core.coordinator import WSStationCoordinator
-        from tests.test_coordinator import _make_state
 
         now = datetime(2026, 6, 21, 11, 0, tzinfo=UTC)
         sources = {
@@ -141,12 +141,11 @@ class TestBurstCoalescing:
             SRC_DEW_POINT: "sensor.dew",
             SRC_SOLAR_RADIATION: "sensor.solar",
         }
-        states = {eid: _make_state("20.0", "", now) for eid in sources.values()}
-        states["sun.sun"] = MagicMock(state="above_horizon", attributes={"elevation": 45, "azimuth": 180})
-        hass = MagicMock()
         hass.config.latitude = 37.9
         hass.config.longitude = 23.7
-        hass.states.get = lambda eid: states.get(eid)
+        for eid in sources.values():
+            hass.states.async_set(eid, "20.0", {"unit_of_measurement": ""})
+        hass.states.async_set("sun.sun", "above_horizon", {"elevation": 45, "azimuth": 180})
 
         with patch.object(DataUpdateCoordinator, "__init__", lambda self, *a, **kw: None):
             coord = WSStationCoordinator(
@@ -219,6 +218,8 @@ class TestBurstCoalescing:
             for i in range(25):
                 burst_now = now + timedelta(minutes=i * 15)
                 current_now[0] = burst_now
+                for eid in sources.values():
+                    hass.states.async_set(eid, f"{20.0 + (i % 5) * 0.1:.1f}", {"unit_of_measurement": ""})
                 coord.runtime.last_forecast_fetch = burst_now
                 coord._forecast_cache = _make_fresh_forecast(burst_now)
                 scheduled.clear()
@@ -241,11 +242,11 @@ class TestBurstCoalescing:
         recompute_sorted = sorted(recompute_ms)
         p95_recompute_ms = recompute_sorted[int(0.95 * len(recompute_sorted)) - 1]
         assert statistics.median(recompute_sorted) > 0.0
-        # Gate: recompute p95 must stay within baseline budget (+10% gate = 10.639 ms)
-        assert p95_recompute_ms <= 10.639
+        # M0 baseline was 0.758 ms p95 per recompute (+10% gate = 0.8338 ms)
+        assert p95_recompute_ms <= 0.834, f"p95 recompute {p95_recompute_ms:.3f} ms exceeds 0.834 ms"
 
         burst_sorted = sorted(burst_ms)
         p95_burst_ms = burst_sorted[int(0.95 * len(burst_sorted)) - 1]
         assert statistics.median(burst_sorted) > 0.0
         # M0 baseline was 9.672 ms p95 per 12-sensor burst (+10% gate = 10.639 ms)
-        assert p95_burst_ms <= 10.639
+        assert p95_burst_ms <= 10.639, f"p95 burst {p95_burst_ms:.3f} ms exceeds 10.639 ms"

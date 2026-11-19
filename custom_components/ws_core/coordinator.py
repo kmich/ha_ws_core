@@ -5321,12 +5321,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         engine = self._get_weather_windows_engine()
-        eval_dict = {}
         local_now = dt_util.as_local(now)
-        for pid, prof in engine.profiles.items():
-            if prof.enabled:
-                res = engine.evaluate_profile(prof, hourly, current_data=data, now=local_now)
-                eval_dict[pid] = res.to_dict()
+        eval_dict = engine.evaluate_profiles(
+            [prof for prof in engine.profiles.values() if prof.enabled],
+            hourly,
+            current_data=data,
+            now=local_now,
+        )
 
         self._weather_windows_eval = eval_dict
         data[KEY_WEATHER_WINDOWS] = eval_dict
@@ -5381,12 +5382,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return res.to_dict()
 
         # Return all enabled profiles
-        results = {}
-        for pid, prof in engine.profiles.items():
-            if prof.enabled:
-                res = engine.evaluate_profile(prof, hourly, current_data=data, now=now)
-                results[pid] = res.to_dict()
-        return results
+        return engine.evaluate_profiles(
+            [prof for prof in engine.profiles.values() if prof.enabled],
+            hourly,
+            current_data=data,
+            now=now,
+        )
 
     def get_station_summary(self) -> dict[str, Any]:
         """Return concise, deterministic summary for voice/Assist actions (SupportsResponse.ONLY)."""

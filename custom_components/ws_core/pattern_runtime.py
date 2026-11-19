@@ -1217,26 +1217,15 @@ class PatternRuntime:
         snapshot = eng.to_dict()
         need_night = any(eng.models[t].spec.kind == "frost" for t in ok_targets if t in eng.models)
         dp_slot = POOL_INDEX["dp_3h"]
-        other_pressure_models = [
-            t for t in eng.models if t not in ok_targets and "dp_3h" in eng.models[t].spec.features
-        ]
-        has_warm_scale = bool(other_pressure_models) and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
+        # Preserve the dp_3h standardizer (and any post-reset live weights on that scale)
+        # once live learning has warmed up the scaler, even if every pressure target is pending.
+        has_warm_scale = eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
 
         def _dp3h_job() -> tuple[PatternEngine, dict[str, int]] | None:
             trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)
             if not has_warm_scale:
-                # Replay dp_3h from a clean slot so historical stats merge cleanly with any post-reset live samples.
+                # Cold scaler (< PATTERN_STD_MIN_N): reset dp_3h cleanly and build scale from history.
                 trainer.scoped_reset_features(("dp_3h",))
-            else:
-                # Reset only target weights for ok_targets, preserving the established standardizer scale
-                for tid in ok_targets:
-                    m = trainer.models.get(tid)
-                    if m is not None and "dp_3h" in m.spec.features:
-                        idx = m.spec.features.index("dp_3h") + 1
-                        m.w[idx] = 0.0
-                        m.g2[idx] = 0.0
-                        m.cp_w[idx] = 0.0
-                        m.cp_g2[idx] = 0.0
             meta, rows = self._fetch_statistics(
                 ids,
                 datetime.fromtimestamp(start_ts, UTC),
@@ -1276,7 +1265,19 @@ class PatternRuntime:
         trained, counts = job_res
         n_h = trained.std.n[dp_slot]
         pressure_targets = [t for t in ok_targets if t in eng.models and "dp_3h" in eng.models[t].spec.features]
-        if (pressure_targets and n_h < PATTERN_STD_MIN_N) or any(counts.get(t, 0) <= 0 for t in pressure_targets):
+        non_pressure_ok = [t for t in ok_targets if t not in eng.models or "dp_3h" not in eng.models[t].spec.features]
+        scaler_ready = n_h >= PATTERN_STD_MIN_N
+        recoverable_pressure = [t for t in pressure_targets if scaler_ready and counts.get(t, 0) > 0]
+        missing_pressure = [t for t in pressure_targets if not (scaler_ready and counts.get(t, 0) > 0)]
+        migrated_targets = [*non_pressure_ok, *recoverable_pressure]
+
+        if recoverable_pressure and not has_warm_scale and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N:
+            # Live observations warmed the dp_3h scaler while the migration job was
+            # in flight; re-run so recoverable targets train against that live scale.
+            await self.async_save()
+            return True
+
+        if not migrated_targets:
             _LOGGER.debug(
                 "ws_core pattern forecast: dp_3h migration replay lacked usable samples (%s, n=%d), will retry",
                 {t: counts.get(t, 0) for t in pressure_targets},
@@ -1285,17 +1286,12 @@ class PatternRuntime:
             await self.async_save()
             return True
 
-        if not has_warm_scale:
-            if other_pressure_models and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N:
-                # A live-only pressure model crossed the warmup threshold while the
-                # migration job was in flight; re-run so we train against its scale.
-                await self.async_save()
-                return True
+        if recoverable_pressure and not has_warm_scale:
             eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
             eng.std.var[dp_slot] = trained.std.var[dp_slot]
             eng.std.n[dp_slot] = trained.std.n[dp_slot]
 
-        for tid in ok_targets:
+        for tid in migrated_targets:
             live = eng.models.get(tid)
             src = trained.models.get(tid)
             if live is not None and src is not None and "dp_3h" in live.spec.features:
@@ -1309,10 +1305,23 @@ class PatternRuntime:
 
         hl["targets"] = targets
         hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
-        hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+        all_done = not missing_pressure and all(
+            _method_int(e.get("features_method")) >= PATTERN_HISTORY_FEATURES_METHOD
+            for e in targets.values()
+            if isinstance(e, dict) and e.get("status") == "ok"
+        )
+        if all_done:
+            hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
         eng.history_learn = hl
         self._published = {}
         await self.async_save()
+        if missing_pressure:
+            _LOGGER.debug(
+                "ws_core pattern forecast: dp_3h migration completed for %s; lacking samples for %s, will retry",
+                recoverable_pressure,
+                {t: counts.get(t, 0) for t in missing_pressure},
+            )
+            return True
         return False
 
     async def _async_seed_pressure(self, now: datetime) -> tuple[int, bool]:

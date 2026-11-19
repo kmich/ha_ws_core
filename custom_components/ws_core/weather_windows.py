@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
@@ -282,6 +282,11 @@ def apply_profile_overrides(
 
 def _as_finite_float(val: Any) -> float | None:
     """Convert non-bool numeric inputs to finite float, else None."""
+    t = type(val)
+    if t is float:
+        return val if math.isfinite(val) else None
+    if t is int:
+        return float(val)
     if val is None or isinstance(val, bool):
         return None
     try:
@@ -401,14 +406,9 @@ class WeatherWindowsEngine:
         self._solar_cache: dict[tuple[float, float, datetime], float] = {}
         self._parse_dt_cache: dict[str, datetime | None] = {}
 
-    def evaluate_profile(
-        self,
-        profile: WeatherWindowProfile,
-        hourly_forecast: list[dict[str, Any]] | None,
-        current_data: dict[str, Any] | None = None,
-        now: datetime | None = None,
-    ) -> WeatherDecisionResult:
-        """Evaluate a profile against forecast and live station conditions."""
+    @staticmethod
+    def _validate_profile(profile: WeatherWindowProfile) -> dict[str, Any]:
+        """Validate profile thresholds and return the evaluated limits mapping."""
         if (
             isinstance(profile.min_duration_h, bool)
             or not isinstance(profile.min_duration_h, int)
@@ -419,19 +419,7 @@ class WeatherWindowsEngine:
             threshold = getattr(profile, field_name)
             if threshold is not None and (isinstance(threshold, bool) or not math.isfinite(float(threshold))):
                 raise ValueError(f"{field_name} must be finite")
-
-        eval_now = now or dt_util.now()
-        local_tz = dt_util.get_default_time_zone()
-        if eval_now.tzinfo is not None and eval_now.tzinfo is not UTC:
-            local_tz = eval_now.tzinfo
-        now_utc = (
-            eval_now.replace(tzinfo=local_tz).astimezone(UTC) if eval_now.tzinfo is None else eval_now.astimezone(UTC)
-        )
-        display_tz = local_tz
-        evaluated_at_iso = now_utc.isoformat()
-        current = current_data or {}
-
-        limits_dict = {
+        return {
             "min_duration_h": profile.min_duration_h,
             "max_rain_prob_pct": profile.max_rain_prob_pct,
             "max_rain_mm": profile.max_rain_mm,
@@ -446,62 +434,220 @@ class WeatherWindowsEngine:
             "require_daylight": profile.require_daylight,
         }
 
-        if not hourly_forecast or len(hourly_forecast) < min(2, profile.min_duration_h):
-            return WeatherDecisionResult(
-                profile_id=profile.profile_id,
-                status=STATUS_UNKNOWN,
-                evaluated_at=evaluated_at_iso,
-                reason_codes=[REASON_INSUFFICIENT_HORIZON],
-                reasons_text=["Insufficient hourly forecast data available to evaluate windows."],
-                evaluated_limits=limits_dict,
-                data_quality={"available_slots": len(hourly_forecast) if hourly_forecast else 0},
-            )
-
-        # 1. Parse timestamps in UTC, enforce active 24h horizon, deduplicate, and sort ascending
-        deduped: dict[datetime, dict[str, Any]] = {}
-        for item in hourly_forecast:
-            slot_utc = self._parse_slot_utc(item, display_tz)
-            if slot_utc is None:
-                continue
-            # Keep current in-progress hour and future hours within the 24-hour evaluation window
-            if (slot_utc + timedelta(hours=1) - now_utc).total_seconds() <= 0.0:
-                continue
-            if (slot_utc - now_utc).total_seconds() >= MAX_HORIZON_HOURS * 3600.0:
-                continue
-            deduped.setdefault(slot_utc, item)
-
-        if not deduped:
-            return WeatherDecisionResult(
-                profile_id=profile.profile_id,
-                status=STATUS_UNKNOWN,
-                evaluated_at=evaluated_at_iso,
-                reason_codes=[REASON_INSUFFICIENT_HORIZON],
-                reasons_text=["No forecast hours within the 24-hour evaluation window."],
-                evaluated_limits=limits_dict,
-                data_quality={"available_slots": 0},
-            )
-
+    def _prepare_evaluation(
+        self,
+        hourly_forecast: list[dict[str, Any]] | None,
+        current_data: dict[str, Any] | None,
+        now: datetime | None,
+    ) -> dict[str, Any]:
+        """Parse and normalize hourly forecast and live station state once across profiles."""
+        eval_now = now or dt_util.now()
+        local_tz = dt_util.get_default_time_zone()
+        if eval_now.tzinfo is not None and eval_now.tzinfo is not UTC:
+            local_tz = eval_now.tzinfo
+        now_utc = (
+            eval_now.replace(tzinfo=local_tz).astimezone(UTC) if eval_now.tzinfo is None else eval_now.astimezone(UTC)
+        )
+        display_tz = local_tz
+        now_ts = now_utc.timestamp()
+        evaluated_at_iso = now_utc.isoformat()
         horizon_end_utc = now_utc + timedelta(hours=MAX_HORIZON_HOURS)
-        evaluated_pairs: list[tuple[datetime, WindowSlotEvaluation]] = []
-        for slot_utc in sorted(deduped):
-            item = deduped[slot_utc]
-            display_iso = slot_utc.astimezone(display_tz).isoformat()
-            slot_eval = self._evaluate_slot(
-                item,
-                slot_utc,
-                display_iso,
-                profile,
-                now_utc=now_utc,
-                horizon_end_utc=horizon_end_utc,
-            )
-            evaluated_pairs.append((slot_utc, slot_eval))
+        horizon_end_ts = horizon_end_utc.timestamp()
 
-        # 2. Check live observations at station now and apply them to the current interval
+        current = current_data or {}
         live_rain_rate = _as_finite_float(current.get(KEY_RAIN_RATE_FILT))
         live_gust_ms = _as_finite_float(current.get(KEY_NORM_WIND_GUST_MS))
+
+        hourly_count = len(hourly_forecast) if hourly_forecast else 0
+        prepared_slots: list[tuple[Any, ...]] = []
+        if hourly_forecast:
+            deduped: dict[float, tuple[datetime, dict[str, Any]]] = {}
+            max_h_s = MAX_HORIZON_HOURS * 3600.0
+            for item in hourly_forecast:
+                slot_utc = self._parse_slot_utc(item, display_tz)
+                if slot_utc is None:
+                    continue
+                slot_ts = slot_utc.timestamp()
+                if slot_ts + 3600.0 - now_ts <= 0.0:
+                    continue
+                if slot_ts - now_ts >= max_h_s:
+                    continue
+                if slot_ts not in deduped:
+                    deduped[slot_ts] = (slot_utc, item)
+
+            if deduped:
+                coord_key = (round(float(self.lat), 5), round(float(self.lon), 5))
+                solar_cache = self._solar_cache
+                lat_f = float(self.lat)
+                lon_f = float(self.lon)
+                is_utc_display = display_tz is UTC
+                prev_end_ts: float | None = None
+                prev_end_elev: float | None = None
+
+                for slot_ts in sorted(deduped):
+                    slot_utc, item = deduped[slot_ts]
+                    display_iso = (
+                        slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
+                    )
+                    raw_end_ts = slot_ts + 3600.0
+                    eff_start_ts = slot_ts if slot_ts >= now_ts else now_ts
+                    eff_end_ts = raw_end_ts if raw_end_ts <= horizon_end_ts else horizon_end_ts
+
+                    if prev_end_ts == eff_start_ts and prev_end_elev is not None:
+                        sol_elev_start = prev_end_elev
+                    else:
+                        eff_start_dt = slot_utc if eff_start_ts == slot_ts else now_utc
+                        s_key = (coord_key[0], coord_key[1], eff_start_dt)
+                        sol_elev_start = solar_cache.get(s_key)
+                        if sol_elev_start is None:
+                            sol_elev_start = solar_elevation_deg(lat_f, lon_f, eff_start_dt)
+                            if len(solar_cache) > 512:
+                                solar_cache.clear()
+                            solar_cache[s_key] = sol_elev_start
+
+                    eff_end_dt = (slot_utc + timedelta(hours=1)) if eff_end_ts == raw_end_ts else horizon_end_utc
+                    e_key = (coord_key[0], coord_key[1], eff_end_dt)
+                    sol_elev_end = solar_cache.get(e_key)
+                    if sol_elev_end is None:
+                        sol_elev_end = solar_elevation_deg(lat_f, lon_f, eff_end_dt)
+                        if len(solar_cache) > 512:
+                            solar_cache.clear()
+                        solar_cache[e_key] = sol_elev_end
+
+                    prev_end_ts = eff_end_ts
+                    prev_end_elev = sol_elev_end
+                    sol_elev = sol_elev_start if sol_elev_start < sol_elev_end else sol_elev_end
+                    is_night = sol_elev_start <= 0.0 or sol_elev_end <= 0.0
+                    sol_elev_rounded = round(sol_elev, 1)
+
+                    temp_c = _as_finite_float(item.get("temp_c"))
+                    rain_prob = _as_finite_float(item.get("precip_prob"))
+                    rain_mm = _as_finite_float(item.get("precip_mm"))
+                    humidity = _as_finite_float(item.get("humidity"))
+                    wind_kmh = _as_finite_float(item.get("wind_kmh"))
+                    gust_kmh = _as_finite_float(item.get("gust_kmh"))
+                    cloud_cover = _as_finite_float(item.get("cloud_cover"))
+                    rain_prob_int = int(rain_prob) if rain_prob is not None else None
+                    is_current = slot_ts <= now_ts < raw_end_ts
+
+                    prepared_slots.append(
+                        (
+                            slot_utc,
+                            slot_ts,
+                            display_iso,
+                            temp_c,
+                            rain_prob_int,
+                            rain_prob,
+                            rain_mm,
+                            humidity,
+                            wind_kmh,
+                            gust_kmh,
+                            cloud_cover,
+                            is_night,
+                            sol_elev_rounded,
+                            is_current,
+                        )
+                    )
+
+        return {
+            "now_utc": now_utc,
+            "now_ts": now_ts,
+            "display_tz": display_tz,
+            "evaluated_at_iso": evaluated_at_iso,
+            "horizon_end_utc": horizon_end_utc,
+            "horizon_end_ts": horizon_end_ts,
+            "live_rain_rate": live_rain_rate,
+            "live_gust_ms": live_gust_ms,
+            "hourly_count": hourly_count,
+            "slots": prepared_slots,
+        }
+
+    def evaluate_profiles(
+        self,
+        profiles: Iterable[WeatherWindowProfile],
+        hourly_forecast: list[dict[str, Any]] | None,
+        current_data: dict[str, Any] | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Evaluate multiple profiles in one pass over parsed forecast slots (returns dict contracts)."""
+        prof_list = list(profiles)
+        if not prof_list:
+            return {}
+        prepared = self._prepare_evaluation(hourly_forecast, current_data, now)
+        return {prof.profile_id: self._evaluate_prepared_profile(prof, prepared, as_dict=True) for prof in prof_list}
+
+    def evaluate_profile(
+        self,
+        profile: WeatherWindowProfile,
+        hourly_forecast: list[dict[str, Any]] | None,
+        current_data: dict[str, Any] | None = None,
+        now: datetime | None = None,
+    ) -> WeatherDecisionResult:
+        """Evaluate a profile against forecast and live station conditions."""
+        prepared = self._prepare_evaluation(hourly_forecast, current_data, now)
+        return self._evaluate_prepared_profile(profile, prepared, as_dict=False)
+
+    def _evaluate_prepared_profile(
+        self,
+        profile: WeatherWindowProfile,
+        prepared: dict[str, Any],
+        *,
+        as_dict: bool = False,
+    ) -> Any:
+        """Evaluate a single profile against a pre-parsed evaluation context."""
+        limits_dict = self._validate_profile(profile)
+        evaluated_at_iso: str = prepared["evaluated_at_iso"]
+        hourly_count: int = prepared["hourly_count"]
+        prepared_slots: list[tuple[Any, ...]] = prepared["slots"]
+
+        if hourly_count < min(2, profile.min_duration_h):
+            payload = {
+                "profile_id": profile.profile_id,
+                "status": STATUS_UNKNOWN,
+                "evaluated_at": evaluated_at_iso,
+                "next_start": None,
+                "next_end": None,
+                "duration_h": None,
+                "horizon_hours": 0,
+                "is_truncated": False,
+                "reason_codes": [REASON_INSUFFICIENT_HORIZON],
+                "reasons_text": ["Insufficient hourly forecast data available to evaluate windows."],
+                "evaluated_limits": limits_dict,
+                "windows": [],
+                "slots": [],
+                "data_quality": {"available_slots": hourly_count},
+            }
+            return payload if as_dict else WeatherDecisionResult(**payload)
+
+        if not prepared_slots:
+            payload = {
+                "profile_id": profile.profile_id,
+                "status": STATUS_UNKNOWN,
+                "evaluated_at": evaluated_at_iso,
+                "next_start": None,
+                "next_end": None,
+                "duration_h": None,
+                "horizon_hours": 0,
+                "is_truncated": False,
+                "reason_codes": [REASON_INSUFFICIENT_HORIZON],
+                "reasons_text": ["No forecast hours within the 24-hour evaluation window."],
+                "evaluated_limits": limits_dict,
+                "windows": [],
+                "slots": [],
+                "data_quality": {"available_slots": 0},
+            }
+            return payload if as_dict else WeatherDecisionResult(**payload)
+
+        now_ts: float = prepared["now_ts"]
+        display_tz: tzinfo = prepared["display_tz"]
+        horizon_end_utc: datetime = prepared["horizon_end_utc"]
+        horizon_end_ts: float = prepared["horizon_end_ts"]
+        live_rain_rate: float | None = prepared["live_rain_rate"]
+        live_gust_ms: float | None = prepared["live_gust_ms"]
+
+        # Precompute live blockers for this profile
         live_blockers: list[str] = []
         live_blocker_texts: list[str] = []
-
         if (
             live_rain_rate is not None
             and (profile.max_rain_mm is not None or profile.max_rain_prob_pct is not None)
@@ -518,32 +664,193 @@ class WeatherWindowsEngine:
                     f"Current wind gust ({live_gust_kmh:.0f} km/h) exceeds limit ({profile.max_wind_gust_kmh:.0f} km/h)."
                 )
 
-        if live_blockers:
-            for slot_utc, slot_eval in evaluated_pairs:
-                if slot_utc <= now_utc < slot_utc + timedelta(hours=1):
-                    slot_eval.suitable = False
-                    slot_eval.reasons = [r for r in slot_eval.reasons if r != REASON_SUITABLE]
-                    for blocker in live_blockers:
-                        if blocker not in slot_eval.reasons:
-                            slot_eval.reasons.append(blocker)
+        # Bind limits to local variables for the inner loop
+        req_daylight = profile.require_daylight
+        p_max_rp = profile.max_rain_prob_pct
+        p_max_rm = profile.max_rain_mm
+        p_min_t = profile.min_temp_c
+        p_max_t = profile.max_temp_c
+        p_min_h = profile.min_humidity_pct
+        p_max_h = profile.max_humidity_pct
+        p_min_w = profile.min_wind_kmh
+        p_max_w = profile.max_wind_kmh
+        p_max_g = profile.max_wind_gust_kmh
+        p_max_c = profile.max_cloud_cover_pct
 
-        # 3. Extract confirmed contiguous windows & candidate unassessed windows
-        window_bounds = self._extract_windows(
-            evaluated_pairs,
-            profile.min_duration_h,
-            now_utc,
-            display_tz,
-            predicate=lambda s: s.suitable,
-        )
-        potential_bounds = self._extract_windows(
-            evaluated_pairs,
-            profile.min_duration_h,
-            now_utc,
-            display_tz,
-            predicate=lambda s: s.suitable or s.reasons == [REASON_MISSING_DATA],
-        )
+        slot_dicts: list[dict[str, Any]] = []
+        suit_flags: list[bool] = []
+        pot_flags: list[bool] = []
+        unassessed_slots = 0
 
-        # 4. Formulate decision status and next suitable window
+        for (
+            _slot_utc,
+            _slot_ts,
+            display_iso,
+            temp_c,
+            rain_prob_int,
+            rain_prob,
+            rain_mm,
+            humidity,
+            wind_kmh,
+            gust_kmh,
+            cloud_cover,
+            is_night,
+            sol_elev_rounded,
+            is_current,
+        ) in prepared_slots:
+            reasons_slot: list[str] = []
+            unassessed: list[str] = []
+
+            if req_daylight and is_night:
+                reasons_slot.append(REASON_NIGHTTIME)
+
+            if p_max_rp is not None:
+                if rain_prob is None:
+                    unassessed.append("max_rain_prob_pct")
+                elif rain_prob > p_max_rp:
+                    reasons_slot.append(REASON_RAIN_RISK)
+            if p_max_rm is not None:
+                if rain_mm is None:
+                    unassessed.append("max_rain_mm")
+                elif rain_mm > p_max_rm:
+                    reasons_slot.append(REASON_RAIN_AMOUNT)
+            if p_min_t is not None:
+                if temp_c is None:
+                    unassessed.append("min_temp_c")
+                elif temp_c < p_min_t:
+                    reasons_slot.append(REASON_TOO_COLD)
+            if p_max_t is not None:
+                if temp_c is None:
+                    unassessed.append("max_temp_c")
+                elif temp_c > p_max_t:
+                    reasons_slot.append(REASON_TOO_HOT)
+            if p_min_h is not None:
+                if humidity is None:
+                    unassessed.append("min_humidity_pct")
+                elif humidity < p_min_h:
+                    reasons_slot.append(REASON_LOW_HUMIDITY)
+            if p_max_h is not None:
+                if humidity is None:
+                    unassessed.append("max_humidity_pct")
+                elif humidity > p_max_h:
+                    reasons_slot.append(REASON_HIGH_HUMIDITY)
+            if p_min_w is not None:
+                if wind_kmh is None:
+                    unassessed.append("min_wind_kmh")
+                elif wind_kmh < p_min_w:
+                    reasons_slot.append(REASON_CALM_AIR)
+            if p_max_w is not None:
+                if wind_kmh is None:
+                    unassessed.append("max_wind_kmh")
+                elif wind_kmh > p_max_w:
+                    reasons_slot.append(REASON_HIGH_WIND)
+            if p_max_g is not None:
+                if gust_kmh is None:
+                    unassessed.append("max_wind_gust_kmh")
+                elif gust_kmh > p_max_g:
+                    reasons_slot.append(REASON_HIGH_GUST)
+            if p_max_c is not None:
+                if cloud_cover is None:
+                    unassessed.append("max_cloud_cover_pct")
+                elif cloud_cover > p_max_c:
+                    reasons_slot.append(REASON_HEAVY_CLOUDS)
+
+            if unassessed:
+                unassessed_slots += 1
+                reasons_slot.append(REASON_MISSING_DATA)
+
+            if is_current and live_blockers:
+                suitable = False
+                for blocker in live_blockers:
+                    if blocker not in reasons_slot:
+                        reasons_slot.append(blocker)
+            else:
+                suitable = not reasons_slot
+                if suitable:
+                    reasons_slot.append(REASON_SUITABLE)
+
+            suit_flags.append(suitable)
+            pot_flags.append(suitable or (len(reasons_slot) == 1 and reasons_slot[0] == REASON_MISSING_DATA))
+            slot_dicts.append(
+                {
+                    "datetime_iso": display_iso,
+                    "suitable": suitable,
+                    "reasons": reasons_slot,
+                    "unassessed_limits": unassessed,
+                    "temp_c": temp_c,
+                    "rain_prob": rain_prob_int,
+                    "rain_mm": rain_mm,
+                    "humidity": humidity,
+                    "wind_kmh": wind_kmh,
+                    "gust_kmh": gust_kmh,
+                    "cloud_cover": cloud_cover,
+                    "solar_elevation": sol_elev_rounded,
+                }
+            )
+
+        # Extract contiguous windows using float timestamps
+        min_dur_h = profile.min_duration_h
+        min_span_s = min_dur_h * 3600.0 - 1e-3
+        last_slot_ts: float = prepared_slots[-1][1]
+        is_utc_display = display_tz is UTC
+
+        def _extract(flags: list[bool]) -> list[tuple[float, float, dict[str, Any]]]:
+            out: list[tuple[float, float, dict[str, Any]]] = []
+            streak_start_idx: int | None = None
+            streak_end_idx: int = 0
+
+            def _flush() -> None:
+                if streak_start_idx is None:
+                    return
+                s_slot = prepared_slots[streak_start_idx]
+                e_slot = prepared_slots[streak_end_idx]
+                s_ts: float = s_slot[1]
+                raw_e_ts: float = e_slot[1] + 3600.0
+                e_ts = raw_e_ts if raw_e_ts <= horizon_end_ts else horizon_end_ts
+                eff_s_ts = s_ts if s_ts >= now_ts else now_ts
+                span_s = e_ts - eff_s_ts
+                if span_s < min_span_s:
+                    return
+                raw_h = round(span_s / 3600.0, 2)
+                dur_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
+                trunc = e_slot[1] == last_slot_ts or raw_e_ts > horizon_end_ts
+                start_iso: str = s_slot[2]
+                end_dt = horizon_end_utc if e_ts == horizon_end_ts else (e_slot[0] + timedelta(hours=1))
+                end_iso = end_dt.isoformat() if is_utc_display else end_dt.astimezone(display_tz).isoformat()
+                out.append(
+                    (
+                        s_ts,
+                        e_ts,
+                        {
+                            "start_iso": start_iso,
+                            "end_iso": end_iso,
+                            "duration_h": dur_h,
+                            "is_truncated": trunc,
+                        },
+                    )
+                )
+
+            for idx, ok in enumerate(flags):
+                if ok:
+                    if streak_start_idx is None:
+                        streak_start_idx = idx
+                        streak_end_idx = idx
+                    elif abs((prepared_slots[idx][1] - prepared_slots[streak_end_idx][1]) - 3600.0) > 1.0:
+                        _flush()
+                        streak_start_idx = idx
+                        streak_end_idx = idx
+                    else:
+                        streak_end_idx = idx
+                else:
+                    _flush()
+                    streak_start_idx = None
+            _flush()
+            return out
+
+        window_bounds = _extract(suit_flags)
+        potential_bounds = _extract(pot_flags)
+
+        # Formulate decision status and next suitable window
         status = STATUS_UNSUITABLE
         next_start: str | None = None
         next_end: str | None = None
@@ -553,35 +860,33 @@ class WeatherWindowsEngine:
         reasons_text: list[str] = []
 
         if window_bounds:
-            w0_start_utc, w0_end_utc, w0 = window_bounds[0]
-            if w0_start_utc <= now_utc < w0_end_utc:
+            w0_start_ts, w0_end_ts, w0 = window_bounds[0]
+            if w0_start_ts <= now_ts < w0_end_ts:
                 status = STATUS_SUITABLE_NOW
-                next_start = w0.start_iso
-                next_end = w0.end_iso
-                duration_h = w0.duration_h
-                is_truncated = w0.is_truncated
+                next_start = w0["start_iso"]
+                next_end = w0["end_iso"]
+                duration_h = w0["duration_h"]
+                is_truncated = w0["is_truncated"]
                 reasons.append(REASON_SUITABLE)
                 reasons_text.append(
                     f"Conditions meet all limits for {profile.name} starting now for at least {duration_h} hours."
                 )
-            elif potential_bounds and not live_blockers and potential_bounds[0][0] <= now_utc < potential_bounds[0][1]:
-                # Current slot is unassessed due solely to missing inputs; keep status unknown
-                # while still publishing the confirmed future window for timestamp sensors/notifications.
+            elif potential_bounds and not live_blockers and potential_bounds[0][0] <= now_ts < potential_bounds[0][1]:
                 status = STATUS_UNKNOWN
-                next_start = w0.start_iso
-                next_end = w0.end_iso
-                duration_h = w0.duration_h
-                is_truncated = w0.is_truncated
+                next_start = w0["start_iso"]
+                next_end = w0["end_iso"]
+                duration_h = w0["duration_h"]
+                is_truncated = w0["is_truncated"]
                 reasons.append(REASON_MISSING_DATA)
                 reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
                 reasons.append(REASON_WINDOW_UPCOMING)
                 reasons_text.append(f"Next suitable window starts at {next_start} for {duration_h} hours.")
             else:
                 status = STATUS_WINDOW_UPCOMING
-                next_start = w0.start_iso
-                next_end = w0.end_iso
-                duration_h = w0.duration_h
-                is_truncated = w0.is_truncated
+                next_start = w0["start_iso"]
+                next_end = w0["end_iso"]
+                duration_h = w0["duration_h"]
+                is_truncated = w0["is_truncated"]
                 if live_blockers:
                     reasons.extend(live_blockers)
                     reasons_text.extend(live_blocker_texts)
@@ -598,8 +903,8 @@ class WeatherWindowsEngine:
                 reasons_text.extend(live_blocker_texts)
 
             blocker_counts: dict[str, int] = {}
-            for _, s in evaluated_pairs:
-                for r in s.reasons:
+            for s in slot_dicts:
+                for r in s["reasons"]:
                     if r in (REASON_SUITABLE, REASON_MISSING_DATA) or r in live_blockers:
                         continue
                     blocker_counts[r] = blocker_counts.get(r, 0) + 1
@@ -609,7 +914,7 @@ class WeatherWindowsEngine:
                     reasons.append(b)
                     reasons_text.append(self._format_blocker_text(b, profile))
 
-            if not reasons and any(REASON_MISSING_DATA in s.reasons for _, s in evaluated_pairs):
+            if not reasons and any(REASON_MISSING_DATA in s["reasons"] for s in slot_dicts):
                 reasons.append(REASON_MISSING_DATA)
                 reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
 
@@ -621,29 +926,29 @@ class WeatherWindowsEngine:
             reasons.append(REASON_HORIZON_TRUNCATED)
             reasons_text.append("Window extends to the end of the available forecast horizon.")
 
-        slot_evals = [s for _, s in evaluated_pairs]
         windows = [w for _, _, w in window_bounds]
-        horizon_hours = min(len(slot_evals), MAX_HORIZON_HOURS)
-        return WeatherDecisionResult(
-            profile_id=profile.profile_id,
-            status=status,
-            evaluated_at=evaluated_at_iso,
-            next_start=next_start,
-            next_end=next_end,
-            duration_h=duration_h,
-            horizon_hours=horizon_hours,
-            is_truncated=is_truncated,
-            reason_codes=reasons,
-            reasons_text=reasons_text,
-            evaluated_limits=limits_dict,
-            windows=[w.to_dict() for w in windows],
-            slots=[s.to_dict() for s in slot_evals],
-            data_quality={
+        horizon_hours = min(len(slot_dicts), MAX_HORIZON_HOURS)
+        result_dict = {
+            "profile_id": profile.profile_id,
+            "status": status,
+            "evaluated_at": evaluated_at_iso,
+            "next_start": next_start,
+            "next_end": next_end,
+            "duration_h": duration_h,
+            "horizon_hours": horizon_hours,
+            "is_truncated": is_truncated,
+            "reason_codes": reasons,
+            "reasons_text": reasons_text,
+            "evaluated_limits": limits_dict,
+            "windows": windows,
+            "slots": slot_dicts,
+            "data_quality": {
                 "horizon_hours": horizon_hours,
                 "is_truncated": is_truncated,
-                "unassessed_slots": sum(1 for s in slot_evals if s.unassessed_limits),
+                "unassessed_slots": unassessed_slots,
             },
-        )
+        }
+        return result_dict if as_dict else WeatherDecisionResult(**result_dict)
 
     def _parse_slot_utc(self, item: dict[str, Any], display_tz: tzinfo) -> datetime | None:
         """Parse an hourly forecast item timestamp into UTC, preserving DST distinct hours."""
@@ -663,13 +968,20 @@ class WeatherWindowsEngine:
                 return datetime.fromtimestamp(raw_dt, tz=UTC)
             except (OverflowError, OSError, ValueError):
                 return None
-        key = str(raw_dt)
-        parsed = self._parse_dt_cache.get(key)
-        if key not in self._parse_dt_cache:
-            parsed = dt_util.parse_datetime(key)
-            if len(self._parse_dt_cache) > 512:
-                self._parse_dt_cache.clear()
-            self._parse_dt_cache[key] = parsed
+        key = raw_dt if type(raw_dt) is str else str(raw_dt)
+        dt_cache = self._parse_dt_cache
+        parsed = dt_cache.get(key)
+        if key not in dt_cache:
+            if "T" in key or " " in key:
+                try:
+                    parsed = datetime.fromisoformat(key)
+                except ValueError:
+                    parsed = dt_util.parse_datetime(key)
+            else:
+                parsed = dt_util.parse_datetime(key)
+            if len(dt_cache) > 512:
+                dt_cache.clear()
+            dt_cache[key] = parsed
         if parsed is None:
             return None
         if parsed.tzinfo is None:

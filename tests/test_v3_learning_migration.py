@@ -1485,6 +1485,197 @@ class TestReplayMaskingAndDp3hAlignment:
         assert eng.std.n[dp_slot] == PATTERN_STD_MIN_N + 5
         assert "features_method" not in eng.history_learn["targets"]["rain_3h"]
 
+    async def test_dp3h_migration_preserves_live_learning_when_every_pressure_target_pending(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        eng = rt.engine
+        dp_slot = POOL_INDEX["dp_3h"]
+
+        # Warm live scale accumulated after the one-time reset
+        eng.std.mean[dp_slot] = 0.25
+        eng.std.var[dp_slot] = 3.5
+        eng.std.n[dp_slot] = 80
+
+        # Every single pressure model in eng.models is pending migration
+        pressure_tids = [t for t, m in eng.models.items() if "dp_3h" in m.spec.features]
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "targets": {
+                tid: {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                }
+                for tid in pressure_tids
+            },
+        }
+
+        rain_model = eng.models["rain_3h"]
+        rain_dp_idx = rain_model.spec.features.index("dp_3h") + 1
+        rain_model.w[rain_dp_idx] = 0.35
+        rain_model.g2[rain_dp_idx] = 100.0
+        rain_model.cp_w[rain_dp_idx] = 0.35
+        rain_model.cp_g2[rain_dp_idx] = 100.0
+
+        n = 48
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=[1000.0 + (i * 0.1) for i in range(n)],
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[5.0] * n,
+            rain=[2.0 if (i % 6) == 3 else 0.0 for i in range(n)],
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        assert retry is False
+        # Even when every pressure target was pending, warm live scale is preserved
+        assert eng.std.mean[dp_slot] == 0.25
+        assert eng.std.var[dp_slot] == 3.5
+        assert eng.std.n[dp_slot] == 80
+        # And post-reset live dp_3h weight was refined rather than reset back to 0.0
+        assert abs(rain_model.w[rain_dp_idx] - 0.35) < 0.05
+        assert eng.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+
+    async def test_dp3h_migration_lets_recoverable_targets_finish_when_another_lacks_history(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        eng = rt.engine
+        dp_slot = POOL_INDEX["dp_3h"]
+
+        rain_model = eng.models["rain_3h"]
+        rain_dp_idx = rain_model.spec.features.index("dp_3h") + 1
+        rain_model.w[rain_dp_idx] = 0.0
+
+        gust_model = eng.models["gust_3h"]
+        gust_dp_idx = gust_model.spec.features.index("dp_3h") + 1
+        gust_model.w[gust_dp_idx] = 0.0
+
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                },
+                "gust_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": 3,
+                },
+            },
+        }
+
+        n = 60
+        mslp = [1015.0 - (0.5 * (i % 6)) for i in range(n)]
+        rain = [2.0 if (i % 6) == 3 else 0.0 for i in range(n)]
+
+        # Attempt 1: rain + pressure history present, gust history missing (None)
+        hist_no_gust = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=mslp,
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[None] * n,
+            rain=rain,
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist_no_gust  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry1 = await rt._async_migrate_feature_replay(now)
+
+        # Recoverable rain_3h finishes immediately; missing gust_3h stays pending for retry
+        assert retry1 is True
+        assert rain_model.w[rain_dp_idx] != 0.0
+        assert eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
+        assert eng.history_learn["targets"]["rain_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn["targets"]["gust_3h"]["features_method"] == 3
+        assert eng.history_learn["features_method"] == 3
+
+        saved_rain_w = rain_model.w[rain_dp_idx]
+        saved_std_n = eng.std.n[dp_slot]
+        saved_std_var = eng.std.var[dp_slot]
+
+        # Attempt 2: gust history recovers -> gust_3h trains against established scale & finishes migration
+        hist_with_gust = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=mslp,
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[16.0 if (i % 6) == 3 else 5.0 for i in range(n)],
+            rain=rain,
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+        rt.build_history = lambda *a, **kw: hist_with_gust  # type: ignore[method-assign]
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_FakeRecorder()):
+            retry2 = await rt._async_migrate_feature_replay(now)
+
+        assert retry2 is False
+        assert gust_model.w[gust_dp_idx] != 0.0
+        assert rain_model.w[rain_dp_idx] == saved_rain_w
+        assert eng.std.n[dp_slot] == saved_std_n
+        assert eng.std.var[dp_slot] == saved_std_var
+        assert eng.history_learn["targets"]["gust_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+
 
 class TestDowngradeTolerance:
     """Verify that storage schema remains compatible with earlier versions."""
