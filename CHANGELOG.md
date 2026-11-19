@@ -39,6 +39,12 @@ All notable changes to Weather Station Core are documented here.
   - Aligned `dp_3h` replay units: removed `/ 3.0` factor in `replay()` so historical replays and live station updates both evaluate 3-hour pressure change in hPa consistently.
   - Implemented scoped reset (`scoped_reset_features`): on upgrade to v3.0 (with `features_method = 4`), standardizer slots and model weights for corrupted features are reset cleanly while preserving all other weights, base rates, and learned history.
 
+## [2.14.3] - 2026-11-18
+
+### Fixed
+
+- **Keep current conditions tied to station readings (#205).** A stormy Zambretti outlook no longer replaces dry current conditions with `pre-storm`. WS Current Condition and the weather entity can continue to show conditions such as clear skies, fog, or wind. The outlook remains available on WS Zambretti Forecast. If an automation matched `pre-storm`, update it to use the stormy outlook on the forecast sensor.
+
 ## [2.14.2] - 2026-11-17
 
 ### Fixed
