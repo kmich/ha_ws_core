@@ -320,6 +320,7 @@ from .const import (
     DEFAULT_WINDY_INTERVAL_MIN,
     DEFAULT_WOW_INTERVAL_MIN,
     DEFAULT_WU_INTERVAL_MIN,
+    DOMAIN,
     DRIFT_MIN_SAMPLES,
     DRIFT_R_SQ_THRESH,
     DRIFT_SLOPE_HUMIDITY_PCT_H,
@@ -329,6 +330,7 @@ from .const import (
     DRIFT_STUCK_BUCKET_SAMPLES,
     DRIFT_STUCK_RATE_RANGE_MAX,
     DRIFT_WINDOW_SAMPLES,
+    ENTRY_REPAIR_ISSUES,
     ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE,
     ET0_RADIATION_SOURCE_SENSOR,
     FORECAST_AGREEMENT_ALIGNED_PP,
@@ -620,6 +622,7 @@ from .const import (
     VALID_PRESSURE_MIN_HPA,
     VALID_TEMP_MAX_C,
     VALID_TEMP_MIN_C,
+    WIND_FACTORS,
     WIND_SMOOTH_ALPHA,
     ZAMBRETTI_FALLBACK_RAIN_THRESHOLD_PCT,
     issue_id_for_entry,
@@ -639,6 +642,7 @@ from .uploaders import (
     async_upload_wow,
     async_upload_wunderground,
 )
+from .weather_windows import DEFAULT_PROFILES, WeatherWindowsEngine, apply_profile_overrides, resolve_profiles
 
 try:
     from homeassistant.helpers import issue_registry as ir
@@ -1105,8 +1109,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._pattern: PatternRuntime | None = PatternRuntime(self) if self.pattern_enabled else None
 
         # v3.0 Update coalescing and Weather Windows Decision Engine
-        from .weather_windows import resolve_profiles
-
         self._debounce_handle: Any = None
         self._burst_debounce_delay_s: float = COALESCE_BURST_DELAY_S
         self.weather_windows_enabled = bool(_get(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS))
@@ -1293,10 +1295,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _fmt_wind(self, ms: float, digits: int = 1, with_unit: bool = True) -> str:
         """Format an m/s value in the configured wind unit."""
-        from .entity_descriptions import _WIND_FACTORS
-
         unit = self.wind_unit
-        text = f"{float(ms) * _WIND_FACTORS.get(unit, 1.0):.{digits}f}"
+        text = f"{float(ms) * WIND_FACTORS.get(unit, 1.0):.{digits}f}"
         return f"{text} {unit}" if with_unit else text
 
     def _fmt_rain_rate(self, mmph: float) -> str:
@@ -2087,6 +2087,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if getattr(self, "_temp_low_all_time", None) is not None:
             data[KEY_TEMP_LOW_ALL_TIME] = round(self._temp_low_all_time, 1)
 
+    def _local_period_keys(self) -> tuple[str, str, str, str]:
+        """Return cached (date_str, iso_week, month_key, year_key) for the current local calendar day."""
+        now_local = dt_util.now()
+        ymd = (now_local.year, now_local.month, now_local.day)
+        cached = getattr(self, "_cached_period_keys", None)
+        if cached is not None and cached[0] == ymd:
+            return cached[1]
+        y, m, d = ymd
+        iso_year, iso_week_num, _ = now_local.isocalendar()
+        keys = (
+            f"{y:04d}-{m:02d}-{d:02d}",
+            f"{iso_year:04d}-W{iso_week_num:02d}",
+            f"{y:04d}-{m:02d}",
+            f"{y:04d}",
+        )
+        self._cached_period_keys = (ymd, keys)
+        return keys
+
     def _update_temp_year_all_time(self, data: dict, tc: float | None) -> None:
         """Update yearly and all-time temperature high/low extremes (issue #124).
 
@@ -2095,7 +2113,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ``year_ref`` attribute on the yearly sensors). All-time extremes never
         reset automatically - they persist for the life of the config entry.
         """
-        year_key = dt_util.now().strftime("%Y")
+        year_key = self._local_period_keys()[3]
         if tc is None:
             self._publish_temp_year_all_time(data, year_key)
             return
@@ -2138,9 +2156,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         the ``week_ref`` attribute. Monthly extremes reset on the 1st,
         exposed as ``month_ref``.
         """
-        now_local = dt_util.now()
-        iso_week = now_local.strftime("%G-W%V")
-        month_key = now_local.strftime("%Y-%m")
+        _, iso_week, month_key, _ = self._local_period_keys()
         if tc is None:
             self._publish_temp_week_month(data, iso_week, month_key)
             return
@@ -2319,9 +2335,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         automatically. A gust far above the wind of the same reading is a
         sensor glitch: the records keep their values and it sets none.
         """
-        now_local = dt_util.now()
-        month_key = now_local.strftime("%Y-%m")
-        year_key = now_local.strftime("%Y")
+        _, _, month_key, year_key = self._local_period_keys()
         if gust_ms is None:
             self._publish_gust_month_year_all_time(data, month_key, year_key)
             return
@@ -2380,7 +2394,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Rain today - resets at local midnight (use local time, not UTC)
         rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
-        date_str = dt_util.now().strftime("%Y-%m-%d")
+        date_str, iso_week, month_key, year_key = self._local_period_keys()
         if date_str != self._rain_today_date:
             # Day rolled over - snapshot the day that just ended (with its final
             # rain total) so streak counters can evaluate the completed day
@@ -2406,11 +2420,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             rt.last_rain_event_ts = now
 
         # v2.0 — Weekly / monthly / yearly rain accumulators
-        now_local = dt_util.now()
-        iso_week = now_local.strftime("%G-W%V")  # ISO 8601 week (Mon start)
-        month_key = now_local.strftime("%Y-%m")
-        year_key = now_local.strftime("%Y")
-
         # Weekly
         if iso_week != self._rain_this_week_isoweek:
             self._rain_this_week_mm = 0.0
@@ -4011,8 +4020,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # HA Repairs integration: create/clear issues for missing sources
         if HAS_REPAIRS:
-            from .const import DOMAIN, ENTRY_REPAIR_ISSUES
-
             if self.suppress_notifications:
                 # User has disabled notifications - clear any existing issues immediately
                 for issue_key in ENTRY_REPAIR_ISSUES:
@@ -5014,8 +5021,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         and leave that state untouched, so its cadence never depends on how
         often sensors report.
         """
-        import time
-
         t0 = time.monotonic()
         data: WsData = WsData()
         now = dt_util.utcnow()
@@ -5284,43 +5289,43 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None, None
         return float(lat), float(lon)
 
-    def _get_weather_windows_engine(self):
+    def _get_weather_windows_engine(self, coords: tuple[float | None, float | None] | None = None):
         """Return or initialize the WeatherWindowsEngine using resolved station profiles."""
-        from .weather_windows import WeatherWindowsEngine, resolve_profiles
-
         profiles = getattr(self, "weather_window_profiles", None)
         if not isinstance(profiles, Mapping):
             profiles = resolve_profiles(getattr(self, "entry_options", None))
-        eff_lat, eff_lon = self._effective_forecast_coords()
+        eff_lat, eff_lon = self._effective_forecast_coords() if coords is None else coords
         lat = float(eff_lat if eff_lat is not None else 0.0)
         lon = float(eff_lon if eff_lon is not None else 0.0)
         elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
-        if self._weather_windows_engine is None:
-            self._weather_windows_engine = WeatherWindowsEngine(
+        engine = self._weather_windows_engine
+        if engine is None:
+            engine = WeatherWindowsEngine(
                 lat=lat,
                 lon=lon,
                 elevation_m=elev,
                 profiles=profiles,
             )
+            self._weather_windows_engine = engine
         else:
-            self._weather_windows_engine.lat = lat
-            self._weather_windows_engine.lon = lon
-            self._weather_windows_engine.elevation_m = elev
-            self._weather_windows_engine.profiles = dict(profiles)
-        return self._weather_windows_engine
+            engine.lat = lat
+            engine.lon = lon
+            engine.elevation_m = elev
+            engine.profiles = profiles if type(profiles) is dict else dict(profiles)
+        return engine
 
     def _compute_weather_windows(self, data: dict, now: Any) -> None:
         """Evaluate enabled activity profiles for the next 24 hours (v3.0)."""
         if not getattr(self, "weather_windows_enabled", DEFAULT_ENABLE_WEATHER_WINDOWS):
             return
 
-        fc = data.get(KEY_FORECAST) or {}
-        hourly = fc.get("hourly") or []
         eff_lat, eff_lon = self._effective_forecast_coords()
         if eff_lat is None or eff_lon is None:
             return
 
-        engine = self._get_weather_windows_engine()
+        fc = data.get(KEY_FORECAST)
+        hourly = fc.get("hourly") if fc else None
+        engine = self._get_weather_windows_engine((eff_lat, eff_lon))
         local_now = dt_util.as_local(now)
         eval_dict = engine.evaluate_profiles(
             [prof for prof in engine.profiles.values() if prof.enabled],
@@ -5336,8 +5341,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, profile_id: str | None = None, custom_limits: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Return structured weather windows response for actions (SupportsResponse.ONLY)."""
-        from .weather_windows import DEFAULT_PROFILES, apply_profile_overrides
-
         engine = self._get_weather_windows_engine()
         data = self.data or {}
         now = dt_util.now()

@@ -432,6 +432,19 @@ class Standardizer:
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class _InFlightSample:
+    """Per-sample optimizer and standardizer context captured during live training."""
+
+    feat: list[float | None]
+    y: float
+    ts: float
+    masked: frozenset[int]
+    pre_w: list[float]
+    z: list[float]
+    warm_slots: tuple[bool, ...]
+
+
 class ModelState:
     """Weights, accumulators, checkpoint and bookkeeping of one target/horizon."""
 
@@ -456,7 +469,7 @@ class ModelState:
         self.ev_live = 0
         self.ev_hist = 0
         self.discarded = 0
-        self._migration_sample_log: list[tuple[list[float | None], float, float, frozenset[int]]] | None = None
+        self._migration_sample_log: list[_InFlightSample] | None = None
 
     # -- prediction ---------------------------------------------------------
 
@@ -481,6 +494,7 @@ class ModelState:
         """One SGD step. Returns False when the numeric guard restored the checkpoint."""
         z = self.zvec(std, feat, masked)
         active = [i not in masked for i in self.idx]
+        pre_w = list(self.w) if self._migration_sample_log is not None else None
         s = self.w[0] + sum(w * v for w, v in zip(self.w[1:], z, strict=True))
         err = _sigmoid(s) - y
         clip = PATTERN_GRAD_CLIP
@@ -509,36 +523,49 @@ class ModelState:
             self.cp_w = list(self.w)
             self.cp_g2 = list(self.g2)
             self.cp_at = ts
-        if self._migration_sample_log is not None:
-            self._migration_sample_log.append((list(feat), float(y), float(ts), masked))
+        if self._migration_sample_log is not None and pre_w is not None:
+            self._migration_sample_log.append(
+                _InFlightSample(
+                    feat=list(feat),
+                    y=float(y),
+                    ts=float(ts),
+                    masked=masked,
+                    pre_w=pre_w,
+                    z=z,
+                    warm_slots=tuple(std.n[i] >= PATTERN_STD_MIN_N for i in self.idx),
+                )
+            )
         return True
 
     def apply_feature_samples(
         self,
         std: Standardizer,
         idx: int,
-        samples: list[tuple[list[float | None], float, float, frozenset[int]]],
+        samples: list[_InFlightSample],
         initial_cp_at: float | None,
     ) -> None:
-        """Apply buffered live training samples to one feature slot on the current optimizer state."""
+        """Apply buffered live samples to one feature slot using each sample's training context."""
         pool_slot = self.idx[idx - 1]
         cp_at = initial_cp_at
-        for feat, y, ts, masked in samples:
-            if pool_slot in masked:
+        for sample in samples:
+            if pool_slot in sample.masked:
                 continue
-            z = self.zvec(std, feat, masked)
-            s = self.w[0] + sum(w * v for w, v in zip(self.w[1:], z, strict=True))
-            err = _sigmoid(s) - y
-            g = max(-PATTERN_GRAD_CLIP, min(PATTERN_GRAD_CLIP, err * z[idx - 1] + PATTERN_L2 * self.w[idx]))
+            z_feat = sample.z[idx - 1] if sample.warm_slots[idx - 1] else std.z(pool_slot, sample.feat[pool_slot])
+            base_s = sample.pre_w[0] + sum(
+                w * v for j, (w, v) in enumerate(zip(sample.pre_w[1:], sample.z, strict=True), start=1) if j != idx
+            )
+            s = base_s + self.w[idx] * z_feat
+            err = _sigmoid(s) - sample.y
+            g = max(-PATTERN_GRAD_CLIP, min(PATTERN_GRAD_CLIP, err * z_feat + PATTERN_L2 * self.w[idx]))
             self._step(idx, g)
             if not (math.isfinite(self.w[idx]) and math.isfinite(self.g2[idx])):
                 self.w[idx] = self.cp_w[idx]
                 self.g2[idx] = self.cp_g2[idx]
                 continue
-            if cp_at is None or ts - cp_at >= PATTERN_CHECKPOINT_INTERVAL_S:
+            if cp_at is None or sample.ts - cp_at >= PATTERN_CHECKPOINT_INTERVAL_S:
                 self.cp_w[idx] = self.w[idx]
                 self.cp_g2[idx] = self.g2[idx]
-                cp_at = ts
+                cp_at = sample.ts
 
     def _step(self, j: int, g: float) -> None:
         self.g2[j] += g * g

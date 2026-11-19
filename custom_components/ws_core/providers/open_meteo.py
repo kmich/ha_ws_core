@@ -36,6 +36,13 @@ class OpenMeteoProvider(ForecastProvider):
     PROVIDER_NAME = "Open-Meteo"
     REQUIRES_API_KEY = False
 
+    @staticmethod
+    async def _fetch_json(session: aiohttp.ClientSession, url: str) -> dict[str, Any]:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            if resp.status != 200:
+                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
+            return await resp.json()
+
     async def async_fetch(
         self,
         session: aiohttp.ClientSession,
@@ -43,24 +50,28 @@ class OpenMeteoProvider(ForecastProvider):
         lon: float,
         api_key: str | None = None,
     ) -> dict[str, Any]:
-        url = (
+        # Daily aggregations use local calendar days; hourly series use UTC to stay DST-unambiguous.
+        daily_url = (
             "https://api.open-meteo.com/v1/forecast"
             f"?latitude={lat}&longitude={lon}"
             "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,"
             "windspeed_10m_max,windgusts_10m_max,weathercode,precipitation_probability_max"
+            "&timezone=auto"
+        )
+        hourly_url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}"
             "&hourly=temperature_2m,apparent_temperature,dewpoint_2m,"
             "precipitation_probability,precipitation,"
             "weathercode,windspeed_10m,windgusts_10m,"
             "relativehumidity_2m,cloudcover"
             "&forecast_hours=26"
-            "&timezone=auto"
+            "&timezone=UTC"
         )
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
-            if resp.status != 200:
-                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
-            js = await resp.json()
+        daily_js = await self._fetch_json(session, daily_url)
+        hourly_js = await self._fetch_json(session, hourly_url)
 
-        daily = js.get("daily") or {}
+        daily = daily_js.get("daily") or {}
         times = daily.get("time") or []
         tmax = daily.get("temperature_2m_max") or []
         tmin = daily.get("temperature_2m_min") or []
@@ -84,15 +95,15 @@ class OpenMeteoProvider(ForecastProvider):
             for i in range(min(len(times), 7))
         ]
 
-        om_tz: tzinfo | None = None
-        utc_offset_s = js.get("utc_offset_seconds")
-        tz_name = js.get("timezone")
+        om_tz: tzinfo | None = UTC
+        utc_offset_s = hourly_js.get("utc_offset_seconds")
+        tz_name = hourly_js.get("timezone")
         if isinstance(utc_offset_s, (int, float)) and not isinstance(utc_offset_s, bool):
             om_tz = timezone(timedelta(seconds=int(utc_offset_s)))
         elif tz_name:
             om_tz = dt_util.get_time_zone(str(tz_name))
 
-        hourly = js.get("hourly") or {}
+        hourly = hourly_js.get("hourly") or {}
         h_times = hourly.get("time") or []
         h_temp = hourly.get("temperature_2m") or []
         h_app = hourly.get("apparent_temperature") or []

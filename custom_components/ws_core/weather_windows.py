@@ -42,6 +42,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 MAX_HORIZON_HOURS = 24
+_ONE_HOUR = timedelta(hours=1)
 
 _NUMERIC_LIMIT_FIELDS: tuple[str, ...] = (
     "max_rain_prob_pct",
@@ -287,7 +288,7 @@ def _as_finite_float(val: Any) -> float | None:
         return val if math.isfinite(val) else None
     if t is int:
         return float(val)
-    if val is None or isinstance(val, bool):
+    if val is None or t is bool:
         return None
     try:
         num = float(val)
@@ -389,6 +390,66 @@ class WeatherDecisionResult:
         }
 
 
+_MISSING = object()
+
+
+def _extract_contiguous_windows(
+    flags: list[bool],
+    prepared_slots: list[tuple[Any, ...]],
+    min_span_s: float,
+    now_ts: float,
+    horizon_end_ts: float,
+    horizon_end_utc: datetime,
+    last_slot_ts: float,
+    display_tz: tzinfo,
+    is_utc_display: bool,
+) -> list[tuple[float, float, dict[str, Any]]]:
+    """Extract contiguous suitable/potential intervals meeting ``min_span_s``."""
+    out: list[tuple[float, float, dict[str, Any]]] = []
+    n_slots = len(prepared_slots)
+    idx = 0
+    while idx < n_slots:
+        if not flags[idx]:
+            idx += 1
+            continue
+        streak_start_idx = idx
+        while (
+            idx + 1 < n_slots
+            and flags[idx + 1]
+            and abs((prepared_slots[idx + 1][1] - prepared_slots[idx][1]) - 3600.0) <= 1.0
+        ):
+            idx += 1
+        s_slot = prepared_slots[streak_start_idx]
+        e_slot = prepared_slots[idx]
+        s_ts: float = s_slot[1]
+        raw_e_ts: float = e_slot[1] + 3600.0
+        e_ts = raw_e_ts if raw_e_ts <= horizon_end_ts else horizon_end_ts
+        span_s = e_ts - (s_ts if s_ts >= now_ts else now_ts)
+        if span_s >= min_span_s:
+            raw_h = round(span_s / 3600.0, 2)
+            dur_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
+            next_idx = idx + 1
+            if e_ts != horizon_end_ts and next_idx < n_slots and abs(prepared_slots[next_idx][1] - raw_e_ts) < 1.0:
+                end_iso: str = prepared_slots[next_idx][2]
+            else:
+                end_dt = horizon_end_utc if e_ts == horizon_end_ts else (e_slot[0] + _ONE_HOUR)
+                end_iso = end_dt.isoformat() if is_utc_display else end_dt.astimezone(display_tz).isoformat()
+            out.append(
+                (
+                    s_ts,
+                    e_ts,
+                    {
+                        "start_iso": s_slot[2],
+                        "end_iso": end_iso,
+                        "duration_h": dur_h,
+                        "is_truncated": e_slot[1] == last_slot_ts or raw_e_ts > horizon_end_ts,
+                    },
+                )
+            )
+        idx += 1
+    return out
+
+
 class WeatherWindowsEngine:
     """Evaluates weather windows across configured profiles."""
 
@@ -403,8 +464,18 @@ class WeatherWindowsEngine:
         self.lon = lon
         self.elevation_m = elevation_m
         self.profiles: dict[str, WeatherWindowProfile] = dict(profiles if profiles is not None else DEFAULT_PROFILES)
-        self._solar_cache: dict[tuple[float, float, datetime], float] = {}
+        self._solar_coord: tuple[float, float] | None = None
+        self._solar_cache: dict[datetime, float] = {}
         self._parse_dt_cache: dict[str, datetime | None] = {}
+        self._slot_time_cache: dict[tuple[str, tzinfo], tuple[datetime, float, str] | None] = {}
+
+    def _sync_solar_cache(self, lat_f: float, lon_f: float) -> dict[datetime, float]:
+        """Return solar elevation cache cleared only when rounded coordinates change."""
+        coord_key = (round(lat_f, 5), round(lon_f, 5))
+        if self._solar_coord != coord_key:
+            self._solar_coord = coord_key
+            self._solar_cache.clear()
+        return self._solar_cache
 
     @staticmethod
     def _validate_profile(profile: WeatherWindowProfile) -> dict[str, Any]:
@@ -461,34 +532,66 @@ class WeatherWindowsEngine:
         hourly_count = len(hourly_forecast) if hourly_forecast else 0
         prepared_slots: list[tuple[Any, ...]] = []
         if hourly_forecast:
-            deduped: dict[float, tuple[datetime, dict[str, Any]]] = {}
+            deduped: dict[float, tuple[datetime, str, dict[str, Any]]] = {}
             max_h_s = MAX_HORIZON_HOURS * 3600.0
+            is_utc_display = display_tz is UTC
+            slot_time_cache = self._slot_time_cache
             for item in hourly_forecast:
-                slot_utc = self._parse_slot_utc(item, display_tz)
-                if slot_utc is None:
+                raw_dt = item.get("utc_datetime")
+                if raw_dt is None or raw_dt == "":
+                    raw_dt = item.get("datetime")
+                if raw_dt is None or raw_dt == "":
                     continue
-                slot_ts = slot_utc.timestamp()
+                if type(raw_dt) is str:
+                    cache_key = (raw_dt, display_tz)
+                    cached_t = slot_time_cache.get(cache_key, _MISSING)
+                    if cached_t is _MISSING:
+                        parsed = self._parse_raw_dt_str(raw_dt)
+                        if parsed is None:
+                            if len(slot_time_cache) > 512:
+                                slot_time_cache.clear()
+                            slot_time_cache[cache_key] = None
+                            continue
+                        slot_utc = (
+                            parsed.replace(tzinfo=display_tz).astimezone(UTC)
+                            if parsed.tzinfo is None
+                            else parsed.astimezone(UTC)
+                        )
+                        slot_ts = slot_utc.timestamp()
+                        display_iso = (
+                            slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
+                        )
+                        if len(slot_time_cache) > 512:
+                            slot_time_cache.clear()
+                        slot_time_cache[cache_key] = (slot_utc, slot_ts, display_iso)
+                    elif cached_t is None:
+                        continue
+                    else:
+                        slot_utc, slot_ts, display_iso = cached_t
+                else:
+                    slot_utc = self._parse_slot_utc(item, display_tz)
+                    if slot_utc is None:
+                        continue
+                    slot_ts = slot_utc.timestamp()
+                    display_iso = (
+                        slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
+                    )
                 if slot_ts + 3600.0 - now_ts <= 0.0:
                     continue
                 if slot_ts - now_ts >= max_h_s:
                     continue
                 if slot_ts not in deduped:
-                    deduped[slot_ts] = (slot_utc, item)
+                    deduped[slot_ts] = (slot_utc, display_iso, item)
 
             if deduped:
-                coord_key = (round(float(self.lat), 5), round(float(self.lon), 5))
-                solar_cache = self._solar_cache
                 lat_f = float(self.lat)
                 lon_f = float(self.lon)
-                is_utc_display = display_tz is UTC
+                solar_cache = self._sync_solar_cache(lat_f, lon_f)
                 prev_end_ts: float | None = None
                 prev_end_elev: float | None = None
 
                 for slot_ts in sorted(deduped):
-                    slot_utc, item = deduped[slot_ts]
-                    display_iso = (
-                        slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
-                    )
+                    slot_utc, display_iso, item = deduped[slot_ts]
                     raw_end_ts = slot_ts + 3600.0
                     eff_start_ts = slot_ts if slot_ts >= now_ts else now_ts
                     eff_end_ts = raw_end_ts if raw_end_ts <= horizon_end_ts else horizon_end_ts
@@ -497,22 +600,20 @@ class WeatherWindowsEngine:
                         sol_elev_start = prev_end_elev
                     else:
                         eff_start_dt = slot_utc if eff_start_ts == slot_ts else now_utc
-                        s_key = (coord_key[0], coord_key[1], eff_start_dt)
-                        sol_elev_start = solar_cache.get(s_key)
+                        sol_elev_start = solar_cache.get(eff_start_dt)
                         if sol_elev_start is None:
                             sol_elev_start = solar_elevation_deg(lat_f, lon_f, eff_start_dt)
                             if len(solar_cache) > 512:
                                 solar_cache.clear()
-                            solar_cache[s_key] = sol_elev_start
+                            solar_cache[eff_start_dt] = sol_elev_start
 
-                    eff_end_dt = (slot_utc + timedelta(hours=1)) if eff_end_ts == raw_end_ts else horizon_end_utc
-                    e_key = (coord_key[0], coord_key[1], eff_end_dt)
-                    sol_elev_end = solar_cache.get(e_key)
+                    eff_end_dt = (slot_utc + _ONE_HOUR) if eff_end_ts == raw_end_ts else horizon_end_utc
+                    sol_elev_end = solar_cache.get(eff_end_dt)
                     if sol_elev_end is None:
                         sol_elev_end = solar_elevation_deg(lat_f, lon_f, eff_end_dt)
                         if len(solar_cache) > 512:
                             solar_cache.clear()
-                        solar_cache[e_key] = sol_elev_end
+                        solar_cache[eff_end_dt] = sol_elev_end
 
                     prev_end_ts = eff_end_ts
                     prev_end_elev = sol_elev_end
@@ -794,61 +895,33 @@ class WeatherWindowsEngine:
         last_slot_ts: float = prepared_slots[-1][1]
         is_utc_display = display_tz is UTC
 
-        def _extract(flags: list[bool]) -> list[tuple[float, float, dict[str, Any]]]:
-            out: list[tuple[float, float, dict[str, Any]]] = []
-            streak_start_idx: int | None = None
-            streak_end_idx: int = 0
-
-            def _flush() -> None:
-                if streak_start_idx is None:
-                    return
-                s_slot = prepared_slots[streak_start_idx]
-                e_slot = prepared_slots[streak_end_idx]
-                s_ts: float = s_slot[1]
-                raw_e_ts: float = e_slot[1] + 3600.0
-                e_ts = raw_e_ts if raw_e_ts <= horizon_end_ts else horizon_end_ts
-                eff_s_ts = s_ts if s_ts >= now_ts else now_ts
-                span_s = e_ts - eff_s_ts
-                if span_s < min_span_s:
-                    return
-                raw_h = round(span_s / 3600.0, 2)
-                dur_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
-                trunc = e_slot[1] == last_slot_ts or raw_e_ts > horizon_end_ts
-                start_iso: str = s_slot[2]
-                end_dt = horizon_end_utc if e_ts == horizon_end_ts else (e_slot[0] + timedelta(hours=1))
-                end_iso = end_dt.isoformat() if is_utc_display else end_dt.astimezone(display_tz).isoformat()
-                out.append(
-                    (
-                        s_ts,
-                        e_ts,
-                        {
-                            "start_iso": start_iso,
-                            "end_iso": end_iso,
-                            "duration_h": dur_h,
-                            "is_truncated": trunc,
-                        },
-                    )
-                )
-
-            for idx, ok in enumerate(flags):
-                if ok:
-                    if streak_start_idx is None:
-                        streak_start_idx = idx
-                        streak_end_idx = idx
-                    elif abs((prepared_slots[idx][1] - prepared_slots[streak_end_idx][1]) - 3600.0) > 1.0:
-                        _flush()
-                        streak_start_idx = idx
-                        streak_end_idx = idx
-                    else:
-                        streak_end_idx = idx
-                else:
-                    _flush()
-                    streak_start_idx = None
-            _flush()
-            return out
-
-        window_bounds = _extract(suit_flags)
-        potential_bounds = _extract(pot_flags)
+        window_bounds = _extract_contiguous_windows(
+            suit_flags,
+            prepared_slots,
+            min_span_s,
+            now_ts,
+            horizon_end_ts,
+            horizon_end_utc,
+            last_slot_ts,
+            display_tz,
+            is_utc_display,
+        )
+        if unassessed_slots == 0:
+            potential_bounds = window_bounds
+        elif window_bounds and window_bounds[0][0] <= now_ts < window_bounds[0][1]:
+            potential_bounds = []
+        else:
+            potential_bounds = _extract_contiguous_windows(
+                pot_flags,
+                prepared_slots,
+                min_span_s,
+                now_ts,
+                horizon_end_ts,
+                horizon_end_utc,
+                last_slot_ts,
+                display_tz,
+                is_utc_display,
+            )
 
         # Formulate decision status and next suitable window
         status = STATUS_UNSUITABLE
@@ -950,6 +1023,23 @@ class WeatherWindowsEngine:
         }
         return result_dict if as_dict else WeatherDecisionResult(**result_dict)
 
+    def _parse_raw_dt_str(self, key: str) -> datetime | None:
+        """Parse and cache an ISO or Home Assistant datetime string."""
+        dt_cache = self._parse_dt_cache
+        parsed = dt_cache.get(key)
+        if key not in dt_cache:
+            if "T" in key or " " in key:
+                try:
+                    parsed = datetime.fromisoformat(key)
+                except ValueError:
+                    parsed = dt_util.parse_datetime(key)
+            else:
+                parsed = dt_util.parse_datetime(key)
+            if len(dt_cache) > 512:
+                dt_cache.clear()
+            dt_cache[key] = parsed
+        return parsed
+
     def _parse_slot_utc(self, item: dict[str, Any], display_tz: tzinfo) -> datetime | None:
         """Parse an hourly forecast item timestamp into UTC, preserving DST distinct hours."""
         raw_dt = item.get("utc_datetime")
@@ -968,20 +1058,7 @@ class WeatherWindowsEngine:
                 return datetime.fromtimestamp(raw_dt, tz=UTC)
             except (OverflowError, OSError, ValueError):
                 return None
-        key = raw_dt if type(raw_dt) is str else str(raw_dt)
-        dt_cache = self._parse_dt_cache
-        parsed = dt_cache.get(key)
-        if key not in dt_cache:
-            if "T" in key or " " in key:
-                try:
-                    parsed = datetime.fromisoformat(key)
-                except ValueError:
-                    parsed = dt_util.parse_datetime(key)
-            else:
-                parsed = dt_util.parse_datetime(key)
-            if len(dt_cache) > 512:
-                dt_cache.clear()
-            dt_cache[key] = parsed
+        parsed = self._parse_raw_dt_str(raw_dt if type(raw_dt) is str else str(raw_dt))
         if parsed is None:
             return None
         if parsed.tzinfo is None:
@@ -990,13 +1067,13 @@ class WeatherWindowsEngine:
 
     def _cached_solar_elevation(self, dt_utc: datetime) -> float:
         """Cache solar elevation by rounded coordinates and UTC timestamp across profiles."""
-        cache_key = (round(float(self.lat), 5), round(float(self.lon), 5), dt_utc)
-        val = self._solar_cache.get(cache_key)
+        solar_cache = self._sync_solar_cache(float(self.lat), float(self.lon))
+        val = solar_cache.get(dt_utc)
         if val is None:
             val = solar_elevation_deg(self.lat, self.lon, dt_utc)
-            if len(self._solar_cache) > 512:
-                self._solar_cache.clear()
-            self._solar_cache[cache_key] = val
+            if len(solar_cache) > 512:
+                solar_cache.clear()
+            solar_cache[dt_utc] = val
         return val
 
     def _evaluate_slot(

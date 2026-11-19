@@ -1773,25 +1773,34 @@ class TestReplayMaskingAndDp3hAlignment:
                 captured["src_w"] = src_rain.w[rain_dp_idx]
                 captured["src_g2"] = src_rain.g2[rain_dp_idx]
 
-                # Simulate live observations and model training on the event loop while replay ran
+                # Simulate live observations and model training with std & non-dp weight drift between samples
                 eng.std.update(dp_slot, -3.5)
+                std1 = PatternEngine.from_dict(eng.to_dict(), eng.thresholds, eng.storm_source, eng.source_fingerprint)[
+                    0
+                ].std
                 feat: list[float | None] = [None] * N_POOL
                 feat[dp_slot] = -3.5
                 live_ts = 1700000000.0 + PATTERN_CHECKPOINT_INTERVAL_S + 60.0
+                w_before_1 = list(rain_model.w)
                 rain_model.train(eng.std, feat, 1.0, live_ts)
-                # Also train a second step after the checkpoint so w != cp_w
+
+                # Mutate std and non-dp weights sharply before the second live sample arrives
+                for _ in range(5):
+                    eng.std.update(dp_slot, 25.0)
+                std2 = PatternEngine.from_dict(eng.to_dict(), eng.thresholds, eng.storm_source, eng.source_fingerprint)[
+                    0
+                ].std
                 feat2: list[float | None] = [None] * N_POOL
                 feat2[dp_slot] = -2.5
+                w_before_2 = list(rain_model.w)
                 rain_model.train(eng.std, feat2, 1.0, live_ts + 60.0)
 
                 captured["live_w"] = rain_model.w[rain_dp_idx]
                 captured["live_bias"] = rain_model.w[0]
                 captured["live_n_updates"] = rain_model.n_updates
                 captured["oracle_eng"] = oracle_eng
-                captured["feats"] = [
-                    (feat, 1.0, live_ts, frozenset()),
-                    (feat2, 1.0, live_ts + 60.0, frozenset()),
-                ]
+                captured["step1"] = (std1, feat, 1.0, live_ts, w_before_1)
+                captured["step2"] = (std2, feat2, 1.0, live_ts + 60.0, w_before_2)
 
                 # Also update missing gust_3h concurrently; migration must not overwrite it
                 gust_model.train(eng.std, feat, 1.0, live_ts)
@@ -1803,22 +1812,56 @@ class TestReplayMaskingAndDp3hAlignment:
             retry = await rt._async_migrate_feature_replay(now)
 
         assert retry is True
+        from custom_components.ws_core.const import PATTERN_CHECKPOINT_INTERVAL_S as _CP_S
+        from custom_components.ws_core.const import PATTERN_GRAD_CLIP as _CLIP
+        from custom_components.ws_core.const import PATTERN_L2 as _L2
+        from custom_components.ws_core.pattern_forecast import _sigmoid
+
+        # Independent serial oracle: apply step1 in (std1, w_before_1), then step2 in (std2, w_before_2)
         oracle_rain = captured["oracle_eng"].models["rain_3h"]
-        oracle_rain.w[0] = captured["live_bias"]
-        oracle_rain.apply_feature_samples(eng.std, rain_dp_idx, captured["feats"], 1700000000.0)
+        cp_at = 1700000000.0
+        for std_i, feat_i, y_i, ts_i, w_i in (captured["step1"], captured["step2"]):
+            z_i = oracle_rain.zvec(std_i, feat_i)
+            base_s = w_i[0] + sum(
+                w * v for j, (w, v) in enumerate(zip(w_i[1:], z_i, strict=True), start=1) if j != rain_dp_idx
+            )
+            s_i = base_s + oracle_rain.w[rain_dp_idx] * z_i[rain_dp_idx - 1]
+            err_i = _sigmoid(s_i) - y_i
+            g_i = max(-_CLIP, min(_CLIP, err_i * z_i[rain_dp_idx - 1] + _L2 * oracle_rain.w[rain_dp_idx]))
+            oracle_rain._step(rain_dp_idx, g_i)
+            if cp_at is None or ts_i - cp_at >= _CP_S:
+                oracle_rain.cp_w[rain_dp_idx] = oracle_rain.w[rain_dp_idx]
+                oracle_rain.cp_g2[rain_dp_idx] = oracle_rain.g2[rain_dp_idx]
+                cp_at = ts_i
+
+        # Also compare against post-hoc context (what broken post-await zvec/w would give) to ensure context matters
+        stale_model = PatternEngine.from_dict(
+            captured["oracle_eng"].to_dict(),
+            captured["oracle_eng"].thresholds,
+            captured["oracle_eng"].storm_source,
+            captured["oracle_eng"].source_fingerprint,
+        )[0].models["rain_3h"]
+        stale_model.w[0] = captured["live_bias"]
+        for _std_i, feat_i, y_i, _ts_i, _w_i in (captured["step1"], captured["step2"]):
+            z_bad = stale_model.zvec(eng.std, feat_i)
+            s_bad = stale_model.w[0] + sum(w * v for w, v in zip(stale_model.w[1:], z_bad, strict=True))
+            g_bad = max(
+                -_CLIP, min(_CLIP, (_sigmoid(s_bad) - y_i) * z_bad[rain_dp_idx - 1] + _L2 * stale_model.w[rain_dp_idx])
+            )
+            stale_model._step(rain_dp_idx, g_bad)
 
         naive_linear_w = captured["src_w"] + (captured["live_w"] - pre_w)
         assert captured["live_w"] != pre_w
         assert captured["src_w"] != pre_w
-        # Replaying live samples onto the replayed optimizer state differs from naive weight-delta addition
         assert abs(rain_model.w[rain_dp_idx] - naive_linear_w) > 1e-3
+        assert abs(rain_model.w[rain_dp_idx] - stale_model.w[rain_dp_idx]) > 1e-4
         assert math.isclose(rain_model.w[rain_dp_idx], oracle_rain.w[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
         assert math.isclose(rain_model.g2[rain_dp_idx], oracle_rain.g2[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
         assert math.isclose(rain_model.cp_w[rain_dp_idx], oracle_rain.cp_w[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
         assert math.isclose(rain_model.cp_g2[rain_dp_idx], oracle_rain.cp_g2[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
         assert rain_model.w[0] == captured["live_bias"]
         assert rain_model.n_updates == captured["live_n_updates"]
-        assert eng.std.n[dp_slot] == 81
+        assert eng.std.n[dp_slot] == 86
         assert gust_model.w[gust_dp_idx] == captured["gust_live_w"]
         assert eng.history_learn["targets"]["rain_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
         assert eng.history_learn["targets"]["gust_3h"]["features_method"] == 3

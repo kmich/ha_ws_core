@@ -481,3 +481,221 @@ async def test_open_meteo_honors_zero_utc_offset_across_dst():
     assert hourly[2]["precip_prob"] == 0
     assert hourly[2]["precip_mm"] == 0.0
     assert hourly[2]["gust_kmh"] == 12.0
+
+
+@pytest.mark.asyncio
+async def test_open_meteo_fetches_hourly_in_utc_and_daily_in_local_tz():
+    from zoneinfo import ZoneInfo
+
+    from homeassistant.util import dt as dt_util
+
+    berlin = ZoneInfo("Europe/Berlin")
+    old_tz = dt_util.get_default_time_zone()
+    dt_util.set_default_time_zone(berlin)
+    try:
+        provider = OpenMeteoProvider()
+        session = MagicMock()
+
+        daily_resp = AsyncMock()
+        daily_resp.status = 200
+        daily_resp.json = AsyncMock(
+            return_value={
+                "timezone": "Europe/Berlin",
+                "utc_offset_seconds": 7200,
+                "daily": {
+                    "time": ["2026-10-25"],
+                    "temperature_2m_max": [16.0],
+                    "temperature_2m_min": [6.0],
+                    "precipitation_sum": [3.0],
+                    "windspeed_10m_max": [20.0],
+                    "windgusts_10m_max": [35.0],
+                    "weathercode": [61],
+                    "precipitation_probability_max": [70],
+                },
+            }
+        )
+
+        # Fall-back DST night in Europe/Berlin: 00:00Z..03:00Z cross both 02:00+02:00 and 02:00+01:00
+        hourly_resp = AsyncMock()
+        hourly_resp.status = 200
+        hourly_resp.json = AsyncMock(
+            return_value={
+                "timezone": "GMT",
+                "utc_offset_seconds": 0,
+                "hourly": {
+                    "time": [
+                        "2026-10-25T00:00",
+                        "2026-10-25T01:00",
+                        "2026-10-25T02:00",
+                        "2026-10-25T03:00",
+                    ],
+                    "temperature_2m": [11.0, 10.0, 9.0, 8.5],
+                    "precipitation_probability": [0, 10, 85, 5],
+                    "precipitation": [0.0, 0.1, 4.5, 0.0],
+                    "windgusts_10m": [12.0, 18.0, 50.0, 14.0],
+                },
+            }
+        )
+
+        cm = AsyncMock()
+        cm.__aexit__.return_value = None
+        cm.__aenter__.side_effect = [daily_resp, hourly_resp]
+        session.get.return_value = cm
+
+        res = await provider.async_fetch(session, 52.52, 13.41)
+        assert session.get.call_count == 2
+        daily_url = session.get.call_args_list[0].args[0]
+        hourly_url = session.get.call_args_list[1].args[0]
+        assert "&daily=" in daily_url
+        assert "&timezone=auto" in daily_url
+        assert "&hourly=" not in daily_url
+        assert "&hourly=" in hourly_url
+        assert "&forecast_hours=26" in hourly_url
+        assert "&timezone=UTC" in hourly_url
+        assert "&daily=" not in hourly_url
+
+        assert res["daily"][0]["date"] == "2026-10-25"
+        hourly = res["hourly"]
+        assert [h["utc_datetime"] for h in hourly] == [
+            "2026-10-25T00:00:00+00:00",
+            "2026-10-25T01:00:00+00:00",
+            "2026-10-25T02:00:00+00:00",
+            "2026-10-25T03:00:00+00:00",
+        ]
+        # Both repeated 02:00 local hours are kept distinctly with contiguous UTC intervals
+        assert [h["datetime"] for h in hourly[:3]] == [
+            "2026-10-25T02:00",
+            "2026-10-25T02:00",
+            "2026-10-25T03:00",
+        ]
+        assert hourly[1]["precip_prob"] == 85
+        assert hourly[1]["precip_mm"] == 4.5
+        assert hourly[1]["gust_kmh"] == 50.0
+    finally:
+        dt_util.set_default_time_zone(old_tz)
+
+
+@pytest.mark.asyncio
+async def test_meteo_france_documented_routes_and_wind_units():
+    from datetime import UTC, datetime, timedelta
+    from unittest.mock import patch
+
+    fixed_now = datetime(2026, 6, 21, 18, 15, tzinfo=UTC)
+
+    def _resp(status: int, payload: dict | None = None):
+        r = AsyncMock()
+        r.status = status
+        r.json = AsyncMock(return_value=payload or {})
+        return r
+
+    daily_payload = {
+        "forecast": [
+            {
+                "datetime": "2026-06-21T00:00:00+0200",
+                "tmax": 26,
+                "tmin": 14,
+                "rr10": 1.2,
+                "wind10m": 20,
+                "gust10m": 45,
+                "weather": 1,
+                "probarain": 30,
+            }
+        ]
+    }
+    # Day 0 has 10 past hours and 4 active/future hours (20:00..23:00+02:00 == 18:00..21:00Z)
+    day0_payload = {
+        "forecast": [
+            {
+                "datetime": (datetime(2026, 6, 21, 16, 0, tzinfo=UTC) + timedelta(hours=k)).isoformat(),
+                "temp2m": 20 + k,
+                "rh2m": 60,
+                "wind10m": 0 if k == 2 else 18,
+                "gust10m": 0 if k == 2 else 36,
+                "rr1": 0.0,
+                "probarain": 10,
+                "weather": 0,
+            }
+            for k in range(6)  # 16:00Z, 17:00Z (past at 18:15Z), 18:00Z..21:00Z (active/future)
+        ]
+    }
+    day1_payload = {
+        "forecast": [
+            {
+                "datetime": (datetime(2026, 6, 21, 22, 0, tzinfo=UTC) + timedelta(hours=k)).isoformat(),
+                "temp2m": 15,
+                "rh2m": 75,
+                "wind10m": 12,
+                "gust10m": 28,
+                "rr1": 0.5,
+                "probarain": 40,
+                "weather": 10,
+            }
+            for k in range(24)
+        ]
+    }
+
+    session = MagicMock()
+    cm = AsyncMock()
+    cm.__aexit__.return_value = None
+    cm.__aenter__.side_effect = [
+        _resp(200, daily_payload),
+        _resp(200, day0_payload),
+        _resp(200, day1_payload),
+    ]
+    session.get.return_value = cm
+
+    with patch("custom_components.ws_core.providers.meteo_france.datetime") as mock_dt:
+        mock_dt.now.return_value = fixed_now
+        res = await MeteoFranceProvider().async_fetch(session, 48.112, -1.6819, api_key="tok")
+
+    called = [(c.args[0], c.kwargs.get("params")) for c in session.get.call_args_list]
+    assert called[0][0].endswith("/forecast/daily")
+    assert called[1][0].endswith("/forecast/daily/0/hourly")
+    assert called[1][1]["hourly"] == "true"
+    assert called[2][0].endswith("/forecast/daily/1/hourly")
+    assert called[2][1]["hourly"] == "true"
+    assert not any(url.endswith("/forecast/hourly") for url, _ in called)
+
+    # Wind/gust values stay in km/h (NOT multiplied by 3.6) and keep 0.0
+    assert res["daily"][0]["wind_kmh"] == 20.0
+    assert res["daily"][0]["gust_kmh"] == 45.0
+    assert len(res["hourly"]) == 25
+    assert res["hourly"][0]["utc_datetime"] == "2026-06-21T18:00:00+00:00"
+    assert res["hourly"][0]["wind_kmh"] == 0.0
+    assert res["hourly"][0]["gust_kmh"] == 0.0
+    assert res["hourly"][1]["wind_kmh"] == 18.0
+    assert res["hourly"][1]["gust_kmh"] == 36.0
+
+    # When daily/{day}/hourly is forbidden, falls back to documented /forecast/nextHours?hourly=true
+    session2 = MagicMock()
+    cm2 = AsyncMock()
+    cm2.__aexit__.return_value = None
+    cm2.__aenter__.side_effect = [
+        _resp(200, daily_payload),
+        _resp(403, {}),
+        _resp(
+            200,
+            {
+                "forecast": [
+                    {
+                        "datetime": "2026-06-21T20:00:00+0200",
+                        "temp2m": 22,
+                        "wind10m": 15,
+                        "gust10m": 32,
+                        "weather": 1,
+                    }
+                ]
+            },
+        ),
+    ]
+    session2.get.return_value = cm2
+    with patch("custom_components.ws_core.providers.meteo_france.datetime") as mock_dt:
+        mock_dt.now.return_value = fixed_now
+        fallback_res = await MeteoFranceProvider().async_fetch(session2, 48.112, -1.6819, api_key="tok")
+
+    fallback_urls = [(c.args[0], c.kwargs.get("params")) for c in session2.get.call_args_list]
+    assert fallback_urls[1][0].endswith("/forecast/daily/0/hourly")
+    assert fallback_urls[2][0].endswith("/forecast/nextHours")
+    assert fallback_urls[2][1]["hourly"] == "true"
+    assert fallback_res["hourly"][0]["wind_kmh"] == 15.0
+    assert fallback_res["hourly"][0]["gust_kmh"] == 32.0

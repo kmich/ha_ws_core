@@ -1346,3 +1346,6 @@ CONF_CUSTOM_MAX_WIND_KMH = "custom_max_wind_kmh"
 CONF_CUSTOM_MAX_WIND_GUST_KMH = "custom_max_wind_gust_kmh"
 CONF_CUSTOM_MAX_CLOUD_COVER_PCT = "custom_max_cloud_cover_pct"
 CONF_CUSTOM_REQUIRE_DAYLIGHT = "custom_require_daylight"
+
+# Conversion factors from canonical internal (m/s) wind speed to configured unit
+WIND_FACTORS: dict[str, float] = {"m/s": 1.0, "km/h": 3.6, "mph": 2.23694, "kn": 1.94384}

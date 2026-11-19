@@ -276,6 +276,9 @@ from .const import (
     UNIT_TEMP_C,
     UNIT_WIND_MS,
 )
+from .const import (
+    WIND_FACTORS as _WIND_FACTORS,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -300,9 +303,9 @@ class WSSensorDescription:
 
 
 # Conversion factors from canonical internal (metric) value to configured unit.
-# wind: from m/s; pressure: from hPa; distance: from km; altitude: from m.
+# wind: from m/s (_WIND_FACTORS is imported from const.py); pressure: from hPa;
+# distance: from km; altitude: from m.
 # Rain accumulation (mm->in) and rain rate (mm/h->in/h) share the 1/25.4 factor.
-_WIND_FACTORS: dict[str, float] = {"m/s": 1.0, "km/h": 3.6, "mph": 2.23694, "kn": 1.94384}
 _PRESSURE_FACTORS: dict[str, float] = {"hPa": 1.0, "inHg": 0.02953, "mmHg": 0.75006}
 _DISTANCE_FACTORS: dict[str, float] = {"km": 1.0, "mi": 0.621371}
 _ALTITUDE_FACTORS: dict[str, float] = {"m": 1.0, "ft": 3.28084}

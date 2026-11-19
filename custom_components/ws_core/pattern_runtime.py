@@ -1238,12 +1238,12 @@ class PatternRuntime:
             counts = trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"}, update_std=not has_warm_scale)
             return trainer, counts
 
-        live_logs: dict[str, list[tuple[list[float | None], float, float, frozenset[int]]]] = {}
+        live_logs: dict[str, list[Any]] = {}
         pre_cp_at: dict[str, float | None] = {}
         for tid in ok_targets:
             m = eng.models.get(tid)
             if m is not None and "dp_3h" in m.spec.features:
-                log: list[tuple[list[float | None], float, float, frozenset[int]]] = []
+                log: list[Any] = []
                 live_logs[tid] = log
                 pre_cp_at[tid] = m.cp_at
                 m._migration_sample_log = log
