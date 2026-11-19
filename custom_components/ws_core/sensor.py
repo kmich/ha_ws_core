@@ -434,7 +434,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             entities.append(WSRiverFlowSensor(coordinator, entry, prefix, st))
 
     # v3.0.0: Weather Windows Decision Engine entities (created only when enabled)
-    if opts.get(CONF_ENABLE_WEATHER_WINDOWS, False):
+    ww_enabled = getattr(coordinator, "weather_windows_enabled", None)
+    if not isinstance(ww_enabled, bool):
+        ww_enabled = bool(opts.get(CONF_ENABLE_WEATHER_WINDOWS, entry.data.get(CONF_ENABLE_WEATHER_WINDOWS, False)))
+    if ww_enabled:
         from homeassistant.util import dt as dt_util
 
         from .weather_windows import resolve_profiles
@@ -442,7 +445,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         def _parse_ts(val: Any):
             if not val:
                 return None
-            return dt_util.parse_datetime(str(val))
+            parsed = dt_util.parse_datetime(str(val))
+            if parsed is not None and parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=dt_util.get_default_time_zone())
+            return parsed
 
         profiles = getattr(coordinator, "weather_window_profiles", None)
         if not isinstance(profiles, Mapping):

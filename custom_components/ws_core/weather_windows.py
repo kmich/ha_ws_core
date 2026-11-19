@@ -647,15 +647,22 @@ class WeatherWindowsEngine:
 
     def _parse_slot_utc(self, item: dict[str, Any], display_tz: tzinfo) -> datetime | None:
         """Parse an hourly forecast item timestamp into UTC, preserving DST distinct hours."""
-        raw_dt = item.get("utc_datetime") or item.get("datetime")
-        if not raw_dt:
+        raw_dt = item.get("utc_datetime")
+        if raw_dt is None or raw_dt == "":
+            raw_dt = item.get("datetime")
+        if raw_dt is None or raw_dt == "":
             return None
         if isinstance(raw_dt, datetime):
             if raw_dt.tzinfo is None:
                 raw_dt = raw_dt.replace(tzinfo=display_tz)
             return raw_dt.astimezone(UTC)
-        if isinstance(raw_dt, (int, float)) and not isinstance(raw_dt, bool):
-            return datetime.fromtimestamp(raw_dt, tz=UTC)
+        if isinstance(raw_dt, (int, float)):
+            if isinstance(raw_dt, bool) or not math.isfinite(raw_dt):
+                return None
+            try:
+                return datetime.fromtimestamp(raw_dt, tz=UTC)
+            except (OverflowError, OSError, ValueError):
+                return None
         key = str(raw_dt)
         parsed = self._parse_dt_cache.get(key)
         if key not in self._parse_dt_cache:

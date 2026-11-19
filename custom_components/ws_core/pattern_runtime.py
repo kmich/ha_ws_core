@@ -860,11 +860,19 @@ class PatternRuntime:
         """Seed the 15-min history bins from the recorder (every startup, before any replay)."""
         ts = now.timestamp()
         plan = {name: self.recent_entity(name, ts) for name in _RECENT_INPUTS}
+        reset_seq = self._reset_seq
+        eng = self.engine
         try:
             bins = await _recorder_instance(self.coord.hass).async_add_executor_job(partial(self._recent_job, plan, ts))
         except Exception as err:  # noqa: BLE001 - recorder missing or busy: warm up live instead
             _LOGGER.debug("ws_core pattern forecast: no short-term statistics to seed from: %s", err)
-            self._recent_failed = True
+            if self._reset_seq == reset_seq and self.engine is eng:
+                self._recent_failed = True
+            return 0
+        if self._reset_seq != reset_seq or self.engine is not eng or getattr(self.coord, "_stopped", False) is True:
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset or stopped during recent bin seed; discarding"
+            )
             return 0
         self._recent_failed = False
         wet = [b["ts"] for b in bins if (b.get("r") or 0.0) > 0.0]
@@ -1167,6 +1175,7 @@ class PatternRuntime:
             hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
             hl["targets"] = targets
             eng.history_learn = hl
+            await self.async_save()
             return False
 
         did_reset = reset_val < PATTERN_HISTORY_FEATURES_METHOD
@@ -1179,6 +1188,19 @@ class PatternRuntime:
             hl["targets"] = targets
             eng.history_learn = hl
             self._published = {}
+
+        pressure_targets = [t for t in ok_targets if t in eng.models and "dp_3h" in eng.models[t].spec.features]
+        if not pressure_targets:
+            for tid in ok_targets:
+                if isinstance(targets.get(tid), dict):
+                    targets[tid]["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            hl["targets"] = targets
+            hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            eng.history_learn = hl
+            self._published = {}
+            await self.async_save()
+            return False
 
         end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
         n = PATTERN_HISTORY_DAYS * 24
@@ -1264,6 +1286,11 @@ class PatternRuntime:
             return True
 
         if not has_warm_scale:
+            if other_pressure_models and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N:
+                # A live-only pressure model crossed the warmup threshold while the
+                # migration job was in flight; re-run so we train against its scale.
+                await self.async_save()
+                return True
             eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
             eng.std.var[dp_slot] = trained.std.var[dp_slot]
             eng.std.n[dp_slot] = trained.std.n[dp_slot]
@@ -1305,13 +1332,21 @@ class PatternRuntime:
             hist = self.build_history(plan, meta, rows, start_ts, n, need_night=False)
             return PatternEngine.pressure_seed_from_history(hist)
 
+        reset_seq = self._reset_seq
+        eng = self.engine
         try:
             points = await _recorder_instance(self.coord.hass).async_add_executor_job(pressure_job)
         except Exception as err:  # noqa: BLE001 - a short recorder outage is retried
             _LOGGER.debug("ws_core pattern forecast: no pressure statistics to seed from: %s", err)
-            self._warm_start["pressure_status"] = "recorder_error"
+            if self._reset_seq == reset_seq and self.engine is eng:
+                self._warm_start["pressure_status"] = "recorder_error"
             return 0, True
-        seeded = self.engine.seed_pressure(points)
+        if self._reset_seq != reset_seq or self.engine is not eng or getattr(self.coord, "_stopped", False) is True:
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset or stopped during pressure seed; discarding"
+            )
+            return 0, False
+        seeded = eng.seed_pressure(points)
         self._warm_start["pressure_status"] = "available" if points else "unavailable"
         self._warm_start["pressure_points_added"] = seeded
         if seeded:
@@ -1359,17 +1394,34 @@ class PatternRuntime:
         retry_needed = False
         cancelled = False
         reset_seq = self._reset_seq
+        eng_initial = self.engine
         try:
             now = dt_util.utcnow()
+
+            def _aborted() -> bool:
+                return (
+                    self._reset_seq != reset_seq
+                    or self.engine is not eng_initial
+                    or getattr(self.coord, "_stopped", False) is True
+                )
+
             retry_needed = await self._async_forget_misread_replay(now)
+            if _aborted():
+                return
             features_migrated = await self._async_migrate_feature_replay(now)
+            if _aborted():
+                return
             retry_needed = retry_needed or features_migrated
             bins = await self._async_seed_recent(now)
+            if _aborted():
+                return
             retry_needed = retry_needed or self._recent_failed
             if bins:
                 _LOGGER.info("ws_core pattern forecast: seeded %d recent 15-min history bins from the recorder", bins)
             eng = self.engine
             seeded, pressure_failed = await self._async_seed_pressure(now)
+            if _aborted():
+                return
             retry_needed = retry_needed or pressure_failed
             targets = eng.targets_needing_replay(now.timestamp())
             if not targets:
@@ -1400,9 +1452,9 @@ class PatternRuntime:
                         for t in targets
                     },
                 }
-            if self._reset_seq != reset_seq or self.engine is not eng:
+            if _aborted():
                 _LOGGER.debug(
-                    "ws_core pattern forecast: learning state was reset during history replay; discarding results"
+                    "ws_core pattern forecast: learning state was reset or stopped during history replay; discarding results"
                 )
                 return
             eng.adopt_replay(result["trained"], result["report"], result["statuses"], update_std, now.timestamp())

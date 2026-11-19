@@ -1318,6 +1318,173 @@ class TestReplayMaskingAndDp3hAlignment:
         # Overall features_method remains pending (< 4)
         assert eng.history_learn.get("features_method") == 3
 
+    async def test_migrate_feature_replay_non_pressure_only_completes_without_recorder_read(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt.engine = _make_engine()
+        eng = rt.engine
+        cloud_slot = POOL_INDEX["cloud_deficit"]
+        assert eng.std.n[cloud_slot] > 0
+
+        eng.history_learn = {
+            "features_method": 3,
+            "targets": {
+                "heat_24h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                },
+                "rain_3h": {
+                    "status": "unavailable",
+                    "attempted_at": 1000.0,
+                    "reason": "no sensor",
+                    "retryable": False,
+                    "method": PATTERN_HISTORY_METHOD,
+                },
+            },
+        }
+
+        recorder_calls = 0
+
+        class _CountingRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                nonlocal recorder_calls
+                recorder_calls += 1
+                return fn(*args)
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_CountingRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        assert retry is False
+        assert recorder_calls == 0
+        assert eng.std.n[cloud_slot] == 0  # corrupted solar features were still reset
+        assert eng.history_learn["targets"]["heat_24h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        assert eng.history_learn["features_reset_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        rt.store.async_save.assert_awaited_once()
+
+    async def test_async_learn_history_aborts_and_discards_seed_if_reset_during_seed(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+        coord._stopped = False
+        scheduled: list = []
+
+        def _fake_start_once(fn, delay, name):
+            scheduled.append((fn, delay, name))
+
+        coord._start_once = _fake_start_once
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt.store.async_remove = AsyncMock()
+        rt._history_job = MagicMock(side_effect=AssertionError("_history_job should not run after in-flight reset"))  # type: ignore[method-assign]
+
+        class _ResetDuringSeedRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                await rt.async_reset()
+                return [{"ts": 1700000000.0, "t": 15.0, "r": 2.0}]
+
+        with (
+            patch.object(pattern_runtime, "_recorder_instance", return_value=_ResetDuringSeedRecorder()),
+            patch(
+                "custom_components.ws_core.pattern_runtime.dt_util.utcnow",
+                return_value=datetime(2026, 6, 21, 12, 0, tzinfo=UTC),
+            ),
+        ):
+            await rt.async_learn_history()
+
+        # Stale bins/rain were discarded and replacement replay was queued cleanly
+        assert len(rt.engine.bins) == 0
+        assert rt.engine.last_rain_ts is None
+        assert rt._history_job.call_count == 0
+        assert len(scheduled) == 1
+        assert scheduled[0][0] == rt.async_learn_history
+
+    async def test_dp3h_migration_retries_if_live_scale_warms_during_job(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        eng = rt.engine
+        dp_slot = POOL_INDEX["dp_3h"]
+
+        eng.history_learn = {
+            "features_method": 3,
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "targets": {
+                "rain_3h": {
+                    "status": "ok",
+                    "attempted_at": 1000.0,
+                    "reason": None,
+                    "method": PATTERN_HISTORY_METHOD,
+                },
+            },
+        }
+
+        n = 48
+        hist = HourlyHistory(
+            start_ts=1700000000.0,
+            n=n,
+            mslp=[1000.0 + (i * 0.1) for i in range(n)],
+            temp=[15.0] * n,
+            temp_min=[12.0] * n,
+            temp_max=[18.0] * n,
+            dpd=[3.0] * n,
+            wind=[4.0] * n,
+            gust=[5.0] * n,
+            rain=[2.0 if (i % 6) == 3 else 0.0 for i in range(n)],
+            strikes=[0.0] * n,
+            night_frac=[0.5] * n,
+            tz_offset=[0.0] * n,
+        )
+
+        class _WarmingRecorder:
+            async def async_add_executor_job(self, fn, *args):
+                res = fn(*args)
+                # Simulate live ticks pushing dp_3h across warmup while executor ran
+                eng.std.mean[dp_slot] = 999.5
+                eng.std.var[dp_slot] = 2.5
+                eng.std.n[dp_slot] = PATTERN_STD_MIN_N + 5
+                return res
+
+        rt.history_entity = lambda name, _ts: f"sensor.{name}"  # type: ignore[method-assign]
+        rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
+        rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
+
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        with patch.object(pattern_runtime, "_recorder_instance", return_value=_WarmingRecorder()):
+            retry = await rt._async_migrate_feature_replay(now)
+
+        # Should NOT overwrite the newly warmed live scale; instead retries under has_warm_scale=True
+        assert retry is True
+        assert eng.std.mean[dp_slot] == 999.5
+        assert eng.std.n[dp_slot] == PATTERN_STD_MIN_N + 5
+        assert "features_method" not in eng.history_learn["targets"]["rain_3h"]
+
 
 class TestDowngradeTolerance:
     """Verify that storage schema remains compatible with earlier versions."""

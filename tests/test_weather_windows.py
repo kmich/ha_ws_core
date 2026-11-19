@@ -798,8 +798,12 @@ class TestWeatherWindowsEngine:
         # Numeric timestamps
         assert engine._parse_slot_utc({"datetime": ts_num}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
         assert engine._parse_slot_utc({"utc_datetime": int(ts_num)}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
+        assert engine._parse_slot_utc({"datetime": 0}, tz) == datetime.fromtimestamp(0, tz=UTC)
 
-        # Invalid/empty
+        # Invalid/empty/non-finite/overflow
         assert engine._parse_slot_utc({"datetime": None}, tz) is None
         assert engine._parse_slot_utc({"datetime": "invalid-date"}, tz) is None
         assert engine._parse_slot_utc({"datetime": True}, tz) is None
+        assert engine._parse_slot_utc({"datetime": float("nan")}, tz) is None
+        assert engine._parse_slot_utc({"datetime": float("inf")}, tz) is None
+        assert engine._parse_slot_utc({"datetime": 1e20}, tz) is None
