@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from custom_components.ws_core import pattern_runtime
 from custom_components.ws_core.const import (
@@ -1701,8 +1702,8 @@ class TestReplayMaskingAndDp3hAlignment:
 
         rain_model = eng.models["rain_3h"]
         rain_dp_idx = rain_model.spec.features.index("dp_3h") + 1
-        pre_w = 0.25
-        pre_g2 = 40.0
+        pre_w = 0.0
+        pre_g2 = 0.0
         rain_model.w[rain_dp_idx] = pre_w
         rain_model.g2[rain_dp_idx] = pre_g2
         rain_model.cp_w[rain_dp_idx] = pre_w
@@ -1759,17 +1760,18 @@ class TestReplayMaskingAndDp3hAlignment:
         rt._fetch_statistics = lambda ids, s, e: ({"sensor.p": {"statistic_id": "sensor.p"}}, {})  # type: ignore[method-assign]
         rt.build_history = lambda *a, **kw: hist  # type: ignore[method-assign]
 
-        captured: dict[str, float] = {}
+        captured: dict[str, Any] = {}
 
         class _InFlightLiveRecorder:
             async def async_add_executor_job(self, fn, *args):
                 res = fn(*args)
                 trained, _counts = res
+                oracle_eng, _ = PatternEngine.from_dict(
+                    trained.to_dict(), trained.thresholds, trained.storm_source, trained.source_fingerprint
+                )
                 src_rain = trained.models["rain_3h"]
                 captured["src_w"] = src_rain.w[rain_dp_idx]
                 captured["src_g2"] = src_rain.g2[rain_dp_idx]
-                captured["src_cp_w"] = src_rain.cp_w[rain_dp_idx]
-                captured["src_cp_g2"] = src_rain.cp_g2[rain_dp_idx]
 
                 # Simulate live observations and model training on the event loop while replay ran
                 eng.std.update(dp_slot, -3.5)
@@ -1783,11 +1785,13 @@ class TestReplayMaskingAndDp3hAlignment:
                 rain_model.train(eng.std, feat2, 1.0, live_ts + 60.0)
 
                 captured["live_w"] = rain_model.w[rain_dp_idx]
-                captured["live_g2"] = rain_model.g2[rain_dp_idx]
-                captured["live_cp_w"] = rain_model.cp_w[rain_dp_idx]
-                captured["live_cp_g2"] = rain_model.cp_g2[rain_dp_idx]
                 captured["live_bias"] = rain_model.w[0]
                 captured["live_n_updates"] = rain_model.n_updates
+                captured["oracle_eng"] = oracle_eng
+                captured["feats"] = [
+                    (feat, 1.0, live_ts, frozenset()),
+                    (feat2, 1.0, live_ts + 60.0, frozenset()),
+                ]
 
                 # Also update missing gust_3h concurrently; migration must not overwrite it
                 gust_model.train(eng.std, feat, 1.0, live_ts)
@@ -1799,17 +1803,19 @@ class TestReplayMaskingAndDp3hAlignment:
             retry = await rt._async_migrate_feature_replay(now)
 
         assert retry is True
-        expected_w = captured["src_w"] + (captured["live_w"] - pre_w)
-        expected_g2 = captured["src_g2"] + (captured["live_g2"] - pre_g2)
-        expected_cp_w = captured["src_cp_w"] + (captured["live_cp_w"] - pre_w)
-        expected_cp_g2 = captured["src_cp_g2"] + (captured["live_cp_g2"] - pre_g2)
+        oracle_rain = captured["oracle_eng"].models["rain_3h"]
+        oracle_rain.w[0] = captured["live_bias"]
+        oracle_rain.apply_feature_samples(eng.std, rain_dp_idx, captured["feats"], 1700000000.0)
 
+        naive_linear_w = captured["src_w"] + (captured["live_w"] - pre_w)
         assert captured["live_w"] != pre_w
         assert captured["src_w"] != pre_w
-        assert math.isclose(rain_model.w[rain_dp_idx], expected_w, rel_tol=0.0, abs_tol=1e-12)
-        assert math.isclose(rain_model.g2[rain_dp_idx], expected_g2, rel_tol=0.0, abs_tol=1e-12)
-        assert math.isclose(rain_model.cp_w[rain_dp_idx], expected_cp_w, rel_tol=0.0, abs_tol=1e-12)
-        assert math.isclose(rain_model.cp_g2[rain_dp_idx], expected_cp_g2, rel_tol=0.0, abs_tol=1e-12)
+        # Replaying live samples onto the replayed optimizer state differs from naive weight-delta addition
+        assert abs(rain_model.w[rain_dp_idx] - naive_linear_w) > 1e-3
+        assert math.isclose(rain_model.w[rain_dp_idx], oracle_rain.w[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
+        assert math.isclose(rain_model.g2[rain_dp_idx], oracle_rain.g2[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
+        assert math.isclose(rain_model.cp_w[rain_dp_idx], oracle_rain.cp_w[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
+        assert math.isclose(rain_model.cp_g2[rain_dp_idx], oracle_rain.cp_g2[rain_dp_idx], rel_tol=0.0, abs_tol=1e-12)
         assert rain_model.w[0] == captured["live_bias"]
         assert rain_model.n_updates == captured["live_n_updates"]
         assert eng.std.n[dp_slot] == 81

@@ -393,3 +393,96 @@ async def test_hourly_forecast_repeated_dst_hour_blend_lead_times(mock_config_en
         assert [o["native_temperature"] for o in out1] == pytest.approx([17.0, 14.0])
     finally:
         dt_util.set_default_time_zone(old_tz)
+
+
+async def test_hourly_forecast_half_hour_timezone_and_shifted_slot_intervals(mock_config_entry, mock_coordinator):
+    from zoneinfo import ZoneInfo
+
+    kolkata = ZoneInfo("Asia/Kolkata")
+    old_tz = dt_util.get_default_time_zone()
+    dt_util.set_default_time_zone(kolkata)
+    try:
+        # 18:15+05:30 = 12:45Z. The active UTC hourly interval [12:00Z, 13:00Z) started 45 min ago.
+        now_local = datetime(2026, 6, 21, 18, 15, tzinfo=kolkata)
+        mock_coordinator.data[KEY_NORM_TEMP_C] = 30.0
+        mock_coordinator.data[KEY_CURRENT_CONDITION] = None
+        mock_coordinator.data[KEY_FORECAST] = {
+            "provider": "open_meteo",
+            "daily": [],
+            "hourly": [
+                {
+                    "datetime": "2026-06-21T16:30:00+05:30",
+                    "utc_datetime": "2026-06-21T11:00:00+00:00",
+                    "temp_c": 10.0,
+                    "wind_kmh": 0.0,
+                    "weathercode": 3,
+                },
+                {
+                    "datetime": "2026-06-21T17:30:00+05:30",
+                    "utc_datetime": "2026-06-21T12:00:00+00:00",
+                    "temp_c": 10.0,
+                    "wind_kmh": 0.0,
+                    "weathercode": 61,
+                },
+                {
+                    "datetime": "2026-06-21T18:30:00+05:30",
+                    "utc_datetime": "2026-06-21T13:00:00+00:00",
+                    "temp_c": 10.0,
+                    "wind_kmh": 0.0,
+                    "weathercode": 0,
+                },
+                {
+                    "datetime": "2026-06-21T19:30:00+05:30",
+                    "utc_datetime": "2026-06-21T14:00:00+00:00",
+                    "temp_c": 10.0,
+                    "wind_kmh": 0.0,
+                    "weathercode": 0,
+                },
+                {
+                    "datetime": "2026-06-21T20:30:00+05:30",
+                    "utc_datetime": "2026-06-21T15:00:00+00:00",
+                    "temp_c": 10.0,
+                    "wind_kmh": 0.0,
+                    "weathercode": 0,
+                },
+            ],
+        }
+        entity = WSStationWeather(mock_coordinator, mock_config_entry, "ws")
+        with patch.object(dt_util, "now", return_value=now_local):
+            out = await entity.async_forecast_hourly()
+            cond = entity.condition
+
+        assert cond == "rainy"
+        assert [o["datetime"] for o in out] == [
+            "2026-06-21T17:30:00+05:30",
+            "2026-06-21T18:30:00+05:30",
+            "2026-06-21T19:30:00+05:30",
+            "2026-06-21T20:30:00+05:30",
+        ]
+        # Lead 0 (0.7*30+0.3*10=24.0), Lead 1 (18.0), Lead 2 (14.0), Lead 3 (10.0)
+        assert [o["native_temperature"] for o in out] == pytest.approx([24.0, 18.0, 14.0, 10.0])
+
+        # Shifted hourly intervals (:30..:30) in standard UTC timezone at 14:15Z
+        dt_util.set_default_time_zone(UTC)
+        now_utc = datetime(2026, 6, 21, 14, 15, tzinfo=UTC)
+        mock_coordinator.data[KEY_FORECAST]["hourly"] = [
+            {"datetime": "2026-06-21T12:30:00+00:00", "temp_c": 10.0, "wind_kmh": 0.0, "weathercode": 3},
+            {"datetime": "2026-06-21T13:30:00+00:00", "temp_c": 10.0, "wind_kmh": 0.0, "weathercode": 95},
+            {"datetime": "2026-06-21T14:30:00+00:00", "temp_c": 10.0, "wind_kmh": 0.0, "weathercode": 0},
+            {"datetime": "2026-06-21T15:30:00+00:00", "temp_c": 10.0, "wind_kmh": 0.0, "weathercode": 0},
+            {"datetime": "2026-06-21T16:30:00+00:00", "temp_c": 10.0, "wind_kmh": 0.0, "weathercode": 0},
+        ]
+        with patch.object(dt_util, "now", return_value=now_utc):
+            shifted_out = await entity.async_forecast_hourly()
+            shifted_cond = entity.condition
+
+        assert shifted_cond == "lightning-rainy"
+        assert [o["datetime"] for o in shifted_out] == [
+            "2026-06-21T13:30:00+00:00",
+            "2026-06-21T14:30:00+00:00",
+            "2026-06-21T15:30:00+00:00",
+            "2026-06-21T16:30:00+00:00",
+        ]
+        assert [o["native_temperature"] for o in shifted_out] == pytest.approx([24.0, 18.0, 14.0, 10.0])
+    finally:
+        dt_util.set_default_time_zone(old_tz)

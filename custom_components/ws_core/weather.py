@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import math
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 from homeassistant.components.weather import WeatherEntity
@@ -82,6 +83,40 @@ def _local_iso(value: str) -> str:
     if dt.tzinfo is not None:
         return value
     return dt_util.as_local(dt).isoformat()  # a naive value is taken as local
+
+
+def _current_now_context() -> tuple[datetime, datetime, tzinfo | None]:
+    """Return (actual_now_local, actual_now_utc, local_tz) without truncating minutes."""
+    now_raw = dt_util.now()
+    local_tz = now_raw.tzinfo or dt_util.get_default_time_zone()
+    now_local = now_raw.replace(tzinfo=local_tz) if now_raw.tzinfo is None else now_raw
+    return now_local, now_local.astimezone(UTC), local_tz
+
+
+def _hourly_slot_utc(item: dict[str, Any], local_tz: tzinfo | None) -> datetime | None:
+    """Parse an hourly forecast slot timestamp into UTC."""
+    dt_s = item.get("datetime")
+    utc_s = item.get("utc_datetime")
+    if not dt_s and not utc_s:
+        return None
+    slot_dt = dt_util.parse_datetime(str(utc_s)) if utc_s else None
+    if slot_dt is None and dt_s:
+        slot_dt = dt_util.parse_datetime(_local_iso(str(dt_s)))
+    if slot_dt is None:
+        return None
+    if slot_dt.tzinfo is None:
+        slot_dt = slot_dt.replace(tzinfo=local_tz)
+    return slot_dt.astimezone(UTC)
+
+
+def _hourly_lead_hours(slot_utc: datetime, actual_now_utc: datetime) -> int | None:
+    """Return lead hours for interval [slot_utc, slot_utc + 1h), or None when past."""
+    if slot_utc + timedelta(hours=1) <= actual_now_utc:
+        return None
+    if slot_utc <= actual_now_utc:
+        return 0
+    delta_s = (slot_utc - actual_now_utc).total_seconds()
+    return max(1, math.ceil((delta_s - 1e-6) / 3600.0))
 
 
 def _weathercode_to_condition(code: int | None) -> str | None:
@@ -305,9 +340,16 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         fc = d.get(KEY_FORECAST) or {}
         hourly = fc.get("hourly") or []
         if hourly:
-            now_iso = dt_util.now().strftime("%Y-%m-%dT%H:00")
+            now_local, now_utc, local_tz = _current_now_context()
+            now_iso = now_local.strftime("%Y-%m-%dT%H")
             for item in hourly:
-                if str(item.get("datetime", "")).startswith(now_iso[:13]):
+                slot_utc = _hourly_slot_utc(item, local_tz)
+                matched = (
+                    _hourly_lead_hours(slot_utc, now_utc) == 0
+                    if slot_utc is not None
+                    else str(item.get("datetime", "")).startswith(now_iso)
+                )
+                if matched:
                     h_cond = _weathercode_to_condition(item.get("weathercode"))
                     if h_cond:
                         return h_cond
@@ -368,8 +410,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         local_gust_ms = d.get(KEY_NORM_WIND_GUST_MS)
         local_condition = d.get(KEY_CURRENT_CONDITION)
         local_rain_rate = d.get(KEY_RAIN_RATE_FILT)  # mm/h  → approx mm in 1h
-        now_local = dt_util.now().replace(minute=0, second=0, microsecond=0)
-        now_utc = now_local.astimezone(UTC)
+        now_local, now_utc, local_tz = _current_now_context()
         now_hour_iso = now_local.strftime("%Y-%m-%dT%H")
 
         out: list[dict[str, Any]] = []
@@ -378,31 +419,18 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             utc_s = item.get("utc_datetime")
             if not dt_s and not utc_s:
                 continue
-            slot_dt = dt_util.parse_datetime(str(utc_s)) if utc_s else None
-            if slot_dt is None and dt_s:
-                dt = _local_iso(str(dt_s))
-                slot_dt = dt_util.parse_datetime(dt)
-                if slot_dt is not None and slot_dt.tzinfo is None:
-                    slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
-            else:
-                dt = _local_iso(str(dt_s or utc_s))
-
+            slot_utc = _hourly_slot_utc(item, local_tz)
             lead_h: int | None = None
-            if slot_dt is not None:
-                if slot_dt.tzinfo is None:
-                    slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
-                slot_utc = slot_dt.astimezone(UTC)
-                dt = dt_util.as_local(slot_utc).isoformat()
-                # Past hours are discarded and lead times are compared in UTC so repeated DST hours never collide.
-                lead_f = (slot_utc - now_utc).total_seconds() / 3600.0
-                if lead_f < -1e-3:
+            if slot_utc is not None:
+                lead_h = _hourly_lead_hours(slot_utc, now_utc)
+                if lead_h is None:
                     continue
-                if abs(lead_f - round(lead_f)) < 1e-3:
-                    lead_h = int(round(lead_f))
-                elif lead_f >= 0:
-                    lead_h = int(lead_f)
-            elif str(dt_s)[:13] < now_hour_iso:
-                continue
+                dt = dt_util.as_local(slot_utc).isoformat()
+            else:
+                raw_s = str(dt_s or utc_s)
+                if raw_s[:13] < now_hour_iso:
+                    continue
+                dt = _local_iso(raw_s)
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")

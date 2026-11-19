@@ -456,6 +456,7 @@ class ModelState:
         self.ev_live = 0
         self.ev_hist = 0
         self.discarded = 0
+        self._migration_sample_log: list[tuple[list[float | None], float, float, frozenset[int]]] | None = None
 
     # -- prediction ---------------------------------------------------------
 
@@ -508,7 +509,36 @@ class ModelState:
             self.cp_w = list(self.w)
             self.cp_g2 = list(self.g2)
             self.cp_at = ts
+        if self._migration_sample_log is not None:
+            self._migration_sample_log.append((list(feat), float(y), float(ts), masked))
         return True
+
+    def apply_feature_samples(
+        self,
+        std: Standardizer,
+        idx: int,
+        samples: list[tuple[list[float | None], float, float, frozenset[int]]],
+        initial_cp_at: float | None,
+    ) -> None:
+        """Apply buffered live training samples to one feature slot on the current optimizer state."""
+        pool_slot = self.idx[idx - 1]
+        cp_at = initial_cp_at
+        for feat, y, ts, masked in samples:
+            if pool_slot in masked:
+                continue
+            z = self.zvec(std, feat, masked)
+            s = self.w[0] + sum(w * v for w, v in zip(self.w[1:], z, strict=True))
+            err = _sigmoid(s) - y
+            g = max(-PATTERN_GRAD_CLIP, min(PATTERN_GRAD_CLIP, err * z[idx - 1] + PATTERN_L2 * self.w[idx]))
+            self._step(idx, g)
+            if not (math.isfinite(self.w[idx]) and math.isfinite(self.g2[idx])):
+                self.w[idx] = self.cp_w[idx]
+                self.g2[idx] = self.cp_g2[idx]
+                continue
+            if cp_at is None or ts - cp_at >= PATTERN_CHECKPOINT_INTERVAL_S:
+                self.cp_w[idx] = self.w[idx]
+                self.cp_g2[idx] = self.g2[idx]
+                cp_at = ts
 
     def _step(self, j: int, g: float) -> None:
         self.g2[j] += g * g
