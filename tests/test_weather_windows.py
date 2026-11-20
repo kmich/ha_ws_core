@@ -832,7 +832,7 @@ class TestWeatherWindowsEngine:
         res_two = engine.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], mixed_one_usable, now=now)
         assert res_two.status == "unknown"
         assert res_two.reason_codes == ["insufficient_horizon"]
-        assert res_two.horizon_hours == 0
+        assert res_two.horizon_hours == 1
         assert res_two.data_quality == {"available_slots": 1}
 
         # Profile with min_duration_h=1 only needs 1 usable filtered slot

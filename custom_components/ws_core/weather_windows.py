@@ -797,7 +797,7 @@ class WeatherWindowsEngine:
                 "next_start": None,
                 "next_end": None,
                 "duration_h": None,
-                "horizon_hours": 0,
+                "horizon_hours": min(available_slots, MAX_HORIZON_HOURS),
                 "is_truncated": False,
                 "reason_codes": [REASON_INSUFFICIENT_HORIZON],
                 "reasons_text": [reason_text],

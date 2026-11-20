@@ -547,3 +547,17 @@ class TestV3Services:
         win_beyond, sum_beyond = await _call_both(beyond_rows, now_hour)
         assert win_beyond["horizon_hours"] == 0
         assert sum_beyond["forecast_validity"]["hourly_horizon_h"] == 0
+
+        # 4. Single usable forecast hour -> both report 1h coverage while min_duration_h=2 keeps status unknown
+        one_usable_rows = [
+            _row("2026-02-30T12:00:00Z"),
+            _row(now_hour - timedelta(hours=1)),
+            _row(now_hour),
+            _row(now_hour),
+            _row(now_hour + timedelta(hours=24)),
+        ]
+        win_one, sum_one = await _call_both(one_usable_rows, now_hour)
+        assert win_one["status"] == "unknown"
+        assert win_one["reason_codes"] == ["insufficient_horizon"]
+        assert win_one["horizon_hours"] == 1
+        assert sum_one["forecast_validity"]["hourly_horizon_h"] == 1
