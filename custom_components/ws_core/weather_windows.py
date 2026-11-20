@@ -393,6 +393,74 @@ class WeatherDecisionResult:
 _MISSING = object()
 
 
+def _parse_raw_dt_str(key: str, dt_cache: dict[str, datetime | None] | None = None) -> datetime | None:
+    """Parse an ISO or Home Assistant datetime string, optionally caching results."""
+    if dt_cache is not None and key in dt_cache:
+        return dt_cache[key]
+    if "T" in key or " " in key:
+        try:
+            parsed = datetime.fromisoformat(key)
+        except ValueError:
+            parsed = dt_util.parse_datetime(key)
+    else:
+        parsed = dt_util.parse_datetime(key)
+    if dt_cache is not None:
+        if len(dt_cache) > 512:
+            dt_cache.clear()
+        dt_cache[key] = parsed
+    return parsed
+
+
+def parse_forecast_slot_utc(
+    item: Mapping[str, Any],
+    display_tz: tzinfo,
+    dt_cache: dict[str, datetime | None] | None = None,
+) -> datetime | None:
+    """Parse an hourly forecast item timestamp into UTC, preserving DST distinct hours."""
+    raw_dt = item.get("utc_datetime")
+    if raw_dt is None or raw_dt == "":
+        raw_dt = item.get("datetime")
+    if raw_dt is None or raw_dt == "":
+        return None
+    if isinstance(raw_dt, datetime):
+        if raw_dt.tzinfo is None:
+            raw_dt = raw_dt.replace(tzinfo=display_tz)
+        return raw_dt.astimezone(UTC)
+    if isinstance(raw_dt, (int, float)):
+        if isinstance(raw_dt, bool) or not math.isfinite(raw_dt):
+            return None
+        try:
+            return datetime.fromtimestamp(raw_dt, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return None
+    parsed = _parse_raw_dt_str(raw_dt if type(raw_dt) is str else str(raw_dt), dt_cache)
+    if parsed is None:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=display_tz)
+    return parsed.astimezone(UTC)
+
+
+def count_usable_hourly_horizon_h(
+    hourly_forecast: list[dict[str, Any]] | None,
+    now_utc: datetime,
+    display_tz: tzinfo,
+) -> int:
+    """Count distinct, parseable hourly forecast slots whose hour has not yet ended."""
+    if not hourly_forecast:
+        return 0
+    dt_cache: dict[str, datetime | None] = {}
+    slots: set[datetime] = set()
+    for item in hourly_forecast:
+        if not isinstance(item, Mapping):
+            continue
+        slot_utc = parse_forecast_slot_utc(item, display_tz, dt_cache)
+        if slot_utc is None or slot_utc + _ONE_HOUR <= now_utc:
+            continue
+        slots.add(slot_utc)
+    return len(slots)
+
+
 def _extract_contiguous_windows(
     flags: list[bool],
     prepared_slots: list[tuple[Any, ...]],
@@ -1025,45 +1093,11 @@ class WeatherWindowsEngine:
 
     def _parse_raw_dt_str(self, key: str) -> datetime | None:
         """Parse and cache an ISO or Home Assistant datetime string."""
-        dt_cache = self._parse_dt_cache
-        parsed = dt_cache.get(key)
-        if key not in dt_cache:
-            if "T" in key or " " in key:
-                try:
-                    parsed = datetime.fromisoformat(key)
-                except ValueError:
-                    parsed = dt_util.parse_datetime(key)
-            else:
-                parsed = dt_util.parse_datetime(key)
-            if len(dt_cache) > 512:
-                dt_cache.clear()
-            dt_cache[key] = parsed
-        return parsed
+        return _parse_raw_dt_str(key, self._parse_dt_cache)
 
     def _parse_slot_utc(self, item: dict[str, Any], display_tz: tzinfo) -> datetime | None:
         """Parse an hourly forecast item timestamp into UTC, preserving DST distinct hours."""
-        raw_dt = item.get("utc_datetime")
-        if raw_dt is None or raw_dt == "":
-            raw_dt = item.get("datetime")
-        if raw_dt is None or raw_dt == "":
-            return None
-        if isinstance(raw_dt, datetime):
-            if raw_dt.tzinfo is None:
-                raw_dt = raw_dt.replace(tzinfo=display_tz)
-            return raw_dt.astimezone(UTC)
-        if isinstance(raw_dt, (int, float)):
-            if isinstance(raw_dt, bool) or not math.isfinite(raw_dt):
-                return None
-            try:
-                return datetime.fromtimestamp(raw_dt, tz=UTC)
-            except (OverflowError, OSError, ValueError):
-                return None
-        parsed = self._parse_raw_dt_str(raw_dt if type(raw_dt) is str else str(raw_dt))
-        if parsed is None:
-            return None
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=display_tz)
-        return parsed.astimezone(UTC)
+        return parse_forecast_slot_utc(item, display_tz, self._parse_dt_cache)
 
     def _cached_solar_elevation(self, dt_utc: datetime) -> float:
         """Cache solar elevation by rounded coordinates and UTC timestamp across profiles."""

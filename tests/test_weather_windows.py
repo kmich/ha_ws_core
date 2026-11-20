@@ -411,6 +411,9 @@ class TestWeatherWindowsEngine:
             "window_custom_next_start",
             "window_custom_next_end",
         ]
+        for ent in created_custom:
+            if getattr(ent, "_desc", None) and ent._desc.key.startswith("window_custom_"):
+                assert ent.translation_placeholders == {"profile_name": "Custom Activity"}
         eval_custom = coord_custom.get_weather_windows_evaluation()
         assert list(eval_custom.keys()) == [PROFILE_CUSTOM]
 

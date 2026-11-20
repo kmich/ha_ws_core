@@ -642,7 +642,13 @@ from .uploaders import (
     async_upload_wow,
     async_upload_wunderground,
 )
-from .weather_windows import DEFAULT_PROFILES, WeatherWindowsEngine, apply_profile_overrides, resolve_profiles
+from .weather_windows import (
+    DEFAULT_PROFILES,
+    WeatherWindowsEngine,
+    apply_profile_overrides,
+    count_usable_hourly_horizon_h,
+    resolve_profiles,
+)
 
 try:
     from homeassistant.helpers import issue_registry as ir
@@ -5396,6 +5402,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return concise, deterministic summary for voice/Assist actions (SupportsResponse.ONLY)."""
         data = self.data or {}
         now = dt_util.now()
+        local_tz = dt_util.get_default_time_zone()
+        if now.tzinfo is not None and now.tzinfo is not UTC:
+            local_tz = now.tzinfo
         now_utc = now.astimezone(UTC) if now.tzinfo is not None else dt_util.as_utc(now)
         pattern = getattr(self, "_pattern", None)
         active_alerts = list(data.get("_active_alerts") or [])
@@ -5483,7 +5492,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "forecast_validity": {
                 "provider": provider_id,
                 "is_expired": fc_expired,
-                "hourly_horizon_h": 0 if fc_expired else len((published_fc or {}).get("hourly") or []),
+                "hourly_horizon_h": (
+                    0
+                    if fc_expired
+                    else count_usable_hourly_horizon_h((published_fc or {}).get("hourly"), now_utc, local_tz)
+                ),
                 "capabilities": get_provider_capabilities(provider_id).to_dict() if provider_id else None,
             },
             "pattern_forecast_maturity": pattern.summary() if pattern is not None else None,

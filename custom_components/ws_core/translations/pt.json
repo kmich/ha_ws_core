@@ -2713,7 +2713,7 @@
         "name": "Trabalho de Jardim Próximo Fim"
       },
       "window_custom_status": {
-        "name": "Janela Personalizada Estado",
+        "name": "{profile_name} Estado",
         "state": {
           "suitable_now": "Adequado agora",
           "window_upcoming": "Janela em breve",
@@ -2722,10 +2722,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Janela Personalizada Próximo Início"
+        "name": "{profile_name} Próximo Início"
       },
       "window_custom_next_end": {
-        "name": "Janela Personalizada Próximo Fim"
+        "name": "{profile_name} Próximo Fim"
       }
     },
     "select": {

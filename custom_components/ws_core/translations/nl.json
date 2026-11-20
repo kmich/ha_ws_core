@@ -2713,7 +2713,7 @@
         "name": "Tuinwerk Volgend Einde"
       },
       "window_custom_status": {
-        "name": "Aangepast Venster Status",
+        "name": "{profile_name} Status",
         "state": {
           "suitable_now": "Nu geschikt",
           "window_upcoming": "Venster op komst",
@@ -2722,10 +2722,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Aangepast Venster Volgende Start"
+        "name": "{profile_name} Volgende Start"
       },
       "window_custom_next_end": {
-        "name": "Aangepast Venster Volgend Einde"
+        "name": "{profile_name} Volgend Einde"
       }
     },
     "select": {

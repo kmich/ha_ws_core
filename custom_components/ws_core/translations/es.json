@@ -2713,7 +2713,7 @@
         "name": "Trabajo de Jardín Próximo Fin"
       },
       "window_custom_status": {
-        "name": "Ventana Personalizada Estado",
+        "name": "{profile_name} Estado",
         "state": {
           "suitable_now": "Apto ahora",
           "window_upcoming": "Ventana próxima",
@@ -2722,10 +2722,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Ventana Personalizada Próximo Inicio"
+        "name": "{profile_name} Próximo Inicio"
       },
       "window_custom_next_end": {
-        "name": "Ventana Personalizada Próximo Fin"
+        "name": "{profile_name} Próximo Fin"
       }
     },
     "select": {

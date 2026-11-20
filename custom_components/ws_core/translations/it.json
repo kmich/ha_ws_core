@@ -2713,7 +2713,7 @@
         "name": "Lavori in Giardino Prossima Fine"
       },
       "window_custom_status": {
-        "name": "Finestra Personalizzata Stato",
+        "name": "{profile_name} Stato",
         "state": {
           "suitable_now": "Adatto ora",
           "window_upcoming": "Finestra in arrivo",
@@ -2722,10 +2722,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Finestra Personalizzata Prossimo Inizio"
+        "name": "{profile_name} Prossimo Inizio"
       },
       "window_custom_next_end": {
-        "name": "Finestra Personalizzata Prossima Fine"
+        "name": "{profile_name} Prossima Fine"
       }
     },
     "select": {

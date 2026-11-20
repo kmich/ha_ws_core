@@ -222,6 +222,7 @@ from .const import (
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
     PATTERN_SOURCE_INTERNET,
+    PROFILE_CUSTOM,
     UNIT_TEMP_C,
     normalize_indoor_rooms,
 )
@@ -457,6 +458,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         for pid, prof in profiles.items():
             if not prof.enabled:
                 continue
+            placeholders = {"profile_name": prof.name} if pid == PROFILE_CUSTOM else None
 
             # 1. Profile Status sensor
             entities.append(
@@ -467,6 +469,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         key=f"window_{pid}_status",
                         name=f"{prof.name} Status",
                         translation_key=f"window_{pid}_status",
+                        translation_placeholders=placeholders,
                         icon="mdi:calendar-clock",
                         value_fn=lambda d, _pid=pid: (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("status"),
                         attrs_fn=lambda d, _pid=pid: {
@@ -490,6 +493,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         key=f"window_{pid}_next_start",
                         name=f"{prof.name} Next Start",
                         translation_key=f"window_{pid}_next_start",
+                        translation_placeholders=placeholders,
                         icon="mdi:play-circle-outline",
                         device_class=SensorDeviceClass.TIMESTAMP,
                         value_fn=lambda d, _pid=pid: _parse_ts(
@@ -509,6 +513,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         key=f"window_{pid}_next_end",
                         name=f"{prof.name} Next End",
                         translation_key=f"window_{pid}_next_end",
+                        translation_placeholders=placeholders,
                         icon="mdi:stop-circle-outline",
                         device_class=SensorDeviceClass.TIMESTAMP,
                         value_fn=lambda d, _pid=pid: _parse_ts(

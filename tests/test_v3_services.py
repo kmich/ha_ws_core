@@ -369,3 +369,80 @@ class TestV3Services:
         assert fresh_summary["forecast_validity"]["hourly_horizon_h"] == 4
         assert PROFILE_OUTDOOR_DRYING not in fresh_summary["weather_windows"]
         assert fresh_summary["weather_windows"][PROFILE_GARDEN_WORK]["status"] == "window_upcoming"
+
+    def test_get_station_summary_reports_usable_hourly_horizon(self):
+        coord = _make_coordinator()
+        coord.config_entry = None
+        coord.forecast_enabled = True
+        coord.entry_options[CONF_FORECAST_PROVIDER] = "open_meteo"
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        coord.runtime.last_forecast_fetch = now - timedelta(hours=3)
+
+        # Mixed slots: 2 past, 1 malformed, 1 duplicate, 3 distinct active/future -> 3 usable hours
+        coord.data = {
+            KEY_FORECAST: {
+                "hourly": [
+                    {"datetime": (now - timedelta(hours=3)).isoformat(), "temp_c": 18.0},
+                    {"datetime": (now - timedelta(hours=1)).isoformat(), "temp_c": 19.0},
+                    {"datetime": "not-a-timestamp", "temp_c": 20.0},
+                    {"datetime": now.isoformat(), "temp_c": 21.0},
+                    {"datetime": now.isoformat(), "temp_c": 21.5},
+                    {"datetime": (now + timedelta(hours=1)).isoformat(), "temp_c": 22.0},
+                    {"datetime": (now + timedelta(hours=2)).isoformat(), "temp_c": 23.0},
+                ]
+            }
+        }
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=now):
+            mixed_summary = coord.get_station_summary()
+        assert mixed_summary["forecast_validity"]["is_expired"] is False
+        assert mixed_summary["forecast_validity"]["hourly_horizon_h"] == 3
+
+        # Unexpired fetch cache whose hourly slots have all elapsed -> 0 usable hours
+        coord.data = {
+            KEY_FORECAST: {
+                "hourly": [{"datetime": (now - timedelta(hours=h)).isoformat(), "temp_c": 19.0} for h in (4, 3, 2, 1)]
+            }
+        }
+        with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=now):
+            past_summary = coord.get_station_summary()
+        assert past_summary["forecast_validity"]["is_expired"] is False
+        assert past_summary["forecast_validity"]["hourly_horizon_h"] == 0
+
+    async def test_custom_profile_sensors_render_configured_name(self, hass, enable_custom_integrations):
+        from custom_components.ws_core.const import (
+            CONF_CUSTOM_WINDOW_NAME,
+            CONF_ENABLE_WEATHER_WINDOWS,
+            CONF_WEATHER_WINDOW_PROFILES,
+        )
+
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            entry_id="custom_name_entry",
+            data={
+                CONF_PREFIX: "ws",
+                CONF_ENABLE_WEATHER_WINDOWS: True,
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM],
+                CONF_CUSTOM_WINDOW_NAME: "Drone Flying",
+                CONF_FORECAST_LAT: 38.0,
+                CONF_FORECAST_LON: 23.7,
+            },
+            options={},
+        )
+        entry.add_to_hass(hass)
+
+        with (
+            patch("custom_components.ws_core.PLATFORMS", ["sensor"]),
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator.async_start", AsyncMock()),
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator.async_stop", AsyncMock()),
+        ):
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+
+        status_state = hass.states.get("sensor.ws_window_custom_status")
+        start_state = hass.states.get("sensor.ws_window_custom_next_start")
+        end_state = hass.states.get("sensor.ws_window_custom_next_end")
+        assert status_state is not None and start_state is not None and end_state is not None
+        assert status_state.attributes["friendly_name"].endswith("Drone Flying Status")
+        assert start_state.attributes["friendly_name"].endswith("Drone Flying Next Start")
+        assert end_state.attributes["friendly_name"].endswith("Drone Flying Next End")
+        assert "Custom Window" not in status_state.attributes["friendly_name"]

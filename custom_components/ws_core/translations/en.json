@@ -2713,7 +2713,7 @@
         "name": "Garden Work Next End"
       },
       "window_custom_status": {
-        "name": "Custom Window Status",
+        "name": "{profile_name} Status",
         "state": {
           "suitable_now": "Suitable now",
           "window_upcoming": "Window upcoming",
@@ -2722,10 +2722,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Custom Window Next Start"
+        "name": "{profile_name} Next Start"
       },
       "window_custom_next_end": {
-        "name": "Custom Window Next End"
+        "name": "{profile_name} Next End"
       }
     },
     "select": {

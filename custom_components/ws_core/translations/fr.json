@@ -2737,7 +2737,7 @@
         "name": "Jardinage Prochaine Fin"
       },
       "window_custom_status": {
-        "name": "Créneau Personnalisé Statut",
+        "name": "{profile_name} Statut",
         "state": {
           "suitable_now": "Favorable maintenant",
           "window_upcoming": "Créneau à venir",
@@ -2746,10 +2746,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Créneau Personnalisé Prochain Début"
+        "name": "{profile_name} Prochain Début"
       },
       "window_custom_next_end": {
-        "name": "Créneau Personnalisé Prochaine Fin"
+        "name": "{profile_name} Prochaine Fin"
       }
     },
     "select": {

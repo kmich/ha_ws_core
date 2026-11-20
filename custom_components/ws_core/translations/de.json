@@ -2713,7 +2713,7 @@
         "name": "Gartenarbeit Nächstes Ende"
       },
       "window_custom_status": {
-        "name": "Benutzerdefiniertes Fenster Status",
+        "name": "{profile_name} Status",
         "state": {
           "suitable_now": "Jetzt geeignet",
           "window_upcoming": "Zeitfenster bevorstehend",
@@ -2722,10 +2722,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Benutzerdefiniertes Fenster Nächster Beginn"
+        "name": "{profile_name} Nächster Beginn"
       },
       "window_custom_next_end": {
-        "name": "Benutzerdefiniertes Fenster Nächstes Ende"
+        "name": "{profile_name} Nächstes Ende"
       }
     },
     "select": {

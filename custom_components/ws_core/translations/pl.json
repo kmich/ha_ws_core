@@ -2713,7 +2713,7 @@
         "name": "Prace w ogrodzie Następny koniec"
       },
       "window_custom_status": {
-        "name": "Własne okno Status",
+        "name": "{profile_name} Status",
         "state": {
           "suitable_now": "Odpowiednie teraz",
           "window_upcoming": "Nadchodzące okno",
@@ -2722,10 +2722,10 @@
         }
       },
       "window_custom_next_start": {
-        "name": "Własne okno Następny start"
+        "name": "{profile_name} Następny start"
       },
       "window_custom_next_end": {
-        "name": "Własne okno Następny koniec"
+        "name": "{profile_name} Następny koniec"
       }
     },
     "select": {
