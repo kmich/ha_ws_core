@@ -25,6 +25,11 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         if temp is not None and speed is not None and (temp > 10 or speed <= 1.34):
             reason = "outside_valid_range"
             explanation = "Wind chill applies only at 10 °C or below with wind above 4.8 km/h."
+    elif key == c.KEY_WIND_GUST_FACTOR:
+        speed = data.get(c.KEY_NORM_WIND_SPEED_MS)
+        if speed is not None and speed < 0.5:
+            reason = "calm"
+            explanation = "The wind is calm (below 0.5 m/s), so gust divided by mean wind is not defined."
     elif key in (c.KEY_CLEARNESS_INDEX, c.KEY_CLOUD_COVER_PCT):
         if not coord.sources.get(c.SRC_SOLAR_RADIATION):
             reason = "missing_solar_radiation"

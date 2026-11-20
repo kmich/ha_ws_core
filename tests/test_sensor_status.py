@@ -22,6 +22,14 @@ def test_mild_weather_is_not_a_sensor_failure(key):
     assert unknown_status(key, coord(), data)["reason"] == "outside_valid_range"
 
 
+def test_calm_wind_explains_missing_gust_factor():
+    calm = unknown_status(c.KEY_WIND_GUST_FACTOR, coord(), {c.KEY_NORM_WIND_SPEED_MS: 0.0})
+    assert calm["reason"] == "calm"
+    assert "calm" in calm["explanation"]
+    # No wind reading at all is still a data problem, not calm weather
+    assert unknown_status(c.KEY_WIND_GUST_FACTOR, coord(), {})["reason"] == "waiting_for_data"
+
+
 def test_missing_temperature_does_not_claim_outside_range():
     assert unknown_status(c.KEY_HEAT_INDEX, coord(), {})["reason"] == "waiting_for_data"
 
