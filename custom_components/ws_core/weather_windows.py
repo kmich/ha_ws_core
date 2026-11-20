@@ -46,6 +46,11 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 MAX_HORIZON_HOURS = 24
+# The horizon ends on the last full local hour and the current hour is partly elapsed, so a
+# 24-hour minimum could never be met; longer stored values are clamped to this.
+MAX_MIN_DURATION_H = MAX_HORIZON_HOURS - 1
+# Rows further apart than this are not an hourly series (for example 3-hourly entity data).
+_HOURLY_STEP_TOLERANCE_S = 3601.0
 _ONE_HOUR = timedelta(hours=1)
 _LIVE_GUST_ON_HOLD_S = 180.0
 _LIVE_GUST_OFF_HOLD_S = 300.0
@@ -98,6 +103,8 @@ REASON_NIGHTTIME = "nighttime"
 REASON_MISSING_DATA = "missing_data"
 REASON_NOT_ASSESSED_BY_PROVIDER = "not_assessed_by_provider"
 REASON_INSUFFICIENT_HORIZON = "insufficient_horizon"
+REASON_FORECAST_UNAVAILABLE = "forecast_unavailable"
+REASON_FORECAST_TOO_COARSE = "forecast_too_coarse"
 REASON_HORIZON_TRUNCATED = "horizon_truncated"
 
 
@@ -259,7 +266,7 @@ def _coerce_positive_int(val: Any) -> int:
         raise ValueError("min_duration_h must be a whole integer >= 1")
     if out < 1:
         raise ValueError("min_duration_h must be >= 1")
-    return out
+    return min(out, MAX_MIN_DURATION_H)
 
 
 def apply_profile_overrides(
@@ -610,6 +617,7 @@ class WeatherWindowsEngine:
         self._parse_dt_cache: dict[str, datetime | None] = {}
         self._slot_time_cache: dict[tuple[str, tzinfo], tuple[datetime, float, str] | None] = {}
         self._gust_hold_state: dict[str, dict[str, Any]] = {}
+        self._open_window_start: dict[str, dict[str, Any]] = {}
 
     def _sync_solar_cache(self, lat_f: float, lon_f: float) -> dict[datetime, float]:
         """Return solar elevation cache cleared only when rounded coordinates change."""
@@ -808,8 +816,8 @@ class WeatherWindowsEngine:
     ) -> dict[str, dict[str, Any]]:
         """Evaluate multiple profiles in one pass over parsed forecast slots (returns dict contracts).
 
-        ``update_live_hold=False`` reads the live gust hold without advancing it, so on-demand
-        action calls cannot reset or shorten the hold that the periodic sensor evaluation tracks.
+        ``update_live_hold=False`` reads the tracked state (live gust hold, open-window start)
+        without changing it, so on-demand action calls cannot alter what the sensors track.
         """
         prof_list = list(profiles)
         if not prof_list:
@@ -904,6 +912,39 @@ class WeatherWindowsEngine:
         state["last_ts"] = now_ts
         return bool(state["active"])
 
+    def _stable_open_start(
+        self,
+        profile_id: str,
+        window: tuple[float, float, dict[str, Any]],
+        now_ts: float,
+        *,
+        update: bool,
+    ) -> tuple[float, str]:
+        """Return the start of a window that is open now, remembered across hourly slot drops.
+
+        Elapsed hours leave the horizon, so an open window would otherwise report the start of
+        the current hour. The remembered start is reused only while the window has stayed open
+        without a break (its last known end reaches this window's start, and it was seen recently).
+        """
+        start_ts, end_ts, w = window
+        chosen = (start_ts, str(w["start_iso"]))
+        prev = self._open_window_start.get(profile_id)
+        if (
+            prev is not None
+            and prev["start_ts"] < start_ts
+            and prev["end_ts"] >= start_ts - 1.0
+            and 0.0 <= now_ts - prev["last_ts"] <= _LIVE_HOLD_STALE_GAP_S
+        ):
+            chosen = (prev["start_ts"], prev["start_iso"])
+        if update:
+            self._open_window_start[profile_id] = {
+                "start_ts": chosen[0],
+                "start_iso": chosen[1],
+                "end_ts": end_ts,
+                "last_ts": now_ts,
+            }
+        return chosen
+
     def _txt(self, key: str, **fmt: object) -> str:
         """Return localized explanation string using engine language."""
         return localize.window_text(self.language, key, **fmt)
@@ -960,9 +1001,14 @@ class WeatherWindowsEngine:
         available_slots = len(prepared_slots)
 
         if not prepared_slots or available_slots < min(2, profile.min_duration_h):
-            reason_key = (
-                "no_horizon_in_window" if not prepared_slots and prepared["has_forecast_rows"] else "insufficient_data"
-            )
+            if update_live_hold:
+                self._open_window_start.pop(profile.profile_id, None)
+            if not prepared["has_forecast_rows"]:
+                reason_code, reason_key = REASON_FORECAST_UNAVAILABLE, "forecast_unavailable"
+            elif not prepared_slots:
+                reason_code, reason_key = REASON_INSUFFICIENT_HORIZON, "no_horizon_in_window"
+            else:
+                reason_code, reason_key = REASON_INSUFFICIENT_HORIZON, "insufficient_data"
             payload = {
                 "profile_id": profile.profile_id,
                 "status": STATUS_UNKNOWN,
@@ -972,13 +1018,41 @@ class WeatherWindowsEngine:
                 "duration_h": None,
                 "horizon_hours": min(available_slots, MAX_HORIZON_HOURS),
                 "is_truncated": False,
-                "reason_codes": [REASON_INSUFFICIENT_HORIZON],
+                "reason_codes": [reason_code],
                 "reasons_text": [self._txt(reason_key)],
                 "not_assessed_by_provider": [],
                 "evaluated_limits": limits_dict,
                 "windows": [],
                 "slots": [],
                 "data_quality": {"available_slots": available_slots},
+            }
+            return payload if as_dict else WeatherDecisionResult(**payload)
+
+        # Rows further apart than an hour (for example 3-hourly data) cannot be assessed as an
+        # hourly series: report unknown instead of rejecting every gap as unsuitable.
+        steps = [prepared_slots[i + 1][1] - prepared_slots[i][1] for i in range(available_slots - 1)]
+        coarse_steps = [st for st in steps if st > _HOURLY_STEP_TOLERANCE_S]
+        if steps and len(coarse_steps) * 2 > len(steps):
+            typical_h = round(sorted(steps)[len(steps) // 2] / 3600.0, 1)
+            typical_disp: int | float = int(typical_h) if typical_h.is_integer() else typical_h
+            if update_live_hold:
+                self._open_window_start.pop(profile.profile_id, None)
+            payload = {
+                "profile_id": profile.profile_id,
+                "status": STATUS_UNKNOWN,
+                "evaluated_at": evaluated_at_iso,
+                "next_start": None,
+                "next_end": None,
+                "duration_h": None,
+                "horizon_hours": min(available_slots, MAX_HORIZON_HOURS),
+                "is_truncated": False,
+                "reason_codes": [REASON_FORECAST_TOO_COARSE],
+                "reasons_text": [self._txt("forecast_too_coarse", hours=typical_disp)],
+                "not_assessed_by_provider": [],
+                "evaluated_limits": limits_dict,
+                "windows": [],
+                "slots": [],
+                "data_quality": {"available_slots": available_slots, "typical_step_h": typical_disp},
             }
             return payload if as_dict else WeatherDecisionResult(**payload)
 
@@ -1251,8 +1325,10 @@ class WeatherWindowsEngine:
         reasons: list[str] = []
         reasons_text: list[str] = []
 
+        open_window: tuple[float, float, dict[str, Any]] | None = None
         if interrupted is not None:
             iw = interrupted[2]
+            open_window = interrupted
             status = STATUS_UNSUITABLE
             next_start = iw["start_iso"]
             next_end = iw["end_iso"]
@@ -1265,6 +1341,7 @@ class WeatherWindowsEngine:
         elif window_bounds:
             w0_start_ts, w0_end_ts, w0 = window_bounds[0]
             if w0_start_ts <= now_ts < w0_end_ts:
+                open_window = window_bounds[0]
                 status = STATUS_SUITABLE_NOW
                 next_start = w0["start_iso"]
                 next_end = w0["end_iso"]
@@ -1359,6 +1436,16 @@ class WeatherWindowsEngine:
             reasons_text.append(self._txt("not_assessed_by_provider", fields=field_list))
 
         windows = [w for _, _, w in (forecast_bounds if interrupted is not None else window_bounds)]
+        if open_window is not None:
+            _start_ts, stable_iso = self._stable_open_start(
+                profile.profile_id, open_window, now_ts, update=update_live_hold
+            )
+            if stable_iso != next_start:
+                orig_iso = next_start
+                next_start = stable_iso
+                windows = [{**w, "start_iso": stable_iso} if w["start_iso"] == orig_iso else w for w in windows]
+        elif update_live_hold:
+            self._open_window_start.pop(profile.profile_id, None)
         horizon_hours = min(len(slot_dicts), MAX_HORIZON_HOURS)
         result_dict = {
             "profile_id": profile.profile_id,

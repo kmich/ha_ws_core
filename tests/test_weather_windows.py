@@ -30,6 +30,8 @@ from custom_components.ws_core.weather_windows import (
     REASON_CALM_AIR,
     REASON_CURRENT_GUST_HIGH,
     REASON_CURRENTLY_RAINING,
+    REASON_FORECAST_TOO_COARSE,
+    REASON_FORECAST_UNAVAILABLE,
     REASON_HEAVY_CLOUDS,
     REASON_HIGH_HUMIDITY,
     REASON_INSUFFICIENT_HORIZON,
@@ -287,7 +289,9 @@ class TestWeatherWindowsEngine:
         profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
         gap_only = [_make_hourly_forecast(t12, hours=1)[0], _make_hourly_forecast(t15, hours=1)[0]]
         gap_res = engine.evaluate_profile(profile, gap_only, current_data={}, now=t12)
-        assert gap_res.status == STATUS_UNSUITABLE
+        # Only two rows, 3 hours apart: not an hourly series, so it cannot be assessed
+        assert gap_res.status == STATUS_UNKNOWN
+        assert REASON_FORECAST_TOO_COARSE in gap_res.reason_codes
         assert gap_res.windows == []
 
         # Out-of-order + duplicate + gap between 12:00 and [15:00, 17:00)
@@ -1152,3 +1156,79 @@ class TestReleaseReviewFixes:
             assert set(localize._WINDOW_FIELD_LABELS[lang]) == set(localize._WINDOW_FIELD_LABELS["en"]), lang
         assert localize.window_field_labels("de-AT", ["max_wind_gust_kmh"]) == "Windböen"
         assert localize.window_text("xx", "pn_prefix", provider="NWS") == "Provider notice (NWS):"
+
+
+class TestDeepReviewFixes:
+    """Regression tests for the v3.0.0 deep review (forecast shape, stable starts, duration cap)."""
+
+    def test_three_hourly_rows_are_unknown_not_unsuitable(self):
+        eng = WeatherWindowsEngine(lat=37.9, lon=23.7)
+        now = datetime(2026, 6, 21, 6, 30, tzinfo=UTC)
+        three_hourly = [
+            _make_hourly_forecast(now.replace(minute=0) + timedelta(hours=3 * i), hours=1)[0] for i in range(9)
+        ]
+        res = eng.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], three_hourly, now=now)
+        assert res.status == STATUS_UNKNOWN
+        assert res.reason_codes == [REASON_FORECAST_TOO_COARSE]
+        assert res.data_quality["typical_step_h"] == 3
+        assert "3 hours apart" in res.reasons_text[0]
+
+    def test_single_missing_hour_is_still_an_hourly_series(self):
+        eng = WeatherWindowsEngine(lat=37.9, lon=23.7)
+        now = datetime(2026, 6, 21, 6, 30, tzinfo=UTC)
+        hourly = _make_hourly_forecast(now.replace(minute=0), hours=12)
+        del hourly[6]
+        res = eng.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], hourly, now=now)
+        assert REASON_FORECAST_TOO_COARSE not in res.reason_codes
+        assert res.status == STATUS_SUITABLE_NOW
+
+    def test_no_forecast_reports_forecast_unavailable(self):
+        eng = WeatherWindowsEngine(lat=37.9, lon=23.7)
+        now = datetime(2026, 6, 21, 9, 0, tzinfo=UTC)
+        for empty in (None, []):
+            res = eng.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], empty, now=now)
+            assert res.status == STATUS_UNKNOWN
+            assert res.reason_codes == [REASON_FORECAST_UNAVAILABLE]
+        # Rows that exist but all lie outside the horizon keep the horizon reason
+        stale = _make_hourly_forecast(now - timedelta(hours=30), hours=5)
+        res_stale = eng.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], stale, now=now)
+        assert res_stale.reason_codes == [REASON_INSUFFICIENT_HORIZON]
+
+    def test_open_window_keeps_its_start_across_hours(self):
+        eng = WeatherWindowsEngine(lat=37.9, lon=23.7)
+        t0 = datetime(2026, 6, 21, 6, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0, hours=30)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        first = eng.evaluate_profile(profile, hourly, now=t0 + timedelta(minutes=5))
+        assert first.status == STATUS_SUITABLE_NOW
+        starts = {
+            eng.evaluate_profile(profile, hourly, now=t0 + timedelta(minutes=m)).next_start for m in range(5, 300, 15)
+        }
+        assert starts == {first.next_start}
+
+        # Action evaluations read the remembered start but never create or move it
+        fresh = WeatherWindowsEngine(lat=37.9, lon=23.7)
+        svc = fresh.evaluate_profile(profile, hourly, now=t0 + timedelta(hours=2, minutes=5), update_live_hold=False)
+        assert svc.next_start == (t0 + timedelta(hours=2)).isoformat()
+        assert fresh._open_window_start == {}
+
+    def test_open_window_start_resets_after_the_window_closes(self):
+        eng = WeatherWindowsEngine(lat=37.9, lon=23.7)
+        t0 = datetime(2026, 6, 21, 6, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0, hours=30)
+        hourly[3]["precip_prob"] = 90  # 09:00-10:00 UTC wet: first window 06:00-09:00
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        assert eng.evaluate_profile(profile, hourly, now=t0 + timedelta(minutes=5)).next_start == t0.isoformat()
+        later = eng.evaluate_profile(profile, hourly, now=t0 + timedelta(hours=4, minutes=5))
+        assert later.status == STATUS_SUITABLE_NOW
+        assert later.next_start == (t0 + timedelta(hours=4)).isoformat()
+
+    def test_minimum_duration_is_capped_at_23_hours(self):
+        from custom_components.ws_core.const import CONF_CUSTOM_MIN_DURATION_H
+        from custom_components.ws_core.weather_windows import MAX_MIN_DURATION_H
+
+        assert MAX_MIN_DURATION_H == 23
+        opts = {CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM], CONF_CUSTOM_MIN_DURATION_H: 24}
+        assert resolve_profiles(opts)[PROFILE_CUSTOM].min_duration_h == 23
+        capped = apply_profile_overrides(DEFAULT_PROFILES[PROFILE_CUSTOM], {"min_duration_h": 40})
+        assert capped.min_duration_h == 23

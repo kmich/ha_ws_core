@@ -737,7 +737,7 @@
       "cannot_connect": "Could not connect to API - check network and try again",
       "station_not_found": "Weather Underground station ID not found",
       "room_name_required": "Please enter a name for the room.",
-      "invalid_duration": "Minimum duration must be at least 1 hour.",
+      "invalid_duration": "Minimum duration must be a whole number of hours between 1 and 23.",
       "min_exceeds_max": "Minimum limit cannot exceed maximum limit.",
       "out_of_range": "Value is outside the valid range.",
       "invalid_profiles": "One or more selected profiles are invalid."

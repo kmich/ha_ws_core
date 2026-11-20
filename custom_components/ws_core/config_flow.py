@@ -1877,7 +1877,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
 
     async def async_step_decision_profiles(self, user_input: dict[str, Any] | None = None):
         """Configure Decision Profiles, active Weather Windows, and Custom Profile limits."""
-        from .weather_windows import DEFAULT_PROFILES, resolve_profiles
+        from .weather_windows import DEFAULT_PROFILES, MAX_MIN_DURATION_H, resolve_profiles
         from .weather_windows import PROFILE_CUSTOM as _PROFILE_CUSTOM
 
         self._ensure_opt()
@@ -1978,7 +1978,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                             errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
                         else:
                             dur_val = int(dur_f)
-                            if dur_val < 1 or dur_val > 24:
+                            if dur_val < 1 or dur_val > MAX_MIN_DURATION_H:
                                 errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
                             else:
                                 validated_dur = dur_val
@@ -2070,10 +2070,23 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         if isinstance(current_profiles, str):
             current_profiles = [current_profiles]
 
+        # After a validation error, re-show what the user submitted rather than the stored values,
+        # so fixing one field does not silently discard their other edits (issue #149 class).
+        submitted: dict[str, Any] = dict(user_input) if (user_input is not None and errors) else {}
+        submitted_full = bool(submitted) and any(
+            k in submitted for k in (CONF_CUSTOM_MIN_DURATION_H, CONF_CUSTOM_WINDOW_NAME, CONF_CUSTOM_REQUIRE_DAYLIGHT)
+        )
+        if submitted.get(CONF_WEATHER_WINDOW_PROFILES) is not None and CONF_WEATHER_WINDOW_PROFILES not in errors:
+            current_profiles = list(submitted[CONF_WEATHER_WINDOW_PROFILES])
+
         fields: dict[Any, Any] = {
             vol.Optional(
                 CONF_ENABLE_WEATHER_WINDOWS,
-                default=bool(g(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS)),
+                default=bool(
+                    submitted.get(
+                        CONF_ENABLE_WEATHER_WINDOWS, g(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS)
+                    )
+                ),
             ): selector.BooleanSelector(),
             vol.Optional(
                 CONF_WEATHER_WINDOW_PROFILES,
@@ -2086,24 +2099,38 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     translation_key="weather_window_profiles",
                 )
             ),
-            vol.Optional(CONF_CUSTOM_WINDOW_NAME, default=custom_prof.name): selector.TextSelector(),
-            vol.Optional(CONF_CUSTOM_MIN_DURATION_H, default=custom_prof.min_duration_h): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=1, max=24, step=1, mode="box", unit_of_measurement="h")
+            vol.Optional(
+                CONF_CUSTOM_WINDOW_NAME, default=str(submitted.get(CONF_CUSTOM_WINDOW_NAME, custom_prof.name))
+            ): selector.TextSelector(),
+            vol.Optional(
+                CONF_CUSTOM_MIN_DURATION_H,
+                default=submitted.get(CONF_CUSTOM_MIN_DURATION_H, custom_prof.min_duration_h),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=MAX_MIN_DURATION_H, step=1, mode="box", unit_of_measurement="h"
+                )
             ),
         }
         for conf_key, attr_name, kind, lo, hi, step, unit, prec in limit_specs:
-            stored_val = getattr(custom_prof, attr_name)
-            suggested = (
-                (round(_to_disp(float(stored_val), kind), prec) if kind != "pct" else float(stored_val))
-                if stored_val is not None
-                else None
-            )
+            if submitted_full:
+                # Already in display units; a field the user cleared stays cleared.
+                suggested = submitted.get(conf_key)
+            else:
+                stored_val = getattr(custom_prof, attr_name)
+                suggested = (
+                    (round(_to_disp(float(stored_val), kind), prec) if kind != "pct" else float(stored_val))
+                    if stored_val is not None
+                    else None
+                )
             fields[vol.Optional(conf_key, description={"suggested_value": suggested})] = selector.NumberSelector(
                 selector.NumberSelectorConfig(min=lo, max=hi, step=step, mode="box", unit_of_measurement=unit)
             )
-        fields[vol.Optional(CONF_CUSTOM_REQUIRE_DAYLIGHT, default=custom_prof.require_daylight)] = (
-            selector.BooleanSelector()
-        )
+        fields[
+            vol.Optional(
+                CONF_CUSTOM_REQUIRE_DAYLIGHT,
+                default=bool(submitted.get(CONF_CUSTOM_REQUIRE_DAYLIGHT, custom_prof.require_daylight)),
+            )
+        ] = selector.BooleanSelector()
         return self.async_show_form(
             step_id="decision_profiles",
             data_schema=vol.Schema(fields),

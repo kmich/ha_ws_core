@@ -80,7 +80,9 @@ class PirateWeatherProvider(ForecastProvider):
                     "gust_kmh": round(float(day["windGust"]) * 3.6, 1) if day.get("windGust") is not None else None,
                     "weathercode": _ICON_TO_WMO.get(day.get("icon", "")),
                     "precip_prob": (
-                        int(float(day["precipProbability"]) * 100) if day.get("precipProbability") is not None else None
+                        round(float(day["precipProbability"]) * 100)
+                        if day.get("precipProbability") is not None
+                        else None
                     ),
                 }
             )
@@ -99,7 +101,7 @@ class PirateWeatherProvider(ForecastProvider):
                     "apparent_temp_c": hour.get("apparentTemperature"),
                     "dewpoint_c": hour.get("dewPoint"),
                     "precip_prob": (
-                        int(float(hour["precipProbability"]) * 100)
+                        round(float(hour["precipProbability"]) * 100)
                         if hour.get("precipProbability") is not None
                         else None
                     ),

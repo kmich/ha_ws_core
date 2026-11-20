@@ -761,7 +761,7 @@
       "cannot_connect": "Impossible de se connecter à l'API - vérifiez le réseau et réessayez.",
       "station_not_found": "ID de la station Weather Underground introuvable.",
       "room_name_required": "Veuillez saisir un nom pour la pièce.",
-      "invalid_duration": "La durée minimale doit être d'au moins 1 heure.",
+      "invalid_duration": "La durée minimale doit être un nombre entier d'heures entre 1 et 23.",
       "min_exceeds_max": "La limite minimale ne peut pas dépasser la limite maximale.",
       "out_of_range": "La valeur est en dehors de la plage valide.",
       "invalid_profiles": "Un ou plusieurs profils sélectionnés sont invalides."

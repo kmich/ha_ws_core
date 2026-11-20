@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, timedelta
 from typing import Any
 
 import aiohttp
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import (
     DistanceConverter,
     SpeedConverter,
     TemperatureConverter,
 )
 
-from .base import ForecastProvider, local_date_str, local_datetime_str, utc_datetime_str
+from .base import ForecastProvider, _to_datetime, local_date_str, local_datetime_str, utc_datetime_str
+
+# Rows kept from an entity's hourly forecast: the in-progress hour plus the next 24.
+_HOURLY_ROWS_KEPT = 25
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -192,9 +197,32 @@ class HaWeatherEntityProvider(ForecastProvider):
             )
         return out
 
+    @staticmethod
+    def _drop_elapsed_hours(raw: list[dict]) -> list[dict]:
+        """Drop hourly rows whose hour has fully passed, keeping up to ``_HOURLY_ROWS_KEPT`` rows.
+
+        Some weather entities list hours earlier in the day; slicing those first would leave
+        only a few future hours. Rows without a parseable time are kept as is.
+        """
+        now_utc = dt_util.utcnow()
+        kept: list[dict] = []
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            when = _to_datetime(entry.get("datetime"))
+            if when is not None:
+                if when.tzinfo is None:
+                    when = when.replace(tzinfo=dt_util.get_default_time_zone())
+                if when.astimezone(UTC) + timedelta(hours=1) <= now_utc:
+                    continue
+            kept.append(entry)
+            if len(kept) >= _HOURLY_ROWS_KEPT:
+                break
+        return kept
+
     def _normalise_hourly(self, raw: list[dict]) -> list[dict]:
         out: list[dict] = []
-        for entry in raw[:25]:
+        for entry in self._drop_elapsed_hours(raw):
             out.append(
                 {
                     "datetime": self._parse_dt(entry.get("datetime")) or "",

@@ -737,7 +737,7 @@
       "cannot_connect": "Kan geen verbinding maken met API - controleer het netwerk en probeer opnieuw",
       "station_not_found": "Weather Underground station-ID niet gevonden",
       "room_name_required": "Voer een naam in voor de ruimte.",
-      "invalid_duration": "De minimale duur moet minstens 1 uur zijn.",
+      "invalid_duration": "De minimale duur moet een heel aantal uren tussen 1 en 23 zijn.",
       "min_exceeds_max": "De minimumlimiet mag niet hoger zijn dan de maximumlimiet.",
       "out_of_range": "De waarde ligt buiten het geldige bereik.",
       "invalid_profiles": "Een of meer geselecteerde profielen zijn ongeldig."

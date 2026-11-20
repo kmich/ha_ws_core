@@ -41,6 +41,7 @@ from .const import (
     issue_id_for_entry,
     normalize_indoor_rooms,
 )
+from .weather_windows import MAX_MIN_DURATION_H
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _LOGGER = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ SERVICE_GET_WEATHER_WINDOWS_SCHEMA = vol.Schema(
         vol.Optional("limits"): vol.Schema(
             {
                 vol.Optional("name"): cv.string,
-                vol.Optional("min_duration_h"): _positive_int,
+                vol.Optional("min_duration_h"): vol.All(_positive_int, vol.Range(max=MAX_MIN_DURATION_H)),
                 vol.Optional("max_rain_prob_pct"): _optional_finite_float,
                 vol.Optional("max_rain_mm"): _optional_finite_float,
                 vol.Optional("min_temp_c"): _optional_finite_float,

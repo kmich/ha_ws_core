@@ -104,7 +104,7 @@ class OpenWeatherMapProvider(ForecastProvider):
                     "wind_kmh": round(float(day["wind_speed"]) * 3.6, 1) if day.get("wind_speed") is not None else None,
                     "gust_kmh": round(float(day["wind_gust"]) * 3.6, 1) if day.get("wind_gust") is not None else None,
                     "weathercode": _owm_to_wmo(weather.get("id")),
-                    "precip_prob": int(float(day["pop"]) * 100) if day.get("pop") is not None else None,
+                    "precip_prob": round(float(day["pop"]) * 100) if day.get("pop") is not None else None,
                 }
             )
 
@@ -125,7 +125,7 @@ class OpenWeatherMapProvider(ForecastProvider):
                     "temp_c": hour.get("temp"),
                     "apparent_temp_c": hour.get("feels_like"),
                     "dewpoint_c": hour.get("dew_point"),
-                    "precip_prob": int(float(hour["pop"]) * 100) if hour.get("pop") is not None else None,
+                    "precip_prob": round(float(hour["pop"]) * 100) if hour.get("pop") is not None else None,
                     "precip_mm": rain_1h,
                     "weathercode": _owm_to_wmo(weather.get("id")),
                     "wind_kmh": round(float(hour["wind_speed"]) * 3.6, 1)

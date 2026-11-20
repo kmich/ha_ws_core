@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -121,7 +122,9 @@ async def test_ha_entity_provider_converts_imperial_source():
         ],
         [{"datetime": "2026-10-28T12:00:00+00:00", "temperature": 32, "dew_point": 23, "wind_speed": 0}],
     )
-    result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.pirateweather")
+    before = datetime(2026, 10, 28, 11, 30, tzinfo=UTC)  # the provider drops hours that already passed
+    with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=before):
+        result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.pirateweather")
 
     day = result["daily"][0]
     assert day["tmax_c"] == pytest.approx(18.89, abs=0.01)
@@ -707,3 +710,19 @@ async def test_meteo_france_documented_routes_and_wind_units():
     assert fallback_res["hourly"][0]["precip_mm"] == 0.2
     assert fallback_res["hourly"][0]["wind_kmh"] == 15.0
     assert fallback_res["hourly"][0]["gust_kmh"] == 32.0
+
+
+@pytest.mark.asyncio
+async def test_ha_entity_provider_drops_elapsed_hours_before_keeping_25_rows():
+    """An entity that lists hours earlier in the day still yields the next 24 hours."""
+    from datetime import timedelta
+
+    now = datetime(2026, 11, 20, 18, 20, tzinfo=UTC)
+    first = now.replace(minute=0) - timedelta(hours=10)
+    rows = [{"datetime": (first + timedelta(hours=i)).isoformat(), "temperature": 10 + i * 0.1} for i in range(48)]
+    hass = _ha_entity_hass({"temperature_unit": "°C"}, [], rows)
+    with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=now):
+        result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.any")
+    hourly = result["hourly"]
+    assert len(hourly) == 25
+    assert hourly[0]["utc_datetime"] == now.replace(minute=0).isoformat()  # the in-progress hour

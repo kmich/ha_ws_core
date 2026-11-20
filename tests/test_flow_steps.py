@@ -500,3 +500,48 @@ class TestOptionsMenuNavigation:
         flow_om.async_show_form = flow.async_show_form
         show_om = await flow_om.async_step_decision_profiles(None)
         assert show_om["placeholders"]["provider_warning"] == ""
+
+
+async def test_decision_profiles_keeps_submitted_values_after_validation_error():
+    """A rejected field must not discard the user's other edits (issue #149 class)."""
+    from custom_components.ws_core.const import (
+        CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+        CONF_CUSTOM_MAX_TEMP_C,
+        CONF_CUSTOM_MAX_WIND_KMH,
+        CONF_CUSTOM_MIN_DURATION_H,
+        CONF_CUSTOM_MIN_TEMP_C,
+        CONF_CUSTOM_REQUIRE_DAYLIGHT,
+        CONF_CUSTOM_WINDOW_NAME,
+    )
+
+    flow = _options_flow(stored={CONF_CUSTOM_MIN_TEMP_C: 12.0, CONF_CUSTOM_MAX_TEMP_C: 30.0}, opt={})
+    flow.async_show_form = MagicMock(side_effect=lambda **kw: kw)
+    res = await flow.async_step_decision_profiles(
+        {
+            CONF_CUSTOM_WINDOW_NAME: "Bike ride",
+            CONF_CUSTOM_MIN_DURATION_H: 3,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT: False,
+            CONF_CUSTOM_MIN_TEMP_C: 35.0,
+            CONF_CUSTOM_MAX_TEMP_C: 20.0,
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT: 5.0,
+        }
+    )
+    assert res["errors"] == {CONF_CUSTOM_MIN_TEMP_C: "min_exceeds_max"}
+    shown = {}
+    for key in res["data_schema"].schema:
+        default = getattr(key, "default", None)
+        shown[str(key)] = (
+            default() if callable(default) else None,
+            (key.description or {}).get("suggested_value"),
+        )
+    assert shown[CONF_CUSTOM_WINDOW_NAME][0] == "Bike ride"
+    assert shown[CONF_CUSTOM_MIN_DURATION_H][0] == 3
+    assert shown[CONF_CUSTOM_REQUIRE_DAYLIGHT][0] is False
+    assert shown[CONF_CUSTOM_MIN_TEMP_C][1] == 35.0
+    assert shown[CONF_CUSTOM_MAX_RAIN_PROB_PCT][1] == 5.0
+    # A field the user cleared stays cleared rather than reverting to the stored value
+    assert shown[CONF_CUSTOM_MAX_WIND_KMH][1] is None
+
+    # The duration field is limited to 23 hours
+    too_long = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_DURATION_H: 24})
+    assert too_long["errors"] == {CONF_CUSTOM_MIN_DURATION_H: "invalid_duration"}

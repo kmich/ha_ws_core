@@ -222,7 +222,7 @@ class TestV3Services:
         assert "forecast_outcomes" in caplog.text
 
         # 3. Registered get_weather_windows rejects zero, negative, fractional, and bool min_duration_h
-        for bad_duration in (0, -2, 1.5, "1.5", True):
+        for bad_duration in (0, -2, 1.5, "1.5", True, 24):
             with pytest.raises(vol.Invalid):
                 await hass.services.async_call(
                     DOMAIN,
