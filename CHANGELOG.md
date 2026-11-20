@@ -40,6 +40,7 @@ This major release builds directly on the v2.14.0–2.14.3 correctness fixes (al
 
 ### Fixed
 
+- **"Clearing after rain" without rain ([#207](https://github.com/kmich/ha_ws_core/issues/207)):** The current condition no longer reports `clearing-after-rain` on any humid, bright day. It now requires measured rain in the last 3 hours (from the persisted rain history, so it survives a restart) and a real illuminance reading; stations without a light sensor no longer get this label from the default brightness value.
 - **Pattern Forecast Learning Migration & Replay Alignment:**
   - Masked solar features (`cloud_deficit`, `solar_ok`, `last_day_clearness`, `last_day_clearness_ok`) in replay vector generation to prevent historical replays from corrupting standardizer slots with zeros.
   - Aligned `dp_3h` replay units: removed `/ 3.0` factor in `replay()` so historical replays and live station updates both evaluate 3-hour pressure change in hPa consistently.

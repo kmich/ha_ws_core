@@ -373,6 +373,10 @@ RAIN_RATE_PHYSICAL_CAP_MMPH: float = 500.0
 # increments; averaging over a short window instead smooths that out while
 # still reacting quickly to real changes in intensity.
 RAIN_RATE_WINDOW_H: float = 10.0 / 60.0
+# "Clearing after rain" needs measured rain this recently (issue #207); the
+# minimum amount ignores counter noise below one typical bucket tip.
+CLEARING_AFTER_RAIN_WINDOW_H: float = 3.0
+CLEARING_AFTER_RAIN_MIN_MM: float = 0.1
 WIND_SMOOTH_ALPHA: float = 0.3
 
 ZAMBRETTI_UPPER_PRESSURE: float = 1050.0

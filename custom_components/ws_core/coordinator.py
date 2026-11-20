@@ -129,6 +129,8 @@ from .algorithms import (
 from .const import (
     ALERT_DEBOUNCE_OFF_TICKS,
     ALERT_DEBOUNCE_ON_TICKS,
+    CLEARING_AFTER_RAIN_MIN_MM,
+    CLEARING_AFTER_RAIN_WINDOW_H,
     COALESCE_BURST_DELAY_S,
     CONF_ALTITUDE_UNIT,
     CONF_AQI_INTERVAL_MIN,
@@ -2397,6 +2399,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if rain_hist:
             data[KEY_RAIN_ACCUM_1H] = round(self._rain_accum_window_from_totals(rain_hist, now, 1.0), 1)
             data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rain_hist), 1)
+            # Recent rain for the "clearing after rain" condition; the 24h history is
+            # persisted, so this survives a restart (issue #207).
+            data["_rain_recent_mm"] = round(
+                self._rain_accum_window_from_totals(rain_hist, now, CLEARING_AFTER_RAIN_WINDOW_H), 2
+            )
 
         # Rain today - resets at local midnight (use local time, not UTC)
         rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
@@ -2511,6 +2518,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if tc is None or rh is None:
             return "sunny" if is_day else "clear-night"
 
+        # Rain in the last few hours: measured accumulation, or a positive filtered rate
+        # seen by this run. Without either, "clearing after rain" cannot be claimed.
+        recent_mm = data.get("_rain_recent_mm")
+        rained_recently = isinstance(recent_mm, (int, float)) and recent_mm >= CLEARING_AFTER_RAIN_MIN_MM
+        last_event = getattr(self.runtime, "last_rain_event_ts", None)
+        if not rained_recently and last_event is not None:
+            try:
+                age_s = (dt_util.utcnow() - last_event).total_seconds()
+            except (TypeError, AttributeError):
+                age_s = None
+            rained_recently = age_s is not None and 0.0 <= age_s <= CLEARING_AFTER_RAIN_WINDOW_H * 3600.0
+
         condition = determine_current_condition(
             temp_c=float(tc),
             humidity=float(rh),
@@ -2527,6 +2546,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             sun_azimuth=sun_azimuth,
             is_day=is_day,
             current_hour=dt_util.now().hour,
+            rained_recently=bool(rained_recently),
+            illuminance_known=lux is not None,
         )
         condition = self.runtime.condition_hold.update(condition, time.monotonic())
         data[KEY_CURRENT_CONDITION] = condition

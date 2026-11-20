@@ -890,6 +890,8 @@ def determine_current_condition(
     pm10=0.0,
     is_wet=False,
     current_hour=None,
+    rained_recently=False,
+    illuminance_known=True,
 ) -> str:
     """Classify current weather into one of 36 conditions.
 
@@ -903,6 +905,11 @@ def determine_current_condition(
     ``current_hour`` is the local hour (0-23) in the Home Assistant timezone,
     used only to distinguish a misty morning from generic fog. Callers should
     pass ``dt_util.now().hour``; when omitted it falls back to the host clock.
+
+    ``rained_recently`` must be True for "clearing-after-rain": humid, bright
+    weather alone is not evidence that rain just ended. ``illuminance_known``
+    is False when no light reading exists (callers then substitute a default
+    lux value), so brightness cannot support that label either.
     """
     is_rising = sun_azimuth < 180
     is_golden_hour = -4 < sun_elevation < 10 and is_day
@@ -973,8 +980,15 @@ def determine_current_condition(
     if is_golden_hour:
         return "golden-hour"
 
-    # Post-rain
-    if not is_wet and rain_rate_mmph == 0 and humidity > 80 and illuminance_lx > 30000:
+    # Post-rain: only after rain actually fell recently, with a real light reading
+    if (
+        rained_recently
+        and illuminance_known
+        and not is_wet
+        and rain_rate_mmph == 0
+        and humidity > 80
+        and illuminance_lx > 30000
+    ):
         return "clearing-after-rain"
 
     # Night
