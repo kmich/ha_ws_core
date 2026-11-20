@@ -266,6 +266,12 @@ _FEELS_LIKE_NOTES: dict[str, str] = {
 # Reasons meaning "this station or its settings cannot provide the value", as opposed
 # to "nothing to report right now".
 _NOT_ON_STATION_REASONS = frozenset(("missing_solar_radiation", "missing_lightning_source", "feature_disabled"))
+# A Pattern Forecast target whose learning details are known but that has not published
+# a forecast since the last restart (it does on its next run, within 15 minutes).
+_PATTERN_FIRST_RUN = {
+    "reason": "waiting_for_first_run",
+    "explanation": "Pattern Forecast has not run since Home Assistant started; it publishes within 15 minutes.",
+}
 _EVENT_NOTES = (
     ("rain_event", "No rain has started or stopped since this station was set up."),
     ("frost_event", "No frost has started or ended since this station was set up."),
@@ -1070,6 +1076,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             attrs["formula_applies"] = not out_of_range
             if out_of_range:
                 attrs["explanation"] = _FEELS_LIKE_NOTES[self._desc.key]
+        if native is None and "maturity" in attrs and not attrs.get("explanation"):
+            attrs.update(_PATTERN_FIRST_RUN)
         return attrs
 
     @property
@@ -1160,7 +1168,7 @@ class WSDataStatusSensor(WSSensor):
                 continue  # still showing a restored value
             info = self._safe_attrs(desc, d)
             if not info.get("explanation"):
-                info = unknown_status(desc.key, self.coordinator, d)
+                info = dict(_PATTERN_FIRST_RUN) if "maturity" in info else unknown_status(desc.key, self.coordinator, d)
             if info.get("reason") in _NOT_ON_STATION_REASONS:
                 if info.get("reason") == "missing_lightning_source" and "Lightning" in not_here:
                     continue  # already covered by the family note

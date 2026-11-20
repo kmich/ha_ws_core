@@ -194,6 +194,24 @@ def test_live_station_replay_is_ok_with_nine_waiting():
     assert attrs["summary"].startswith("Everything is working.")
 
 
+def test_pattern_target_before_its_first_run_says_so():
+    """Right after a restart a learning target has details but no forecast yet."""
+    desc = WSSensorDescription(key="pattern_rain_3h", attrs_fn=lambda d: {"maturity": "learning", "events_live": 12})
+    watched = [desc]
+    registered = [("sensor", f"{ENTRY_ID}_pattern_rain_3h", "sensor.ws_pattern_rain_3h")]
+    states = {"sensor.ws_pattern_rain_3h": "unknown"}
+    state, attrs = _status({c.KEY_SOURCE_PROBLEMS: []}, watched, registered=registered, states=states)
+    assert state == "ok"
+    assert "has not run since Home Assistant started" in attrs["waiting"]["sensor.ws_pattern_rain_3h"]
+
+    coordinator = MagicMock()
+    coordinator.data = {}
+    sensor = WSSensor(coordinator, MagicMock(entry_id=ENTRY_ID), desc, "ws")
+    own = sensor.extra_state_attributes
+    assert own["reason"] == "waiting_for_first_run"
+    assert own["events_live"] == 12
+
+
 def test_lasting_source_problem_turns_status_to_attention():
     data = {c.KEY_SOURCE_PROBLEMS: ["No recent update from: wind_speed"]}
     state, attrs = _status(data, [], registered=[])
