@@ -655,7 +655,7 @@ class WeatherWindowsEngine:
         live_rain_rate = _as_finite_float(current.get(KEY_RAIN_RATE_FILT))
         live_gust_ms = _as_finite_float(current.get(KEY_NORM_WIND_GUST_MS))
 
-        hourly_count = len(hourly_forecast) if hourly_forecast else 0
+        has_forecast_rows = bool(hourly_forecast)
         prepared_slots: list[tuple[Any, ...]] = []
         if hourly_forecast:
             deduped = _collect_horizon_slots(
@@ -742,7 +742,7 @@ class WeatherWindowsEngine:
             "horizon_end_ts": horizon_end_ts,
             "live_rain_rate": live_rain_rate,
             "live_gust_ms": live_gust_ms,
-            "hourly_count": hourly_count,
+            "has_forecast_rows": has_forecast_rows,
             "slots": prepared_slots,
         }
 
@@ -781,10 +781,15 @@ class WeatherWindowsEngine:
         """Evaluate a single profile against a pre-parsed evaluation context."""
         limits_dict = self._validate_profile(profile)
         evaluated_at_iso: str = prepared["evaluated_at_iso"]
-        hourly_count: int = prepared["hourly_count"]
         prepared_slots: list[tuple[Any, ...]] = prepared["slots"]
+        available_slots = len(prepared_slots)
 
-        if hourly_count < min(2, profile.min_duration_h):
+        if not prepared_slots or available_slots < min(2, profile.min_duration_h):
+            reason_text = (
+                "No forecast hours within the 24-hour evaluation window."
+                if not prepared_slots and prepared["has_forecast_rows"]
+                else "Insufficient hourly forecast data available to evaluate windows."
+            )
             payload = {
                 "profile_id": profile.profile_id,
                 "status": STATUS_UNKNOWN,
@@ -795,30 +800,11 @@ class WeatherWindowsEngine:
                 "horizon_hours": 0,
                 "is_truncated": False,
                 "reason_codes": [REASON_INSUFFICIENT_HORIZON],
-                "reasons_text": ["Insufficient hourly forecast data available to evaluate windows."],
+                "reasons_text": [reason_text],
                 "evaluated_limits": limits_dict,
                 "windows": [],
                 "slots": [],
-                "data_quality": {"available_slots": hourly_count},
-            }
-            return payload if as_dict else WeatherDecisionResult(**payload)
-
-        if not prepared_slots:
-            payload = {
-                "profile_id": profile.profile_id,
-                "status": STATUS_UNKNOWN,
-                "evaluated_at": evaluated_at_iso,
-                "next_start": None,
-                "next_end": None,
-                "duration_h": None,
-                "horizon_hours": 0,
-                "is_truncated": False,
-                "reason_codes": [REASON_INSUFFICIENT_HORIZON],
-                "reasons_text": ["No forecast hours within the 24-hour evaluation window."],
-                "evaluated_limits": limits_dict,
-                "windows": [],
-                "slots": [],
-                "data_quality": {"available_slots": 0},
+                "data_quality": {"available_slots": available_slots},
             }
             return payload if as_dict else WeatherDecisionResult(**payload)
 

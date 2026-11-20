@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
@@ -815,3 +816,27 @@ class TestWeatherWindowsEngine:
         assert engine._parse_slot_utc({"datetime": "2026-06-21T25:00:00Z"}, tz) is None
         assert engine._parse_slot_utc({"datetime": "2026-06-21T12:65:00+00:00"}, tz) is None
         assert engine._parse_slot_utc({"datetime": "2026-02-30"}, tz) is None
+
+    def test_minimum_slot_check_uses_filtered_coverage(self, engine: WeatherWindowsEngine):
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        valid_slot = _make_hourly_forecast(now, hours=1)[0]
+        mixed_one_usable = [
+            {"datetime": "2026-02-30T12:00:00Z", "temp_c": 22.0},
+            {**valid_slot, "datetime": (now - timedelta(hours=2)).isoformat()},
+            valid_slot,
+            valid_slot,  # duplicate
+            {**valid_slot, "datetime": (now + timedelta(hours=24)).isoformat()},
+        ]
+
+        # Profile with min_duration_h=2 requires at least 2 usable slots after filtering
+        res_two = engine.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], mixed_one_usable, now=now)
+        assert res_two.status == "unknown"
+        assert res_two.reason_codes == ["insufficient_horizon"]
+        assert res_two.horizon_hours == 0
+        assert res_two.data_quality == {"available_slots": 1}
+
+        # Profile with min_duration_h=1 only needs 1 usable filtered slot
+        prof_one = replace(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], min_duration_h=1)
+        res_one = engine.evaluate_profile(prof_one, mixed_one_usable, now=now)
+        assert res_one.status == STATUS_SUITABLE_NOW
+        assert res_one.horizon_hours == 1
