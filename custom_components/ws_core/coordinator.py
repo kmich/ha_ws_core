@@ -219,6 +219,7 @@ from .const import (
     CONF_SOLAR_PANEL_AZIMUTH,
     CONF_SOLAR_PANEL_TILT,
     CONF_SOLAR_PEAK_KW,
+    CONF_SOLAR_PV_ENERGY_ENTITIES,
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_SUPPRESS_NOTIFICATIONS,
@@ -1062,6 +1063,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.solar_panel_tilt = int(_get(CONF_SOLAR_PANEL_TILT, DEFAULT_SOLAR_PANEL_TILT))
         self.solar_interval_min = int(_get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN))
         self._solar_cache: dict[str, Any] | None = None
+        # v3.0.0 - Local PV forecast: Open-Meteo GTI scaled by this site's measured PV energy
+        self._solar_local: Any = None
+        _pv_meters = _get(CONF_SOLAR_PV_ENERGY_ENTITIES, []) or []
+        if isinstance(_pv_meters, str):
+            _pv_meters = [_pv_meters]
+        if self.solar_forecast_enabled and _pv_meters:
+            from .solar_local_runtime import SolarLocalRuntime
+
+            self._solar_local = SolarLocalRuntime(self, list(_pv_meters))
         self.et0_illuminance_fallback = bool(_get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK))
         self._solar_radiation_source: str | None = None
 
@@ -1404,6 +1414,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # (targets that already learned, or are waiting for a retry, are skipped).
             self._start_once(self._pattern.async_learn_history, PATTERN_HISTORY_DELAY_S, "ws_core_pattern_history")
 
+        if self._solar_local is not None:
+            await self._solar_local.async_load(entry_id)
+
         # Once per start, fill rain totals from the station's recorder statistics.
         from .history_backfill import async_backfill_from_statistics
 
@@ -1462,6 +1475,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.solar_forecast_enabled and has_location:
             self._start_periodic(
                 self._async_fetch_solar_forecast, self.solar_interval_min * 60, "ws_core_solar_fetch", 30
+            )
+        if self._solar_local is not None and has_location:
+            # After the forecast.solar fetch, so the first day-ahead snapshot can include it.
+            self._start_periodic(
+                self._solar_local.async_update, self.solar_interval_min * 60, "ws_core_solar_local_fetch", 40
             )
         # Météo Vigilance: alerts rarely change faster than 30 min
         if self.vigilance_meteo_enabled and has_location:
@@ -5310,6 +5328,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_FORECAST_TODAY_KWH] = sol.get("today_kwh")
             data[KEY_SOLAR_FORECAST_TOMORROW_KWH] = sol.get("tomorrow_kwh")
             data[KEY_SOLAR_FORECAST_STATUS] = sol.get("status", "OK")
+        if self._solar_local is not None:
+            self._solar_local.apply(data, now)
 
         # --- v1.5.0 wind run, chill hours, clearness index ---
         if self.comfort_indices_enabled:

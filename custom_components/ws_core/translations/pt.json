@@ -309,6 +309,7 @@
           "solar_panel_azimuth": "Azimute dos painéis",
           "solar_panel_tilt": "Inclinação dos painéis",
           "solar_interval_min": "Intervalo de atualização",
+          "solar_pv_energy_entities": "Contadores de energia FV (opcional)",
           "_go_back": "← Voltar ao passo anterior"
         }
       },
@@ -668,7 +669,8 @@
           "solar_peak_kw": "Potência de pico (kWp)",
           "solar_panel_azimuth": "Azimute dos painéis",
           "solar_panel_tilt": "Inclinação dos painéis",
-          "solar_interval_min": "Intervalo de atualização"
+          "solar_interval_min": "Intervalo de atualização",
+          "solar_pv_energy_entities": "Contadores de energia FV (opcional)"
         }
       },
       "vigicrues_station_opt": {
@@ -1605,6 +1607,37 @@
       },
       "solar_forecast_tomorrow": {
         "name": "Previsão solar amanhã"
+      },
+      "solar_local_forecast_today": {
+        "name": "Previsão FV local hoje",
+        "state_attributes": {
+          "model_status": {
+            "name": "Estado do modelo",
+            "state": {
+              "prior": "Pelas definições dos painéis",
+              "learning": "Aprendendo",
+              "trained": "Treinado"
+            }
+          },
+          "days_used": {
+            "name": "Dias usados"
+          },
+          "site_factor": {
+            "name": "Fator do local"
+          },
+          "skill_local": {
+            "name": "Precisão do dia anterior (local)"
+          },
+          "skill_forecast_solar": {
+            "name": "Precisão do dia anterior (forecast.solar)"
+          }
+        }
+      },
+      "solar_local_forecast_tomorrow": {
+        "name": "Previsão FV local amanhã"
+      },
+      "solar_local_forecast_remaining_today": {
+        "name": "Previsão FV local restante hoje"
       },
       "fog_probability": {
         "name": "Probabilidade de nevoeiro",

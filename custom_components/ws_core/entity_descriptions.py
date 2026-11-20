@@ -42,6 +42,7 @@ from .const import (
     CONF_ENABLE_WOW,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ET0_ILLUMINANCE_FALLBACK,
+    CONF_SOLAR_PV_ENERGY_ENTITIES,
     KEY_ABSOLUTE_HUMIDITY,
     KEY_AIR_DENSITY,
     KEY_ALERT_MESSAGE,
@@ -216,6 +217,10 @@ from .const import (
     KEY_SOLAR_FORECAST_STATUS,
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
+    KEY_SOLAR_LOCAL_INFO,
+    KEY_SOLAR_LOCAL_REMAINING_KWH,
+    KEY_SOLAR_LOCAL_TODAY_KWH,
+    KEY_SOLAR_LOCAL_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
     KEY_SPECIFIC_HUMIDITY,
     KEY_TEMP_ANOMALY_30D,
@@ -2233,6 +2238,37 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # ---------------------------------------------------------------
+    # Local PV forecast (v3.0.0, Open-Meteo GTI scaled by measured PV energy)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_SOLAR_LOCAL_TODAY_KWH,
+        translation_key="solar_local_forecast_today",
+        name="WS Local PV Forecast Today",
+        icon="mdi:solar-power",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        attrs_fn=lambda d: dict(d.get(KEY_SOLAR_LOCAL_INFO) or {}),
+    ),
+    WSSensorDescription(
+        key=KEY_SOLAR_LOCAL_TOMORROW_KWH,
+        translation_key="solar_local_forecast_tomorrow",
+        name="WS Local PV Forecast Tomorrow",
+        icon="mdi:solar-power-variant",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    WSSensorDescription(
+        key=KEY_SOLAR_LOCAL_REMAINING_KWH,
+        translation_key="solar_local_forecast_remaining_today",
+        name="WS Local PV Forecast Remaining Today",
+        icon="mdi:solar-power",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
     # Penman-Monteith ET₀ (v0.9.0, when solar radiation sensor available)
     WSSensorDescription(
         key=KEY_ET0_PM_DAILY_MM,
@@ -2749,6 +2785,9 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # Remote PV forecast only. Local ET₀ has its own configured radiation source.
     KEY_SOLAR_FORECAST_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
     KEY_SOLAR_FORECAST_TOMORROW_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_SOLAR_LOCAL_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_SOLAR_LOCAL_TOMORROW_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_SOLAR_LOCAL_REMAINING_KWH: CONF_ENABLE_SOLAR_FORECAST,
     # v1.2.0 - optional new sensors
     KEY_FOG_PROBABILITY: CONF_ENABLE_FOG,
     KEY_THUNDERSTORM_RISK: CONF_ENABLE_THUNDERSTORM,
@@ -2884,8 +2923,11 @@ _MEASURED_SOLAR_KEYS = frozenset((KEY_CLEARNESS_INDEX, KEY_CLOUD_COVER_PCT))
 # Part of a feature group (its toggle still applies), but can only ever have a value
 # with a measured solar radiation sensor.
 _SOLAR_REQUIRED_TOGGLED_KEYS = frozenset((KEY_THSW_INDEX,))
+# Local PV forecast: part of the solar forecast feature (its toggle still applies), but
+# only possible with at least one PV energy meter mapped to learn from.
+_PV_METER_KEYS = frozenset((KEY_SOLAR_LOCAL_TODAY_KWH, KEY_SOLAR_LOCAL_TOMORROW_KWH, KEY_SOLAR_LOCAL_REMAINING_KWH))
 # Every sensor that this station's hardware decides, whatever the feature toggles say.
-STATION_DEPENDENT_KEYS = _SOLAR_SOURCE_KEYS | _MEASURED_SOLAR_KEYS | _SOLAR_REQUIRED_TOGGLED_KEYS
+STATION_DEPENDENT_KEYS = _SOLAR_SOURCE_KEYS | _MEASURED_SOLAR_KEYS | _SOLAR_REQUIRED_TOGGLED_KEYS | _PV_METER_KEYS
 
 
 def station_supports(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
@@ -2901,6 +2943,8 @@ def station_supports(key: str, options: dict[str, Any], sources: dict[str, str])
         )
     if key in _MEASURED_SOLAR_KEYS or key in _SOLAR_REQUIRED_TOGGLED_KEYS:
         return bool(sources.get(SRC_SOLAR_RADIATION))
+    if key in _PV_METER_KEYS:
+        return bool(options.get(CONF_SOLAR_PV_ENERGY_ENTITIES))
     return True
 
 

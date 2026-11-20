@@ -193,6 +193,10 @@ class WsData(dict):
     solar_forecast_today_kwh: float | None
     solar_forecast_tomorrow_kwh: float | None
     solar_forecast_status: str | None
+    solar_local_forecast_today_kwh: float | None
+    solar_local_forecast_tomorrow_kwh: float | None
+    solar_local_forecast_remaining_kwh: float | None
+    solar_local_forecast_info: dict[str, Any] | None
     et0_pm_daily_mm: float | None
 
     # ------------------------------------------------------------------

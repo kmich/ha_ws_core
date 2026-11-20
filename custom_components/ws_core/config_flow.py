@@ -112,6 +112,7 @@ from .const import (
     CONF_SOLAR_PANEL_AZIMUTH,
     CONF_SOLAR_PANEL_TILT,
     CONF_SOLAR_PEAK_KW,
+    CONF_SOLAR_PV_ENERGY_ENTITIES,
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_TEMP_UNIT,
@@ -599,6 +600,19 @@ def _build_optional_sources_fields(defaults: dict[str, str], soil_unit: str) -> 
 
 # Plain sensor selector — no device_class filter (fixes issue #41: sensors mis-routed into wrong slots)
 _ENTITY_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+# v3.0.0 - PV energy meters for the local PV forecast (the Energy dashboard's solar meters)
+_PV_METER_SELECTOR = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)
+)
+
+
+def _pv_meter_list(value: Any) -> list[str]:
+    """Selected PV meters as a sorted list without blanks or duplicates."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        return []
+    return sorted({str(v).strip() for v in value if isinstance(v, str) and v.strip()})
 
 
 # ---------------------------------------------------------------------------
@@ -1486,6 +1500,7 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             self._data[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
+            self._data[CONF_SOLAR_PV_ENERGY_ENTITIES] = _pv_meter_list(user_input.get(CONF_SOLAR_PV_ENERGY_ENTITIES))
             self._data[CONF_ET0_ILLUMINANCE_FALLBACK] = bool(
                 user_input.get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK)
             )
@@ -1519,6 +1534,7 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
                     vol.Optional(CONF_SOLAR_INTERVAL_MIN, default=DEFAULT_SOLAR_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
+                    vol.Optional(CONF_SOLAR_PV_ENERGY_ENTITIES, default=[]): _PV_METER_SELECTOR,
                     vol.Optional(
                         CONF_ET0_ILLUMINANCE_FALLBACK, default=DEFAULT_ET0_ILLUMINANCE_FALLBACK
                     ): selector.BooleanSelector(),
@@ -1526,6 +1542,8 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             ),
             description_placeholders={
                 "info": "Free solar PV generation forecast from forecast.solar. Uses forecast lat/lon. Azimuth: 0=N, 90=E, 180=S, 270=W. "
+                "Optionally pick the PV energy meters (kWh) that count your solar production: ws_core then also "
+                "learns a local PV forecast from Open-Meteo irradiance and your real yield. "
                 "The illuminance fallback derives an approximate solar radiation from a lux sensor for the ET₀ "
                 "Penman-Monteith sensor when no solar_radiation source is mapped - lower confidence than a real "
                 "pyranometer reading, and only used if an illuminance sensor is also mapped in Sources."
@@ -2874,6 +2892,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             self._opt[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
+            self._opt[CONF_SOLAR_PV_ENERGY_ENTITIES] = _pv_meter_list(user_input.get(CONF_SOLAR_PV_ENERGY_ENTITIES))
             self._opt[CONF_ET0_ILLUMINANCE_FALLBACK] = bool(
                 user_input.get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK)
             )
@@ -2909,6 +2928,9 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
                     vol.Optional(
+                        CONF_SOLAR_PV_ENERGY_ENTITIES, default=_pv_meter_list(g(CONF_SOLAR_PV_ENERGY_ENTITIES, []))
+                    ): _PV_METER_SELECTOR,
+                    vol.Optional(
                         CONF_ET0_ILLUMINANCE_FALLBACK,
                         default=g(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK),
                     ): selector.BooleanSelector(),
@@ -2916,6 +2938,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             ),
             description_placeholders={
                 "info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal. "
+                "PV energy meters (optional): the kWh meters that count your solar production, as in the Energy "
+                "dashboard. With them, ws_core learns a local PV forecast from Open-Meteo irradiance and your real yield. "
                 "The illuminance fallback derives an approximate solar radiation from a lux sensor for the ET₀ "
                 "Penman-Monteith sensor when no solar_radiation source is mapped - lower confidence than a real "
                 "pyranometer reading, and only used if an illuminance sensor is also mapped in Sources."

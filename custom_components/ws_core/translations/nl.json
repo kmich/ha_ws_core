@@ -309,6 +309,7 @@
           "solar_panel_azimuth": "Azimut zonnepanelen",
           "solar_panel_tilt": "Hellingshoek zonnepanelen",
           "solar_interval_min": "Verversingsinterval",
+          "solar_pv_energy_entities": "PV-energiemeters (optioneel)",
           "_go_back": "← Terug naar vorige stap"
         }
       },
@@ -668,7 +669,8 @@
           "solar_peak_kw": "Piekzonnestroom (kWp)",
           "solar_panel_azimuth": "Azimut zonnepanelen",
           "solar_panel_tilt": "Hellingshoek zonnepanelen",
-          "solar_interval_min": "Verversingsinterval"
+          "solar_interval_min": "Verversingsinterval",
+          "solar_pv_energy_entities": "PV-energiemeters (optioneel)"
         }
       },
       "vigicrues_station_opt": {
@@ -1572,6 +1574,37 @@
       },
       "solar_forecast_tomorrow": {
         "name": "Zonvoorspelling morgen"
+      },
+      "solar_local_forecast_today": {
+        "name": "Lokale PV-voorspelling vandaag",
+        "state_attributes": {
+          "model_status": {
+            "name": "Modelstatus",
+            "state": {
+              "prior": "Uit paneelinstellingen",
+              "learning": "Leert",
+              "trained": "Getraind"
+            }
+          },
+          "days_used": {
+            "name": "Gebruikte dagen"
+          },
+          "site_factor": {
+            "name": "Locatiefactor"
+          },
+          "skill_local": {
+            "name": "Nauwkeurigheid dag vooraf (lokaal)"
+          },
+          "skill_forecast_solar": {
+            "name": "Nauwkeurigheid dag vooraf (forecast.solar)"
+          }
+        }
+      },
+      "solar_local_forecast_tomorrow": {
+        "name": "Lokale PV-voorspelling morgen"
+      },
+      "solar_local_forecast_remaining_today": {
+        "name": "Lokale PV-voorspelling resterend vandaag"
       },
       "fog_probability": {
         "name": "Mistkans",

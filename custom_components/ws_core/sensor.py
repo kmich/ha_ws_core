@@ -20,6 +20,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_INDOOR,
+    CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_WEATHER_WINDOWS,
     CONF_INDOOR_ROOMS,
@@ -177,6 +178,9 @@ from .const import (
     KEY_SOLAR_ENERGY_TODAY_WHM2,
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
+    KEY_SOLAR_LOCAL_REMAINING_KWH,
+    KEY_SOLAR_LOCAL_TODAY_KWH,
+    KEY_SOLAR_LOCAL_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
     KEY_SOURCE_PROBLEMS,
     KEY_SPECIFIC_HUMIDITY,
@@ -321,7 +325,7 @@ def _async_remove_unsupported_solar_entities(
             continue
         if ent.unique_id in stale_uids:
             _LOGGER.info(
-                "Removing solar sensor %s (unique_id=%s): no solar radiation source is mapped",
+                "Removing solar sensor %s (unique_id=%s): its solar radiation source or PV meter is not mapped",
                 ent.entity_id,
                 ent.unique_id,
             )
@@ -864,6 +868,9 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             # v0.9.0
             KEY_SOLAR_FORECAST_TODAY_KWH: "solar_forecast_today",
             KEY_SOLAR_FORECAST_TOMORROW_KWH: "solar_forecast_tomorrow",
+            KEY_SOLAR_LOCAL_TODAY_KWH: "solar_local_forecast_today",
+            KEY_SOLAR_LOCAL_TOMORROW_KWH: "solar_local_forecast_tomorrow",
+            KEY_SOLAR_LOCAL_REMAINING_KWH: "solar_local_forecast_remaining_today",
             KEY_ET0_PM_DAILY_MM: "et0_penman_monteith",
             # v1.2.0
             KEY_FOG_PROBABILITY: "fog_probability",
@@ -1247,6 +1254,10 @@ class WSDataStatusSensor(WSSensor):
             if sources.get(SRC_LUX):
                 note += ", or turn on the illuminance fallback to estimate them from your lux sensor"
             notes["Solar energy, peak sun hours, net radiation and Penman-Monteith ET₀"] = note + "."
+        if opts.get(CONF_ENABLE_SOLAR_FORECAST) and not station_supports(KEY_SOLAR_LOCAL_TODAY_KWH, opts, sources):
+            notes["Local PV forecast"] = (
+                "Pick your PV energy meters (kWh) in the Solar Forecast settings to learn a forecast from your real yield."
+            )
         if getattr(self.coordinator, "lightning_enabled", False) is True and not (
             sources.get(SRC_LIGHTNING_COUNT)
             or sources.get(SRC_LIGHTNING_DISTANCE)

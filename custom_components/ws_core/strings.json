@@ -309,6 +309,7 @@
           "solar_panel_azimuth": "Panel azimuth",
           "solar_panel_tilt": "Panel tilt",
           "solar_interval_min": "Refresh interval",
+          "solar_pv_energy_entities": "PV energy meters (optional)",
           "_go_back": "← Go back to previous step"
         }
       },
@@ -668,7 +669,8 @@
           "solar_peak_kw": "Peak power (kWp)",
           "solar_panel_azimuth": "Panel azimuth",
           "solar_panel_tilt": "Panel tilt",
-          "solar_interval_min": "Refresh interval"
+          "solar_interval_min": "Refresh interval",
+          "solar_pv_energy_entities": "PV energy meters (optional)"
         }
       },
       "vigicrues_station_opt": {
@@ -1886,6 +1888,37 @@
       },
       "solar_forecast_tomorrow": {
         "name": "Solar Forecast Tomorrow"
+      },
+      "solar_local_forecast_today": {
+        "name": "Local PV Forecast Today",
+        "state_attributes": {
+          "model_status": {
+            "name": "Model status",
+            "state": {
+              "prior": "From panel settings",
+              "learning": "Learning",
+              "trained": "Trained"
+            }
+          },
+          "days_used": {
+            "name": "Days used"
+          },
+          "site_factor": {
+            "name": "Site factor"
+          },
+          "skill_local": {
+            "name": "Day-ahead skill (local)"
+          },
+          "skill_forecast_solar": {
+            "name": "Day-ahead skill (forecast.solar)"
+          }
+        }
+      },
+      "solar_local_forecast_tomorrow": {
+        "name": "Local PV Forecast Tomorrow"
+      },
+      "solar_local_forecast_remaining_today": {
+        "name": "Local PV Forecast Remaining Today"
       },
       "et0_pm_daily": {
         "name": "ET₀ Penman-Monteith (Daily)",

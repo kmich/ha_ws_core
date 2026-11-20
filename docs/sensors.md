@@ -341,6 +341,40 @@ Via forecast.solar (free). Configure your panel peak kWp, azimuth, and tilt.
 | `sensor.ws_solar_forecast_today` | kWh | Estimated PV generation today |
 | `sensor.ws_solar_forecast_tomorrow` | kWh | Estimated PV generation tomorrow |
 
+### Local PV forecast (v3.0.0, optional)
+
+Pick the PV energy meters that count your solar production (the same kWh meters as in the Energy dashboard, one or several) under **Configure > Solar Forecast**. ws_core then learns a forecast for your own installation:
+
+- It fetches Open-Meteo's hourly irradiance forecast on the plane of your panels (your tilt and azimuth; free, no key).
+- From your meters' long-term statistics it learns how many kWh your system really produces per kWh/m² of that irradiance (the **site factor**). Shading, inverter losses, soiling and a wrong kWp setting are all absorbed by it.
+- On the first start it reads up to 92 days of history from the recorder and Open-Meteo, so a system with existing statistics is calibrated right away. Without history it starts from your peak power (kWp × 0.80) and refits as days come in.
+
+| Entity ID | Unit | Description |
+|---|---|---|
+| `sensor.ws_solar_local_forecast_today` | kWh | Local PV forecast for today |
+| `sensor.ws_solar_local_forecast_tomorrow` | kWh | Local PV forecast for tomorrow |
+| `sensor.ws_solar_local_forecast_remaining_today` | kWh | Energy still expected today (rest of the current hour plus later hours) |
+
+Attributes of `sensor.ws_solar_local_forecast_today`:
+
+| Attribute | Meaning |
+|---|---|
+| `model_status` | `prior` (from your kWp only), `learning` (fewer than 7 usable days, blended with the prior) or `trained` |
+| `days_used` | Days in the last 60 that went into the fit |
+| `site_factor` / `prior_site_factor` | Learned and kWp-based kWh per kWh/m² of plane irradiance |
+| `skill_local` / `skill_forecast_solar` | Day-ahead error over the last 30 days for this forecast and for forecast.solar: `days`, `mae_kwh`, `bias_kwh`, `correlation` (shown from 5 days) |
+| `hourly` | Hourly forecast for today and tomorrow (`start`, `kwh`); not recorded in history |
+| `meter_problem` / `last_error` | Why measured energy or the forecast is missing, if it is |
+
+Skill is scored fairly: only the last forecast made **before** a day started is compared with what the meters measured that day, for both forecasts, and on the same days when both exist. The day-ahead history starts when the feature is turned on, so `skill_*` appear after about 5 days.
+
+Notes and limits:
+
+- The meters need long-term statistics (`state_class` `total` or `total_increasing`, unit Wh, kWh or MWh). Lifetime and daily-reset counters both work.
+- Days with a meter outage, or whose yield is far from what the irradiance predicts (curtailment from a full battery or an export limit, snow on the panels), are left out of the fit. Frequent curtailment still pulls the site factor down a little.
+- One tilt and azimuth are used for the whole system. For arrays facing different ways, set the orientation of the largest array; the site factor absorbs the rest, but the hourly shape follows that one orientation.
+- Uses the forecast latitude and longitude. Removing the integration deletes the learned data (`.storage/ws_core_<entry>_solar_local`).
+
 ---
 
 ## Optional: Fog and Thunderstorm

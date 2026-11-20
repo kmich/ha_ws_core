@@ -96,6 +96,9 @@ def test_feature_toggles_never_count_as_unsupported():
             c.KEY_SOLAR_ENERGY_TODAY_WHM2,
             c.KEY_PEAK_SUN_HOURS,
             c.KEY_NET_RADIATION,
+            c.KEY_SOLAR_LOCAL_TODAY_KWH,
+            c.KEY_SOLAR_LOCAL_TOMORROW_KWH,
+            c.KEY_SOLAR_LOCAL_REMAINING_KWH,
         ):
             assert station_supports(desc.key, {}, {}), desc.key
 

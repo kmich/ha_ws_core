@@ -43,6 +43,17 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         elif key == c.KEY_ET0_PM_DAILY_MM and not getattr(coord, "_solar_energy_previous_whm2", 0.0):
             reason = "waiting_for_daily_radiation"
             explanation = "Waiting for a completed day's solar irradiation to calculate daily Penman–Monteith ET₀."
+    elif key in (c.KEY_SOLAR_LOCAL_TODAY_KWH, c.KEY_SOLAR_LOCAL_TOMORROW_KWH, c.KEY_SOLAR_LOCAL_REMAINING_KWH):
+        runtime = getattr(coord, "_solar_local", None)
+        if getattr(coord, "forecast_lat", None) is None or getattr(coord, "forecast_lon", None) is None:
+            reason = "missing_location"
+            explanation = "Set the forecast latitude and longitude to fetch the irradiance forecast."
+        elif runtime is not None and runtime.error:
+            reason = "fetch_failed"
+            explanation = f"The Open-Meteo irradiance forecast could not be fetched ({runtime.error}); retrying."
+        else:
+            reason = "waiting_for_forecast"
+            explanation = "Waiting for the first Open-Meteo irradiance forecast and PV meter history."
     elif key in (c.KEY_MINUTES_UNTIL_RAIN, c.KEY_MINUTES_UNTIL_DRY):
         cache = getattr(coord, "_nowcast_cache", None)
         if not getattr(coord, "nowcast_enabled", False):

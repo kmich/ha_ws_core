@@ -129,6 +129,7 @@ ws_core sends no telemetry or analytics. These are the only features that contac
 | **Precipitation nowcast, air quality, pollen** | Open-Meteo | Configured coordinates | If enabled |
 | **Sea temperature, climate normals** | Open-Meteo Marine and Archive APIs | Configured coordinates | If enabled |
 | **Solar forecast** | Forecast.Solar | Configured coordinates | If enabled |
+| **Local PV forecast** | Open-Meteo | Configured coordinates and panel tilt/azimuth (your meter readings stay local) | If the solar forecast is enabled and PV energy meters are picked |
 | **French Vigilance** | French government geocoder (api-adresse.data.gouv.fr), then OpenDataSoft | Coordinates to the geocoder, then the department code | If enabled |
 | **Vigicrues river levels** | Hub'Eau (French government) | Coordinates or the chosen station ID | If enabled |
 | **Lightning via Blitzortung** | Blitzortung, through its own integration | Whatever the Blitzortung integration sends | If that integration is installed and no lightning sensor is mapped |

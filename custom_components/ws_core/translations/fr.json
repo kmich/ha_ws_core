@@ -309,6 +309,7 @@
           "solar_panel_azimuth": "Azimut du panneau",
           "solar_panel_tilt": "Inclinaison du panneau",
           "solar_interval_min": "Intervalle d'actualisation",
+          "solar_pv_energy_entities": "Compteurs d'énergie PV (facultatif)",
           "_go_back": "← Retour à l'étape précédente"
         }
       },
@@ -668,7 +669,8 @@
           "solar_peak_kw": "Puissance crête (kWp)",
           "solar_panel_azimuth": "Azimut du panneau",
           "solar_panel_tilt": "Inclinaison du panneau",
-          "solar_interval_min": "Intervalle d'actualisation"
+          "solar_interval_min": "Intervalle d'actualisation",
+          "solar_pv_energy_entities": "Compteurs d'énergie PV (facultatif)"
         }
       },
       "vigicrues_station_opt": {
@@ -1886,6 +1888,37 @@
       },
       "solar_forecast_tomorrow": {
         "name": "Prévision solaire (24h)"
+      },
+      "solar_local_forecast_today": {
+        "name": "Prévision PV locale aujourd'hui",
+        "state_attributes": {
+          "model_status": {
+            "name": "État du modèle",
+            "state": {
+              "prior": "D'après les panneaux",
+              "learning": "Apprentissage",
+              "trained": "Entraîné"
+            }
+          },
+          "days_used": {
+            "name": "Jours utilisés"
+          },
+          "site_factor": {
+            "name": "Facteur du site"
+          },
+          "skill_local": {
+            "name": "Qualité à J-1 (locale)"
+          },
+          "skill_forecast_solar": {
+            "name": "Qualité à J-1 (forecast.solar)"
+          }
+        }
+      },
+      "solar_local_forecast_tomorrow": {
+        "name": "Prévision PV locale demain"
+      },
+      "solar_local_forecast_remaining_today": {
+        "name": "Prévision PV locale restante aujourd'hui"
       },
       "et0_pm_daily": {
         "name": "Évapotranspiration (jour) (PM)",

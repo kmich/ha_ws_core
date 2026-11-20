@@ -444,6 +444,8 @@ CONF_SOLAR_PEAK_KW = "solar_peak_kw"
 CONF_SOLAR_PANEL_AZIMUTH = "solar_panel_azimuth"
 CONF_SOLAR_PANEL_TILT = "solar_panel_tilt"
 CONF_SOLAR_INTERVAL_MIN = "solar_interval_min"
+# v3.0.0 - Local PV forecast: PV energy meters whose statistics train the site factor
+CONF_SOLAR_PV_ENERGY_ENTITIES = "solar_pv_energy_entities"
 DEFAULT_ENABLE_SOLAR_FORECAST = False
 DEFAULT_SOLAR_PEAK_KW = 5.0
 DEFAULT_SOLAR_PANEL_AZIMUTH = 180  # south-facing
@@ -491,6 +493,11 @@ KEY_MOON_NEXT_NEW = "moon_next_new_days"
 KEY_SOLAR_FORECAST_TODAY_KWH = "solar_forecast_today_kwh"
 KEY_SOLAR_FORECAST_TOMORROW_KWH = "solar_forecast_tomorrow_kwh"
 KEY_SOLAR_FORECAST_STATUS = "solar_forecast_status"
+# Data keys - v3.0.0 Local PV forecast (Open-Meteo GTI scaled by measured PV energy)
+KEY_SOLAR_LOCAL_TODAY_KWH = "solar_local_forecast_today_kwh"
+KEY_SOLAR_LOCAL_TOMORROW_KWH = "solar_local_forecast_tomorrow_kwh"
+KEY_SOLAR_LOCAL_REMAINING_KWH = "solar_local_forecast_remaining_kwh"
+KEY_SOLAR_LOCAL_INFO = "solar_local_forecast_info"
 KEY_ET0_PM_DAILY_MM = "et0_pm_daily_mm"  # Penman-Monteith (when solar available)
 KEY_ET0_PM_RADIATION_SOURCE = "et0_pm_radiation_source"  # "sensor" or "illuminance_estimate"
 KEY_ET0_PM_PERIOD = "et0_pm_period"  # completed local calendar date

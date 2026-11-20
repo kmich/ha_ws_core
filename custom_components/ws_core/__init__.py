@@ -619,6 +619,7 @@ def entry_storage_keys(entry_id: str) -> tuple[str, ...]:
         f"ws_core_{entry_id}_climate_normals",
         f"ws_core_{entry_id}_pattern_forecast",
         f"ws_core_{entry_id}_pattern_forecast_pre_v3_backup",
+        f"ws_core_{entry_id}_solar_local",
     )
 
 
