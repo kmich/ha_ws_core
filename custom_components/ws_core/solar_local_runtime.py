@@ -128,8 +128,10 @@ class SolarLocalRuntime:
         if bad_units:
             self.meter_problem = "not_an_energy_meter"
             return {}
-        self.meter_problem = None
-        return actual_daily_kwh(rows, units, tz, today)
+        out = actual_daily_kwh(rows, units, tz, today)
+        # Statistics exist but no day had every meter reporting most of its hours.
+        self.meter_problem = None if out else "no_complete_days"
+        return out
 
     async def _async_fetch_gti(self, past_days: int) -> dict[str, Any] | None:
         coord = self.coord
@@ -178,7 +180,8 @@ class SolarLocalRuntime:
         actual = await self._async_read_actuals(BACKFILL_DAYS if backfill else _RECENT_DAYS, today, tz)
         for day, kwh in (actual or {}).items():
             self.state.set_value(day, "actual", kwh)
-        if backfill and actual is not None and self.meter_problem is None:
+        # A backfill that found no usable day is tried again on the next refresh.
+        if backfill and actual and self.meter_problem is None:
             self.state.backfilled = True
 
         self.k, self.n_days, self.status = fit_factor(self.state, prior_factor(coord.solar_peak_kw), today)

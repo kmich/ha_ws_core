@@ -1534,7 +1534,8 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
                     vol.Optional(CONF_SOLAR_INTERVAL_MIN, default=DEFAULT_SOLAR_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
-                    vol.Optional(CONF_SOLAR_PV_ENERGY_ENTITIES, default=[]): _PV_METER_SELECTOR,
+                    # No default: a default makes the picker impossible to clear (issue #135).
+                    vol.Optional(CONF_SOLAR_PV_ENERGY_ENTITIES): _PV_METER_SELECTOR,
                     vol.Optional(
                         CONF_ET0_ILLUMINANCE_FALLBACK, default=DEFAULT_ET0_ILLUMINANCE_FALLBACK
                     ): selector.BooleanSelector(),
@@ -2927,8 +2928,10 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
+                    # suggested_value, not default: the meters must stay clearable (issue #135).
                     vol.Optional(
-                        CONF_SOLAR_PV_ENERGY_ENTITIES, default=_pv_meter_list(g(CONF_SOLAR_PV_ENERGY_ENTITIES, []))
+                        CONF_SOLAR_PV_ENERGY_ENTITIES,
+                        description={"suggested_value": _pv_meter_list(g(CONF_SOLAR_PV_ENERGY_ENTITIES, [])) or None},
                     ): _PV_METER_SELECTOR,
                     vol.Optional(
                         CONF_ET0_ILLUMINANCE_FALLBACK,

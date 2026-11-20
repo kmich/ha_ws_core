@@ -355,3 +355,40 @@ def test_coordinator_creates_runtime_only_with_toggle_and_meters():
     coord = _construct({**on, c.CONF_SOLAR_PV_ENERGY_ENTITIES: "sensor.pv"})
     assert isinstance(coord._solar_local, SolarLocalRuntime)
     assert coord._solar_local.meters == ["sensor.pv"]
+
+
+async def test_runtime_reports_meters_without_complete_days_and_retries_backfill():
+    now = datetime(2026, 11, 20, 20, 0, tzinfo=ATHENS)
+    js = _om_response({TODAY: _bell(400), TODAY + timedelta(days=1): _bell(500)})
+    # A meter that only writes statistics in daylight: no day reaches the hour count
+    rows = {"sensor.pv": [r for i in range(1, 6) for r in _rows(TODAY - timedelta(days=i), 1.0, hours=10)]}
+    rt = SolarLocalRuntime(_coord(), ["sensor.pv"])
+    fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now)
+    fetch.assert_awaited_once_with(sl.BACKFILL_DAYS)
+    assert rt.meter_problem == "no_complete_days"
+    assert rt.state.backfilled is False
+    fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now)
+    fetch.assert_awaited_once_with(sl.BACKFILL_DAYS)
+
+
+def _schema_marker(schema, key_name: str):
+    return next(k for k in schema.schema if str(k) == key_name)
+
+
+async def test_options_meter_picker_is_clearable():
+    from custom_components.ws_core.config_flow import WSStationOptionsFlowHandler
+
+    handler = WSStationOptionsFlowHandler()
+    handler._opt = {}
+    handler._get = lambda key, default=None: ["sensor.pv"] if key == c.CONF_SOLAR_PV_ENERGY_ENTITIES else default
+    handler._finish_or_next = AsyncMock(return_value={"type": "done"})
+    with patch.object(handler, "async_show_form", side_effect=lambda **kw: kw):
+        form = await handler.async_step_solar_forecast_opt()
+    import voluptuous as vol
+
+    marker = _schema_marker(form["data_schema"], c.CONF_SOLAR_PV_ENERGY_ENTITIES)
+    assert marker.default is vol.UNDEFINED
+    assert marker.description == {"suggested_value": ["sensor.pv"]}
+    # Submitting the form with the picker cleared removes the meters
+    await handler.async_step_solar_forecast_opt({c.CONF_SOLAR_PEAK_KW: 5.0})
+    assert handler._opt[c.CONF_SOLAR_PV_ENERGY_ENTITIES] == []
