@@ -5435,12 +5435,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 custom_limits,
                 profile_id=base_profile.profile_id,
             )
-            res = engine.evaluate_profile(target_profile, hourly, current_data=live_current, now=now)
+            res = engine.evaluate_profile(
+                target_profile, hourly, current_data=live_current, now=now, update_live_hold=False
+            )
             return res.to_dict()
 
         if profile_id:
             prof = engine.profiles[profile_id]
-            res = engine.evaluate_profile(prof, hourly, current_data=live_current, now=now)
+            res = engine.evaluate_profile(prof, hourly, current_data=live_current, now=now, update_live_hold=False)
             return res.to_dict()
 
         # Return all enabled profiles
@@ -5449,6 +5451,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hourly,
             current_data=live_current,
             now=now,
+            update_live_hold=False,
         )
 
     def get_station_summary(self) -> dict[str, Any]:

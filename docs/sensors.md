@@ -532,7 +532,7 @@ For each enabled profile `<pid>` (`outdoor_drying`, `garden_work`, `custom`):
 
 | Entity ID | Device Class | Description |
 |---|---|---|
-| `sensor.ws_window_<pid>_status` | — | Current suitability state: `suitable_now`, `window_upcoming`, `unsuitable`, or `unknown` |
+| `sensor.ws_window_<pid>_status` | none | Current suitability state: `suitable_now`, `window_upcoming`, `unsuitable`, or `unknown` |
 | `sensor.ws_window_<pid>_next_start` | `timestamp` | Start time of the active or next suitable interval (`unknown` if none) |
 | `sensor.ws_window_<pid>_next_end` | `timestamp` | End time of the active or next suitable interval (`unknown` if none) |
 
@@ -540,14 +540,17 @@ Default profile criteria (all numeric custom limits accept °C/°F, mm/in, and k
 
 | Profile | Min Duration | Rain Limits | Temp (°C) | Humidity | Wind / Gust (km/h) | Daylight | Clouds |
 |---|---|---|---|---|---|---|---|
-| `outdoor_drying` | 2 h | prob ≤ 20%, mm = 0 | 10–35 | 15–75% | wind 5–30, gust ≤ 40 | Required | ≤ 70% |
-| `garden_work` | 2 h | prob ≤ 20%, mm = 0 | 10–32 | ≤ 85% | wind ≤ 25, gust ≤ 40 | Required | — |
-| `custom` | 2 h | prob ≤ 25%, mm = 0 | 12–30 | ≤ 80% | wind ≤ 30, gust ≤ 50 | Optional | — |
+| `outdoor_drying` | 2 h | prob ≤ 20%, mm = 0 | 10 to 38 | ≤ 75% | wind 3 to 35, gust ≤ 45 | Required | ≤ 80% |
+| `garden_work` | 2 h | prob ≤ 30%, mm ≤ 0.1 | 8 to 32 | ≤ 90% | wind ≤ 25, gust ≤ 40 | Required | not checked |
+| `custom` | 2 h | prob ≤ 25%, mm = 0 | 12 to 30 | ≤ 80% | wind ≤ 30, gust ≤ 50 | Not required | not checked |
 
 ### Attributes, Live Station Checks & Provider Coverage
 
-- `sensor.ws_window_<pid>_status` exposes `reasons` (localized summary sentences in configured display units, excluding live fluctuating numbers to prevent recorder churn), `reason_codes`, `not_assessed_by_provider`, `duration_h`, `is_truncated`, and `horizon_hours`.
-- **Live station checks:** Active station rainfall immediately blocks `suitable_now`, while instantaneous anemometer wind gusts require a 3-minute sustained exceedance (with a 5-minute clear hold) before interrupting a currently open window, and stale/unavailable gust or rain sensors are ignored.
+- `sensor.ws_window_<pid>_status` exposes `reasons` (localized summary sentences in configured display units, with times shown as local `HH:MM`), `reason_codes`, `not_assessed_by_provider`, `is_truncated`, and `horizon_hours`. These attributes only change when the evaluation changes, not every minute. The remaining duration (`duration_h`) is returned by `ws_core.get_weather_windows`, not stored as an attribute.
+- **Live station checks:** Active station rainfall blocks the current hour, while instantaneous anemometer wind gusts require a 3-minute sustained exceedance (with a 5-minute clear hold) before blocking it. Stale or unavailable gust and rain sensors are ignored.
+- **Interrupted windows:** When live rain or a sustained gust blocks a window that the forecast says is open now, the status becomes `unsuitable` with `window_interrupted` plus the live reason, and `next_start` / `next_end` keep the forecast window's original times. The rest of the window stays visible and the notification blueprint does not re-fire for it.
+- **Action calls:** `ws_core.get_weather_windows` reads the live gust hold but never starts, resets or advances it, so calling the action (even with custom limits) does not change the sensors.
+- **Horizon:** windows are evaluated up to 24 hours ahead, ending on the last full local hour, so a window that runs to the end of the horizon keeps a stable end time.
 - **Provider capability handling:** If your forecast provider omits an entire variable across every forecast hour (for example gusts on Met.no, or gusts and cloud cover on NWS/NOAA), limits depending on that variable are skipped and listed in `not_assessed_by_provider` rather than falsely failing to `unknown`. Either precipitation probability or rainfall amount satisfies rain checks where both limits exist. Real mid-forecast gaps still report `unknown` (`missing_data`), and shorter-than-minimum passing forecasts report `unknown` (`insufficient_horizon`).
 
 ---

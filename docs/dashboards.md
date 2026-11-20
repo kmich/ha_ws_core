@@ -118,16 +118,16 @@ Without the photos that card keeps its plain background.
 Seven-view dashboard covering the full range of sensors and v3.0 Weather Windows.
 
 **Views:**
-1. **Now** — current conditions tile grid with weather conditions, temperature,
+1. **Now** - current conditions tile grid with weather conditions, temperature,
    rain, wind, nowcast, and alerts
-2. **Charts** — 24h and 7-day trend graphs
-3. **Advanced** — UTCI, fire risk, ET₀, VPD, pressure trend, forecast agreement
-4. **Records** — rain accumulators (today/week/month/year), temperature records,
+2. **Charts** - 24h and 7-day trend graphs
+3. **Advanced** - UTCI, fire risk, ET₀, VPD, pressure trend, forecast agreement
+4. **Records** - rain accumulators (today/week/month/year), temperature records,
    streak counters
-5. **Diagnostics** — data quality score, sensor drift flags, upload status sensors,
+5. **Diagnostics** - data quality score, sensor drift flags, upload status sensors,
    and a **Recent Weather Events** logbook (rain start/stop, frost/thaw, lightning)
-6. **Indoor** — indoor comfort score, temperature and humidity deltas, plus per-room sensors (temp delta, humidity, CO₂ and comfort) for each named room
-7. **Windows** — Weather Windows summary card, outdoor drying, garden work, and optional custom profile schedules & status attributes (`enable_weather_windows`)
+6. **Indoor** - indoor comfort score, temperature and humidity deltas, plus per-room sensors (temp delta, humidity, CO₂ and comfort) for each named room
+7. **Windows** - Weather Windows summary card, outdoor drying, garden work, and optional custom profile schedules & status attributes (`enable_weather_windows`)
 
 **HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
 

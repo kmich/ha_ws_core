@@ -40,12 +40,15 @@ from custom_components.ws_core.weather_windows import (
     REASON_RAIN_RISK,
     REASON_SUITABLE,
     REASON_TOO_COLD,
+    REASON_WINDOW_INTERRUPTED,
     STATUS_SUITABLE_NOW,
     STATUS_UNKNOWN,
     STATUS_UNSUITABLE,
     STATUS_WINDOW_UPCOMING,
     WeatherWindowProfile,
     WeatherWindowsEngine,
+    apply_profile_overrides,
+    parse_forecast_slot_utc,
     resolve_profiles,
 )
 
@@ -425,6 +428,12 @@ class TestWeatherWindowsEngine:
         for ent in created_custom:
             if getattr(ent, "_desc", None) and ent._desc.key.startswith("window_custom_"):
                 assert ent.translation_placeholders == {"profile_name": "Custom Activity"}
+        status_ent = next(
+            e for e in created_custom if getattr(e, "_desc", None) and e._desc.key == "window_custom_status"
+        )
+        attrs = status_ent._desc.attrs_fn({KEY_WEATHER_WINDOWS: {PROFILE_CUSTOM: {"duration_h": 2.37}}})
+        # Remaining duration changes every minute, so it is not a state attribute (recorder churn)
+        assert "duration_h" not in attrs
         eval_custom = coord_custom.get_weather_windows_evaluation()
         assert list(eval_custom.keys()) == [PROFILE_CUSTOM]
 
@@ -494,7 +503,10 @@ class TestWeatherWindowsEngine:
         assert result.status == STATUS_SUITABLE_NOW
         assert result.duration_h == 2.5
         assert result.windows[0]["duration_h"] == 2.5
-        assert "2.5 hours" in result.reasons_text[0]
+        # The sentence names the end time, not a remaining duration that changes every minute
+        assert "until 13:00" in result.reasons_text[0]
+        later = engine.evaluate_profile(profile, hourly, current_data={}, now=now + timedelta(minutes=9))
+        assert later.reasons_text == result.reasons_text
 
     def test_enforces_24_hour_horizon_cutoff(self, engine: WeatherWindowsEngine):
         start_time = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
@@ -512,10 +524,10 @@ class TestWeatherWindowsEngine:
 
     def test_window_end_clipped_to_24_hour_cutoff(self, engine: WeatherWindowsEngine):
         slot_start = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
-        now = datetime(2026, 6, 21, 10, 30, tzinfo=UTC)  # 24h cutoff is 2026-06-22T10:30:00+00:00
+        now = datetime(2026, 6, 21, 10, 30, tzinfo=UTC)  # 24h cutoff floors to 2026-06-22T10:00:00+00:00
         profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
 
-        # Case A: Only 09:00 (+1d) and 10:00 (+1d) suitable -> clipped at 10:30 (+1d) = 1.5h < 2h -> rejected
+        # Case A: Only 09:00 (+1d) and 10:00 (+1d) suitable; 10:00 (+1d) is past the floored cutoff -> 1h < 2h
         hourly_short = _make_hourly_forecast(slot_start, hours=25)
         for i in range(23):
             hourly_short[i]["precip_prob"] = 90
@@ -523,15 +535,19 @@ class TestWeatherWindowsEngine:
         assert res_short.status == STATUS_UNSUITABLE
         assert res_short.windows == []
 
-        # Case B: 08:00 (+1d), 09:00 (+1d), 10:00 (+1d) suitable -> clipped end 10:30 (+1d), duration 2.5h, truncated
+        # Case B: 08:00 (+1d) and 09:00 (+1d) suitable up to the floored cutoff -> end 10:00 (+1d), 2h, truncated
         hourly_ok = _make_hourly_forecast(slot_start, hours=25)
         for i in range(22):
             hourly_ok[i]["precip_prob"] = 90
         res_ok = engine.evaluate_profile(profile, hourly_ok, current_data={}, now=now)
         assert res_ok.horizon_hours == 24
         assert res_ok.status == STATUS_WINDOW_UPCOMING
-        assert res_ok.next_end == "2026-06-22T10:30:00+00:00"
-        assert res_ok.duration_h == 2.5
+        assert res_ok.next_end == "2026-06-22T10:00:00+00:00"
+        assert res_ok.duration_h == 2
+
+        # The end stays put as the clock advances within the hour (no per-minute timestamp churn)
+        res_later = engine.evaluate_profile(profile, hourly_ok, current_data={}, now=now + timedelta(minutes=17))
+        assert res_later.next_end == res_ok.next_end
         assert res_ok.is_truncated is True
 
     def test_expired_forecast_returns_unknown_from_evaluation_action(self):
@@ -798,34 +814,34 @@ class TestWeatherWindowsEngine:
         assert "weather_windows" in data
         assert coord.runtime.last_compute_ms >= 25.0
 
-    def test_parse_slot_utc_handles_datetime_objects_and_numeric_timestamps(self, engine: WeatherWindowsEngine):
+    def test_parse_slot_utc_handles_datetime_objects_and_numeric_timestamps(self):
         tz = UTC
         dt_aware = datetime(2026, 6, 21, 14, 0, tzinfo=UTC)
         dt_naive = datetime(2026, 6, 21, 14, 0)
         ts_num = 1782050400.0  # 2026-06-21T14:00:00Z
 
         # Datetime objects
-        assert engine._parse_slot_utc({"datetime": dt_aware}, tz) == dt_aware
-        assert engine._parse_slot_utc({"datetime": dt_naive}, tz) == dt_aware
-        assert engine._parse_slot_utc({"utc_datetime": dt_aware}, tz) == dt_aware
+        assert parse_forecast_slot_utc({"datetime": dt_aware}, tz) == dt_aware
+        assert parse_forecast_slot_utc({"datetime": dt_naive}, tz) == dt_aware
+        assert parse_forecast_slot_utc({"utc_datetime": dt_aware}, tz) == dt_aware
 
         # Numeric timestamps
-        assert engine._parse_slot_utc({"datetime": ts_num}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
-        assert engine._parse_slot_utc({"utc_datetime": int(ts_num)}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
-        assert engine._parse_slot_utc({"datetime": 0}, tz) == datetime.fromtimestamp(0, tz=UTC)
+        assert parse_forecast_slot_utc({"datetime": ts_num}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
+        assert parse_forecast_slot_utc({"utc_datetime": int(ts_num)}, tz) == datetime.fromtimestamp(ts_num, tz=UTC)
+        assert parse_forecast_slot_utc({"datetime": 0}, tz) == datetime.fromtimestamp(0, tz=UTC)
 
         # Invalid/empty/non-finite/overflow
-        assert engine._parse_slot_utc({"datetime": None}, tz) is None
-        assert engine._parse_slot_utc({"datetime": "invalid-date"}, tz) is None
-        assert engine._parse_slot_utc({"datetime": True}, tz) is None
-        assert engine._parse_slot_utc({"datetime": float("nan")}, tz) is None
-        assert engine._parse_slot_utc({"datetime": float("inf")}, tz) is None
-        assert engine._parse_slot_utc({"datetime": 1e20}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": None}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": "invalid-date"}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": True}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": float("nan")}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": float("inf")}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": 1e20}, tz) is None
         # Calendar-invalid timestamps (must return None rather than raising ValueError)
-        assert engine._parse_slot_utc({"datetime": "2026-02-30T12:00:00Z"}, tz) is None
-        assert engine._parse_slot_utc({"datetime": "2026-06-21T25:00:00Z"}, tz) is None
-        assert engine._parse_slot_utc({"datetime": "2026-06-21T12:65:00+00:00"}, tz) is None
-        assert engine._parse_slot_utc({"datetime": "2026-02-30"}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": "2026-02-30T12:00:00Z"}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": "2026-06-21T25:00:00Z"}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": "2026-06-21T12:65:00+00:00"}, tz) is None
+        assert parse_forecast_slot_utc({"datetime": "2026-02-30"}, tz) is None
 
     def test_minimum_slot_check_uses_filtered_coverage(self, engine: WeatherWindowsEngine):
         now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
@@ -929,8 +945,11 @@ class TestWeatherWindowsEngine:
             profile, hourly, current_data={KEY_NORM_WIND_GUST_MS: 14.5}, now=t0 + timedelta(minutes=4)
         )
         assert r_held.status == STATUS_UNSUITABLE
-        assert r_held.next_start is None
+        # The interrupted forecast window keeps its original times (no re-armed 10:00 start)
+        assert r_held.next_start == t0.isoformat()
+        assert r_held.next_end == r0.next_end
         assert REASON_CURRENT_GUST_HIGH in r_held.reason_codes
+        assert REASON_WINDOW_INTERRUPTED in r_held.reason_codes
 
         # Fluctuating live gust values must produce identical static reasons_text (no recorder churn)
         r_held2 = eng.evaluate_profile(
@@ -959,8 +978,9 @@ class TestWeatherWindowsEngine:
             profile, hourly, current_data={KEY_RAIN_RATE_FILT: 2.5}, now=t0 + timedelta(minutes=12)
         )
         assert r_rain.status == STATUS_UNSUITABLE
-        assert r_rain.next_start is None
+        assert r_rain.next_start == t0.isoformat()
         assert REASON_CURRENTLY_RAINING in r_rain.reason_codes
+        assert REASON_WINDOW_INTERRUPTED in r_rain.reason_codes
         assert "2.5" not in " ".join(r_rain.reasons_text)
 
         # Whereas if [09:00..10:00) was forecast rain and [10:00..15:00) is clean -> window_upcoming @ 10:00
@@ -1042,3 +1062,93 @@ class TestWeatherWindowsEngine:
         )
         assert "Conditions meet" not in res_fr.reasons_text[0]
         assert "créneau" in res_fr.reasons_text[0].lower() or "limites" in res_fr.reasons_text[0].lower()
+
+
+class TestReleaseReviewFixes:
+    """Regression tests for the v3.0.0 release review (interrupted windows, hold, text stability)."""
+
+    @staticmethod
+    def _sustain_gust(eng: WeatherWindowsEngine, profile, hourly, t0: datetime, gust_ms: float = 14.0):
+        res = None
+        for minute in (0, 1, 2, 4):
+            res = eng.evaluate_profile(
+                profile, hourly, current_data={KEY_NORM_WIND_GUST_MS: gust_ms}, now=t0 + timedelta(minutes=minute)
+            )
+        return res
+
+    def test_full_day_window_stays_visible_while_live_gust_blocks_it(self):
+        eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
+        t0 = datetime(2026, 6, 21, 9, 30, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0.replace(minute=0), hours=25)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+
+        calm = eng.evaluate_profile(profile, hourly, current_data={KEY_NORM_WIND_GUST_MS: 3.0}, now=t0)
+        assert calm.status == STATUS_SUITABLE_NOW
+
+        blocked = self._sustain_gust(eng, profile, hourly, t0 + timedelta(minutes=1))
+        assert blocked.status == STATUS_UNSUITABLE
+        assert REASON_CURRENT_GUST_HIGH in blocked.reason_codes
+        assert REASON_WINDOW_INTERRUPTED in blocked.reason_codes
+        # Same day, same window: not "next window tomorrow morning"
+        assert blocked.next_start == calm.next_start
+        assert blocked.next_end == calm.next_end
+        assert blocked.windows[0]["start_iso"] == calm.windows[0]["start_iso"]
+        assert blocked.windows[0]["end_iso"] == calm.windows[0]["end_iso"]
+        assert "tomorrow" not in " ".join(blocked.reasons_text)
+
+    def test_action_evaluation_reads_but_never_resets_the_gust_hold(self):
+        eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
+        t0 = datetime(2026, 6, 21, 9, 30, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0.replace(minute=0), hours=8)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        assert self._sustain_gust(eng, profile, hourly, t0).status == STATUS_UNSUITABLE
+
+        gust = {KEY_NORM_WIND_GUST_MS: 14.0}
+        t_svc = t0 + timedelta(minutes=5)
+        # Same limits: the action sees the active hold
+        same = eng.evaluate_profile(profile, hourly, current_data=gust, now=t_svc, update_live_hold=False)
+        assert same.status == STATUS_UNSUITABLE
+        # Different gust limit: evaluated without the hold, and the hold itself is untouched
+        relaxed = apply_profile_overrides(profile, {"max_wind_gust_kmh": 60}, profile_id=profile.profile_id)
+        svc = eng.evaluate_profile(relaxed, hourly, current_data=gust, now=t_svc, update_live_hold=False)
+        assert svc.status == STATUS_SUITABLE_NOW
+        after = eng.evaluate_profile(profile, hourly, current_data=gust, now=t_svc + timedelta(minutes=1))
+        assert after.status == STATUS_UNSUITABLE
+        assert REASON_CURRENT_GUST_HIGH in after.reason_codes
+
+    def test_upcoming_window_text_uses_local_clock_and_tomorrow(self):
+        eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
+        now = datetime(2026, 6, 21, 20, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(now, hours=24)
+        res = eng.evaluate_profile(DEFAULT_PROFILES[PROFILE_GARDEN_WORK], hourly, now=now)
+        assert res.status == STATUS_WINDOW_UPCOMING
+        text = " ".join(res.reasons_text)
+        assert "tomorrow" in text
+        assert "T0" not in text and "+00:00" not in text  # no raw ISO timestamps
+
+    def test_profile_names_and_field_labels_are_localized(self):
+        now = datetime(2026, 6, 21, 9, 0, tzinfo=UTC)
+        metno = _make_hourly_forecast(now, hours=6)
+        for slot in metno:
+            slot["precip_prob"] = None
+            slot["gust_kmh"] = None
+        eng_fr = WeatherWindowsEngine(lat=38.0, lon=23.7, language="fr")
+        res = eng_fr.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], metno, now=now)
+        text = " ".join(res.reasons_text)
+        assert "Séchage du linge en extérieur" in text
+        assert "rafales" in text
+        assert "wind gusts" not in text
+
+        renamed = replace(DEFAULT_PROFILES[PROFILE_CUSTOM], name="Bike ride", enabled=True, require_daylight=False)
+        res_named = eng_fr.evaluate_profile(renamed, _make_hourly_forecast(now, hours=6, temp_c=20.0), now=now)
+        assert "Bike ride" in res_named.reasons_text[0]
+
+    def test_window_text_tables_cover_every_language(self):
+        from custom_components.ws_core import localize
+
+        en_keys = set(localize._WINDOW_TEXT["en"])
+        for lang, table in localize._WINDOW_TEXT.items():
+            assert set(table) == en_keys, lang
+            assert set(localize._WINDOW_FIELD_LABELS[lang]) == set(localize._WINDOW_FIELD_LABELS["en"]), lang
+        assert localize.window_field_labels("de-AT", ["max_wind_gust_kmh"]) == "Windböen"
+        assert localize.window_text("xx", "pn_prefix", provider="NWS") == "Provider notice (NWS):"

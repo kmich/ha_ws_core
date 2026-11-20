@@ -473,7 +473,7 @@ views:
     cards:
       - type: custom:mushroom-title-card
         title: Weather Windows
-        subtitle: Next 24 hours — drying, garden work & custom activity windows
+        subtitle: Next 24 hours - drying, garden work & custom activity windows
 
       - type: markdown
         content: >-
@@ -485,37 +485,48 @@ views:
             ('Garden Work', 'sensor.ws_window_garden_work_status'),
             ('Custom Profile', 'sensor.ws_window_custom_status')
           ] if states(ent) not in ['unknown', 'unavailable', 'none', ''] or state_attr(ent, 'reasons') %}
-          - **{{ label }}**: `{{ states(ent) }}`{% if state_attr(ent, 'duration_h') %} ({{ state_attr(ent, 'duration_h') }} h){% endif %}{% for r in state_attr(ent, 'reasons') or [] %} — {{ r }}{% endfor %}
+          - **{{ label }}**: {{ state_translated(ent) }}{% for r in state_attr(ent, 'reasons') or [] %}. {{ r }}{% endfor %}
           {% endfor %}
 
-      - type: horizontal-stack
-        cards:
-          - type: custom:mushroom-entity-card
+      - type: conditional
+        conditions:
+          - condition: state
             entity: sensor.ws_window_outdoor_drying_status
-            name: Outdoor Drying
-            icon: mdi:tshirt-crew-outline
-          - type: custom:mushroom-entity-card
-            entity: sensor.ws_window_garden_work_status
-            name: Garden Work
-            icon: mdi:flower-tulip-outline
-          - type: custom:mushroom-entity-card
-            entity: weather.ws
-            name: Weather Forecast
-            icon: mdi:weather-partly-cloudy
+            state_not: "unavailable"
+        card:
+          type: vertical-stack
+          cards:
+            - type: custom:mushroom-entity-card
+              entity: sensor.ws_window_outdoor_drying_status
+              name: Outdoor Drying
+              icon: mdi:tshirt-crew-outline
+            - type: entities
+              show_header_toggle: false
+              entities:
+                - entity: sensor.ws_window_outdoor_drying_next_start
+                  name: Drying Next Start
+                - entity: sensor.ws_window_outdoor_drying_next_end
+                  name: Drying Next End
 
-      - type: entities
-        title: Window Schedule (Next 24h)
-        icon: mdi:calendar-range
-        show_header_toggle: false
-        entities:
-          - entity: sensor.ws_window_outdoor_drying_next_start
-            name: Drying Next Start
-          - entity: sensor.ws_window_outdoor_drying_next_end
-            name: Drying Next End
-          - entity: sensor.ws_window_garden_work_next_start
-            name: Garden Next Start
-          - entity: sensor.ws_window_garden_work_next_end
-            name: Garden Next End
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_window_garden_work_status
+            state_not: "unavailable"
+        card:
+          type: vertical-stack
+          cards:
+            - type: custom:mushroom-entity-card
+              entity: sensor.ws_window_garden_work_status
+              name: Garden Work
+              icon: mdi:flower-tulip-outline
+            - type: entities
+              show_header_toggle: false
+              entities:
+                - entity: sensor.ws_window_garden_work_next_start
+                  name: Garden Next Start
+                - entity: sensor.ws_window_garden_work_next_end
+                  name: Garden Next End
 
       - type: conditional
         conditions:
@@ -523,14 +534,16 @@ views:
             entity: sensor.ws_window_custom_status
             state_not: "unavailable"
         card:
-          type: entities
-          title: Custom Window Profile
-          icon: mdi:tune-variant
-          show_header_toggle: false
-          entities:
-            - entity: sensor.ws_window_custom_status
-              name: Custom Status
-            - entity: sensor.ws_window_custom_next_start
-              name: Custom Next Start
-            - entity: sensor.ws_window_custom_next_end
-              name: Custom Next End
+          type: vertical-stack
+          cards:
+            - type: custom:mushroom-entity-card
+              entity: sensor.ws_window_custom_status
+              name: Custom Window Profile
+              icon: mdi:tune-variant
+            - type: entities
+              show_header_toggle: false
+              entities:
+                - entity: sensor.ws_window_custom_next_start
+                  name: Custom Next Start
+                - entity: sensor.ws_window_custom_next_end
+                  name: Custom Next End

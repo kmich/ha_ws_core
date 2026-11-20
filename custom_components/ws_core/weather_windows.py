@@ -71,18 +71,6 @@ _WIND_KMH_FACTORS: dict[str, float] = {
     "kn": 0.5399568,
 }
 
-_PROVIDER_FIELD_LABELS: dict[str, str] = {
-    "max_rain_prob_pct": "rain probability",
-    "max_rain_mm": "precipitation amount",
-    "min_temp_c": "min temperature",
-    "max_temp_c": "max temperature",
-    "min_humidity_pct": "min humidity",
-    "max_humidity_pct": "max humidity",
-    "min_wind_kmh": "min wind",
-    "max_wind_kmh": "max wind",
-    "max_wind_gust_kmh": "wind gusts",
-    "max_cloud_cover_pct": "cloud cover",
-}
 
 # Decision status outcomes
 STATUS_SUITABLE_NOW = "suitable_now"
@@ -93,6 +81,7 @@ STATUS_UNKNOWN = "unknown"
 # Reason codes
 REASON_SUITABLE = "suitable"
 REASON_WINDOW_UPCOMING = "window_upcoming"
+REASON_WINDOW_INTERRUPTED = "window_interrupted"
 REASON_CURRENTLY_RAINING = "currently_raining"
 REASON_CURRENT_GUST_HIGH = "current_gust_high"
 REASON_RAIN_RISK = "rain_risk"
@@ -424,6 +413,16 @@ def _resolve_eval_clock(now: datetime | None = None) -> tuple[tzinfo, datetime, 
     return display_tz, now_utc, now_utc.timestamp()
 
 
+def _horizon_end_utc(now_utc: datetime, display_tz: tzinfo) -> datetime:
+    """Return the evaluation horizon end: now + 24 h, floored to the local hour.
+
+    Flooring keeps window end times stable within an hour, so a window that runs to the
+    end of the horizon does not move its end time (and its timestamp sensor) every minute.
+    """
+    local_end = (now_utc + timedelta(hours=MAX_HORIZON_HOURS)).astimezone(display_tz)
+    return local_end.replace(minute=0, second=0, microsecond=0).astimezone(UTC)
+
+
 def parse_forecast_slot_utc(
     item: Mapping[str, Any],
     display_tz: tzinfo,
@@ -460,10 +459,11 @@ def _collect_horizon_slots(
     display_tz: tzinfo,
     slot_time_cache: dict[tuple[str, tzinfo], tuple[datetime, float, str] | None] | None = None,
     dt_cache: dict[str, datetime | None] | None = None,
+    horizon_end_ts: float | None = None,
 ) -> dict[float, tuple[datetime, str, Mapping[str, Any]]]:
-    """Parse, deduplicate, and filter hourly slots to [now - 1h, now + 24h)."""
+    """Parse, deduplicate, and filter hourly slots to [now - 1h, horizon end)."""
     deduped: dict[float, tuple[datetime, str, Mapping[str, Any]]] = {}
-    max_h_s = MAX_HORIZON_HOURS * 3600.0
+    end_ts = horizon_end_ts if horizon_end_ts is not None else now_ts + MAX_HORIZON_HOURS * 3600.0
     is_utc_display = display_tz is UTC
     for item in hourly_forecast:
         if not isinstance(item, Mapping):
@@ -505,7 +505,7 @@ def _collect_horizon_slots(
             display_iso = slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
         if slot_ts + 3600.0 - now_ts <= 0.0:
             continue
-        if slot_ts - now_ts >= max_h_s:
+        if slot_ts >= end_ts:
             continue
         if slot_ts not in deduped:
             deduped[slot_ts] = (slot_utc, display_iso, item)
@@ -519,8 +519,9 @@ def count_usable_hourly_horizon_h(
     """Count distinct usable hourly forecast slots within the 24-hour evaluation horizon."""
     if not hourly_forecast:
         return 0
-    display_tz, _now_utc, now_ts = _resolve_eval_clock(now)
-    deduped = _collect_horizon_slots(hourly_forecast, now_ts, display_tz, dt_cache={})
+    display_tz, now_utc, now_ts = _resolve_eval_clock(now)
+    horizon_end_ts = _horizon_end_utc(now_utc, display_tz).timestamp()
+    deduped = _collect_horizon_slots(hourly_forecast, now_ts, display_tz, dt_cache={}, horizon_end_ts=horizon_end_ts)
     return min(len(deduped), MAX_HORIZON_HOURS)
 
 
@@ -655,7 +656,7 @@ class WeatherWindowsEngine:
         """Parse and normalize hourly forecast and live station state once across profiles."""
         display_tz, now_utc, now_ts = _resolve_eval_clock(now)
         evaluated_at_iso = now_utc.isoformat()
-        horizon_end_utc = now_utc + timedelta(hours=MAX_HORIZON_HOURS)
+        horizon_end_utc = _horizon_end_utc(now_utc, display_tz)
         horizon_end_ts = horizon_end_utc.timestamp()
 
         current = current_data or {}
@@ -689,6 +690,7 @@ class WeatherWindowsEngine:
                 display_tz,
                 slot_time_cache=self._slot_time_cache,
                 dt_cache=self._parse_dt_cache,
+                horizon_end_ts=horizon_end_ts,
             )
 
             if deduped:
@@ -801,13 +803,24 @@ class WeatherWindowsEngine:
         hourly_forecast: list[dict[str, Any]] | None,
         current_data: dict[str, Any] | None = None,
         now: datetime | None = None,
+        *,
+        update_live_hold: bool = True,
     ) -> dict[str, dict[str, Any]]:
-        """Evaluate multiple profiles in one pass over parsed forecast slots (returns dict contracts)."""
+        """Evaluate multiple profiles in one pass over parsed forecast slots (returns dict contracts).
+
+        ``update_live_hold=False`` reads the live gust hold without advancing it, so on-demand
+        action calls cannot reset or shorten the hold that the periodic sensor evaluation tracks.
+        """
         prof_list = list(profiles)
         if not prof_list:
             return {}
         prepared = self._prepare_evaluation(hourly_forecast, current_data, now)
-        return {prof.profile_id: self._evaluate_prepared_profile(prof, prepared, as_dict=True) for prof in prof_list}
+        return {
+            prof.profile_id: self._evaluate_prepared_profile(
+                prof, prepared, as_dict=True, update_live_hold=update_live_hold
+            )
+            for prof in prof_list
+        }
 
     def evaluate_profile(
         self,
@@ -815,16 +828,39 @@ class WeatherWindowsEngine:
         hourly_forecast: list[dict[str, Any]] | None,
         current_data: dict[str, Any] | None = None,
         now: datetime | None = None,
+        *,
+        update_live_hold: bool = True,
     ) -> WeatherDecisionResult:
         """Evaluate a profile against forecast and live station conditions."""
         prepared = self._prepare_evaluation(hourly_forecast, current_data, now)
-        return self._evaluate_prepared_profile(profile, prepared, as_dict=False)
+        return self._evaluate_prepared_profile(profile, prepared, as_dict=False, update_live_hold=update_live_hold)
 
     def _resolve_live_gust_active(
-        self, profile: WeatherWindowProfile, live_gust_ms: float | None, now_ts: float
+        self,
+        profile: WeatherWindowProfile,
+        live_gust_ms: float | None,
+        now_ts: float,
+        *,
+        update: bool = True,
     ) -> bool:
-        """Apply onset/clear hold hysteresis to instantaneous station gusts."""
+        """Apply onset/clear hold hysteresis to instantaneous station gusts.
+
+        With ``update=False`` the tracked hold is only read: it applies when it was tracked for
+        the same threshold and is still fresh, and it is never created, reset or advanced.
+        """
         threshold = profile.max_wind_gust_kmh
+        if not update:
+            state = self._gust_hold_state.get(profile.profile_id)
+            if (
+                live_gust_ms is None
+                or threshold is None
+                or state is None
+                or state["threshold"] != threshold
+                or now_ts < state["last_ts"]
+                or (now_ts - state["last_ts"]) > _LIVE_HOLD_STALE_GAP_S
+            ):
+                return False
+            return bool(state["active"])
         if live_gust_ms is None or threshold is None:
             self._gust_hold_state.pop(profile.profile_id, None)
             return False
@@ -872,6 +908,24 @@ class WeatherWindowsEngine:
         """Return localized explanation string using engine language."""
         return localize.window_text(self.language, key, **fmt)
 
+    def _txt_at(self, key: str, field_name: str, iso: str, prepared: Mapping[str, Any], **fmt: object) -> str:
+        """Localized text with ``field_name`` as local HH:MM, using the ``_tomorrow`` variant when due."""
+        display_tz: tzinfo = prepared["display_tz"]
+        try:
+            local_dt = datetime.fromisoformat(iso).astimezone(display_tz)
+        except (TypeError, ValueError):
+            return self._txt(key, **{field_name: iso}, **fmt)
+        today = prepared["now_utc"].astimezone(display_tz).date()
+        variant = f"{key}_tomorrow" if local_dt.date() > today else key
+        return self._txt(variant, **{field_name: local_dt.strftime("%H:%M")}, **fmt)
+
+    def _profile_display_name(self, profile: WeatherWindowProfile) -> str:
+        """Return the localized built-in profile name unless the user renamed it."""
+        default = DEFAULT_PROFILES.get(profile.profile_id)
+        if default is not None and profile.name == default.name:
+            return self._txt(f"profile_{profile.profile_id}")
+        return profile.name
+
     def _fmt_temp_limit(self, c: float | None) -> str:
         val = 0.0 if c is None else float(c)
         if self.temp_unit == "°F":
@@ -897,6 +951,7 @@ class WeatherWindowsEngine:
         prepared: dict[str, Any],
         *,
         as_dict: bool = False,
+        update_live_hold: bool = True,
     ) -> Any:
         """Evaluate a single profile against a pre-parsed evaluation context."""
         limits_dict = self._validate_profile(profile)
@@ -996,7 +1051,7 @@ class WeatherWindowsEngine:
             live_blockers.append(REASON_CURRENTLY_RAINING)
             live_blocker_texts.append(self._txt("currently_raining"))
 
-        if self._resolve_live_gust_active(profile, live_gust_ms, now_ts):
+        if self._resolve_live_gust_active(profile, live_gust_ms, now_ts, update=update_live_hold):
             live_blockers.append(REASON_CURRENT_GUST_HIGH)
             live_blocker_texts.append(self._txt("current_gust_high", limit=self._fmt_wind_limit(p_max_g)))
 
@@ -1150,8 +1205,12 @@ class WeatherWindowsEngine:
             display_tz,
             is_utc_display,
         )
-        # Prevent an interrupted active window from re-arming as an upcoming window at the next hour
-        if live_blockers and current_slot_raw_end_ts is not None and window_bounds:
+        # A live blocker inside a forecast window that is open now interrupts that window. Report the
+        # forecast window as it stands (start in the past, real end) instead of hiding it or
+        # re-arming a later start, so the timestamp sensors stay put and nothing re-triggers.
+        interrupted: tuple[float, float, dict[str, Any]] | None = None
+        forecast_bounds: list[tuple[float, float, dict[str, Any]]] = []
+        if live_blockers and current_slot_raw_end_ts is not None:
             forecast_bounds = _extract_contiguous_windows(
                 forecast_suit_flags,
                 prepared_slots,
@@ -1163,12 +1222,8 @@ class WeatherWindowsEngine:
                 display_tz,
                 is_utc_display,
             )
-            if (
-                forecast_bounds
-                and forecast_bounds[0][0] <= now_ts < forecast_bounds[0][1]
-                and abs(window_bounds[0][0] - current_slot_raw_end_ts) <= 1.0
-            ):
-                window_bounds = window_bounds[1:]
+            if forecast_bounds and forecast_bounds[0][0] <= now_ts < forecast_bounds[0][1]:
+                interrupted = forecast_bounds[0]
 
         if unassessed_slots == 0:
             potential_bounds = window_bounds
@@ -1196,7 +1251,18 @@ class WeatherWindowsEngine:
         reasons: list[str] = []
         reasons_text: list[str] = []
 
-        if window_bounds:
+        if interrupted is not None:
+            iw = interrupted[2]
+            status = STATUS_UNSUITABLE
+            next_start = iw["start_iso"]
+            next_end = iw["end_iso"]
+            duration_h = iw["duration_h"]
+            is_truncated = iw["is_truncated"]
+            reasons.extend(live_blockers)
+            reasons_text.extend(live_blocker_texts)
+            reasons.append(REASON_WINDOW_INTERRUPTED)
+            reasons_text.append(self._txt_at("window_interrupted", "end", iw["end_iso"], prepared))
+        elif window_bounds:
             w0_start_ts, w0_end_ts, w0 = window_bounds[0]
             if w0_start_ts <= now_ts < w0_end_ts:
                 status = STATUS_SUITABLE_NOW
@@ -1205,7 +1271,11 @@ class WeatherWindowsEngine:
                 duration_h = w0["duration_h"]
                 is_truncated = w0["is_truncated"]
                 reasons.append(REASON_SUITABLE)
-                reasons_text.append(self._txt("suitable_now", name=profile.name, dur=duration_h))
+                reasons_text.append(
+                    self._txt_at(
+                        "suitable_now", "end", w0["end_iso"], prepared, name=self._profile_display_name(profile)
+                    )
+                )
             elif potential_bounds and not live_blockers and potential_bounds[0][0] <= now_ts < potential_bounds[0][1]:
                 status = STATUS_UNKNOWN
                 next_start = w0["start_iso"]
@@ -1215,7 +1285,7 @@ class WeatherWindowsEngine:
                 reasons.append(REASON_MISSING_DATA)
                 reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
                 reasons.append(REASON_WINDOW_UPCOMING)
-                reasons_text.append(self._txt("window_upcoming", start=next_start, dur=duration_h))
+                reasons_text.append(self._txt_at("window_upcoming", "start", w0["start_iso"], prepared, dur=duration_h))
             else:
                 status = STATUS_WINDOW_UPCOMING
                 next_start = w0["start_iso"]
@@ -1226,7 +1296,7 @@ class WeatherWindowsEngine:
                     reasons.extend(live_blockers)
                     reasons_text.extend(live_blocker_texts)
                 reasons.append(REASON_WINDOW_UPCOMING)
-                reasons_text.append(self._txt("window_upcoming", start=next_start, dur=duration_h))
+                reasons_text.append(self._txt_at("window_upcoming", "start", w0["start_iso"], prepared, dur=duration_h))
         elif potential_bounds:
             status = STATUS_UNKNOWN
             reasons.append(REASON_MISSING_DATA)
@@ -1285,10 +1355,10 @@ class WeatherWindowsEngine:
 
         if not_assessed_by_provider:
             reasons.append(REASON_NOT_ASSESSED_BY_PROVIDER)
-            field_list = ", ".join(_PROVIDER_FIELD_LABELS.get(f, f) for f in not_assessed_by_provider)
+            field_list = localize.window_field_labels(self.language, not_assessed_by_provider)
             reasons_text.append(self._txt("not_assessed_by_provider", fields=field_list))
 
-        windows = [w for _, _, w in window_bounds]
+        windows = [w for _, _, w in (forecast_bounds if interrupted is not None else window_bounds)]
         horizon_hours = min(len(slot_dicts), MAX_HORIZON_HOURS)
         result_dict = {
             "profile_id": profile.profile_id,
@@ -1313,25 +1383,6 @@ class WeatherWindowsEngine:
             },
         }
         return result_dict if as_dict else WeatherDecisionResult(**result_dict)
-
-    def _parse_raw_dt_str(self, key: str) -> datetime | None:
-        """Parse and cache an ISO or Home Assistant datetime string."""
-        return _parse_raw_dt_str(key, self._parse_dt_cache)
-
-    def _parse_slot_utc(self, item: dict[str, Any], display_tz: tzinfo) -> datetime | None:
-        """Parse an hourly forecast item timestamp into UTC, preserving DST distinct hours."""
-        return parse_forecast_slot_utc(item, display_tz, self._parse_dt_cache)
-
-    def _cached_solar_elevation(self, dt_utc: datetime) -> float:
-        """Cache solar elevation by rounded coordinates and UTC timestamp across profiles."""
-        solar_cache = self._sync_solar_cache(float(self.lat), float(self.lon))
-        val = solar_cache.get(dt_utc)
-        if val is None:
-            val = solar_elevation_deg(self.lat, self.lon, dt_utc)
-            if len(solar_cache) > 512:
-                solar_cache.clear()
-            solar_cache[dt_utc] = val
-        return val
 
     def _format_blocker_text(self, reason: str, profile: WeatherWindowProfile) -> str:
         """Provide clear localized, unit-aware explanation for a blocker reason code."""

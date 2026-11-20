@@ -1839,44 +1839,41 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         )
 
     def _decision_provider_warning(self, g: Any) -> str:
-        """Build a concise provider capability notice for the decision profiles form."""
+        """Build a concise, localized provider capability notice for the decision profiles form."""
+        from . import localize
         from .providers.capabilities import get_provider_capabilities
 
+        lang = getattr(getattr(self.hass, "config", None), "language", None)
         if not bool(g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)):
-            return "\n\nNotice: Weather forecast is disabled, so future activity windows cannot be evaluated."
+            return "\n\n" + localize.window_text(lang, "pn_forecast_disabled")
         provider_id = str(g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER))
         caps = get_provider_capabilities(provider_id)
         if provider_id == FORECAST_PROVIDER_HA_ENTITY:
-            return (
-                f"\n\nProvider notice ({caps.display_name}): Variable availability depends on the selected Home Assistant "
-                "weather entity; limits whose variables are never supplied will be marked as not assessed by provider."
-            )
+            return "\n\n" + localize.window_text(lang, "pn_ha_entity", provider=caps.display_name)
         missing: list[str] = []
         if not caps.has_wind_gust:
-            missing.append("wind gusts")
+            missing.append("max_wind_gust_kmh")
         if not caps.has_cloud_cover:
-            missing.append("cloud cover")
+            missing.append("max_cloud_cover_pct")
         if not caps.has_humidity:
-            missing.append("humidity")
+            missing.extend(("min_humidity_pct", "max_humidity_pct"))
         if not caps.has_wind_speed:
-            missing.append("wind speed")
+            missing.extend(("min_wind_kmh", "max_wind_kmh"))
         rain_note = ""
         if not caps.has_precip_probability and caps.has_precip_amount:
-            rain_note = " Precipitation amount (mm) is used for rain checks."
+            rain_note = localize.window_text(lang, "pn_rain_mm")
         elif not caps.has_precip_amount and caps.has_precip_probability:
-            rain_note = " Precipitation probability (%) is used for rain checks."
+            rain_note = localize.window_text(lang, "pn_rain_prob")
         elif not caps.has_precip_probability and not caps.has_precip_amount:
-            missing.append("precipitation")
+            missing.extend(("max_rain_prob_pct", "max_rain_mm"))
         if not missing and not rain_note:
             return ""
-        parts = []
+        parts = [localize.window_text(lang, "pn_prefix", provider=caps.display_name)]
         if missing:
-            parts.append(
-                f"{', '.join(missing).capitalize()} are not supplied and will be skipped as not assessed by provider."
-            )
+            parts.append(localize.window_text(lang, "pn_missing", fields=localize.window_field_labels(lang, missing)))
         if rain_note:
-            parts.append(rain_note.strip())
-        return f"\n\nProvider notice ({caps.display_name}): {' '.join(parts)}"
+            parts.append(rain_note)
+        return "\n\n" + " ".join(parts)
 
     async def async_step_decision_profiles(self, user_input: dict[str, Any] | None = None):
         """Configure Decision Profiles, active Weather Windows, and Custom Profile limits."""

@@ -416,33 +416,44 @@ views:
             ('Garden & Yard Work', 'sensor.ws_window_garden_work_status'),
             ('Custom Profile', 'sensor.ws_window_custom_status')
           ] if states(ent) not in ['unknown', 'unavailable', 'none', ''] or state_attr(ent, 'reasons') %}
-          - **{{ label }}**: `{{ states(ent) }}`
-            {% for r in state_attr(ent, 'reasons') or [] %} — {{ r }}{% endfor %}
+          - **{{ label }}**: {{ state_translated(ent) }}{% for r in state_attr(ent, 'reasons') or [] %}. {{ r }}{% endfor %}
           {% endfor %}
 
-      - type: entities
-        title: Outdoor Laundry Drying
-        icon: mdi:tshirt-crew-outline
-        show_header_toggle: false
-        entities:
-          - entity: sensor.ws_window_outdoor_drying_status
-            name: Status
-          - entity: sensor.ws_window_outdoor_drying_next_start
-            name: Next Window Start
-          - entity: sensor.ws_window_outdoor_drying_next_end
-            name: Next Window End
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_window_outdoor_drying_status
+            state_not: "unavailable"
+        card:
+          type: entities
+          title: Outdoor Laundry Drying
+          icon: mdi:tshirt-crew-outline
+          show_header_toggle: false
+          entities:
+            - entity: sensor.ws_window_outdoor_drying_status
+              name: Status
+            - entity: sensor.ws_window_outdoor_drying_next_start
+              name: Next Window Start
+            - entity: sensor.ws_window_outdoor_drying_next_end
+              name: Next Window End
 
-      - type: entities
-        title: Garden & Yard Work
-        icon: mdi:flower-tulip-outline
-        show_header_toggle: false
-        entities:
-          - entity: sensor.ws_window_garden_work_status
-            name: Status
-          - entity: sensor.ws_window_garden_work_next_start
-            name: Next Window Start
-          - entity: sensor.ws_window_garden_work_next_end
-            name: Next Window End
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_window_garden_work_status
+            state_not: "unavailable"
+        card:
+          type: entities
+          title: Garden & Yard Work
+          icon: mdi:flower-tulip-outline
+          show_header_toggle: false
+          entities:
+            - entity: sensor.ws_window_garden_work_status
+              name: Status
+            - entity: sensor.ws_window_garden_work_next_start
+              name: Next Window Start
+            - entity: sensor.ws_window_garden_work_next_end
+              name: Next Window End
 
       - type: conditional
         conditions:

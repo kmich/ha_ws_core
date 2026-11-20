@@ -478,7 +478,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "not_assessed_by_provider": (d.get(KEY_WEATHER_WINDOWS) or {})
                             .get(_pid, {})
                             .get("not_assessed_by_provider", []),
-                            "duration_h": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("duration_h"),
+                            # No remaining-duration attribute: it would change every minute while a
+                            # window is open. next_start/next_end carry the window; the action
+                            # response still returns duration_h.
                             "is_truncated": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("is_truncated", False),
                             "horizon_hours": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("horizon_hours", 0),
                         },
