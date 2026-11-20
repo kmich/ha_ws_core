@@ -475,6 +475,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         attrs_fn=lambda d, _pid=pid: {
                             "reasons": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("reasons_text", []),
                             "reason_codes": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("reason_codes", []),
+                            "not_assessed_by_provider": (d.get(KEY_WEATHER_WINDOWS) or {})
+                            .get(_pid, {})
+                            .get("not_assessed_by_provider", []),
                             "duration_h": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("duration_h"),
                             "is_truncated": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("is_truncated", False),
                             "horizon_hours": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("horizon_hours", 0),

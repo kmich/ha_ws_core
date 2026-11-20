@@ -404,21 +404,21 @@
       },
       "decision_profiles": {
         "title": "Perfiles de decisión y ventanas meteorológicas",
-        "description": "Configure el motor de decisiones meteorológicas y seleccione las ventanas de actividad.",
+        "description": "Configure el motor de decisiones meteorológicas y seleccione las ventanas de actividad.{provider_warning}",
         "data": {
           "enable_weather_windows": "Activar motor de decisiones de ventanas meteorológicas",
           "weather_window_profiles": "Perfiles de decisión activos",
           "custom_window_name": "Nombre del perfil personalizado",
           "custom_min_duration_h": "Duración mínima personalizada (horas)",
           "custom_max_rain_prob_pct": "Probabilidad máx. de lluvia personalizada (%)",
-          "custom_max_rain_mm": "Precipitación máx. personalizada (mm/h)",
-          "custom_min_temp_c": "Temperatura mín. personalizada (°C)",
-          "custom_max_temp_c": "Temperatura máx. personalizada (°C)",
+          "custom_max_rain_mm": "Precipitación máx. personalizada",
+          "custom_min_temp_c": "Temperatura mín. personalizada",
+          "custom_max_temp_c": "Temperatura máx. personalizada",
           "custom_min_humidity_pct": "Humedad mín. personalizada (%)",
           "custom_max_humidity_pct": "Humedad máx. personalizada (%)",
-          "custom_min_wind_kmh": "Velocidad mín. del viento personalizada (km/h)",
-          "custom_max_wind_kmh": "Velocidad máx. del viento personalizada (km/h)",
-          "custom_max_wind_gust_kmh": "Racha máx. de viento personalizada (km/h)",
+          "custom_min_wind_kmh": "Velocidad mín. del viento personalizada",
+          "custom_max_wind_kmh": "Velocidad máx. del viento personalizada",
+          "custom_max_wind_gust_kmh": "Racha máx. de viento personalizada",
           "custom_max_cloud_cover_pct": "Nubosidad máx. personalizada (%)",
           "custom_require_daylight": "El perfil personalizado requiere luz diurna"
         }
@@ -3066,6 +3066,13 @@
         "auto": "Automático (detectar de la unidad del sensor)",
         "percent": "Porcentaje (0-100 %)",
         "fraction": "Fracción volumétrica (0-1 / m³/m³)"
+      }
+    },
+    "weather_window_profiles": {
+      "options": {
+        "outdoor_drying": "Secado de ropa al aire libre",
+        "garden_work": "Trabajo en el jardín y patio",
+        "custom": "Perfil de ventana personalizado"
       }
     }
   }

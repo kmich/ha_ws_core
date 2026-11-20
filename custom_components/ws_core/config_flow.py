@@ -529,12 +529,14 @@ def _is_imperial(units_mode: str, hass: HomeAssistant) -> bool:
     if m == "metric":
         return False
     try:
-        return hass.config.units.temperature_unit != "°C"
+        temp_unit = hass.config.units.temperature_unit
+        return isinstance(temp_unit, str) and temp_unit != "°C"
     except Exception:
         return False
 
 
 _GUST_UNIT_FACTORS: dict[str, float] = {"m/s": 1.0, "km/h": 3.6, "mph": 2.23694, "kn": 1.94384}
+_WIND_KMH_DISPLAY_FACTORS: dict[str, float] = {"km/h": 1.0, "m/s": 1.0 / 3.6, "mph": 0.62137119, "kn": 0.5399568}
 
 
 def _convert_gust_to_display(ms: float, wind_unit: str) -> float:
@@ -543,6 +545,14 @@ def _convert_gust_to_display(ms: float, wind_unit: str) -> float:
 
 def _convert_gust_to_ms(val: float, wind_unit: str) -> float:
     return val / _GUST_UNIT_FACTORS.get(wind_unit, 1.0)
+
+
+def _convert_wind_kmh_to_display(kmh: float, wind_unit: str) -> float:
+    return kmh * _WIND_KMH_DISPLAY_FACTORS.get(wind_unit, 1.0)
+
+
+def _convert_wind_display_to_kmh(val: float, wind_unit: str) -> float:
+    return val / _WIND_KMH_DISPLAY_FACTORS.get(wind_unit, 1.0)
 
 
 def _convert_rain_to_display(mmph: float, rain_unit: str) -> float:
@@ -1828,27 +1838,106 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             }
         )
 
+    def _decision_provider_warning(self, g: Any) -> str:
+        """Build a concise provider capability notice for the decision profiles form."""
+        from .providers.capabilities import get_provider_capabilities
+
+        if not bool(g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)):
+            return "\n\nNotice: Weather forecast is disabled, so future activity windows cannot be evaluated."
+        provider_id = str(g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER))
+        caps = get_provider_capabilities(provider_id)
+        if provider_id == FORECAST_PROVIDER_HA_ENTITY:
+            return (
+                f"\n\nProvider notice ({caps.display_name}): Variable availability depends on the selected Home Assistant "
+                "weather entity; limits whose variables are never supplied will be marked as not assessed by provider."
+            )
+        missing: list[str] = []
+        if not caps.has_wind_gust:
+            missing.append("wind gusts")
+        if not caps.has_cloud_cover:
+            missing.append("cloud cover")
+        if not caps.has_humidity:
+            missing.append("humidity")
+        if not caps.has_wind_speed:
+            missing.append("wind speed")
+        rain_note = ""
+        if not caps.has_precip_probability and caps.has_precip_amount:
+            rain_note = " Precipitation amount (mm) is used for rain checks."
+        elif not caps.has_precip_amount and caps.has_precip_probability:
+            rain_note = " Precipitation probability (%) is used for rain checks."
+        elif not caps.has_precip_probability and not caps.has_precip_amount:
+            missing.append("precipitation")
+        if not missing and not rain_note:
+            return ""
+        parts = []
+        if missing:
+            parts.append(
+                f"{', '.join(missing).capitalize()} are not supplied and will be skipped as not assessed by provider."
+            )
+        if rain_note:
+            parts.append(rain_note.strip())
+        return f"\n\nProvider notice ({caps.display_name}): {' '.join(parts)}"
+
     async def async_step_decision_profiles(self, user_input: dict[str, Any] | None = None):
         """Configure Decision Profiles, active Weather Windows, and Custom Profile limits."""
         from .weather_windows import DEFAULT_PROFILES, resolve_profiles
         from .weather_windows import PROFILE_CUSTOM as _PROFILE_CUSTOM
 
         self._ensure_opt()
-        limit_specs: tuple[tuple[str, str, float, float, float, str], ...] = (
-            (CONF_CUSTOM_MAX_RAIN_PROB_PCT, "max_rain_prob_pct", 0.0, 100.0, 1.0, "%"),
-            (CONF_CUSTOM_MAX_RAIN_MM, "max_rain_mm", 0.0, 200.0, 0.1, "mm"),
-            (CONF_CUSTOM_MIN_TEMP_C, "min_temp_c", -40.0, 50.0, 0.5, "°C"),
-            (CONF_CUSTOM_MAX_TEMP_C, "max_temp_c", -40.0, 60.0, 0.5, "°C"),
-            (CONF_CUSTOM_MIN_HUMIDITY_PCT, "min_humidity_pct", 0.0, 100.0, 1.0, "%"),
-            (CONF_CUSTOM_MAX_HUMIDITY_PCT, "max_humidity_pct", 0.0, 100.0, 1.0, "%"),
-            (CONF_CUSTOM_MIN_WIND_KMH, "min_wind_kmh", 0.0, 150.0, 1.0, "km/h"),
-            (CONF_CUSTOM_MAX_WIND_KMH, "max_wind_kmh", 0.0, 150.0, 1.0, "km/h"),
-            (CONF_CUSTOM_MAX_WIND_GUST_KMH, "max_wind_gust_kmh", 0.0, 250.0, 1.0, "km/h"),
-            (CONF_CUSTOM_MAX_CLOUD_COVER_PCT, "max_cloud_cover_pct", 0.0, 100.0, 1.0, "%"),
-        )
-        errors: dict[str, str] = {}
-
         g = self._get
+        units_mode = str(g(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
+        imperial = _is_imperial(units_mode, self.hass)
+        wind_unit_conf = str(g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT))
+        rain_unit_conf = str(g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT))
+        temp_unit_conf = str(g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT))
+        temp_u = _effective_temp_unit(temp_unit_conf, imperial)
+        rain_u = rain_unit_conf if rain_unit_conf != "auto" else ("in" if imperial else "mm")
+        wind_u = wind_unit_conf if wind_unit_conf != "auto" else ("mph" if imperial else "km/h")
+
+        def _to_disp(val: float, kind: str) -> float:
+            if kind == "temp":
+                return _convert_temp_to_display(val, temp_u == "°F")
+            if kind == "rain":
+                return _convert_rain_to_display(val, rain_u)
+            if kind == "wind":
+                return _convert_wind_kmh_to_display(val, wind_u)
+            return val
+
+        def _to_canonical(val: float, kind: str) -> float:
+            if kind == "temp":
+                return _convert_temp_to_c(val, temp_u == "°F")
+            if kind == "rain":
+                return _convert_rain_to_mmph(val, rain_u)
+            if kind == "wind":
+                return _convert_wind_display_to_kmh(val, wind_u)
+            return val
+
+        # (conf_key, profile_attr, kind, c_lo, c_hi, c_step, precision)
+        raw_specs: tuple[tuple[str, str, str, float, float, float, int], ...] = (
+            (CONF_CUSTOM_MAX_RAIN_PROB_PCT, "max_rain_prob_pct", "pct", 0.0, 100.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_RAIN_MM, "max_rain_mm", "rain", 0.0, 200.0, 0.1, 2 if rain_u == "in" else 1),
+            (CONF_CUSTOM_MIN_TEMP_C, "min_temp_c", "temp", -40.0, 50.0, 0.5, 1),
+            (CONF_CUSTOM_MAX_TEMP_C, "max_temp_c", "temp", -40.0, 60.0, 0.5, 1),
+            (CONF_CUSTOM_MIN_HUMIDITY_PCT, "min_humidity_pct", "pct", 0.0, 100.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_HUMIDITY_PCT, "max_humidity_pct", "pct", 0.0, 100.0, 1.0, 1),
+            (CONF_CUSTOM_MIN_WIND_KMH, "min_wind_kmh", "wind", 0.0, 150.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_WIND_KMH, "max_wind_kmh", "wind", 0.0, 150.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_WIND_GUST_KMH, "max_wind_gust_kmh", "wind", 0.0, 250.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_CLOUD_COVER_PCT, "max_cloud_cover_pct", "pct", 0.0, 100.0, 1.0, 1),
+        )
+        limit_specs: list[tuple[str, str, str, float, float, float, str, int]] = []
+        for conf_key, attr_name, kind, c_lo, c_hi, c_step, prec in raw_specs:
+            unit = {"pct": "%", "rain": rain_u, "temp": temp_u, "wind": wind_u}[kind]
+            lo = round(_to_disp(c_lo, kind), prec) if kind != "pct" else c_lo
+            hi = round(_to_disp(c_hi, kind), prec) if kind != "pct" else c_hi
+            step = (
+                (0.01 if rain_u == "in" else c_step)
+                if kind == "rain"
+                else ((0.5 if wind_u == "m/s" else c_step) if kind == "wind" else c_step)
+            )
+            limit_specs.append((conf_key, attr_name, kind, lo, hi, step, unit, prec))
+
+        errors: dict[str, str] = {}
         sentinel = object()
         cfg: dict[str, Any] = {}
         try:
@@ -1863,7 +1952,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             CONF_CUSTOM_WINDOW_NAME,
             CONF_CUSTOM_MIN_DURATION_H,
             CONF_CUSTOM_REQUIRE_DAYLIGHT,
-            *(k for k, *_ in limit_specs),
+            *(spec[0] for spec in limit_specs),
         ):
             val = self._flow_default(key, sentinel)
             if val is not sentinel:
@@ -1900,8 +1989,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                         errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
 
             validated_limits: dict[str, float] = {}
-            limit_attr_map = {conf_key: attr_name for conf_key, attr_name, *_ in limit_specs}
-            for conf_key, _attr, lo, hi, _step, _unit in limit_specs:
+            spec_by_key = {spec[0]: spec for spec in limit_specs}
+            for conf_key, attr_name, kind, lo, hi, _step, _unit, prec in limit_specs:
                 raw_val = user_input.get(conf_key)
                 if raw_val is None:
                     continue
@@ -1916,7 +2005,21 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                 if not math.isfinite(fval) or fval < lo or fval > hi:
                     errors[conf_key] = "out_of_range"
                     continue
-                validated_limits[conf_key] = fval
+                existing_canonical = getattr(custom_prof, attr_name)
+                if (
+                    existing_canonical is not None
+                    and kind != "pct"
+                    and abs(fval - round(_to_disp(float(existing_canonical), kind), prec)) <= 1e-6
+                ):
+                    validated_limits[conf_key] = float(existing_canonical)
+                else:
+                    is_identity = (
+                        kind == "pct"
+                        or (kind == "temp" and temp_u == "°C")
+                        or (kind == "rain" and rain_u == "mm")
+                        or (kind == "wind" and wind_u == "km/h")
+                    )
+                    validated_limits[conf_key] = fval if is_identity else round(_to_canonical(fval, kind), 4)
 
             is_full_form = any(
                 k in user_input
@@ -1930,7 +2033,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     return validated_limits.get(conf_k)
                 if is_full_form:
                     return None
-                val = getattr(custom_prof, limit_attr_map[conf_k], None)
+                val = getattr(custom_prof, spec_by_key[conf_k][1], None)
                 return float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else None
 
             for min_k, max_k in (
@@ -1961,7 +2064,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                 for conf_key, fval in validated_limits.items():
                     self._opt[conf_key] = fval
                 if is_full_form:
-                    for conf_key, _attr, _lo, _hi, _step, _unit in limit_specs:
+                    for conf_key, *_rest in limit_specs:
                         if user_input.get(conf_key) is None:
                             self._opt[conf_key] = None
                 return self.async_create_entry(title="", data=self._opt)
@@ -1980,13 +2083,10 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                 default=list(current_profiles),
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
-                    options=[
-                        {"value": PROFILE_OUTDOOR_DRYING, "label": "Outdoor Clothes Drying"},
-                        {"value": PROFILE_GARDEN_WORK, "label": "Garden & Yard Work"},
-                        {"value": PROFILE_CUSTOM, "label": "Custom Window Profile"},
-                    ],
+                    options=[PROFILE_OUTDOOR_DRYING, PROFILE_GARDEN_WORK, PROFILE_CUSTOM],
                     multiple=True,
                     mode=selector.SelectSelectorMode.LIST,
+                    translation_key="weather_window_profiles",
                 )
             ),
             vol.Optional(CONF_CUSTOM_WINDOW_NAME, default=custom_prof.name): selector.TextSelector(),
@@ -1994,16 +2094,25 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                 selector.NumberSelectorConfig(min=1, max=24, step=1, mode="box", unit_of_measurement="h")
             ),
         }
-        for conf_key, attr_name, lo, hi, step, unit in limit_specs:
-            fields[vol.Optional(conf_key, description={"suggested_value": getattr(custom_prof, attr_name)})] = (
-                selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=lo, max=hi, step=step, mode="box", unit_of_measurement=unit)
-                )
+        for conf_key, attr_name, kind, lo, hi, step, unit, prec in limit_specs:
+            stored_val = getattr(custom_prof, attr_name)
+            suggested = (
+                (round(_to_disp(float(stored_val), kind), prec) if kind != "pct" else float(stored_val))
+                if stored_val is not None
+                else None
+            )
+            fields[vol.Optional(conf_key, description={"suggested_value": suggested})] = selector.NumberSelector(
+                selector.NumberSelectorConfig(min=lo, max=hi, step=step, mode="box", unit_of_measurement=unit)
             )
         fields[vol.Optional(CONF_CUSTOM_REQUIRE_DAYLIGHT, default=custom_prof.require_daylight)] = (
             selector.BooleanSelector()
         )
-        return self.async_show_form(step_id="decision_profiles", data_schema=vol.Schema(fields), errors=errors)
+        return self.async_show_form(
+            step_id="decision_profiles",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"provider_warning": self._decision_provider_warning(g)},
+        )
 
     async def async_step_rooms(self, user_input: dict[str, Any] | None = None):
         """Hub menu for managing named indoor rooms."""

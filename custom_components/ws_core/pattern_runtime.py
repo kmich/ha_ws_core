@@ -252,6 +252,48 @@ class PatternRuntime:
 
         return Store(self.coord.hass, PATTERN_STORE_VERSION, f"ws_core_{entry_id}_pattern_forecast")
 
+    def make_backup_store(self) -> Any | None:
+        """Return a backup Store alongside the pattern Store when backed by a real HA instance."""
+        hass = getattr(getattr(self, "coord", None), "hass", None)
+        if hass is None or not isinstance(getattr(hass, "data", None), dict):
+            return None
+        store = getattr(self, "store", None)
+        store_key = getattr(store, "key", None)
+        if not isinstance(store_key, str) or not store_key:
+            return None
+        from homeassistant.helpers.storage import Store
+
+        version = getattr(store, "version", PATTERN_STORE_VERSION)
+        if not isinstance(version, int) or isinstance(version, bool):
+            version = PATTERN_STORE_VERSION
+        return Store(hass, version, f"{store_key}_pre_v3_backup")
+
+    async def _async_backup_pre_migration_state(self) -> bool:
+        """Persist pre-reset pattern storage before one-way v3.0 feature migration.
+
+        Returns False only when a real backup Store exists and writing fails so
+        one-way migration waits for the next retry before mutating state.
+        """
+        backup_store = getattr(self, "backup_store", None)
+        if backup_store is None:
+            backup_store = self.make_backup_store()
+        if backup_store is None:
+            return True
+
+        store = getattr(self, "store", None)
+        try:
+            if await backup_store.async_load() is not None:
+                return True
+            raw: Any = None
+            if store is not None and hasattr(store, "async_load"):
+                raw = await store.async_load()
+            payload = raw if isinstance(raw, dict) else self.engine.to_dict()
+            await backup_store.async_save(payload)
+            return True
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("ws_core pattern forecast: pre-migration backup failed, deferring reset: %s", err)
+            return False
+
     async def async_load(self, store: Any) -> None:
         """Load the engine; a missing, corrupt or mismatched store starts fresh."""
         self.store = store
@@ -1181,6 +1223,8 @@ class PatternRuntime:
 
         did_reset = reset_val < PATTERN_HISTORY_FEATURES_METHOD
         if did_reset:
+            if not await self._async_backup_pre_migration_state():
+                return True
             _LOGGER.info(
                 "ws_core pattern forecast: migrating pattern state for v3.0 feature alignment (dp_3h and solar replay masking)"
             )

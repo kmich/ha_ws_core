@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -21,10 +22,12 @@ from .const import (
     CONF_CAL_TEMP_C,
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_HEMISPHERE,
     CONF_INDOOR_ROOMS,
     CONFIG_VERSION,
     DEFAULT_CLIMATE_REGION,
+    DEFAULT_ENABLE_WEATHER_WINDOWS,
     DEFAULT_HEMISPHERE,
     DEPRECATED_CONF_KEYS_V030,
     DEPRECATED_KEYS_FORECASTER,
@@ -32,6 +35,9 @@ from .const import (
     DOMAIN,
     ENTRY_REPAIR_ISSUES,
     PLATFORMS,
+    PROFILE_CUSTOM,
+    PROFILE_GARDEN_WORK,
+    PROFILE_OUTDOOR_DRYING,
     issue_id_for_entry,
     normalize_indoor_rooms,
 )
@@ -268,6 +274,34 @@ def _async_remove_orphaned_forecaster_entities(hass: HomeAssistant, entry: Confi
             registry.async_remove(ent.entity_id)
 
 
+def _async_remove_disabled_window_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove Weather Window registry entities when the engine or specific profiles are disabled."""
+    from .weather_windows import resolve_profiles
+
+    merged = {**entry.data, **entry.options}
+    ww_enabled = bool(merged.get(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS))
+    profiles = resolve_profiles(merged)
+    active_pids = {pid for pid, prof in profiles.items() if ww_enabled and prof.enabled}
+    disabled_pids = [
+        pid for pid in (PROFILE_OUTDOOR_DRYING, PROFILE_GARDEN_WORK, PROFILE_CUSTOM) if pid not in active_pids
+    ]
+    if not disabled_pids:
+        return
+
+    disabled_uids = {
+        f"{entry.entry_id}_window_{pid}_{suffix}"
+        for pid in disabled_pids
+        for suffix in ("status", "next_start", "next_end")
+    }
+    registry = er.async_get(hass)
+    for ent in list(registry.entities.values()):
+        if ent.config_entry_id != entry.entry_id:
+            continue
+        if ent.unique_id in disabled_uids:
+            _LOGGER.info("Removing disabled Weather Window entity %s (unique_id=%s)", ent.entity_id, ent.unique_id)
+            registry.async_remove(ent.entity_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WSStationCoordinator
 
@@ -277,6 +311,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ir.async_delete_issue(hass, DOMAIN, name)
 
     _async_remove_orphaned_forecaster_entities(hass, entry)
+    _async_remove_disabled_window_entities(hass, entry)
 
     coordinator = WSStationCoordinator(
         hass, {**entry.data, "entry_id": entry.entry_id}, entry.options, config_entry=entry
@@ -307,9 +342,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_update_options))
 
+    def _get_targets(call: ServiceCall) -> list:
+        entry_id = call.data.get(ATTR_ENTRY_ID)
+        targets = _loaded_coordinators(hass, entry_id)
+        if not targets:
+            if entry_id is not None:
+                raise ServiceValidationError(f"Unknown or unloaded Weather Station Core config entry '{entry_id}'")
+            raise ServiceValidationError("No loaded Weather Station Core config entries found")
+        return targets
+
     # ── Service: reset_rain_baseline ──────────────────────────────────────
     async def _reset_rain(call: ServiceCall) -> None:
-        for coord in _loaded_coordinators(hass, call.data.get(ATTR_ENTRY_ID)):
+        for coord in _get_targets(call):
             coord.runtime.last_rain_total_mm = None
             coord.runtime.last_rain_ts = None
             coord.runtime.last_rain_rate_filt = 0.0
@@ -327,9 +371,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             vol.Optional("target", default="all"): vol.In(["all", "solar", "forecast", "streaks", "pattern_forecast"]),
         }
     )
-
-    def _get_targets(call: ServiceCall) -> list:
-        return _loaded_coordinators(hass, call.data.get(ATTR_ENTRY_ID))
 
     async def _reset_learning(call: ServiceCall) -> None:
         from .learning_state import async_save_learning
@@ -404,7 +445,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         out: dict[str, Any] = {}
         for coord in _get_targets(call):
             eid = coord.entry_data.get("entry_id", "station")
-            out[eid] = coord.get_weather_windows_evaluation(profile_id=profile_id, custom_limits=limits)
+            try:
+                out[eid] = coord.get_weather_windows_evaluation(profile_id=profile_id, custom_limits=limits)
+            except ValueError as err:
+                raise ServiceValidationError(str(err)) from err
         return out
 
     async def _get_station_summary(call: ServiceCall) -> dict[str, Any]:
@@ -471,10 +515,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if entry_id:
             entry = hass.config_entries.async_get_entry(entry_id)
-            if entry and entry.domain == DOMAIN:
-                targets = [entry]
+            if not entry or entry.domain != DOMAIN:
+                raise ServiceValidationError(f"Unknown Weather Station Core config entry '{entry_id}'")
+            targets = [entry]
         else:
             targets = [e for e in hass.config_entries.async_entries(DOMAIN)]
+            if not targets:
+                raise ServiceValidationError("No Weather Station Core config entries found")
 
         offsets = {
             k: call.data[k]

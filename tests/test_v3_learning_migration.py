@@ -1885,3 +1885,102 @@ class TestDowngradeTolerance:
         loaded, notes = PatternEngine.from_dict(d, eng.thresholds, eng.storm_source, eng.source_fingerprint)
         assert len(notes) == 0
         assert loaded.history_learn.get("features_method") == PATTERN_HISTORY_FEATURES_METHOD
+
+
+class TestPreMigrationBackup:
+    """Verify pre-reset storage backup is persisted before one-way v3.0 scoped reset."""
+
+    async def test_pre_v3_backup_saved_on_disk_before_scoped_reset(self, hass):
+        from datetime import UTC, datetime
+        from unittest.mock import MagicMock
+
+        from homeassistant.helpers.storage import Store
+
+        from custom_components.ws_core.const import PATTERN_STORE_VERSION
+        from custom_components.ws_core.pattern_forecast import PatternEngine
+        from custom_components.ws_core.pattern_runtime import PatternRuntime
+
+        eng = _make_engine()
+        dp_slot = POOL_INDEX["dp_3h"]
+        sol_slot = POOL_INDEX["cloud_deficit"]
+        eng.std.n[dp_slot] = 100
+        eng.std.mean[dp_slot] = 0.3
+        eng.std.var[dp_slot] = 1.4
+        eng.std.n[sol_slot] = 50
+        eng.std.mean[sol_slot] = 0.2
+        eng.std.var[sol_slot] = 0.1
+        rain_model = eng.models["rain_3h"]
+        orig_dp_w = rain_model.w[rain_model.spec.features.index("dp_3h") + 1] = 0.42
+        rain_model.w[rain_model.spec.features.index("cloud_deficit") + 1] = -0.15
+        eng.history_learn = {
+            "status": "ok",
+            "targets": {
+                "rain_3h": {"status": "ok", "attempted_at": 1000.0, "reason": None, "method": PATTERN_HISTORY_METHOD}
+            },
+        }
+
+        rt = PatternRuntime.__new__(PatternRuntime)
+        rt.coord = MagicMock()
+        rt.coord.hass = hass
+        rt.coord.elevation_m = 0.0
+        rt.coord.sources = {"temperature": "sensor.t", "humidity": "sensor.h", "pressure": "sensor.p"}
+        rt.engine = eng
+        rt.fingerprint = eng.source_fingerprint
+        rt._published = {}
+        rt._reset_seq = 0
+        rt._history_running = False
+        rt._history_queued = False
+        rt.store = Store(hass, PATTERN_STORE_VERSION, "ws_core_backup_test_pattern_forecast")
+        await rt.store.async_save(eng.to_dict())
+
+        # Trigger migration with transient empty recorder so scoped reset runs without replay completion
+        rt.history_entity = lambda name, _ts: None  # type: ignore[method-assign]
+        now = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+        retry = await rt._async_migrate_feature_replay(now)
+        assert retry is True  # deferred because history entities not ready
+        assert eng.std.n[sol_slot] == 0  # scoped reset ran
+
+        backup_store = Store(hass, PATTERN_STORE_VERSION, "ws_core_backup_test_pattern_forecast_pre_v3_backup")
+        backup = await backup_store.async_load()
+        assert backup is not None
+        assert backup["standardizer"]["n"][dp_slot] == 100
+        assert backup["standardizer"]["n"][sol_slot] == 50
+        restored, notes = PatternEngine.from_dict(backup, eng.thresholds, eng.storm_source, eng.source_fingerprint)
+        assert not notes
+        assert restored.models["rain_3h"].w[restored.models["rain_3h"].spec.features.index("dp_3h") + 1] == orig_dp_w
+
+        # Re-running migration must NOT overwrite the pre-migration backup
+        await rt._async_migrate_feature_replay(now)
+        backup_after = await backup_store.async_load()
+        assert backup_after["standardizer"]["n"][sol_slot] == 50
+
+        # If writing the real backup store fails before reset, one-way reset must be deferred
+        eng2 = _make_engine()
+        eng2.std.n[sol_slot] = 75
+        eng2.history_learn = {
+            "status": "ok",
+            "targets": {
+                "rain_3h": {"status": "ok", "attempted_at": 1000.0, "reason": None, "method": PATTERN_HISTORY_METHOD}
+            },
+        }
+        rt2 = PatternRuntime.__new__(PatternRuntime)
+        rt2.coord = rt.coord
+        rt2.engine = eng2
+        rt2.fingerprint = eng2.source_fingerprint
+        rt2._published = {}
+        rt2._reset_seq = 0
+        rt2._history_running = False
+        rt2._history_queued = False
+        rt2.store = Store(hass, PATTERN_STORE_VERSION, "ws_core_backup_fail_pattern_forecast")
+
+        class _FailingBackupStore:
+            async def async_load(self):
+                return None
+
+            async def async_save(self, _data):
+                raise OSError("disk full")
+
+        rt2.backup_store = _FailingBackupStore()
+        retry_failed = await rt2._async_migrate_feature_replay(now)
+        assert retry_failed is True
+        assert eng2.std.n[sol_slot] == 75  # not mutated when backup save fails!

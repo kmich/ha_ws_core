@@ -443,3 +443,60 @@ class TestOptionsMenuNavigation:
             }
         )
         assert gust_err["errors"] == {CONF_CUSTOM_MIN_WIND_KMH: "min_exceeds_max"}
+
+    async def test_options_decision_profiles_imperial_units_and_provider_warning(self):
+        from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
+
+        from custom_components.ws_core.const import (
+            CONF_CUSTOM_MAX_RAIN_MM,
+            CONF_CUSTOM_MAX_WIND_GUST_KMH,
+            CONF_CUSTOM_MIN_TEMP_C,
+            CONF_FORECAST_PROVIDER,
+            FORECAST_PROVIDER_NWS,
+            FORECAST_PROVIDER_OPEN_METEO,
+        )
+
+        # With NWS and US Customary system: displays °F / in / mph and includes provider notice
+        flow = _options_flow(
+            stored={
+                CONF_FORECAST_PROVIDER: FORECAST_PROVIDER_NWS,
+                CONF_CUSTOM_MIN_TEMP_C: 12.3,
+                CONF_CUSTOM_MAX_RAIN_MM: 0.0,
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: 50.0,
+            },
+            opt={},
+        )
+        flow.hass.config.units = US_CUSTOMARY_SYSTEM
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {
+                "step_id": kw["step_id"],
+                "schema": kw["data_schema"],
+                "placeholders": kw.get("description_placeholders", {}),
+            }
+        )
+        show_res = await flow.async_step_decision_profiles(None)
+        assert "NWS" in show_res["placeholders"]["provider_warning"]
+
+        # Unchanged submission preserves exact canonical Celsius value (12.3)
+        markers = {str(getattr(k, "schema", k)): k for k in show_res["schema"].schema}
+        assert markers[CONF_CUSTOM_MIN_TEMP_C].description["suggested_value"] == 54.1
+        save_unchanged = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_TEMP_C: 54.1})
+        assert save_unchanged["data"][CONF_CUSTOM_MIN_TEMP_C] == 12.3
+
+        # Edited imperial inputs (59.0 °F = 15.0 °C, 1.0 in = 25.4 mm, 25.0 mph ≈ 40.2336 km/h)
+        save_edited = await flow.async_step_decision_profiles(
+            {
+                CONF_CUSTOM_MIN_TEMP_C: 59.0,
+                CONF_CUSTOM_MAX_RAIN_MM: 1.0,
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: 25.0,
+            }
+        )
+        assert abs(save_edited["data"][CONF_CUSTOM_MIN_TEMP_C] - 15.0) < 0.01
+        assert abs(save_edited["data"][CONF_CUSTOM_MAX_RAIN_MM] - 25.4) < 0.05
+        assert abs(save_edited["data"][CONF_CUSTOM_MAX_WIND_GUST_KMH] - 40.2336) < 0.1
+
+        # Open-Meteo shows no missing-variable provider warning
+        flow_om = _options_flow(stored={CONF_FORECAST_PROVIDER: FORECAST_PROVIDER_OPEN_METEO}, opt={})
+        flow_om.async_show_form = flow.async_show_form
+        show_om = await flow_om.async_step_decision_profiles(None)
+        assert show_om["placeholders"]["provider_warning"] == ""

@@ -1,6 +1,6 @@
 """Weather Windows Decision Engine for Home Assistant (v3.0.0).
 
-Finds suitable intervals in the next 24-48 hours based on profile constraints,
+Finds suitable intervals in the next 24 hours based on profile constraints,
 NWP hourly forecasts, and live local station observations.
 """
 
@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 from homeassistant.util import dt as dt_util
 
+from . import localize
 from .algorithms import solar_elevation_deg
 from .const import (
     CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
@@ -37,12 +38,18 @@ from .const import (
     PROFILE_CUSTOM,
     PROFILE_GARDEN_WORK,
     PROFILE_OUTDOOR_DRYING,
+    SRC_GUST,
+    SRC_RAIN_TOTAL,
+    SRC_WIND,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 MAX_HORIZON_HOURS = 24
 _ONE_HOUR = timedelta(hours=1)
+_LIVE_GUST_ON_HOLD_S = 180.0
+_LIVE_GUST_OFF_HOLD_S = 300.0
+_LIVE_HOLD_STALE_GAP_S = 1800.0
 
 _NUMERIC_LIMIT_FIELDS: tuple[str, ...] = (
     "max_rain_prob_pct",
@@ -56,6 +63,26 @@ _NUMERIC_LIMIT_FIELDS: tuple[str, ...] = (
     "max_wind_gust_kmh",
     "max_cloud_cover_pct",
 )
+
+_WIND_KMH_FACTORS: dict[str, float] = {
+    "km/h": 1.0,
+    "m/s": 1.0 / 3.6,
+    "mph": 0.62137119,
+    "kn": 0.5399568,
+}
+
+_PROVIDER_FIELD_LABELS: dict[str, str] = {
+    "max_rain_prob_pct": "rain probability",
+    "max_rain_mm": "precipitation amount",
+    "min_temp_c": "min temperature",
+    "max_temp_c": "max temperature",
+    "min_humidity_pct": "min humidity",
+    "max_humidity_pct": "max humidity",
+    "min_wind_kmh": "min wind",
+    "max_wind_kmh": "max wind",
+    "max_wind_gust_kmh": "wind gusts",
+    "max_cloud_cover_pct": "cloud cover",
+}
 
 # Decision status outcomes
 STATUS_SUITABLE_NOW = "suitable_now"
@@ -80,6 +107,7 @@ REASON_HIGH_GUST = "high_gust"
 REASON_HEAVY_CLOUDS = "heavy_clouds"  # Cloud cover proxy for sunshine
 REASON_NIGHTTIME = "nighttime"
 REASON_MISSING_DATA = "missing_data"
+REASON_NOT_ASSESSED_BY_PROVIDER = "not_assessed_by_provider"
 REASON_INSUFFICIENT_HORIZON = "insufficient_horizon"
 REASON_HORIZON_TRUNCATED = "horizon_truncated"
 
@@ -278,7 +306,28 @@ def apply_profile_overrides(
         changes[field_name] = num
     if "require_daylight" in overrides and overrides["require_daylight"] is not None:
         changes["require_daylight"] = bool(overrides["require_daylight"])
-    return replace(base, **changes)
+    updated = replace(base, **changes)
+    if updated.min_temp_c is not None and updated.max_temp_c is not None and updated.min_temp_c > updated.max_temp_c:
+        raise ValueError("min_temp_c cannot exceed max_temp_c")
+    if (
+        updated.min_humidity_pct is not None
+        and updated.max_humidity_pct is not None
+        and updated.min_humidity_pct > updated.max_humidity_pct
+    ):
+        raise ValueError("min_humidity_pct cannot exceed max_humidity_pct")
+    if (
+        updated.min_wind_kmh is not None
+        and updated.max_wind_kmh is not None
+        and updated.min_wind_kmh > updated.max_wind_kmh
+    ):
+        raise ValueError("min_wind_kmh cannot exceed max_wind_kmh")
+    if (
+        updated.min_wind_kmh is not None
+        and updated.max_wind_gust_kmh is not None
+        and updated.min_wind_kmh > updated.max_wind_gust_kmh
+    ):
+        raise ValueError("min_wind_kmh cannot exceed max_wind_gust_kmh")
+    return updated
 
 
 def _as_finite_float(val: Any) -> float | None:
@@ -298,60 +347,6 @@ def _as_finite_float(val: Any) -> float | None:
 
 
 @dataclass
-class WindowSlotEvaluation:
-    """Evaluation of a single hourly forecast slot."""
-
-    datetime_iso: str
-    suitable: bool
-    reasons: list[str] = field(default_factory=list)
-    unassessed_limits: list[str] = field(default_factory=list)
-    temp_c: float | None = None
-    rain_prob: int | None = None
-    rain_mm: float | None = None
-    humidity: float | None = None
-    wind_kmh: float | None = None
-    gust_kmh: float | None = None
-    cloud_cover: float | None = None
-    solar_elevation: float | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert slot evaluation to dictionary without recursive asdict copies."""
-        return {
-            "datetime_iso": self.datetime_iso,
-            "suitable": self.suitable,
-            "reasons": self.reasons,
-            "unassessed_limits": self.unassessed_limits,
-            "temp_c": self.temp_c,
-            "rain_prob": self.rain_prob,
-            "rain_mm": self.rain_mm,
-            "humidity": self.humidity,
-            "wind_kmh": self.wind_kmh,
-            "gust_kmh": self.gust_kmh,
-            "cloud_cover": self.cloud_cover,
-            "solar_elevation": self.solar_elevation,
-        }
-
-
-@dataclass
-class IdentifiedWindow:
-    """A contiguous interval of suitable hours."""
-
-    start_iso: str
-    end_iso: str
-    duration_h: int | float
-    is_truncated: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert identified window to dictionary without recursive asdict copies."""
-        return {
-            "start_iso": self.start_iso,
-            "end_iso": self.end_iso,
-            "duration_h": self.duration_h,
-            "is_truncated": self.is_truncated,
-        }
-
-
-@dataclass
 class WeatherDecisionResult:
     """Standardized decision engine result contract (v3.0.0)."""
 
@@ -365,6 +360,7 @@ class WeatherDecisionResult:
     is_truncated: bool = False
     reason_codes: list[str] = field(default_factory=list)
     reasons_text: list[str] = field(default_factory=list)
+    not_assessed_by_provider: list[str] = field(default_factory=list)
     evaluated_limits: dict[str, Any] = field(default_factory=dict)
     windows: list[dict[str, Any]] = field(default_factory=list)
     slots: list[dict[str, Any]] = field(default_factory=list)
@@ -383,6 +379,7 @@ class WeatherDecisionResult:
             "is_truncated": self.is_truncated,
             "reason_codes": self.reason_codes,
             "reasons_text": self.reasons_text,
+            "not_assessed_by_provider": self.not_assessed_by_provider,
             "evaluated_limits": self.evaluated_limits,
             "windows": self.windows,
             "slots": self.slots,
@@ -593,15 +590,25 @@ class WeatherWindowsEngine:
         lon: float,
         elevation_m: float = 0.0,
         profiles: dict[str, WeatherWindowProfile] | None = None,
+        *,
+        language: str = "en",
+        temp_unit: str = "°C",
+        wind_unit: str = "km/h",
+        rain_unit: str = "mm",
     ) -> None:
         self.lat = lat
         self.lon = lon
         self.elevation_m = elevation_m
         self.profiles: dict[str, WeatherWindowProfile] = dict(profiles if profiles is not None else DEFAULT_PROFILES)
+        self.language = language
+        self.temp_unit = temp_unit
+        self.wind_unit = wind_unit
+        self.rain_unit = rain_unit
         self._solar_coord: tuple[float, float] | None = None
         self._solar_cache: dict[datetime, float] = {}
         self._parse_dt_cache: dict[str, datetime | None] = {}
         self._slot_time_cache: dict[tuple[str, tzinfo], tuple[datetime, float, str] | None] = {}
+        self._gust_hold_state: dict[str, dict[str, Any]] = {}
 
     def _sync_solar_cache(self, lat_f: float, lon_f: float) -> dict[datetime, float]:
         """Return solar elevation cache cleared only when rounded coordinates change."""
@@ -652,11 +659,29 @@ class WeatherWindowsEngine:
         horizon_end_ts = horizon_end_utc.timestamp()
 
         current = current_data or {}
-        live_rain_rate = _as_finite_float(current.get(KEY_RAIN_RATE_FILT))
-        live_gust_ms = _as_finite_float(current.get(KEY_NORM_WIND_GUST_MS))
+        stale_raw = current.get("_stale_sources") or current.get("stale_sources")
+        stale_set = {str(s) for s in stale_raw} if stale_raw else set()
+        live_rain_rate = (
+            None
+            if stale_set & {SRC_RAIN_TOTAL, "rain", "rain_rate"}
+            else _as_finite_float(current.get(KEY_RAIN_RATE_FILT))
+        )
+        live_gust_ms = (
+            None
+            if stale_set & {SRC_GUST, SRC_WIND, "gust", "wind"}
+            else _as_finite_float(current.get(KEY_NORM_WIND_GUST_MS))
+        )
 
         has_forecast_rows = bool(hourly_forecast)
         prepared_slots: list[tuple[Any, ...]] = []
+        has_temp = False
+        has_rain_prob = False
+        has_rain_mm = False
+        has_humidity = False
+        has_wind = False
+        has_gust = False
+        has_cloud = False
+
         if hourly_forecast:
             deduped = _collect_horizon_slots(
                 hourly_forecast,
@@ -714,6 +739,21 @@ class WeatherWindowsEngine:
                     rain_prob_int = int(rain_prob) if rain_prob is not None else None
                     is_current = slot_ts <= now_ts < raw_end_ts
 
+                    if temp_c is not None:
+                        has_temp = True
+                    if rain_prob is not None:
+                        has_rain_prob = True
+                    if rain_mm is not None:
+                        has_rain_mm = True
+                    if humidity is not None:
+                        has_humidity = True
+                    if wind_kmh is not None:
+                        has_wind = True
+                    if gust_kmh is not None:
+                        has_gust = True
+                    if cloud_cover is not None:
+                        has_cloud = True
+
                     prepared_slots.append(
                         (
                             slot_utc,
@@ -743,6 +783,15 @@ class WeatherWindowsEngine:
             "live_rain_rate": live_rain_rate,
             "live_gust_ms": live_gust_ms,
             "has_forecast_rows": has_forecast_rows,
+            "available_vars": {
+                "temp_c": has_temp,
+                "precip_prob": has_rain_prob,
+                "precip_mm": has_rain_mm,
+                "humidity": has_humidity,
+                "wind_kmh": has_wind,
+                "gust_kmh": has_gust,
+                "cloud_cover": has_cloud,
+            },
             "slots": prepared_slots,
         }
 
@@ -771,6 +820,77 @@ class WeatherWindowsEngine:
         prepared = self._prepare_evaluation(hourly_forecast, current_data, now)
         return self._evaluate_prepared_profile(profile, prepared, as_dict=False)
 
+    def _resolve_live_gust_active(
+        self, profile: WeatherWindowProfile, live_gust_ms: float | None, now_ts: float
+    ) -> bool:
+        """Apply onset/clear hold hysteresis to instantaneous station gusts."""
+        threshold = profile.max_wind_gust_kmh
+        if live_gust_ms is None or threshold is None:
+            self._gust_hold_state.pop(profile.profile_id, None)
+            return False
+
+        exceeds = (live_gust_ms * 3.6) > threshold
+        state = self._gust_hold_state.get(profile.profile_id)
+        if (
+            state is None
+            or state["threshold"] != threshold
+            or now_ts < state["last_ts"]
+            or (now_ts - state["last_ts"]) > _LIVE_HOLD_STALE_GAP_S
+        ):
+            self._gust_hold_state[profile.profile_id] = {
+                "threshold": threshold,
+                "active": False,
+                "exceeded_since": now_ts if exceeds else None,
+                "clear_since": None,
+                "last_ts": now_ts,
+            }
+            return False
+
+        if not state["active"]:
+            if exceeds:
+                if state["exceeded_since"] is None:
+                    state["exceeded_since"] = now_ts
+                elif (now_ts - state["exceeded_since"]) >= _LIVE_GUST_ON_HOLD_S:
+                    state["active"] = True
+                    state["clear_since"] = None
+            else:
+                state["exceeded_since"] = None
+        elif exceeds:
+            state["clear_since"] = None
+        else:
+            if state["clear_since"] is None:
+                state["clear_since"] = now_ts
+            elif (now_ts - state["clear_since"]) >= _LIVE_GUST_OFF_HOLD_S:
+                state["active"] = False
+                state["exceeded_since"] = None
+                state["clear_since"] = None
+
+        state["last_ts"] = now_ts
+        return bool(state["active"])
+
+    def _txt(self, key: str, **fmt: object) -> str:
+        """Return localized explanation string using engine language."""
+        return localize.window_text(self.language, key, **fmt)
+
+    def _fmt_temp_limit(self, c: float | None) -> str:
+        val = 0.0 if c is None else float(c)
+        if self.temp_unit == "°F":
+            return f"{val * 9.0 / 5.0 + 32.0:.1f}°F"
+        return f"{val}°C"
+
+    def _fmt_wind_limit(self, kmh: float | None) -> str:
+        val = 0.0 if kmh is None else float(kmh)
+        factor = _WIND_KMH_FACTORS.get(self.wind_unit)
+        if factor is not None and self.wind_unit != "km/h":
+            return f"{val * factor:.1f} {self.wind_unit}"
+        return f"{val} km/h"
+
+    def _fmt_rain_limit(self, mm: float | None) -> str:
+        val = 0.0 if mm is None else float(mm)
+        if self.rain_unit == "in":
+            return f"{val / 25.4:.2f} in"
+        return f"{val} mm"
+
     def _evaluate_prepared_profile(
         self,
         profile: WeatherWindowProfile,
@@ -785,10 +905,8 @@ class WeatherWindowsEngine:
         available_slots = len(prepared_slots)
 
         if not prepared_slots or available_slots < min(2, profile.min_duration_h):
-            reason_text = (
-                "No forecast hours within the 24-hour evaluation window."
-                if not prepared_slots and prepared["has_forecast_rows"]
-                else "Insufficient hourly forecast data available to evaluate windows."
+            reason_key = (
+                "no_horizon_in_window" if not prepared_slots and prepared["has_forecast_rows"] else "insufficient_data"
             )
             payload = {
                 "profile_id": profile.profile_id,
@@ -800,7 +918,8 @@ class WeatherWindowsEngine:
                 "horizon_hours": min(available_slots, MAX_HORIZON_HOURS),
                 "is_truncated": False,
                 "reason_codes": [REASON_INSUFFICIENT_HORIZON],
-                "reasons_text": [reason_text],
+                "reasons_text": [self._txt(reason_key)],
+                "not_assessed_by_provider": [],
                 "evaluated_limits": limits_dict,
                 "windows": [],
                 "slots": [],
@@ -814,27 +933,9 @@ class WeatherWindowsEngine:
         horizon_end_ts: float = prepared["horizon_end_ts"]
         live_rain_rate: float | None = prepared["live_rain_rate"]
         live_gust_ms: float | None = prepared["live_gust_ms"]
+        avail: dict[str, bool] = prepared["available_vars"]
 
-        # Precompute live blockers for this profile
-        live_blockers: list[str] = []
-        live_blocker_texts: list[str] = []
-        if (
-            live_rain_rate is not None
-            and (profile.max_rain_mm is not None or profile.max_rain_prob_pct is not None)
-            and live_rain_rate > max(0.05, float(profile.max_rain_mm or 0.0))
-        ):
-            live_blockers.append(REASON_CURRENTLY_RAINING)
-            live_blocker_texts.append(f"Rain is currently falling at the station ({live_rain_rate:.1f} mm/h).")
-
-        if live_gust_ms is not None and profile.max_wind_gust_kmh is not None:
-            live_gust_kmh = live_gust_ms * 3.6
-            if live_gust_kmh > profile.max_wind_gust_kmh:
-                live_blockers.append(REASON_CURRENT_GUST_HIGH)
-                live_blocker_texts.append(
-                    f"Current wind gust ({live_gust_kmh:.0f} km/h) exceeds limit ({profile.max_wind_gust_kmh:.0f} km/h)."
-                )
-
-        # Bind limits to local variables for the inner loop
+        # Bind limits to local variables for provider checks and inner loop
         req_daylight = profile.require_daylight
         p_max_rp = profile.max_rain_prob_pct
         p_max_rm = profile.max_rain_mm
@@ -847,10 +948,65 @@ class WeatherWindowsEngine:
         p_max_g = profile.max_wind_gust_kmh
         p_max_c = profile.max_cloud_cover_pct
 
+        # Determine which limits the provider never supplies across the horizon
+        has_rain_prob = avail["precip_prob"]
+        has_rain_mm = avail["precip_mm"]
+        has_humidity = avail["humidity"]
+        has_wind = avail["wind_kmh"]
+        has_gust = avail["gust_kmh"]
+        has_cloud = avail["cloud_cover"]
+
+        eval_rain_prob = p_max_rp is not None and has_rain_prob
+        eval_rain_mm = p_max_rm is not None and has_rain_mm
+        eval_min_h = p_min_h is not None and has_humidity
+        eval_max_h = p_max_h is not None and has_humidity
+        eval_min_w = p_min_w is not None and has_wind
+        eval_max_w = p_max_w is not None and has_wind
+        eval_max_g = p_max_g is not None and has_gust
+        eval_max_c = p_max_c is not None and has_cloud
+
+        not_assessed_by_provider: list[str] = []
+        if p_max_rp is not None and not has_rain_prob and p_max_rm is None:
+            not_assessed_by_provider.append("max_rain_prob_pct")
+        if p_max_rm is not None and not has_rain_mm and p_max_rp is None:
+            not_assessed_by_provider.append("max_rain_mm")
+        if not has_humidity:
+            if p_min_h is not None:
+                not_assessed_by_provider.append("min_humidity_pct")
+            if p_max_h is not None:
+                not_assessed_by_provider.append("max_humidity_pct")
+        if not has_wind:
+            if p_min_w is not None:
+                not_assessed_by_provider.append("min_wind_kmh")
+            if p_max_w is not None:
+                not_assessed_by_provider.append("max_wind_kmh")
+        if p_max_g is not None and not has_gust:
+            not_assessed_by_provider.append("max_wind_gust_kmh")
+        if p_max_c is not None and not has_cloud:
+            not_assessed_by_provider.append("max_cloud_cover_pct")
+
+        # Precompute live station blockers without embedding volatile numeric readings
+        live_blockers: list[str] = []
+        live_blocker_texts: list[str] = []
+        if (
+            live_rain_rate is not None
+            and (p_max_rm is not None or p_max_rp is not None)
+            and live_rain_rate > max(0.05, float(p_max_rm or 0.0))
+        ):
+            live_blockers.append(REASON_CURRENTLY_RAINING)
+            live_blocker_texts.append(self._txt("currently_raining"))
+
+        if self._resolve_live_gust_active(profile, live_gust_ms, now_ts):
+            live_blockers.append(REASON_CURRENT_GUST_HIGH)
+            live_blocker_texts.append(self._txt("current_gust_high", limit=self._fmt_wind_limit(p_max_g)))
+
         slot_dicts: list[dict[str, Any]] = []
         suit_flags: list[bool] = []
+        forecast_suit_flags: list[bool] = []
         pot_flags: list[bool] = []
         unassessed_slots = 0
+        current_slot_raw_end_ts: float | None = None
+        has_forecast_limit_blocker = False
 
         for (
             _slot_utc,
@@ -874,72 +1030,91 @@ class WeatherWindowsEngine:
             if req_daylight and is_night:
                 reasons_slot.append(REASON_NIGHTTIME)
 
-            if p_max_rp is not None:
-                if rain_prob is None:
-                    unassessed.append("max_rain_prob_pct")
-                elif rain_prob > p_max_rp:
-                    reasons_slot.append(REASON_RAIN_RISK)
-            if p_max_rm is not None:
-                if rain_mm is None:
-                    unassessed.append("max_rain_mm")
-                elif rain_mm > p_max_rm:
-                    reasons_slot.append(REASON_RAIN_AMOUNT)
-            if p_min_t is not None:
-                if temp_c is None:
+            # Core required inputs per slot: temperature and at least one rain signal
+            if temp_c is None:
+                if p_min_t is not None:
                     unassessed.append("min_temp_c")
-                elif temp_c < p_min_t:
-                    reasons_slot.append(REASON_TOO_COLD)
-            if p_max_t is not None:
-                if temp_c is None:
+                if p_max_t is not None:
                     unassessed.append("max_temp_c")
-                elif temp_c > p_max_t:
+                if p_min_t is None and p_max_t is None:
+                    unassessed.append("temp_c")
+            else:
+                if p_min_t is not None and temp_c < p_min_t:
+                    reasons_slot.append(REASON_TOO_COLD)
+                if p_max_t is not None and temp_c > p_max_t:
                     reasons_slot.append(REASON_TOO_HOT)
-            if p_min_h is not None:
+
+            if rain_prob is None and rain_mm is None:
+                if p_max_rp is not None:
+                    unassessed.append("max_rain_prob_pct")
+                if p_max_rm is not None:
+                    unassessed.append("max_rain_mm")
+                if p_max_rp is None and p_max_rm is None:
+                    unassessed.append("precip")
+            else:
+                if eval_rain_prob:
+                    if rain_prob is None:
+                        unassessed.append("max_rain_prob_pct")
+                    elif rain_prob > p_max_rp:
+                        reasons_slot.append(REASON_RAIN_RISK)
+                if eval_rain_mm:
+                    if rain_mm is None:
+                        unassessed.append("max_rain_mm")
+                    elif rain_mm > p_max_rm:
+                        reasons_slot.append(REASON_RAIN_AMOUNT)
+
+            if eval_min_h:
                 if humidity is None:
                     unassessed.append("min_humidity_pct")
                 elif humidity < p_min_h:
                     reasons_slot.append(REASON_LOW_HUMIDITY)
-            if p_max_h is not None:
+            if eval_max_h:
                 if humidity is None:
                     unassessed.append("max_humidity_pct")
                 elif humidity > p_max_h:
                     reasons_slot.append(REASON_HIGH_HUMIDITY)
-            if p_min_w is not None:
+            if eval_min_w:
                 if wind_kmh is None:
                     unassessed.append("min_wind_kmh")
                 elif wind_kmh < p_min_w:
                     reasons_slot.append(REASON_CALM_AIR)
-            if p_max_w is not None:
+            if eval_max_w:
                 if wind_kmh is None:
                     unassessed.append("max_wind_kmh")
                 elif wind_kmh > p_max_w:
                     reasons_slot.append(REASON_HIGH_WIND)
-            if p_max_g is not None:
+            if eval_max_g:
                 if gust_kmh is None:
                     unassessed.append("max_wind_gust_kmh")
                 elif gust_kmh > p_max_g:
                     reasons_slot.append(REASON_HIGH_GUST)
-            if p_max_c is not None:
+            if eval_max_c:
                 if cloud_cover is None:
                     unassessed.append("max_cloud_cover_pct")
                 elif cloud_cover > p_max_c:
                     reasons_slot.append(REASON_HEAVY_CLOUDS)
 
+            if reasons_slot:
+                has_forecast_limit_blocker = True
             if unassessed:
                 unassessed_slots += 1
                 reasons_slot.append(REASON_MISSING_DATA)
 
+            forecast_suitable = not reasons_slot
+            if is_current:
+                current_slot_raw_end_ts = _slot_ts + 3600.0
             if is_current and live_blockers:
                 suitable = False
                 for blocker in live_blockers:
                     if blocker not in reasons_slot:
                         reasons_slot.append(blocker)
             else:
-                suitable = not reasons_slot
+                suitable = forecast_suitable
                 if suitable:
                     reasons_slot.append(REASON_SUITABLE)
 
             suit_flags.append(suitable)
+            forecast_suit_flags.append(forecast_suitable)
             pot_flags.append(suitable or (len(reasons_slot) == 1 and reasons_slot[0] == REASON_MISSING_DATA))
             slot_dicts.append(
                 {
@@ -975,6 +1150,26 @@ class WeatherWindowsEngine:
             display_tz,
             is_utc_display,
         )
+        # Prevent an interrupted active window from re-arming as an upcoming window at the next hour
+        if live_blockers and current_slot_raw_end_ts is not None and window_bounds:
+            forecast_bounds = _extract_contiguous_windows(
+                forecast_suit_flags,
+                prepared_slots,
+                min_span_s,
+                now_ts,
+                horizon_end_ts,
+                horizon_end_utc,
+                last_slot_ts,
+                display_tz,
+                is_utc_display,
+            )
+            if (
+                forecast_bounds
+                and forecast_bounds[0][0] <= now_ts < forecast_bounds[0][1]
+                and abs(window_bounds[0][0] - current_slot_raw_end_ts) <= 1.0
+            ):
+                window_bounds = window_bounds[1:]
+
         if unassessed_slots == 0:
             potential_bounds = window_bounds
         elif window_bounds and window_bounds[0][0] <= now_ts < window_bounds[0][1]:
@@ -1010,9 +1205,7 @@ class WeatherWindowsEngine:
                 duration_h = w0["duration_h"]
                 is_truncated = w0["is_truncated"]
                 reasons.append(REASON_SUITABLE)
-                reasons_text.append(
-                    f"Conditions meet all limits for {profile.name} starting now for at least {duration_h} hours."
-                )
+                reasons_text.append(self._txt("suitable_now", name=profile.name, dur=duration_h))
             elif potential_bounds and not live_blockers and potential_bounds[0][0] <= now_ts < potential_bounds[0][1]:
                 status = STATUS_UNKNOWN
                 next_start = w0["start_iso"]
@@ -1022,7 +1215,7 @@ class WeatherWindowsEngine:
                 reasons.append(REASON_MISSING_DATA)
                 reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
                 reasons.append(REASON_WINDOW_UPCOMING)
-                reasons_text.append(f"Next suitable window starts at {next_start} for {duration_h} hours.")
+                reasons_text.append(self._txt("window_upcoming", start=next_start, dur=duration_h))
             else:
                 status = STATUS_WINDOW_UPCOMING
                 next_start = w0["start_iso"]
@@ -1033,40 +1226,67 @@ class WeatherWindowsEngine:
                     reasons.extend(live_blockers)
                     reasons_text.extend(live_blocker_texts)
                 reasons.append(REASON_WINDOW_UPCOMING)
-                reasons_text.append(f"Next suitable window starts at {next_start} for {duration_h} hours.")
+                reasons_text.append(self._txt("window_upcoming", start=next_start, dur=duration_h))
         elif potential_bounds:
             status = STATUS_UNKNOWN
             reasons.append(REASON_MISSING_DATA)
             reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
         else:
-            status = STATUS_UNSUITABLE
-            if live_blockers:
-                reasons.extend(live_blockers)
-                reasons_text.extend(live_blocker_texts)
-
             blocker_counts: dict[str, int] = {}
             for s in slot_dicts:
                 for r in s["reasons"]:
                     if r in (REASON_SUITABLE, REASON_MISSING_DATA) or r in live_blockers:
                         continue
                     blocker_counts[r] = blocker_counts.get(r, 0) + 1
-            top_blockers = sorted(blocker_counts.keys(), key=lambda k: -blocker_counts[k])[:3]
-            for b in top_blockers:
-                if b not in reasons:
-                    reasons.append(b)
-                    reasons_text.append(self._format_blocker_text(b, profile))
 
-            if not reasons and any(REASON_MISSING_DATA in s["reasons"] for s in slot_dicts):
-                reasons.append(REASON_MISSING_DATA)
-                reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
+            has_slot_gap = any(
+                abs((prepared_slots[i + 1][1] - prepared_slots[i][1]) - 3600.0) > 1.0
+                for i in range(available_slots - 1)
+            )
+            contiguous_span_s = min(last_slot_ts + 3600.0, horizon_end_ts) - max(prepared_slots[0][1], now_ts)
+            has_limit_blocker = has_forecast_limit_blocker or bool(live_blockers)
+            short_horizon_only = (
+                not has_limit_blocker
+                and unassessed_slots == 0
+                and (available_slots < min_dur_h or (not has_slot_gap and contiguous_span_s < min_span_s))
+            )
 
-            if not reasons:
+            if short_horizon_only:
+                status = STATUS_UNKNOWN
                 reasons.append(REASON_INSUFFICIENT_HORIZON)
                 reasons_text.append(self._format_blocker_text(REASON_INSUFFICIENT_HORIZON, profile))
+            elif not has_limit_blocker and unassessed_slots > 0:
+                status = STATUS_UNKNOWN
+                reasons.append(REASON_MISSING_DATA)
+                reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
+            else:
+                status = STATUS_UNSUITABLE
+                if live_blockers:
+                    reasons.extend(live_blockers)
+                    reasons_text.extend(live_blocker_texts)
+
+                top_blockers = sorted(blocker_counts.keys(), key=lambda k: -blocker_counts[k])[:3]
+                for b in top_blockers:
+                    if b not in reasons:
+                        reasons.append(b)
+                        reasons_text.append(self._format_blocker_text(b, profile))
+
+                if not reasons and unassessed_slots > 0:
+                    reasons.append(REASON_MISSING_DATA)
+                    reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
+
+                if not reasons:
+                    reasons.append(REASON_INSUFFICIENT_HORIZON)
+                    reasons_text.append(self._format_blocker_text(REASON_INSUFFICIENT_HORIZON, profile))
 
         if is_truncated:
             reasons.append(REASON_HORIZON_TRUNCATED)
-            reasons_text.append("Window extends to the end of the available forecast horizon.")
+            reasons_text.append(self._txt("horizon_truncated"))
+
+        if not_assessed_by_provider:
+            reasons.append(REASON_NOT_ASSESSED_BY_PROVIDER)
+            field_list = ", ".join(_PROVIDER_FIELD_LABELS.get(f, f) for f in not_assessed_by_provider)
+            reasons_text.append(self._txt("not_assessed_by_provider", fields=field_list))
 
         windows = [w for _, _, w in window_bounds]
         horizon_hours = min(len(slot_dicts), MAX_HORIZON_HOURS)
@@ -1081,6 +1301,7 @@ class WeatherWindowsEngine:
             "is_truncated": is_truncated,
             "reason_codes": reasons,
             "reasons_text": reasons_text,
+            "not_assessed_by_provider": not_assessed_by_provider,
             "evaluated_limits": limits_dict,
             "windows": windows,
             "slots": slot_dicts,
@@ -1088,6 +1309,7 @@ class WeatherWindowsEngine:
                 "horizon_hours": horizon_hours,
                 "is_truncated": is_truncated,
                 "unassessed_slots": unassessed_slots,
+                "not_assessed_by_provider": list(not_assessed_by_provider),
             },
         }
         return result_dict if as_dict else WeatherDecisionResult(**result_dict)
@@ -1111,166 +1333,32 @@ class WeatherWindowsEngine:
             solar_cache[dt_utc] = val
         return val
 
-    def _evaluate_slot(
-        self,
-        item: dict[str, Any],
-        slot_utc: datetime,
-        display_iso: str,
-        profile: WeatherWindowProfile,
-        *,
-        now_utc: datetime | None = None,
-        horizon_end_utc: datetime | None = None,
-    ) -> WindowSlotEvaluation:
-        """Evaluate a single hourly slot against every enabled profile limit."""
-        temp_c = _as_finite_float(item.get("temp_c"))
-        rain_prob = _as_finite_float(item.get("precip_prob"))
-        rain_mm = _as_finite_float(item.get("precip_mm"))
-        humidity = _as_finite_float(item.get("humidity"))
-        wind_kmh = _as_finite_float(item.get("wind_kmh"))
-        gust_kmh = _as_finite_float(item.get("gust_kmh"))
-        cloud_cover = _as_finite_float(item.get("cloud_cover"))
-
-        effective_start_utc = max(slot_utc, now_utc) if now_utc is not None else slot_utc
-        raw_end_utc = slot_utc + timedelta(hours=1)
-        effective_end_utc = min(raw_end_utc, horizon_end_utc) if horizon_end_utc is not None else raw_end_utc
-        sol_elev_start = self._cached_solar_elevation(effective_start_utc)
-        sol_elev_end = self._cached_solar_elevation(effective_end_utc)
-        sol_elev = min(sol_elev_start, sol_elev_end)
-        reasons: list[str] = []
-
-        # 1. Daylight requirement across the full effective window interval [start, end]
-        if profile.require_daylight and (sol_elev_start <= 0.0 or sol_elev_end <= 0.0):
-            reasons.append(REASON_NIGHTTIME)
-
-        # 2. Evaluate every enabled numeric limit uniformly; missing inputs mark slot unassessed.
-        limit_checks: tuple[tuple[str, float | None, str, str], ...] = (
-            ("max_rain_prob_pct", rain_prob, "gt", REASON_RAIN_RISK),
-            ("max_rain_mm", rain_mm, "gt", REASON_RAIN_AMOUNT),
-            ("min_temp_c", temp_c, "lt", REASON_TOO_COLD),
-            ("max_temp_c", temp_c, "gt", REASON_TOO_HOT),
-            ("min_humidity_pct", humidity, "lt", REASON_LOW_HUMIDITY),
-            ("max_humidity_pct", humidity, "gt", REASON_HIGH_HUMIDITY),
-            ("min_wind_kmh", wind_kmh, "lt", REASON_CALM_AIR),
-            ("max_wind_kmh", wind_kmh, "gt", REASON_HIGH_WIND),
-            ("max_wind_gust_kmh", gust_kmh, "gt", REASON_HIGH_GUST),
-            ("max_cloud_cover_pct", cloud_cover, "gt", REASON_HEAVY_CLOUDS),
-        )
-        unassessed: list[str] = []
-        for limit_name, val, op, blocker in limit_checks:
-            threshold = getattr(profile, limit_name)
-            if threshold is None:
-                continue
-            if val is None:
-                unassessed.append(limit_name)
-                continue
-            if (op == "gt" and val > threshold) or (op == "lt" and val < threshold):
-                reasons.append(blocker)
-
-        if unassessed:
-            reasons.append(REASON_MISSING_DATA)
-
-        suitable = not reasons
-        if suitable:
-            reasons.append(REASON_SUITABLE)
-
-        return WindowSlotEvaluation(
-            datetime_iso=display_iso,
-            suitable=suitable,
-            reasons=reasons,
-            unassessed_limits=unassessed,
-            temp_c=temp_c,
-            rain_prob=int(rain_prob) if rain_prob is not None else None,
-            rain_mm=rain_mm,
-            humidity=humidity,
-            wind_kmh=wind_kmh,
-            gust_kmh=gust_kmh,
-            cloud_cover=cloud_cover,
-            solar_elevation=round(sol_elev, 1),
-        )
-
-    @staticmethod
-    def _extract_windows(
-        evaluated_pairs: list[tuple[datetime, WindowSlotEvaluation]],
-        min_duration_h: int,
-        now_utc: datetime,
-        display_tz: tzinfo,
-        predicate: Callable[[WindowSlotEvaluation], bool],
-    ) -> list[tuple[datetime, datetime, IdentifiedWindow]]:
-        """Extract contiguous 1-hour windows meeting duration requirements, splitting on gaps."""
-        if not evaluated_pairs:
-            return []
-
-        last_slot_utc = evaluated_pairs[-1][0]
-        horizon_end_utc = now_utc + timedelta(hours=MAX_HORIZON_HOURS)
-        windows: list[tuple[datetime, datetime, IdentifiedWindow]] = []
-        current_streak: list[tuple[datetime, WindowSlotEvaluation]] = []
-
-        def _flush(streak: list[tuple[datetime, WindowSlotEvaluation]]) -> None:
-            if not streak:
-                return
-            start_utc = streak[0][0]
-            raw_end_utc = streak[-1][0] + timedelta(hours=1)
-            end_utc = min(raw_end_utc, horizon_end_utc)
-            effective_start_utc = max(start_utc, now_utc)
-            span_s = (end_utc - effective_start_utc).total_seconds()
-            if span_s < min_duration_h * 3600.0 - 1e-3:
-                return
-            raw_h = round(span_s / 3600.0, 2)
-            duration_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
-            is_truncated = streak[-1][0] == last_slot_utc or raw_end_utc > horizon_end_utc
-            windows.append(
-                (
-                    start_utc,
-                    end_utc,
-                    IdentifiedWindow(
-                        start_iso=start_utc.astimezone(display_tz).isoformat(),
-                        end_iso=end_utc.astimezone(display_tz).isoformat(),
-                        duration_h=duration_h,
-                        is_truncated=is_truncated,
-                    ),
-                )
-            )
-
-        for slot_utc, slot_eval in evaluated_pairs:
-            if predicate(slot_eval):
-                if current_streak and abs((slot_utc - current_streak[-1][0]).total_seconds() - 3600.0) > 1.0:
-                    _flush(current_streak)
-                    current_streak = []
-                current_streak.append((slot_utc, slot_eval))
-            else:
-                _flush(current_streak)
-                current_streak = []
-
-        _flush(current_streak)
-        return windows
-
-    @staticmethod
-    def _format_blocker_text(reason: str, profile: WeatherWindowProfile) -> str:
-        """Provide clear human-readable explanation for a blocker reason code."""
+    def _format_blocker_text(self, reason: str, profile: WeatherWindowProfile) -> str:
+        """Provide clear localized, unit-aware explanation for a blocker reason code."""
         if reason == REASON_NIGHTTIME:
-            return "Sun is below horizon (daylight required)."
+            return self._txt("nighttime")
         if reason == REASON_RAIN_RISK:
-            return f"Forecast rain probability exceeds {profile.max_rain_prob_pct}%."
+            return self._txt("rain_risk", limit=profile.max_rain_prob_pct)
         if reason == REASON_RAIN_AMOUNT:
-            return f"Forecast precipitation exceeds {profile.max_rain_mm} mm."
+            return self._txt("rain_amount", limit=self._fmt_rain_limit(profile.max_rain_mm))
         if reason == REASON_TOO_COLD:
-            return f"Temperature is below {profile.min_temp_c}°C."
+            return self._txt("too_cold", limit=self._fmt_temp_limit(profile.min_temp_c))
         if reason == REASON_TOO_HOT:
-            return f"Temperature exceeds {profile.max_temp_c}°C."
+            return self._txt("too_hot", limit=self._fmt_temp_limit(profile.max_temp_c))
         if reason == REASON_HIGH_HUMIDITY:
-            return f"Relative humidity exceeds {profile.max_humidity_pct}%."
+            return self._txt("high_humidity", limit=profile.max_humidity_pct)
         if reason == REASON_LOW_HUMIDITY:
-            return f"Relative humidity is below {profile.min_humidity_pct}%."
+            return self._txt("low_humidity", limit=profile.min_humidity_pct)
         if reason == REASON_CALM_AIR:
-            return f"Wind is calm (< {profile.min_wind_kmh} km/h)."
+            return self._txt("calm_air", limit=self._fmt_wind_limit(profile.min_wind_kmh))
         if reason == REASON_HIGH_WIND:
-            return f"Wind speed exceeds {profile.max_wind_kmh} km/h."
+            return self._txt("high_wind", limit=self._fmt_wind_limit(profile.max_wind_kmh))
         if reason == REASON_HIGH_GUST:
-            return f"Wind gusts exceed {profile.max_wind_gust_kmh} km/h."
+            return self._txt("high_gust", limit=self._fmt_wind_limit(profile.max_wind_gust_kmh))
         if reason == REASON_HEAVY_CLOUDS:
-            return f"Cloud cover exceeds {profile.max_cloud_cover_pct}% (sunshine proxy)."
+            return self._txt("heavy_clouds", limit=profile.max_cloud_cover_pct)
         if reason == REASON_MISSING_DATA:
-            return "Required forecast variable is missing from provider."
+            return self._txt("missing_data")
         if reason == REASON_INSUFFICIENT_HORIZON:
-            return f"No continuous suitable interval meets the {profile.min_duration_h}-hour minimum duration."
+            return self._txt("insufficient_horizon", dur=profile.min_duration_h)
         return reason

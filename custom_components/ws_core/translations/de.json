@@ -404,21 +404,21 @@
       },
       "decision_profiles": {
         "title": "Entscheidungsprofile & Wetterfenster",
-        "description": "Wetter-Entscheidungs-Engine konfigurieren und automatisierte Aktivitätsfenster auswählen.",
+        "description": "Wetter-Entscheidungs-Engine konfigurieren und automatisierte Aktivitätsfenster auswählen.{provider_warning}",
         "data": {
           "enable_weather_windows": "Wetterfenster-Entscheidungs-Engine aktivieren",
           "weather_window_profiles": "Aktive Entscheidungsprofile",
           "custom_window_name": "Name des benutzerdefinierten Profils",
           "custom_min_duration_h": "Benutzerdefinierte Mindestdauer (Stunden)",
           "custom_max_rain_prob_pct": "Benutzerdefinierte max. Regenwahrscheinlichkeit (%)",
-          "custom_max_rain_mm": "Benutzerdefinierter max. Niederschlag (mm/h)",
-          "custom_min_temp_c": "Benutzerdefinierte Mindesttemperatur (°C)",
-          "custom_max_temp_c": "Benutzerdefinierte Höchsttemperatur (°C)",
+          "custom_max_rain_mm": "Benutzerdefinierter max. Niederschlag",
+          "custom_min_temp_c": "Benutzerdefinierte Mindesttemperatur",
+          "custom_max_temp_c": "Benutzerdefinierte Höchsttemperatur",
           "custom_min_humidity_pct": "Benutzerdefinierte min. Luftfeuchtigkeit (%)",
           "custom_max_humidity_pct": "Benutzerdefinierte max. Luftfeuchtigkeit (%)",
-          "custom_min_wind_kmh": "Benutzerdefinierte min. Windgeschwindigkeit (km/h)",
-          "custom_max_wind_kmh": "Benutzerdefinierte max. Windgeschwindigkeit (km/h)",
-          "custom_max_wind_gust_kmh": "Benutzerdefinierte max. Windböe (km/h)",
+          "custom_min_wind_kmh": "Benutzerdefinierte min. Windgeschwindigkeit",
+          "custom_max_wind_kmh": "Benutzerdefinierte max. Windgeschwindigkeit",
+          "custom_max_wind_gust_kmh": "Benutzerdefinierte max. Windböe",
           "custom_max_cloud_cover_pct": "Benutzerdefinierte max. Bewölkung (%)",
           "custom_require_daylight": "Tageslicht für benutzerdefiniertes Profil erforderlich"
         }
@@ -3066,6 +3066,13 @@
         "auto": "Automatisch (aus Sensoreinheit erkennen)",
         "percent": "Prozent (0–100 %)",
         "fraction": "Volumenanteil (0–1 / m³/m³)"
+      }
+    },
+    "weather_window_profiles": {
+      "options": {
+        "outdoor_drying": "Wäsche draußen trocknen",
+        "garden_work": "Garten- und Hofarbeit",
+        "custom": "Benutzerdefiniertes Fensterprofil"
       }
     }
   }

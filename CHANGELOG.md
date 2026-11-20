@@ -2,26 +2,30 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [3.0.0] - 2026-11-17
+## [3.0.0] - 2026-11-20
+
+This major release builds directly on the v2.14.0–2.14.3 correctness fixes (all v2.14.x fixes are included). Minimum supported Home Assistant version is raised from **2024.6.0** to **2024.10.0**.
 
 ### Added
 
-- **Weather Windows Decision Engine:** Evaluates upcoming weather conditions across a 24-hour horizon to identify optimal outdoor activity windows:
-  - `outdoor_drying`: Identifies periods suitable for drying clothes outdoors based on rain probability, ambient temperature, humidity/drying potential, wind/gust speed, and daylight.
-  - `garden_work`: Identifies suitable outdoor gardening intervals with custom temperature, wind gust, daylight, and precipitation limits.
-  - `custom`: Flexible user-defined window criteria with configurable limits and minimum required duration.
-  - **Sensors:** When enabled (`enable_weather_windows`), adds `status`, `next_start` (`SensorDeviceClass.TIMESTAMP`), and `next_end` (`SensorDeviceClass.TIMESTAMP`) sensors for enabled profiles. Zero entities created when disabled.
-  - **Truncation detection:** Automatically marks windows reaching the end of the forecast horizon as horizon-truncated (`is_truncated: True`) to avoid open-ended assumptions.
-  - **Automation Blueprint:** Added `blueprints/automation/ws_core/weather_window_notification.yaml` to notify users ahead of an upcoming activity window using a configurable lead-time offset on the window start timestamp sensor.
-- **Provider Capability Matrix (`capabilities.py`):** Added capability and coverage definitions across all 7 forecast providers (Open-Meteo, Met.no, NWS/NOAA, OpenWeatherMap, Pirate Weather, Météo-France, and HA Weather Entity) to track assessable horizon and variable availability without fabricating missing series.
+- **Weather Windows Decision Engine:** Evaluates upcoming weather conditions across the next 24 hours to identify optimal outdoor activity windows:
+  - `outdoor_drying`: Identifies periods suitable for drying clothes outdoors based on rain probability/amount, temperature, humidity, wind/gust speed, cloud cover, and daylight.
+  - `garden_work`: Identifies suitable outdoor gardening intervals with temperature, wind/gust, daylight, and precipitation limits.
+  - `custom`: Flexible user-defined window criteria with configurable limits, minimum duration, and unit-aware UI inputs (°C/°F, mm/in, km/h/mph/m/s/kn).
+  - **Sensors:** When enabled (`enable_weather_windows` under **Configure → Decision Profiles**), creates `status`, `next_start` (`SensorDeviceClass.TIMESTAMP`), and `next_end` (`SensorDeviceClass.TIMESTAMP`) sensors only for enabled profiles. Turning Weather Windows or an individual profile off removes its disabled entities from the Home Assistant entity registry on reload.
+  - **Provider missing-input transparency:** Automatically skips limits whose variables are never supplied by a forecast provider (for example `max_wind_gust_kmh` on Met.no, or `max_wind_gust_kmh` and `max_cloud_cover_pct` on NWS/NOAA) and surfaces them via `not_assessed_by_provider` (`reason_codes`, entity attributes, and `get_station_summary`), while using either precipitation probability or rainfall amount to satisfy rain checks and keeping partial mid-forecast gaps as `unknown`.
+  - **Live station hazard stability & hysteresis:** Instantaneous station wind gusts require a 3-minute sustained exceedance (with a 5-minute clear hold) before blocking an active window, active open forecast windows do not advance `next_start` forward inside the same window on transient live interruptions, stale or unavailable gust/rain sensors are ignored, and `reasons` attributes omit fluctuating numeric station measurements to avoid unnecessary recorder writes.
+  - **Truncation and short-horizon detection:** Marks windows reaching the end of the 24-hour horizon as `is_truncated: True`, and reports `unknown` (`insufficient_horizon`) when a shorter forecast contains only passing hours below `min_duration_h`.
+  - **Dashboard Views & Blueprint:** Added a **Windows** view to the Vanilla (`weather_dashboard_vanilla.yaml`) and Full (`ws_core_dashboard.yaml`) dashboards, plus `blueprints/automation/ws_core/weather_window_notification.yaml` (requires HA 2024.10.0+ for timestamp trigger offsets).
+- **Provider Capability Matrix (`capabilities.py`):** Added capability and coverage definitions across all 7 forecast providers (Open-Meteo, Met.no, NWS/NOAA, OpenWeatherMap, Pirate Weather, Météo France, and HA Weather Entity), including Decision Profiles setup warnings when a selected provider lacks certain inputs.
 - **New Read-Only Service Actions:**
-  - `ws_core.get_weather_windows` (`SupportsResponse.ONLY`): Evaluates weather windows on demand with structured reasons, assessed intervals, and horizon limits.
+  - `ws_core.get_weather_windows` (`SupportsResponse.ONLY`): Evaluates weather windows on demand with structured reasons, `not_assessed_by_provider`, evaluated limits, and horizon limits.
   - `ws_core.get_station_summary` (`SupportsResponse.ONLY`): Deterministic, compact JSON-serializable station snapshot designed for voice assistants (Home Assistant Assist) and scripts.
 - **Modernized `ws_core.export_learning_state` Service:** Upgraded to `SupportsResponse.OPTIONAL`. Returns a compact JSON summary by default (safe for automation traces) with an optional `full: true` parameter for complete model weights and climatology history.
 - **Menu-Driven Options Flow:** Replaced the rigid multi-step wizard in Post-Install Configuration with an `async_show_menu` navigation hub featuring dedicated sections:
   - **Sensor Sources:** Hardware entity mappings for required and optional sensors.
   - **Weather Forecast:** Provider selection, coordinates, refresh interval, and HA weather entity setup.
-  - **Decision Profiles:** Weather Windows engine toggle and active profile selection.
+  - **Decision Profiles:** Weather Windows engine toggle, active profile selection, provider notices, and unit-aware Custom Profile limits.
   - **Indoor Rooms:** Room management hub (add, edit, remove rooms).
   - **Thresholds, Units & Calibration:** Station elevation, unit presets, alert thresholds, filtering, and calibration offsets.
   - **Weather Services & Uploads:** CWOP, Wunderground, Windy, Weathercloud, PWSweather, WOW, AWEKAS, and MQTT.
@@ -29,6 +33,7 @@ All notable changes to Weather Station Core are documented here.
 
 ### Changed
 
+- **Minimum Home Assistant Version Raised (`2024.10.0`):** `hacs.json` now requires Home Assistant `2024.10.0` or newer (required by the native timestamp-offset automation blueprint trigger and aligned with tested CI environments).
 - **Coalesced Sensor Burst Updates:** Implemented a 150 ms debounce delay (`COALESCE_BURST_DELAY_S`) in `WSStationCoordinator` for sensor bursts from multi-sensor weather stations (e.g. Ecowitt, Ambient Weather). Immediate state flushing is preserved for lightning hazard events, the 60 s sample tick cancels pending debounce refreshes, and coordinator teardown cancels pending debounce handles cleanly without post-unload writes.
 - **Timestamp-Aware Lead-Time Blending:** Forecast lead-time blending in `weather.py` now uses aware datetime comparisons, ensuring robustness against repeated and skipped DST hours.
 
@@ -38,6 +43,20 @@ All notable changes to Weather Station Core are documented here.
   - Masked solar features (`cloud_deficit`, `solar_ok`, `last_day_clearness`, `last_day_clearness_ok`) in replay vector generation to prevent historical replays from corrupting standardizer slots with zeros.
   - Aligned `dp_3h` replay units: removed `/ 3.0` factor in `replay()` so historical replays and live station updates both evaluate 3-hour pressure change in hPa consistently.
   - Implemented scoped reset (`scoped_reset_features`): on upgrade to v3.0 (with `features_method = 4`), standardizer slots and model weights for corrupted features are reset cleanly while preserving all other weights, base rates, and learned history.
+
+### Breaking Changes
+
+- **Service validation errors:** `ws_core.get_weather_windows`, `ws_core.get_station_summary`, `ws_core.export_learning_state`, `ws_core.reset_rain_baseline`, `ws_core.reset_learning_state`, and `ws_core.apply_calibration` now raise `ServiceValidationError` when called with an unknown/unloaded `entry_id`, unknown `profile_id`, or invalid profile limit range instead of returning `{}` or an `{"error": ...}` payload.
+- **Minimum Home Assistant 2024.10.0:** Installs running Home Assistant 2024.6–2024.9 must upgrade Home Assistant before updating to v3.0.0.
+- **Automatic cleanup of disabled Weather Window entities:** Disabling `enable_weather_windows` or unchecking a profile automatically removes its stale `window_<profile>_*` entity registry entries on reload.
+
+### Upgrade & Data Retention Notes
+
+- **Automatic pre-migration backup:** Before executing the one-time v3.0 Pattern Forecast feature reset (`features_method < 4`), `ws_core` writes a full pre-reset copy of your stored Pattern Forecast state to `.storage/ws_core_<entry_id>_pattern_forecast_pre_v3_backup`.
+- **What is reset vs. kept:** Only the standardizer slots (`n`, `mean`, `var`) and per-feature model weights for `dp_3h` (used by rain, frost, gust, storm) and the four solar features (`cloud_deficit`, `solar_ok`, `last_day_clearness`, `last_day_clearness_ok`, used by rain, heat, storm, frost) are reset once. All unrelated model weights, intercepts, event counts (`ev_live`), `solar_lux_factor`, rain blend outcomes/weights, 90-day climatology history, streaks, daily extremes, manual calibration offsets, and applied auto-calibration offsets are preserved intact.
+- **Relearning behavior and duration:** `dp_3h` replays up to 90 days of hourly pressure statistics from Home Assistant Recorder immediately after startup (when history exists). Because Home Assistant Recorder history does not contain cloud cover / clearness index series, the four solar feature weights start neutral and relearn gradually from live daylight updates over subsequent days/weeks while models continue operating safely (or briefly show `collecting` on targets below minimum sample count).
+- **Provider capability notes:** Open-Meteo supplies all Weather Windows inputs. Met.no lacks precipitation probability and wind gusts (rain checks use `precip_mm`, and gust limits appear in `not_assessed_by_provider`). NWS/NOAA lacks precipitation amount, cloud cover, and wind gusts (`precip_prob` covers rain, while gusts and cloud cover appear in `not_assessed_by_provider`). `ha_weather_entity` depends on what attributes the wrapped entity supplies.
+- **Downgrade tolerance:** Pattern Forecast storage remains on schema version `1` (`PATTERN_STORE_VERSION = 1`), so downgrading back to v2.14.x does not break storage parsing; however, once `features_method = 4` has reset the corrupted feature weights in `.storage/ws_core_<entry_id>_pattern_forecast`, restoring the pre-upgrade feature weights requires restoring from `.storage/ws_core_<entry_id>_pattern_forecast_pre_v3_backup` (or re-running recorder history replay).
 
 ## [2.14.3] - 2026-11-18
 

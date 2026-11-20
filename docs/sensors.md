@@ -517,3 +517,48 @@ a coordinator reload automatically.
 | `switch.ws_enable_comfort_indices` | All comfort and heat-stress indices |
 | `switch.ws_enable_neighbor_qc` | Hourly sensor sanity check against Open-Meteo (on by default; sends your coordinates) |
 | `switch.ws_enable_pattern_forecast` | Pattern Forecast: learned chance of rain, frost, heat, gusts and storms (off by default; local) |
+
+---
+
+## Optional: Weather Windows Decision Engine (`Decision Profiles`) {#weather-windows}
+
+Off by default (`enable_weather_windows = false`). Configure under **Settings → Devices & Services → Weather Station Core → Configure → Decision Engine & Weather Windows**.
+
+Entities are created **only** when `enable_weather_windows` is turned on, and only for the selected profiles (`outdoor_drying`, `garden_work`, and/or `custom`). Disabling the feature or unchecking a profile removes its disabled entities from Home Assistant's entity registry on reload.
+
+### Profiles and Entities
+
+For each enabled profile `<pid>` (`outdoor_drying`, `garden_work`, `custom`):
+
+| Entity ID | Device Class | Description |
+|---|---|---|
+| `sensor.ws_window_<pid>_status` | — | Current suitability state: `suitable_now`, `window_upcoming`, `unsuitable`, or `unknown` |
+| `sensor.ws_window_<pid>_next_start` | `timestamp` | Start time of the active or next suitable interval (`unknown` if none) |
+| `sensor.ws_window_<pid>_next_end` | `timestamp` | End time of the active or next suitable interval (`unknown` if none) |
+
+Default profile criteria (all numeric custom limits accept °C/°F, mm/in, and km/h/mph/m/s/kn matching station units):
+
+| Profile | Min Duration | Rain Limits | Temp (°C) | Humidity | Wind / Gust (km/h) | Daylight | Clouds |
+|---|---|---|---|---|---|---|---|
+| `outdoor_drying` | 2 h | prob ≤ 20%, mm = 0 | 10–35 | 15–75% | wind 5–30, gust ≤ 40 | Required | ≤ 70% |
+| `garden_work` | 2 h | prob ≤ 20%, mm = 0 | 10–32 | ≤ 85% | wind ≤ 25, gust ≤ 40 | Required | — |
+| `custom` | 2 h | prob ≤ 25%, mm = 0 | 12–30 | ≤ 80% | wind ≤ 30, gust ≤ 50 | Optional | — |
+
+### Attributes, Live Station Checks & Provider Coverage
+
+- `sensor.ws_window_<pid>_status` exposes `reasons` (localized summary sentences in configured display units, excluding live fluctuating numbers to prevent recorder churn), `reason_codes`, `not_assessed_by_provider`, `duration_h`, `is_truncated`, and `horizon_hours`.
+- **Live station checks:** Active station rainfall immediately blocks `suitable_now`, while instantaneous anemometer wind gusts require a 3-minute sustained exceedance (with a 5-minute clear hold) before interrupting a currently open window, and stale/unavailable gust or rain sensors are ignored.
+- **Provider capability handling:** If your forecast provider omits an entire variable across every forecast hour (for example gusts on Met.no, or gusts and cloud cover on NWS/NOAA), limits depending on that variable are skipped and listed in `not_assessed_by_provider` rather than falsely failing to `unknown`. Either precipitation probability or rainfall amount satisfies rain checks where both limits exist. Real mid-forecast gaps still report `unknown` (`missing_data`), and shorter-than-minimum passing forecasts report `unknown` (`insufficient_horizon`).
+
+---
+
+## Actions (Services) {#actions}
+
+| Service | Response | Description |
+|---|---|---|
+| `ws_core.get_weather_windows` | `SupportsResponse.ONLY` | Evaluates enabled profiles (or a chosen `profile_id` with optional custom `limits` dict) across the next 24 hours; raises `ServiceValidationError` on unknown `entry_id`, unknown `profile_id`, or invalid limits |
+| `ws_core.get_station_summary` | `SupportsResponse.ONLY` | Deterministic JSON-serializable snapshot of live observations, 24h extremes, alerts, forecast validity (`hourly_horizon_h`, `capabilities`), Pattern Forecast maturity, and Weather Windows (`not_assessed_by_provider` when present) for Home Assistant Assist and scripts |
+| `ws_core.export_learning_state` | `SupportsResponse.OPTIONAL` | Returns a compact JSON summary (or complete raw model weights when `full: true` is passed), or writes to the INFO log when called without `return_response` |
+| `ws_core.apply_calibration` | None | Updates calibration offsets (`cal_temp_c`, `cal_humidity`, `cal_pressure_hpa`, `cal_wind_ms`) and triggers a reload |
+| `ws_core.reset_learning_state` | None | Resets `all`, `solar`, `forecast`, `streaks`, or `pattern_forecast` learning state |
+| `ws_core.reset_rain_baseline` | None | Resets the internal cumulative precipitation baseline used for rain rate filtering |

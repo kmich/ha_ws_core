@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 
@@ -139,9 +140,8 @@ class TestV3Services:
         assert res_default["profile_id"] == PROFILE_CUSTOM
 
         # Unknown profile_id is rejected even when limits are passed
-        err = coord.get_weather_windows_evaluation(profile_id="astronomy", custom_limits=custom_limits)
-        assert err["error"] == "Unknown profile 'astronomy'"
-        assert PROFILE_OUTDOOR_DRYING in err["available_profiles"]
+        with pytest.raises(ValueError, match="Unknown profile 'astronomy'"):
+            coord.get_weather_windows_evaluation(profile_id="astronomy", custom_limits=custom_limits)
 
     async def test_registered_v3_services_and_schema_validation(self, hass, caplog):
         entry = MockConfigEntry(
@@ -242,6 +242,31 @@ class TestV3Services:
                     blocking=True,
                     return_response=True,
                 )
+
+        # 5. Unknown profile_id, unknown entry_id, and contradictory limits raise ServiceValidationError
+        with pytest.raises(ServiceValidationError):
+            await hass.services.async_call(
+                DOMAIN,
+                SERVICE_GET_WEATHER_WINDOWS,
+                {"profile_id": "unknown_profile"},
+                blocking=True,
+                return_response=True,
+            )
+        with pytest.raises(ServiceValidationError):
+            await hass.services.async_call(
+                DOMAIN,
+                SERVICE_GET_WEATHER_WINDOWS,
+                {"limits": {"min_temp_c": 30.0, "max_temp_c": 10.0}},
+                blocking=True,
+                return_response=True,
+            )
+        for svc, data in (
+            (SERVICE_GET_WEATHER_WINDOWS, {"entry_id": "missing_entry"}),
+            (SERVICE_GET_STATION_SUMMARY, {"entry_id": "missing_entry"}),
+            (SERVICE_EXPORT_LEARNING, {"entry_id": "missing_entry"}),
+        ):
+            with pytest.raises(ServiceValidationError):
+                await hass.services.async_call(DOMAIN, svc, data, blocking=True, return_response=True)
 
     async def test_weather_window_notification_blueprint_fires_15_min_before_start(self, hass):
         src_bp = (
@@ -446,6 +471,22 @@ class TestV3Services:
         assert start_state.attributes["friendly_name"].endswith("Drone Flying Next Start")
         assert end_state.attributes["friendly_name"].endswith("Drone Flying Next End")
         assert "Custom Window" not in status_state.attributes["friendly_name"]
+        assert "not_assessed_by_provider" in status_state.attributes
+
+        # Disabling Weather Windows removes disabled window entities from the registry on reload
+        from homeassistant.helpers import entity_registry as er
+
+        with (
+            patch("custom_components.ws_core.PLATFORMS", ["sensor"]),
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator.async_start", AsyncMock()),
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator.async_stop", AsyncMock()),
+        ):
+            hass.config_entries.async_update_entry(entry, options={CONF_ENABLE_WEATHER_WINDOWS: False})
+            await hass.async_block_till_done()
+
+        reg = er.async_get(hass)
+        for suffix in ("status", "next_start", "next_end"):
+            assert reg.async_get(f"sensor.ws_window_custom_{suffix}") is None
 
     async def test_public_actions_share_forecast_coverage_contract(self, hass):
         entry = MockConfigEntry(

@@ -139,6 +139,20 @@ class TestPR6LocalizationCompleteness:
                 "custom_require_daylight",
             ):
                 assert opt_steps["decision_profiles"]["data"][custom_key], (lang, custom_key)
+                if custom_key in (
+                    "custom_max_rain_mm",
+                    "custom_min_temp_c",
+                    "custom_max_temp_c",
+                    "custom_min_wind_kmh",
+                    "custom_max_wind_kmh",
+                    "custom_max_wind_gust_kmh",
+                ):
+                    label = opt_steps["decision_profiles"]["data"][custom_key]
+                    assert "(°C)" not in label and "(km/h)" not in label and "(mm/h)" not in label, (lang, custom_key)
+            assert "{provider_warning}" in opt_steps["decision_profiles"]["description"], lang
+            prof_opts = d["selector"]["weather_window_profiles"]["options"]
+            assert set(prof_opts) == {"outdoor_drying", "garden_work", "custom"}, lang
+            assert all(prof_opts.values()), lang
             assert d["options"]["error"]["invalid_duration"]
             assert d["options"]["error"]["min_exceeds_max"]
 
@@ -152,6 +166,10 @@ class TestPR6LocalizationCompleteness:
         for lang in ("de", "es", "fr", "it", "nl", "pl", "pt"):
             tr = self._load(lang)
             assert tr["options"]["step"]["init"]["title"] != en["options"]["step"]["init"]["title"], lang
+            assert (
+                tr["selector"]["weather_window_profiles"]["options"]["outdoor_drying"]
+                != en["selector"]["weather_window_profiles"]["options"]["outdoor_drying"]
+            ), lang
             assert (
                 tr["entity"]["sensor"]["window_outdoor_drying_status"]["name"]
                 != en["entity"]["sensor"]["window_outdoor_drying_status"]["name"]

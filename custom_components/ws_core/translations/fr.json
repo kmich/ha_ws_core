@@ -424,21 +424,21 @@
       },
       "decision_profiles": {
         "title": "Profils de décision et créneaux météo",
-        "description": "Configurez le moteur de décision météo et sélectionnez les profils d'activité.",
+        "description": "Configurez le moteur de décision météo et sélectionnez les profils d'activité.{provider_warning}",
         "data": {
           "enable_weather_windows": "Activer le moteur de décision des créneaux météo",
           "weather_window_profiles": "Profils de décision actifs",
           "custom_window_name": "Nom du profil personnalisé",
           "custom_min_duration_h": "Durée minimale personnalisée (heures)",
           "custom_max_rain_prob_pct": "Probabilité de pluie max. personnalisée (%)",
-          "custom_max_rain_mm": "Précipitations max. personnalisées (mm/h)",
-          "custom_min_temp_c": "Température min. personnalisée (°C)",
-          "custom_max_temp_c": "Température max. personnalisée (°C)",
+          "custom_max_rain_mm": "Précipitations max. personnalisées",
+          "custom_min_temp_c": "Température min. personnalisée",
+          "custom_max_temp_c": "Température max. personnalisée",
           "custom_min_humidity_pct": "Humidité min. personnalisée (%)",
           "custom_max_humidity_pct": "Humidité max. personnalisée (%)",
-          "custom_min_wind_kmh": "Vitesse de vent min. personnalisée (km/h)",
-          "custom_max_wind_kmh": "Vitesse de vent max. personnalisée (km/h)",
-          "custom_max_wind_gust_kmh": "Rafale de vent max. personnalisée (km/h)",
+          "custom_min_wind_kmh": "Vitesse de vent min. personnalisée",
+          "custom_max_wind_kmh": "Vitesse de vent max. personnalisée",
+          "custom_max_wind_gust_kmh": "Rafale de vent max. personnalisée",
           "custom_max_cloud_cover_pct": "Couverture nuageuse max. personnalisée (%)",
           "custom_require_daylight": "Le profil personnalisé exige la lumière du jour"
         }
@@ -3090,6 +3090,13 @@
         "auto": "Auto (détecter depuis l'unité du capteur)",
         "percent": "Pourcentage (0-100 %)",
         "fraction": "Fraction volumique (0-1 / m³/m³)"
+      }
+    },
+    "weather_window_profiles": {
+      "options": {
+        "outdoor_drying": "Séchage du linge en extérieur",
+        "garden_work": "Jardinage et travaux extérieurs",
+        "custom": "Profil de créneau personnalisé"
       }
     }
   }

@@ -404,21 +404,21 @@
       },
       "decision_profiles": {
         "title": "Profili decisionali e finestre meteo",
-        "description": "Configura il motore decisionale meteo e seleziona le finestre di attività.",
+        "description": "Configura il motore decisionale meteo e seleziona le finestre di attività.{provider_warning}",
         "data": {
           "enable_weather_windows": "Abilita motore decisionale finestre meteo",
           "weather_window_profiles": "Profili decisionali attivi",
           "custom_window_name": "Nome del profilo personalizzato",
           "custom_min_duration_h": "Durata minima personalizzata (ore)",
           "custom_max_rain_prob_pct": "Probabilità max pioggia personalizzata (%)",
-          "custom_max_rain_mm": "Precipitazione max personalizzata (mm/h)",
-          "custom_min_temp_c": "Temperatura min personalizzata (°C)",
-          "custom_max_temp_c": "Temperatura max personalizzata (°C)",
+          "custom_max_rain_mm": "Precipitazione max personalizzata",
+          "custom_min_temp_c": "Temperatura min personalizzata",
+          "custom_max_temp_c": "Temperatura max personalizzata",
           "custom_min_humidity_pct": "Umidità min personalizzata (%)",
           "custom_max_humidity_pct": "Umidità max personalizzata (%)",
-          "custom_min_wind_kmh": "Velocità vento min personalizzata (km/h)",
-          "custom_max_wind_kmh": "Velocità vento max personalizzata (km/h)",
-          "custom_max_wind_gust_kmh": "Raffica di vento max personalizzata (km/h)",
+          "custom_min_wind_kmh": "Velocità vento min personalizzata",
+          "custom_max_wind_kmh": "Velocità vento max personalizzata",
+          "custom_max_wind_gust_kmh": "Raffica di vento max personalizzata",
           "custom_max_cloud_cover_pct": "Copertura nuvolosa max personalizzata (%)",
           "custom_require_daylight": "Il profilo personalizzato richiede luce diurna"
         }
@@ -3066,6 +3066,13 @@
         "auto": "Automatico (rileva dall'unità del sensore)",
         "percent": "Percentuale (0-100%)",
         "fraction": "Frazione volumetrica (0-1 / m³/m³)"
+      }
+    },
+    "weather_window_profiles": {
+      "options": {
+        "outdoor_drying": "Asciugatura biancheria all’aperto",
+        "garden_work": "Lavori in giardino e cortile",
+        "custom": "Profilo finestra personalizzato"
       }
     }
   }

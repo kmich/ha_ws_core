@@ -4,7 +4,7 @@ This page gets you from zero to a working installation in about 5 minutes.
 
 ## Requirements
 
-- Home Assistant 2024.6 or newer
+- Home Assistant 2024.10 or newer
 - A personal weather station already integrated into HA, providing at minimum:
 
 | Measurement | Example entity |
@@ -176,7 +176,9 @@ Every setting from the wizard is changeable after installation without reinstall
 
 Go to **Settings → Devices & Services → Weather Station Core → Configure**.
 
-The options flow mirrors the full setup wizard. Changes take effect after saving.
+The options flow uses a menu hub (**Sensor Sources**, **Weather Forecast & Location**, **Decision Engine & Weather Windows**, **Indoor Rooms**, **Thresholds, Units & Calibration**, **Weather Services & Uploads**, **Features & Diagnostics**). Changes take effect after saving.
+
+To enable activity planning windows (`outdoor_drying`, `garden_work`, or a custom profile), open **Configure → Decision Engine & Weather Windows**.
 
 To remap a required or optional sensor (e.g. after replacing your weather station
-hardware), use **Configure → Required sensors** or **Configure → Optional sensors**.
+hardware), use **Configure → Sensor Sources**.

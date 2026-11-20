@@ -404,21 +404,21 @@
       },
       "decision_profiles": {
         "title": "Profile decyzji i okna pogodowe",
-        "description": "Skonfiguruj silnik decyzji pogodowych i wybierz aktywne profile aktywności.",
+        "description": "Skonfiguruj silnik decyzji pogodowych i wybierz aktywne profile aktywności.{provider_warning}",
         "data": {
           "enable_weather_windows": "Włącz silnik decyzji okien pogodowych",
           "weather_window_profiles": "Aktywne profile decyzji",
           "custom_window_name": "Nazwa własnego profilu",
           "custom_min_duration_h": "Własny minimalny czas trwania (godziny)",
           "custom_max_rain_prob_pct": "Własne maks. prawdopodobieństwo opadów (%)",
-          "custom_max_rain_mm": "Własne maks. opady (mm/h)",
-          "custom_min_temp_c": "Własna min. temperatura (°C)",
-          "custom_max_temp_c": "Własna maks. temperatura (°C)",
+          "custom_max_rain_mm": "Własne maks. opady",
+          "custom_min_temp_c": "Własna min. temperatura",
+          "custom_max_temp_c": "Własna maks. temperatura",
           "custom_min_humidity_pct": "Własna min. wilgotność (%)",
           "custom_max_humidity_pct": "Własna maks. wilgotność (%)",
-          "custom_min_wind_kmh": "Własna min. prędkość wiatru (km/h)",
-          "custom_max_wind_kmh": "Własna maks. prędkość wiatru (km/h)",
-          "custom_max_wind_gust_kmh": "Własne maks. porywy wiatru (km/h)",
+          "custom_min_wind_kmh": "Własna min. prędkość wiatru",
+          "custom_max_wind_kmh": "Własna maks. prędkość wiatru",
+          "custom_max_wind_gust_kmh": "Własne maks. porywy wiatru",
           "custom_max_cloud_cover_pct": "Własne maks. zachmurzenie (%)",
           "custom_require_daylight": "Własny profil wymaga światła dziennego"
         }
@@ -3066,6 +3066,13 @@
         "auto": "Automatycznie (wykryj z jednostki czujnika)",
         "percent": "Procent (0-100%)",
         "fraction": "Ułamek objętościowy (0-1 / m³/m³)"
+      }
+    },
+    "weather_window_profiles": {
+      "options": {
+        "outdoor_drying": "Suszenie prania na zewnątrz",
+        "garden_work": "Prace ogrodowe i podwórkowe",
+        "custom": "Własny profil okna"
       }
     }
   }

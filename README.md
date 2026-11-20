@@ -16,6 +16,8 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 ## What's new
 
+- **Weather Windows Decision Engine (v3.0).** Enable **Decision Profiles** (`Outdoor Drying`, `Garden & Yard Work`, or `Custom`) to get `suitable_now` / `window_upcoming` / `unsuitable` / `unknown` status and `next_start` / `next_end` timestamp sensors over the next 24 hours, plus a dedicated notification blueprint and **Windows** dashboard view.
+- **Voice & script service actions.** Call `ws_core.get_weather_windows` and `ws_core.get_station_summary` (`SupportsResponse.ONLY`) or `ws_core.export_learning_state` (`SupportsResponse.OPTIONAL`) directly from Home Assistant scripts and Assist automations.
 - **Forecasts that learn from your own station.** Pattern Forecast gives the chance of rain, frost, a hot day, strong gusts and thunderstorms over the next hours. It now learns from the history Home Assistant already has, so it can show numbers minutes after you switch it on instead of weeks later.
 - **A rain chance that keeps score.** Your station's rain estimate and the forecast provider's are checked against your gauge every 6 hours, and whichever has been more accurate at your location gets more say. In 2.13.5 both are scored on the same 6-hour window, so the comparison is fair.
 - **Sensors that explain themselves.** When a value can't be calculated, the sensor tells you why (a missing source, a formula that doesn't apply right now, or a model still collecting data) instead of a bare `unknown`.
@@ -34,6 +36,8 @@ The [changelog](CHANGELOG.md) has every change.
 **Protection.** Gust alerts for awnings and blinds, frost point (Buck 1981) and freeze warnings, UTCI and WBGT heat stress, and fire danger from the Canadian FWI, McArthur FFDI and Fosberg FFWI.
 
 **Data quality.** Checks for stuck, spiking and drifting sensors, cross-sensor consistency, and a station health summary. When a value can't be calculated, the sensor's `reason` and `explanation` attributes say why.
+
+**Weather Windows & actions (opt-in).** Evaluates hourly forecasts and live station hazards across the next 24 hours for outdoor drying, garden work, or custom limits, creating `window_*_status`, `window_*_next_start`, and `window_*_next_end` entities alongside `ws_core.get_weather_windows`, `ws_core.get_station_summary`, and `ws_core.export_learning_state`. See the [sensor and action reference](docs/sensors.md).
 
 **Extras you can turn on.** Snow phase and accumulation, heating and cooling degree days, 10-year climate normals (ERA5), air quality, pollen, sea temperature, a solar forecast, lightning, and uploads to Weather Underground, Windy, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP and OpenWeatherMap.
 
@@ -73,10 +77,11 @@ More than 50 sensors are created straight away. Optional features are under **Co
 
 ## Blueprints
 
-Ten automation blueprints with sensible defaults, for example:
+Eleven automation blueprints with sensible defaults, for example:
 
 | Blueprint | What it does | Import |
 |---|---|---|
+| **Weather Window Notification** | Alerts ahead of an upcoming drying, garden, or custom weather window (HA 2024.10+) | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fweather_window_notification.yaml) |
 | **Rain Start Warning** | Phone or TTS alert when rain begins or is imminent | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Frain_start.yaml) |
 | **Irrigation Rain Skip** | Skips watering when rainfall or ET₀ says the soil doesn't need it | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Firrigation_rain_skip.yaml) |
 | **High Wind Protection** | Retracts awnings and blinds on strong gusts | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fhigh_wind.yaml) |
@@ -91,9 +96,9 @@ The `dashboards/` folder has five dashboards and a set of gauge cards. Paste one
 
 | Dashboard | Layout | Custom cards |
 |---|---|---|
-| **Vanilla** (`weather_dashboard_vanilla.yaml`) | Four views | none |
+| **Vanilla** (`weather_dashboard_vanilla.yaml`) | Five views (including **Windows**) | none |
 | **Enhanced** (`weather_dashboard.yaml`) | Animated Weather and Advanced pages, including Pattern Forecast | `button-card` and six others |
-| **Full** (`ws_core_dashboard.yaml`) | Six views covering every sensor group | `mushroom`, `mini-graph-card` |
+| **Full** (`ws_core_dashboard.yaml`) | Seven views covering every sensor group and **Windows** | `mushroom`, `mini-graph-card` |
 | **Mobile** (`ws_core_dashboard_mobile.yaml`) | Single-column phone layout | `mushroom`, `mini-graph-card` |
 | **Bubble** (`ws_core_bubble_dashboard.yaml`) | One centred column on any screen, with pop-ups, an alert banner, the learning stats and an optional weather background | Bubble Card 3.2.0+ |
 | **Gauge presets** (`ws_core_gauge_presets.yaml`) | 13 gauge cards to add to your own dashboard | none |

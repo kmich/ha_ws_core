@@ -6,9 +6,9 @@ pasting into the raw configuration editor.
 
 | File | What it is | Custom cards needed |
 |---|---|---|
-| [`weather_dashboard_vanilla.yaml`](#vanilla-dashboard-weather_dashboard_vanillayaml) | Native-cards dashboard that works immediately | none |
+| [`weather_dashboard_vanilla.yaml`](#vanilla-dashboard-weather_dashboard_vanillayaml) | Native-cards dashboard that works immediately (5 views incl. **Windows**) | none |
 | [`weather_dashboard.yaml`](#enhanced-dashboard-weather_dashboardyaml) | Rich, animated two-page dashboard (Weather + Advanced) | `button-card` and six others |
-| [`ws_core_dashboard.yaml`](#v20-full-dashboard-ws_core_dashboardyaml) | Six-view dashboard covering every sensor group | `mushroom`, `mini-graph-card` |
+| [`ws_core_dashboard.yaml`](#v20-full-dashboard-ws_core_dashboardyaml) | Seven-view dashboard covering every sensor group and **Windows** | `mushroom`, `mini-graph-card` |
 | [`ws_core_dashboard_mobile.yaml`](#v20-mobile-dashboard-ws_core_dashboard_mobileyaml) | Single-column phone layout | `mushroom`, `mini-graph-card` |
 | [`ws_core_bubble_dashboard.yaml`](#bubble-card-dashboard-ws_core_bubble_dashboardyaml) | Mobile-first dashboard in one centred column, with pop-ups and a bottom bar | Bubble Card v3.2.0+ |
 | [`ws_core_gauge_presets.yaml`](#gauge-presets-ws_core_gauge_presetsyaml) | Not a dashboard: gauge cards to paste into your own | none |
@@ -47,7 +47,9 @@ additional HACS frontend integrations.
 
 Includes a **Recent Weather Events** logbook card (Station page) showing the last
 72h of rain start/stop, frost/thaw, and lightning-strike events from the built-in
-event entities.
+event entities, and a **Windows** page (`path: windows`) displaying Weather Windows
+status, next window start/end timestamps, and reason explanations when **Decision Profiles**
+are enabled.
 
 ---
 
@@ -113,7 +115,7 @@ Without the photos that card keeps its plain background.
 
 ## v2.0 Full Dashboard (`ws_core_dashboard.yaml`)
 
-Six-view dashboard covering the full range of v2.0 sensors.
+Seven-view dashboard covering the full range of sensors and v3.0 Weather Windows.
 
 **Views:**
 1. **Now** — current conditions tile grid with weather conditions, temperature,
@@ -125,6 +127,7 @@ Six-view dashboard covering the full range of v2.0 sensors.
 5. **Diagnostics** — data quality score, sensor drift flags, upload status sensors,
    and a **Recent Weather Events** logbook (rain start/stop, frost/thaw, lightning)
 6. **Indoor** — indoor comfort score, temperature and humidity deltas, plus per-room sensors (temp delta, humidity, CO₂ and comfort) for each named room
+7. **Windows** — Weather Windows summary card, outdoor drying, garden work, and optional custom profile schedules & status attributes (`enable_weather_windows`)
 
 **HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
 

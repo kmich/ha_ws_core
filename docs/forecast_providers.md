@@ -140,3 +140,16 @@ See [Contributing](contributing.md) for the provider contribution path.
 New providers require: a Python file in `custom_components/ws_core/providers/`, a
 one-line registry entry in `providers/__init__.py`, and translation strings for the
 provider name.
+
+---
+
+## Variable availability and Weather Windows {#provider-capabilities}
+
+Not every forecast provider supplies the same hourly fields (`capabilities.py`):
+
+- **Open-Meteo, OpenWeatherMap, Pirate Weather, Météo France:** Supply temperature, precipitation probability and amount, humidity, wind speed, gusts, and cloud cover.
+- **Met.no:** Supplies temperature, humidity, wind speed, cloud cover, and hourly precipitation amount (`precip_mm`), but omits `precip_prob` and `gust_kmh`. Weather Windows uses `precip_mm` for rain limits and lists `max_wind_gust_kmh` in `not_assessed_by_provider`.
+- **NWS / NOAA:** Supplies temperature, humidity, wind speed, and `precip_prob`, but omits `precip_mm`, `gust_kmh`, and `cloud_cover`. Weather Windows uses `precip_prob` for rain limits and lists unassessed limits (such as `max_wind_gust_kmh` and `max_cloud_cover_pct`) in `not_assessed_by_provider`.
+- **Home Assistant weather entity:** Available fields depend on what the wrapped `weather.*` integration returns at runtime; any variable absent across every forecast hour is listed under `not_assessed_by_provider`, while partial slot gaps report `unknown`.
+
+Live station gust and rain checks still run on your local station sensors even when a provider omits forecast gusts. **Configure → Decision Profiles** displays a notice when the active provider omits variables used by Decision Profiles.

@@ -62,7 +62,12 @@ trigger:
 condition:
   - condition: template
     value_template: >-
-      {{ states(next_start_sensor) not in ['unknown', 'unavailable', 'none', ''] }}
+      {% set start = states(next_start_sensor) %}
+      {% if start in ['unknown', 'unavailable', 'none', ''] %}
+        false
+      {% else %}
+        {{ as_timestamp(start, 0) >= (as_timestamp(now()) - 60) }}
+      {% endif %}
 
 action:
   - service: !input notify_service

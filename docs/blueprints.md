@@ -1,6 +1,6 @@
 # Automation Blueprints
 
-`ws_core` includes ten pre-configured automation blueprints located in `blueprints/automation/ws_core/`. Each blueprint imports directly into Home Assistant as an interactive, customizable automation with sensible threshold defaults and hysteresis.
+`ws_core` includes eleven pre-configured automation blueprints located in `blueprints/automation/ws_core/`. Each blueprint imports directly into Home Assistant as an interactive, customizable automation with sensible threshold defaults and hysteresis.
 
 ---
 
@@ -10,6 +10,7 @@ Click any badge below to import the blueprint directly into your Home Assistant 
 
 | Blueprint | Purpose | 1-Click Import |
 |---|---|---|
+| **Weather Window Notification** | Notify ahead of an upcoming outdoor drying, garden work, or custom weather window (requires HA 2024.10.0+) | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fweather_window_notification.yaml) |
 | **Rain Start Warning** | Alert via TTS or phone when rain begins or is imminent; close covers | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Frain_start.yaml) |
 | **Irrigation Rain Skip** | Automatically skip scheduled watering when rainfall or ET₀ indicates moist soil | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Firrigation_rain_skip.yaml) |
 | **High Wind Protection** | Automatically retract awnings and blinds when severe wind gusts are detected | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fhigh_wind.yaml) |
@@ -47,6 +48,10 @@ Monitors outdoor temperatures and the scientific Buck (1981) frost point. Trigge
 
 #### Optional early warning from Pattern Forecast {#frost-early-warning}
 Both blueprints have two extra inputs: **Pattern Forecast frost sensor** (pick `sensor.ws_pattern_frost_12h`) and **Pattern frost probability threshold** (default 50 %). When the sensor is chosen, the alert also fires as soon as the probability reaches the threshold, before the temperature actually drops, and **only while that sensor's `maturity` attribute is `skilled`**. The Freeze blueprint also shuts the optional valve in that case. Leave the sensor empty and both blueprints behave exactly as before. See the [Pattern Forecast guide](guides/pattern_forecast.md).
+
+### 6. Weather Window Notification (`weather_window_notification.yaml`) {#weather-window-notification}
+Triggers ahead of an upcoming suitable activity window using Home Assistant's native `time` trigger against a `next_start` timestamp sensor (`sensor.ws_window_outdoor_drying_next_start`, `sensor.ws_window_garden_work_next_start`, or `sensor.ws_window_custom_next_start`). Requires Home Assistant **2024.10.0** or newer.
+* **Key parameters:** Weather Window Next Start Sensor (`sensor` with `device_class: timestamp`), Lead Time Offset (default `-00:15:00`, i.e. 15 minutes before window start), Notification Service (`notify.persistent_notification` or mobile notify action), Optional Custom Message.
 
 ---
 

@@ -5295,6 +5295,53 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None, None
         return float(lat), float(lon)
 
+    def _weather_windows_display_prefs(self) -> dict[str, str]:
+        """Resolve validated language and display units for weather-window text."""
+        hass = getattr(self, "hass", None)
+        raw_lang = getattr(getattr(hass, "config", None), "language", None)
+        lang = raw_lang if isinstance(raw_lang, str) and raw_lang else "en"
+        t_unit = getattr(self, "temp_unit", None)
+        temp_u = t_unit if isinstance(t_unit, str) and t_unit in ("°C", "°F") else "°C"
+        r_unit = getattr(self, "rain_unit", None)
+        rain_u = r_unit if isinstance(r_unit, str) and r_unit in ("mm", "in") else "mm"
+        w_conf = getattr(self, "_wind_unit_conf", "auto")
+        if w_conf == "auto":
+            wind_u = "mph" if self._is_imperial() else "km/h"
+        else:
+            w_val = getattr(self, "wind_unit", None)
+            wind_u = w_val if isinstance(w_val, str) and w_val in ("km/h", "m/s", "mph", "kn") else "km/h"
+        return {"language": lang, "temp_unit": temp_u, "wind_unit": wind_u, "rain_unit": rain_u}
+
+    def _live_weather_windows_inputs(self, data: Mapping[str, Any], now: datetime) -> dict[str, Any]:
+        """Return shallow current-observation view with stale or unavailable gust/rain suppressed."""
+        stale_list = list(data.get("_stale_sources") or ())
+        hass = getattr(self, "hass", None)
+        sources = getattr(self, "sources", None) or {}
+        if hass is not None and isinstance(sources, Mapping):
+            gust_eid = sources.get(SRC_GUST)
+            if gust_eid:
+                gust_state = hass.states.get(gust_eid)
+                if gust_state is not None and (
+                    self._num(hass, gust_eid) is None or self._source_is_stale(SRC_GUST, now)
+                ):
+                    stale_list.append(SRC_GUST)
+            rain_eid = sources.get(SRC_RAIN_TOTAL)
+            if rain_eid:
+                rain_state = hass.states.get(rain_eid)
+                rain_rate_val = data.get(KEY_RAIN_RATE_FILT)
+                is_stale_raining = (
+                    isinstance(rain_rate_val, (int, float))
+                    and float(rain_rate_val) > 0.05
+                    and self._source_is_stale(SRC_RAIN_TOTAL, now)
+                )
+                if rain_state is not None and (self._num(hass, rain_eid) is None or is_stale_raining):
+                    stale_list.append(SRC_RAIN_TOTAL)
+        if not stale_list:
+            return data if isinstance(data, dict) else dict(data)
+        out = dict(data)
+        out["_stale_sources"] = stale_list
+        return out
+
     def _get_weather_windows_engine(self, coords: tuple[float | None, float | None] | None = None):
         """Return or initialize the WeatherWindowsEngine using resolved station profiles."""
         profiles = getattr(self, "weather_window_profiles", None)
@@ -5304,6 +5351,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         lat = float(eff_lat if eff_lat is not None else 0.0)
         lon = float(eff_lon if eff_lon is not None else 0.0)
         elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
+        prefs = self._weather_windows_display_prefs()
         engine = self._weather_windows_engine
         if engine is None:
             engine = WeatherWindowsEngine(
@@ -5311,6 +5359,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 lon=lon,
                 elevation_m=elev,
                 profiles=profiles,
+                **prefs,
             )
             self._weather_windows_engine = engine
         else:
@@ -5318,6 +5367,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             engine.lon = lon
             engine.elevation_m = elev
             engine.profiles = profiles if type(profiles) is dict else dict(profiles)
+            engine.language = prefs["language"]
+            engine.temp_unit = prefs["temp_unit"]
+            engine.wind_unit = prefs["wind_unit"]
+            engine.rain_unit = prefs["rain_unit"]
         return engine
 
     def _compute_weather_windows(self, data: dict, now: Any) -> None:
@@ -5333,10 +5386,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hourly = fc.get("hourly") if fc else None
         engine = self._get_weather_windows_engine((eff_lat, eff_lon))
         local_now = dt_util.as_local(now)
+        live_current = self._live_weather_windows_inputs(data, now)
         eval_dict = engine.evaluate_profiles(
             [prof for prof in engine.profiles.values() if prof.enabled],
             hourly,
-            current_data=data,
+            current_data=live_current,
             now=local_now,
         )
 
@@ -5365,10 +5419,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Reject unknown profile_id before applying custom overrides
         if profile_id is not None and profile_id not in engine.profiles:
-            return {
-                "error": f"Unknown profile '{profile_id}'",
-                "available_profiles": list(engine.profiles.keys()),
-            }
+            raise ValueError(f"Unknown profile '{profile_id}'. Available profiles: {', '.join(engine.profiles)}")
+
+        live_current = self._live_weather_windows_inputs(data, now_utc)
 
         # If custom limits provided, apply partial overrides onto the selected base profile
         if custom_limits:
@@ -5382,19 +5435,19 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 custom_limits,
                 profile_id=base_profile.profile_id,
             )
-            res = engine.evaluate_profile(target_profile, hourly, current_data=data, now=now)
+            res = engine.evaluate_profile(target_profile, hourly, current_data=live_current, now=now)
             return res.to_dict()
 
         if profile_id:
             prof = engine.profiles[profile_id]
-            res = engine.evaluate_profile(prof, hourly, current_data=data, now=now)
+            res = engine.evaluate_profile(prof, hourly, current_data=live_current, now=now)
             return res.to_dict()
 
         # Return all enabled profiles
         return engine.evaluate_profiles(
             [prof for prof in engine.profiles.values() if prof.enabled],
             hourly,
-            current_data=data,
+            current_data=live_current,
             now=now,
         )
 
@@ -5447,12 +5500,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     end_dt_utc = end_dt.astimezone(UTC) if end_dt.tzinfo is not None else dt_util.as_utc(end_dt)
                     if end_dt_utc <= now_utc:
                         continue
-                windows_summary[pid] = {
+                win_summary: dict[str, Any] = {
                     "status": win.get("status"),
                     "next_start": win.get("next_start"),
                     "duration_h": win.get("duration_h"),
                     "reasons": win.get("reasons_text", [])[:1],
                 }
+                if win.get("not_assessed_by_provider"):
+                    win_summary["not_assessed_by_provider"] = list(win["not_assessed_by_provider"])
+                windows_summary[pid] = win_summary
 
         return {
             "entry_id": self.entry_data.get("entry_id", "station"),
