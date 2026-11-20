@@ -446,3 +446,104 @@ class TestV3Services:
         assert start_state.attributes["friendly_name"].endswith("Drone Flying Next Start")
         assert end_state.attributes["friendly_name"].endswith("Drone Flying Next End")
         assert "Custom Window" not in status_state.attributes["friendly_name"]
+
+    async def test_public_actions_share_forecast_coverage_contract(self, hass):
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            entry_id="station",
+            data={
+                CONF_PREFIX: "ws",
+                CONF_FORECAST_PROVIDER: "open_meteo",
+                CONF_FORECAST_LAT: 38.0,
+                CONF_FORECAST_LON: 23.7,
+            },
+            options={},
+        )
+        entry.add_to_hass(hass)
+
+        mock_integration = MagicMock()
+        mock_integration.version = "3.0.0"
+
+        with (
+            patch("custom_components.ws_core.async_get_integration", return_value=mock_integration),
+            patch("custom_components.ws_core.coordinator.WSStationCoordinator.async_start", AsyncMock()),
+            patch.object(hass.config_entries, "async_forward_entry_setups", AsyncMock(return_value=True)),
+        ):
+            assert await async_setup_entry(hass, entry) is True
+
+        entry.mock_state(hass, ConfigEntryState.LOADED)
+        coord = entry.runtime_data
+
+        def _row(dt_val):
+            return {
+                "datetime": dt_val.isoformat() if isinstance(dt_val, datetime) else dt_val,
+                "temp_c": 22.0,
+                "apparent_temp_c": 22.0,
+                "precip_prob": 0,
+                "precip_mm": 0.0,
+                "wind_kmh": 10.0,
+                "gust_kmh": 15.0,
+                "humidity": 45.0,
+                "cloud_cover": 10.0,
+            }
+
+        async def _call_both(hourly_rows, eval_now):
+            coord.runtime.last_forecast_fetch = eval_now - timedelta(minutes=5)
+            coord.data = {KEY_FORECAST: {"provider": "open_meteo", "hourly": hourly_rows}}
+            with patch("custom_components.ws_core.coordinator.dt_util.now", return_value=eval_now):
+                win_resp = await hass.services.async_call(
+                    DOMAIN,
+                    SERVICE_GET_WEATHER_WINDOWS,
+                    {"profile_id": PROFILE_OUTDOOR_DRYING},
+                    blocking=True,
+                    return_response=True,
+                )
+                sum_resp = await hass.services.async_call(
+                    DOMAIN,
+                    SERVICE_GET_STATION_SUMMARY,
+                    {},
+                    blocking=True,
+                    return_response=True,
+                )
+            return win_resp["station"], sum_resp["station"]
+
+        now_hour = datetime(2026, 6, 21, 12, 0, tzinfo=UTC)
+
+        # 1. Mixed impossible dates/hours, expired, duplicate, valid, exact 24h cutoff, and >24h rows
+        mixed_rows = [
+            _row("2026-02-30T12:00:00Z"),
+            _row("2026-06-21T25:00:00Z"),
+            _row("2026-02-30"),
+            _row(now_hour - timedelta(hours=2)),
+            _row(now_hour - timedelta(hours=1)),
+            _row(now_hour),
+            _row(now_hour),  # duplicate slot
+            _row(now_hour + timedelta(hours=1)),
+            _row(now_hour + timedelta(hours=2)),
+            _row(now_hour + timedelta(hours=3)),
+            _row(now_hour + timedelta(hours=24)),  # exact 24h cutoff -> excluded
+            _row(now_hour + timedelta(hours=25)),  # beyond 24h cutoff -> excluded
+        ]
+        win_mixed, sum_mixed = await _call_both(mixed_rows, now_hour)
+        assert win_mixed["horizon_hours"] == 4
+        assert sum_mixed["forecast_validity"]["hourly_horizon_h"] == 4
+        assert sum_mixed["forecast_validity"]["hourly_horizon_h"] == win_mixed["horizon_hours"]
+
+        # 2. 25 hourly rows starting on the hour, evaluated mid-hour -> both cap at 24 hours
+        now_mid = datetime(2026, 6, 21, 12, 30, tzinfo=UTC)
+        rows_25 = [_row(now_hour + timedelta(hours=h)) for h in range(25)]
+        win_25, sum_25 = await _call_both(rows_25, now_mid)
+        assert win_25["horizon_hours"] <= 24
+        assert sum_25["forecast_validity"]["hourly_horizon_h"] <= 24
+        assert win_25["horizon_hours"] == 24
+        assert sum_25["forecast_validity"]["hourly_horizon_h"] == 24
+
+        # 3. Slot at exact 24h cutoff + rows entirely beyond 24h cutoff -> both report 0
+        beyond_rows = [
+            _row(now_hour + timedelta(hours=24)),
+            _row(now_hour + timedelta(hours=25)),
+            _row(now_hour + timedelta(hours=26)),
+        ]
+        win_beyond, sum_beyond = await _call_both(beyond_rows, now_hour)
+        assert win_beyond["horizon_hours"] == 0
+        assert sum_beyond["forecast_validity"]["hourly_horizon_h"] == 0

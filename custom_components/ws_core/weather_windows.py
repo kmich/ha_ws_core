@@ -397,18 +397,34 @@ def _parse_raw_dt_str(key: str, dt_cache: dict[str, datetime | None] | None = No
     """Parse an ISO or Home Assistant datetime string, optionally caching results."""
     if dt_cache is not None and key in dt_cache:
         return dt_cache[key]
+    parsed: datetime | None = None
     if "T" in key or " " in key:
         try:
             parsed = datetime.fromisoformat(key)
         except ValueError:
+            parsed = None
+    if parsed is None:
+        try:
             parsed = dt_util.parse_datetime(key)
-    else:
-        parsed = dt_util.parse_datetime(key)
+        except ValueError:
+            parsed = None
     if dt_cache is not None:
         if len(dt_cache) > 512:
             dt_cache.clear()
         dt_cache[key] = parsed
     return parsed
+
+
+def _resolve_eval_clock(now: datetime | None = None) -> tuple[tzinfo, datetime, float]:
+    """Resolve (display_tz, now_utc, now_ts) consistently across decision engine and summary."""
+    eval_now = now or dt_util.now()
+    display_tz = dt_util.get_default_time_zone()
+    if eval_now.tzinfo is not None and eval_now.tzinfo is not UTC:
+        display_tz = eval_now.tzinfo
+    now_utc = (
+        eval_now.replace(tzinfo=display_tz).astimezone(UTC) if eval_now.tzinfo is None else eval_now.astimezone(UTC)
+    )
+    return display_tz, now_utc, now_utc.timestamp()
 
 
 def parse_forecast_slot_utc(
@@ -441,24 +457,74 @@ def parse_forecast_slot_utc(
     return parsed.astimezone(UTC)
 
 
-def count_usable_hourly_horizon_h(
-    hourly_forecast: list[dict[str, Any]] | None,
-    now_utc: datetime,
+def _collect_horizon_slots(
+    hourly_forecast: list[dict[str, Any]],
+    now_ts: float,
     display_tz: tzinfo,
-) -> int:
-    """Count distinct, parseable hourly forecast slots whose hour has not yet ended."""
-    if not hourly_forecast:
-        return 0
-    dt_cache: dict[str, datetime | None] = {}
-    slots: set[datetime] = set()
+    slot_time_cache: dict[tuple[str, tzinfo], tuple[datetime, float, str] | None] | None = None,
+    dt_cache: dict[str, datetime | None] | None = None,
+) -> dict[float, tuple[datetime, str, Mapping[str, Any]]]:
+    """Parse, deduplicate, and filter hourly slots to [now - 1h, now + 24h)."""
+    deduped: dict[float, tuple[datetime, str, Mapping[str, Any]]] = {}
+    max_h_s = MAX_HORIZON_HOURS * 3600.0
+    is_utc_display = display_tz is UTC
     for item in hourly_forecast:
         if not isinstance(item, Mapping):
             continue
-        slot_utc = parse_forecast_slot_utc(item, display_tz, dt_cache)
-        if slot_utc is None or slot_utc + _ONE_HOUR <= now_utc:
+        raw_dt = item.get("utc_datetime")
+        if raw_dt is None or raw_dt == "":
+            raw_dt = item.get("datetime")
+        if raw_dt is None or raw_dt == "":
             continue
-        slots.add(slot_utc)
-    return len(slots)
+        if type(raw_dt) is str and slot_time_cache is not None:
+            cache_key = (raw_dt, display_tz)
+            cached_t = slot_time_cache.get(cache_key, _MISSING)
+            if cached_t is _MISSING:
+                parsed = _parse_raw_dt_str(raw_dt, dt_cache)
+                if parsed is None:
+                    if len(slot_time_cache) > 512:
+                        slot_time_cache.clear()
+                    slot_time_cache[cache_key] = None
+                    continue
+                slot_utc = (
+                    parsed.replace(tzinfo=display_tz).astimezone(UTC)
+                    if parsed.tzinfo is None
+                    else parsed.astimezone(UTC)
+                )
+                slot_ts = slot_utc.timestamp()
+                display_iso = slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
+                if len(slot_time_cache) > 512:
+                    slot_time_cache.clear()
+                slot_time_cache[cache_key] = (slot_utc, slot_ts, display_iso)
+            elif cached_t is None:
+                continue
+            else:
+                slot_utc, slot_ts, display_iso = cached_t
+        else:
+            slot_utc = parse_forecast_slot_utc(item, display_tz, dt_cache)
+            if slot_utc is None:
+                continue
+            slot_ts = slot_utc.timestamp()
+            display_iso = slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
+        if slot_ts + 3600.0 - now_ts <= 0.0:
+            continue
+        if slot_ts - now_ts >= max_h_s:
+            continue
+        if slot_ts not in deduped:
+            deduped[slot_ts] = (slot_utc, display_iso, item)
+    return deduped
+
+
+def count_usable_hourly_horizon_h(
+    hourly_forecast: list[dict[str, Any]] | None,
+    now: datetime | None = None,
+) -> int:
+    """Count distinct usable hourly forecast slots within the 24-hour evaluation horizon."""
+    if not hourly_forecast:
+        return 0
+    display_tz, _now_utc, now_ts = _resolve_eval_clock(now)
+    deduped = _collect_horizon_slots(hourly_forecast, now_ts, display_tz, dt_cache={})
+    return min(len(deduped), MAX_HORIZON_HOURS)
 
 
 def _extract_contiguous_windows(
@@ -580,15 +646,7 @@ class WeatherWindowsEngine:
         now: datetime | None,
     ) -> dict[str, Any]:
         """Parse and normalize hourly forecast and live station state once across profiles."""
-        eval_now = now or dt_util.now()
-        local_tz = dt_util.get_default_time_zone()
-        if eval_now.tzinfo is not None and eval_now.tzinfo is not UTC:
-            local_tz = eval_now.tzinfo
-        now_utc = (
-            eval_now.replace(tzinfo=local_tz).astimezone(UTC) if eval_now.tzinfo is None else eval_now.astimezone(UTC)
-        )
-        display_tz = local_tz
-        now_ts = now_utc.timestamp()
+        display_tz, now_utc, now_ts = _resolve_eval_clock(now)
         evaluated_at_iso = now_utc.isoformat()
         horizon_end_utc = now_utc + timedelta(hours=MAX_HORIZON_HOURS)
         horizon_end_ts = horizon_end_utc.timestamp()
@@ -600,56 +658,13 @@ class WeatherWindowsEngine:
         hourly_count = len(hourly_forecast) if hourly_forecast else 0
         prepared_slots: list[tuple[Any, ...]] = []
         if hourly_forecast:
-            deduped: dict[float, tuple[datetime, str, dict[str, Any]]] = {}
-            max_h_s = MAX_HORIZON_HOURS * 3600.0
-            is_utc_display = display_tz is UTC
-            slot_time_cache = self._slot_time_cache
-            for item in hourly_forecast:
-                raw_dt = item.get("utc_datetime")
-                if raw_dt is None or raw_dt == "":
-                    raw_dt = item.get("datetime")
-                if raw_dt is None or raw_dt == "":
-                    continue
-                if type(raw_dt) is str:
-                    cache_key = (raw_dt, display_tz)
-                    cached_t = slot_time_cache.get(cache_key, _MISSING)
-                    if cached_t is _MISSING:
-                        parsed = self._parse_raw_dt_str(raw_dt)
-                        if parsed is None:
-                            if len(slot_time_cache) > 512:
-                                slot_time_cache.clear()
-                            slot_time_cache[cache_key] = None
-                            continue
-                        slot_utc = (
-                            parsed.replace(tzinfo=display_tz).astimezone(UTC)
-                            if parsed.tzinfo is None
-                            else parsed.astimezone(UTC)
-                        )
-                        slot_ts = slot_utc.timestamp()
-                        display_iso = (
-                            slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
-                        )
-                        if len(slot_time_cache) > 512:
-                            slot_time_cache.clear()
-                        slot_time_cache[cache_key] = (slot_utc, slot_ts, display_iso)
-                    elif cached_t is None:
-                        continue
-                    else:
-                        slot_utc, slot_ts, display_iso = cached_t
-                else:
-                    slot_utc = self._parse_slot_utc(item, display_tz)
-                    if slot_utc is None:
-                        continue
-                    slot_ts = slot_utc.timestamp()
-                    display_iso = (
-                        slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
-                    )
-                if slot_ts + 3600.0 - now_ts <= 0.0:
-                    continue
-                if slot_ts - now_ts >= max_h_s:
-                    continue
-                if slot_ts not in deduped:
-                    deduped[slot_ts] = (slot_utc, display_iso, item)
+            deduped = _collect_horizon_slots(
+                hourly_forecast,
+                now_ts,
+                display_tz,
+                slot_time_cache=self._slot_time_cache,
+                dt_cache=self._parse_dt_cache,
+            )
 
             if deduped:
                 lat_f = float(self.lat)

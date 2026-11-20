@@ -5402,9 +5402,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return concise, deterministic summary for voice/Assist actions (SupportsResponse.ONLY)."""
         data = self.data or {}
         now = dt_util.now()
-        local_tz = dt_util.get_default_time_zone()
-        if now.tzinfo is not None and now.tzinfo is not UTC:
-            local_tz = now.tzinfo
         now_utc = now.astimezone(UTC) if now.tzinfo is not None else dt_util.as_utc(now)
         pattern = getattr(self, "_pattern", None)
         active_alerts = list(data.get("_active_alerts") or [])
@@ -5493,9 +5490,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "provider": provider_id,
                 "is_expired": fc_expired,
                 "hourly_horizon_h": (
-                    0
-                    if fc_expired
-                    else count_usable_hourly_horizon_h((published_fc or {}).get("hourly"), now_utc, local_tz)
+                    0 if fc_expired else count_usable_hourly_horizon_h((published_fc or {}).get("hourly"), now)
                 ),
                 "capabilities": get_provider_capabilities(provider_id).to_dict() if provider_id else None,
             },

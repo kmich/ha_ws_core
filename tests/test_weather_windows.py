@@ -810,3 +810,8 @@ class TestWeatherWindowsEngine:
         assert engine._parse_slot_utc({"datetime": float("nan")}, tz) is None
         assert engine._parse_slot_utc({"datetime": float("inf")}, tz) is None
         assert engine._parse_slot_utc({"datetime": 1e20}, tz) is None
+        # Calendar-invalid timestamps (must return None rather than raising ValueError)
+        assert engine._parse_slot_utc({"datetime": "2026-02-30T12:00:00Z"}, tz) is None
+        assert engine._parse_slot_utc({"datetime": "2026-06-21T25:00:00Z"}, tz) is None
+        assert engine._parse_slot_utc({"datetime": "2026-06-21T12:65:00+00:00"}, tz) is None
+        assert engine._parse_slot_utc({"datetime": "2026-02-30"}, tz) is None
