@@ -159,12 +159,31 @@
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
+          "enable_display_sensors": "Sensori di visualizzazione (livelli, tendenze, salute)",
+          "enable_fire_risk_score": "Punteggio rischio incendio",
+          "enable_sea_temp": "Temperatura superficiale del mare",
+          "enable_air_quality": "Indice qualità dell'aria (Open-Meteo)",
+          "enable_pollen": "Livelli pollini (Open-Meteo)",
+          "enable_moon": "Fase lunare e illuminazione",
+          "enable_solar_forecast": "Previsione fotovoltaica (forecast.solar)",
+          "enable_fog": "Abilita sensore probabilità nebbia (modello depressione punto di rugiada)",
+          "enable_thunderstorm_risk": "Abilita sensore rischio temporale (euristica superficiale)",
+          "enable_comfort_indices": "Abilita indici di comfort e sensori agrometeorологici",
+          "enable_vigilance_meteo": "Abilita avvisi meteo dipartimentali Meteo-France (Vigilance Meteo)",
+          "enable_vigicrues": "Abilita livello del fiume più vicino da Vigicrues (Hub'Eau v2)",
+          "enable_diagnostics": "Deriva sensore, coerenza inter-sensore, indicatori qualità, abilità/concordanza previsioni, fattore solare-lux, climatologia 30 giorni",
+          "enable_fwi_components": "Codici intermedi FWI (FFMC/DMC/DC/ISI/BUI). Richiede Rischio Incendio abilitato per produrre dati",
+          "enable_advanced_sensors": "Numero Zambretti (forma numerica), ET₀ oraria, direzione vento smussata",
+          "enable_nowcast": "Nowcast precipitazioni 15 minuti Open-Meteo: minuti all'inizio/fine della pioggia, totale ora successiva, intensità. Senza chiave API",
           "enable_degree_days": "Calcolo di gradi-giorno di crescita, riscaldamento e raffrescamento più una stima della bagnatura fogliare, utile per agricoltura e monitoraggio energetico.",
+          "enable_lightning": "Conteggio dei fulmini, distanza più vicina e vicinanza del temporale da un sensore di fulmini (o da Blitzortung se nessun sensore è assegnato).",
+          "enable_indoor": "Temperatura, umidità e CO₂ interni, la loro differenza rispetto all'esterno e il comfort di ogni stanza con nome.",
+          "enable_soil": "Sensori di umidità e temperatura del suolo, più un fabbisogno irriguo stimato da evapotraspirazione e pioggia.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Attivo per impostazione predefinita. Una volta all'ora confronta temperatura, umidità e pressione con il valore di Open-Meteo per le coordinate configurate ed elenca le differenze rilevanti in sensor.ws_neighbor_qc_flags. Disattivalo per interrompere la richiesta. La calibrazione adattiva, se attiva, continua a usarla.",
           "enable_pattern_forecast": "Impara dallo storico della tua stazione per stimare la probabilità di pioggia, gelo, giornata calda, forti raffiche e (con un rilevatore di fulmini locale) temporali nelle prossime ore. Ogni previsione mostra valori quando ha visto abbastanza esempi della tua stazione, spesso subito se Home Assistant conserva già lo storico a lungo termine dei tuoi sensori. Funziona interamente su questa macchina.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "weathercloud": {
@@ -541,11 +560,15 @@
           "enable_fwi_components": "Codici intermedi FWI (FFMC/DMC/DC/ISI/BUI). Richiede Rischio Incendio abilitato per produrre dati",
           "enable_advanced_sensors": "Numero Zambretti (forma numerica), ET₀ oraria, direzione vento smussata",
           "enable_nowcast": "Nowcast precipitazioni 15 minuti Open-Meteo: minuti all'inizio/fine della pioggia, totale ora successiva, intensità. Senza chiave API",
+          "enable_degree_days": "Calcolo di gradi-giorno di crescita, riscaldamento e raffrescamento più una stima della bagnatura fogliare, utile per agricoltura e monitoraggio energetico.",
+          "enable_lightning": "Conteggio dei fulmini, distanza più vicina e vicinanza del temporale da un sensore di fulmini (o da Blitzortung se nessun sensore è assegnato).",
+          "enable_indoor": "Temperatura, umidità e CO₂ interni, la loro differenza rispetto all'esterno e il comfort di ogni stanza con nome.",
+          "enable_soil": "Sensori di umidità e temperatura del suolo, più un fabbisogno irriguo stimato da evapotraspirazione e pioggia.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Attivo per impostazione predefinita. Una volta all'ora confronta temperatura, umidità e pressione con il valore di Open-Meteo per le coordinate configurate ed elenca le differenze rilevanti in sensor.ws_neighbor_qc_flags. Disattivalo per interrompere la richiesta. La calibrazione adattiva, se attiva, continua a usarla.",
           "enable_pattern_forecast": "Impara dallo storico della tua stazione per stimare la probabilità di pioggia, gelo, giornata calda, forti raffiche e (con un rilevatore di fulmini locale) temporali nelle prossime ore. Ogni previsione mostra valori quando ha visto abbastanza esempi della tua stazione, spesso subito se Home Assistant conserva già lo storico a lungo termine dei tuoi sensori. Funziona interamente su questa macchina.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "indoor_rooms_opt": {

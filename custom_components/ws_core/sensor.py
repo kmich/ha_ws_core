@@ -441,7 +441,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     if ww_enabled:
         from homeassistant.util import dt as dt_util
 
-        from .weather_windows import resolve_profiles
+        from .weather_windows import WINDOW_STATUSES, resolve_profiles
 
         def _parse_ts(val: Any):
             if not val:
@@ -471,6 +471,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                         translation_key=f"window_{pid}_status",
                         translation_placeholders=placeholders,
                         icon="mdi:calendar-clock",
+                        # Fixed states, so automations and the UI can offer them as choices
+                        device_class=SensorDeviceClass.ENUM,
+                        options=list(WINDOW_STATUSES),
                         value_fn=lambda d, _pid=pid: (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("status"),
                         attrs_fn=lambda d, _pid=pid: {
                             "reasons": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("reasons_text", []),

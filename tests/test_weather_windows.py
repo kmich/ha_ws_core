@@ -438,6 +438,11 @@ class TestWeatherWindowsEngine:
         attrs = status_ent._desc.attrs_fn({KEY_WEATHER_WINDOWS: {PROFILE_CUSTOM: {"duration_h": 2.37}}})
         # Remaining duration changes every minute, so it is not a state attribute (recorder churn)
         assert "duration_h" not in attrs
+        # Fixed states, offered as choices in automations
+        from homeassistant.components.sensor import SensorDeviceClass
+
+        assert status_ent._desc.device_class == SensorDeviceClass.ENUM
+        assert status_ent._desc.options == ["suitable_now", "window_upcoming", "unsuitable", "unknown"]
         eval_custom = coord_custom.get_weather_windows_evaluation()
         assert list(eval_custom.keys()) == [PROFILE_CUSTOM]
 
@@ -1232,3 +1237,38 @@ class TestDeepReviewFixes:
         assert resolve_profiles(opts)[PROFILE_CUSTOM].min_duration_h == 23
         capped = apply_profile_overrides(DEFAULT_PROFILES[PROFILE_CUSTOM], {"min_duration_h": 40})
         assert capped.min_duration_h == 23
+
+
+def test_repeated_naive_hour_at_dst_fall_back_is_the_second_occurrence():
+    """Naive local times list 02:00 twice when clocks go back; no hour may go missing."""
+    tz = ZoneInfo("Europe/Berlin")
+    old_tz = dt_util.get_default_time_zone()
+    dt_util.set_default_time_zone(tz)
+    try:
+        now = datetime(2026, 10, 24, 22, 30, tzinfo=UTC)
+        rows = []
+        for i in range(26):
+            local = (now.replace(minute=0) + timedelta(hours=i)).astimezone(tz)
+            rows.append(
+                {
+                    "datetime": local.isoformat()[:19],  # naive local time, as some entities send it
+                    "temp_c": 12.0,
+                    "precip_prob": 0,
+                    "precip_mm": 0.0,
+                    "humidity": 60.0,
+                    "wind_kmh": 10.0,
+                    "gust_kmh": 15.0,
+                    "cloud_cover": 10.0,
+                }
+            )
+        profile = replace(DEFAULT_PROFILES[PROFILE_CUSTOM], enabled=True, require_daylight=False, min_temp_c=0.0)
+        res = WeatherWindowsEngine(lat=52.5, lon=13.4).evaluate_profile(profile, rows, now=dt_util.as_local(now))
+        assert res.horizon_hours == 24
+        assert len(res.windows) == 1  # one continuous window, not split at the repeated hour
+        assert res.status == STATUS_SUITABLE_NOW
+        # A naive time repeated outside the DST change is still a plain duplicate
+        dup = [*rows[:5], rows[2]]
+        res_dup = WeatherWindowsEngine(lat=52.5, lon=13.4).evaluate_profile(profile, dup, now=dt_util.as_local(now))
+        assert len(res_dup.slots) == 5
+    finally:
+        dt_util.set_default_time_zone(old_tz)

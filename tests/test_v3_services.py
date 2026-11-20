@@ -602,3 +602,23 @@ class TestV3Services:
         assert win_one["reason_codes"] == ["insufficient_horizon"]
         assert win_one["horizon_hours"] == 1
         assert sum_one["forecast_validity"]["hourly_horizon_h"] == 1
+
+
+async def test_removing_the_entry_deletes_its_stored_files(hass):
+    """Deleting the integration also deletes its learning, history and backup files."""
+    from unittest.mock import patch
+
+    from homeassistant.helpers.storage import Store
+
+    from custom_components.ws_core import async_remove_entry, entry_storage_keys
+
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="gone123", data={}, options={})
+    removed: list[str] = []
+
+    async def _fake_remove(self):
+        removed.append(self.key)
+
+    with patch.object(Store, "async_remove", _fake_remove):
+        await async_remove_entry(hass, entry)
+    assert removed == list(entry_storage_keys("gone123"))
+    assert "ws_core_gone123_pattern_forecast_pre_v3_backup" in removed

@@ -141,8 +141,8 @@ async def test_ha_entity_provider_returns_local_times(berlin_tz):
             {"datetime": "2026-11-13T18:00:00+00:00", "temperature": 6},
         ],
     )
-    # The provider drops hours that already passed; evaluate before the first row.
-    before = datetime(2026, 11, 13, 16, 30, tzinfo=UTC)
+    # Evaluate inside the first row's hour: past hours are dropped and nothing needs filling.
+    before = datetime(2026, 11, 13, 17, 10, tzinfo=UTC)
     with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=before):
         result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.dwd")
     assert [h["datetime"] for h in result["hourly"]] == ["2026-11-13T18:00", "2026-11-13T19:00"]

@@ -174,3 +174,27 @@ class TestPR6LocalizationCompleteness:
                 tr["entity"]["sensor"]["window_outdoor_drying_status"]["name"]
                 != en["entity"]["sensor"]["window_outdoor_drying_status"]["name"]
             ), lang
+
+
+def test_every_translation_has_exactly_the_english_keys_and_placeholders():
+    """No missing, stale or mismatched strings in any language (issues #91, #94 class)."""
+    import json
+    import re
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parent.parent / "custom_components" / "ws_core"
+    placeholder = re.compile(r"\{([a-zA-Z0-9_]+)\}")
+
+    def flatten(node, path=()):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                yield from flatten(value, (*path, key))
+        else:
+            yield path, node
+
+    english = dict(flatten(json.loads((base / "strings.json").read_text(encoding="utf-8"))))
+    for file in sorted((base / "translations").glob("*.json")):
+        other = dict(flatten(json.loads(file.read_text(encoding="utf-8"))))
+        assert set(other) == set(english), (file.name, sorted(set(other) ^ set(english))[:5])
+        for key, text in english.items():
+            assert set(placeholder.findall(str(text))) == set(placeholder.findall(str(other[key]))), (file.name, key)

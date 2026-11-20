@@ -159,12 +159,31 @@
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
+          "enable_display_sensors": "Weergavesensoren (niveaus, trends, gezondheid)",
+          "enable_fire_risk_score": "Brandrisicoscore",
+          "enable_sea_temp": "Zeewateroppervlaktetemperatuur",
+          "enable_air_quality": "Luchtkwaliteitsindex (Open-Meteo)",
+          "enable_pollen": "Pollenniveaus (Open-Meteo)",
+          "enable_moon": "Maanfase & verlichting",
+          "enable_solar_forecast": "Zonne-PV-voorspelling (forecast.solar)",
+          "enable_fog": "Schakelt mistkans-sensor in (dauwpunt-depressiemodel)",
+          "enable_thunderstorm_risk": "Schakelt onweersrisico-sensor in (oppervlakte-heuristiek)",
+          "enable_comfort_indices": "Schakelt comfortindexen en agrometeorologische sensoren in",
+          "enable_vigilance_meteo": "Schakelt departementale weerwaarschuwingen van Météo-France in (Vigilance Météo)",
+          "enable_vigicrues": "Schakelt het dichtstbijzijnde rivierpeil van Vigicrues in (Hub'Eau v2)",
+          "enable_diagnostics": "Sensordrift, cross-sensorconsistentie, kwaliteitsvlaggen, voorspellingsvaardigheid/-overeenkomst, zonne-luxfactor, 30-daagse klimatologie",
+          "enable_fwi_components": "FWI-tussencodes (FFMC/DMC/DC/ISI/BUI). Vereist Brandrisico ingeschakeld om gegevens te produceren",
+          "enable_advanced_sensors": "Zambretti-nummer (numerieke vorm), uurlijkse ET₀, afgevlakte windrichting",
+          "enable_nowcast": "Open-Meteo 15-minuten neerslag-nowcast: minuten tot regen begint/stopt, totaal volgend uur, intensiteit. Geen API-sleutel",
           "enable_degree_days": "Berekening van groei-, verwarmings- en koelgraaddagen plus een schatting van de bladnatheid, nuttig voor landbouw en energiebeheer.",
+          "enable_lightning": "Aantal blikseminslagen, dichtstbijzijnde afstand en onweersnabijheid van een bliksemsensor (of Blitzortung als er geen sensor is gekoppeld).",
+          "enable_indoor": "Binnentemperatuur, luchtvochtigheid en CO₂, het verschil met buiten en het comfort per benoemde ruimte.",
+          "enable_soil": "Bodemvocht- en bodemtemperatuursensoren, plus een geschatte beregeningsbehoefte op basis van verdamping en regen.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "weathercloud": {
@@ -541,11 +560,15 @@
           "enable_fwi_components": "FWI-tussencodes (FFMC/DMC/DC/ISI/BUI). Vereist Brandrisico ingeschakeld om gegevens te produceren",
           "enable_advanced_sensors": "Zambretti-nummer (numerieke vorm), uurlijkse ET₀, afgevlakte windrichting",
           "enable_nowcast": "Open-Meteo 15-minuten neerslag-nowcast: minuten tot regen begint/stopt, totaal volgend uur, intensiteit. Geen API-sleutel",
+          "enable_degree_days": "Berekening van groei-, verwarmings- en koelgraaddagen plus een schatting van de bladnatheid, nuttig voor landbouw en energiebeheer.",
+          "enable_lightning": "Aantal blikseminslagen, dichtstbijzijnde afstand en onweersnabijheid van een bliksemsensor (of Blitzortung als er geen sensor is gekoppeld).",
+          "enable_indoor": "Binnentemperatuur, luchtvochtigheid en CO₂, het verschil met buiten en het comfort per benoemde ruimte.",
+          "enable_soil": "Bodemvocht- en bodemtemperatuursensoren, plus een geschatte beregeningsbehoefte op basis van verdamping en regen.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "indoor_rooms_opt": {

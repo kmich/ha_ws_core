@@ -122,7 +122,7 @@ async def test_ha_entity_provider_converts_imperial_source():
         ],
         [{"datetime": "2026-10-28T12:00:00+00:00", "temperature": 32, "dew_point": 23, "wind_speed": 0}],
     )
-    before = datetime(2026, 10, 28, 11, 30, tzinfo=UTC)  # the provider drops hours that already passed
+    before = datetime(2026, 10, 28, 12, 10, tzinfo=UTC)  # inside the first row's hour
     with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=before):
         result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.pirateweather")
 
@@ -726,3 +726,85 @@ async def test_ha_entity_provider_drops_elapsed_hours_before_keeping_25_rows():
     hourly = result["hourly"]
     assert len(hourly) == 25
     assert hourly[0]["utc_datetime"] == now.replace(minute=0).isoformat()  # the in-progress hour
+
+
+def _next_hour_entity_rows(fetched_at, hours=48):
+    """Rows like Home Assistant's Open-Meteo entity: start at the NEXT full hour, no rain probability."""
+    from datetime import timedelta
+
+    first = fetched_at.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    return [
+        {
+            "datetime": (first + timedelta(hours=i)).isoformat(),
+            "temperature": 21.0 + i * 0.1,
+            "precipitation": 0.0,
+            "humidity": 60,
+            "wind_speed": 12.0,
+            "wind_gust_speed": 20.0,
+            "cloud_coverage": 30,
+        }
+        for i in range(hours)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_ha_entity_provider_fills_the_hour_in_progress_from_the_next_row():
+    """An entity starting at the next hour still yields a row for the hour in progress."""
+    from datetime import timedelta
+
+    now = datetime(2026, 11, 20, 14, 39, tzinfo=UTC)
+    hass = _ha_entity_hass({"temperature_unit": "°C", "wind_speed_unit": "km/h"}, [], _next_hour_entity_rows(now))
+    with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=now):
+        result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.openmeteo")
+    hourly = result["hourly"]
+    assert len(hourly) == 25
+    assert hourly[0]["utc_datetime"] == datetime(2026, 11, 20, 14, 0, tzinfo=UTC).isoformat()
+    assert hourly[0]["estimated_from_next_hour"] is True
+    assert hourly[0]["temp_c"] == hourly[1]["temp_c"]  # copied from 15:00
+    assert hourly[1]["utc_datetime"] == (now.replace(minute=0) + timedelta(hours=1)).isoformat()
+    assert "estimated_from_next_hour" not in hourly[1]
+
+    # An entity that already covers the hour in progress is left as it is
+    covered = _next_hour_entity_rows(now - timedelta(hours=1))
+    hass2 = _ha_entity_hass({"temperature_unit": "°C", "wind_speed_unit": "km/h"}, [], covered)
+    with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=now):
+        result2 = await HaWeatherEntityProvider(hass2).async_fetch(MagicMock(), 0, 0, api_key="weather.other")
+    assert not any(h.get("estimated_from_next_hour") for h in result2["hourly"])
+
+
+@pytest.mark.asyncio
+async def test_next_hour_entity_keeps_an_open_window_open_across_refreshes():
+    """Replay of the live case: 30-minute refreshes must not hide 'suitable now' or move next_start hourly."""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.ws_core.weather_windows import DEFAULT_PROFILES, WeatherWindowsEngine
+
+    old_tz = dt_util.get_default_time_zone()
+    dt_util.set_default_time_zone(ZoneInfo("Europe/Athens"))
+    try:
+        engine = WeatherWindowsEngine(37.9, 23.7)
+        profile = DEFAULT_PROFILES["garden_work"]
+        start = datetime(2026, 6, 21, 7, 0, tzinfo=UTC)  # 10:00 local, daylight until evening
+        cache = None
+        fetched = None
+        statuses, starts = set(), set()
+        for minute in range(0, 240, 3):
+            now = start + timedelta(minutes=minute)
+            if fetched is None or now - fetched >= timedelta(minutes=30):
+                fetched = now
+                hass = _ha_entity_hass(
+                    {"temperature_unit": "°C", "wind_speed_unit": "km/h"}, [], _next_hour_entity_rows(now)
+                )
+                with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=now):
+                    cache = (await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="w"))["hourly"]
+            res = engine.evaluate_profile(profile, cache, now=dt_util.as_local(now))
+            statuses.add(res.status)
+            starts.add(res.next_start)
+            assert res.data_quality["current_hour_estimated"] in (True, False)
+        assert statuses == {"suitable_now"}
+        assert len(starts) == 1  # the open window keeps the time it opened
+    finally:
+        dt_util.set_default_time_zone(old_tz)

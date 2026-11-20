@@ -611,7 +611,26 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+def entry_storage_keys(entry_id: str) -> tuple[str, ...]:
+    """Every .storage file this integration keeps for one config entry."""
+    return (
+        f"ws_core_{entry_id}_learning",
+        f"ws_core_{entry_id}_history",
+        f"ws_core_{entry_id}_climate_normals",
+        f"ws_core_{entry_id}_pattern_forecast",
+        f"ws_core_{entry_id}_pattern_forecast_pre_v3_backup",
+    )
+
+
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Clean up this entry's Repairs issues when it is deleted."""
+    """Clean up this entry's Repairs issues and stored data when it is deleted."""
+    from homeassistant.helpers.storage import Store
+
     for name in ENTRY_REPAIR_ISSUES:
         ir.async_delete_issue(hass, DOMAIN, issue_id_for_entry(name, entry.entry_id))
+    # Deleting the integration removes its learned and accumulated data; a missing file is fine.
+    for key in entry_storage_keys(entry.entry_id):
+        try:
+            await Store(hass, 1, key).async_remove()
+        except Exception as err:  # noqa: BLE001 - cleanup must never block entry removal
+            _LOGGER.debug("ws_core: could not remove stored data %s: %s", key, err)

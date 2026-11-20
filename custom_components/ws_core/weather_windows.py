@@ -82,6 +82,7 @@ STATUS_SUITABLE_NOW = "suitable_now"
 STATUS_WINDOW_UPCOMING = "window_upcoming"
 STATUS_UNSUITABLE = "unsuitable"
 STATUS_UNKNOWN = "unknown"
+WINDOW_STATUSES: tuple[str, ...] = (STATUS_SUITABLE_NOW, STATUS_WINDOW_UPCOMING, STATUS_UNSUITABLE, STATUS_UNKNOWN)
 
 # Reason codes
 REASON_SUITABLE = "suitable"
@@ -460,6 +461,16 @@ def parse_forecast_slot_utc(
     return parsed.astimezone(UTC)
 
 
+def _localize_repeated_naive(parsed: datetime, display_tz: tzinfo) -> datetime:
+    """UTC instant for a naive local time seen a second time in one forecast.
+
+    When clocks go back, a local hour such as 02:00 happens twice. A forecast that sends
+    naive local times lists it twice; the second copy is the later (``fold=1``) instant.
+    Outside that hour both folds are the same instant, so the row is a true duplicate.
+    """
+    return parsed.replace(tzinfo=display_tz, fold=1).astimezone(UTC)
+
+
 def _collect_horizon_slots(
     hourly_forecast: list[dict[str, Any]],
     now_ts: float,
@@ -472,6 +483,7 @@ def _collect_horizon_slots(
     deduped: dict[float, tuple[datetime, str, Mapping[str, Any]]] = {}
     end_ts = horizon_end_ts if horizon_end_ts is not None else now_ts + MAX_HORIZON_HOURS * 3600.0
     is_utc_display = display_tz is UTC
+    seen_raw: set[str] = set()
     for item in hourly_forecast:
         if not isinstance(item, Mapping):
             continue
@@ -480,7 +492,18 @@ def _collect_horizon_slots(
             raw_dt = item.get("datetime")
         if raw_dt is None or raw_dt == "":
             continue
-        if type(raw_dt) is str and slot_time_cache is not None:
+        repeated_naive: datetime | None = None
+        if type(raw_dt) is str:
+            if raw_dt in seen_raw:
+                again = _parse_raw_dt_str(raw_dt, dt_cache)
+                if again is not None and again.tzinfo is None:
+                    repeated_naive = again
+            seen_raw.add(raw_dt)
+        if repeated_naive is not None:
+            slot_utc = _localize_repeated_naive(repeated_naive, display_tz)
+            slot_ts = slot_utc.timestamp()
+            display_iso = slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
+        elif type(raw_dt) is str and slot_time_cache is not None:
             cache_key = (raw_dt, display_tz)
             cached_t = slot_time_cache.get(cache_key, _MISSING)
             if cached_t is _MISSING:
@@ -683,6 +706,7 @@ class WeatherWindowsEngine:
 
         has_forecast_rows = bool(hourly_forecast)
         prepared_slots: list[tuple[Any, ...]] = []
+        current_hour_estimated = False
         has_temp = False
         has_rain_prob = False
         has_rain_mm = False
@@ -748,6 +772,8 @@ class WeatherWindowsEngine:
                     cloud_cover = _as_finite_float(item.get("cloud_cover"))
                     rain_prob_int = int(rain_prob) if rain_prob is not None else None
                     is_current = slot_ts <= now_ts < raw_end_ts
+                    if is_current and item.get("estimated_from_next_hour"):
+                        current_hour_estimated = True
 
                     if temp_c is not None:
                         has_temp = True
@@ -793,6 +819,7 @@ class WeatherWindowsEngine:
             "live_rain_rate": live_rain_rate,
             "live_gust_ms": live_gust_ms,
             "has_forecast_rows": has_forecast_rows,
+            "current_hour_estimated": current_hour_estimated,
             "available_vars": {
                 "temp_c": has_temp,
                 "precip_prob": has_rain_prob,
@@ -1467,6 +1494,8 @@ class WeatherWindowsEngine:
                 "is_truncated": is_truncated,
                 "unassessed_slots": unassessed_slots,
                 "not_assessed_by_provider": list(not_assessed_by_provider),
+                # The source had no row for the hour in progress; the next hour's row stands in.
+                "current_hour_estimated": bool(prepared.get("current_hour_estimated")),
             },
         }
         return result_dict if as_dict else WeatherDecisionResult(**result_dict)

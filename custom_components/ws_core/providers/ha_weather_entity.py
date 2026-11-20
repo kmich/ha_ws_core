@@ -19,6 +19,8 @@ from .base import ForecastProvider, _to_datetime, local_date_str, local_datetime
 
 # Rows kept from an entity's hourly forecast: the in-progress hour plus the next 24.
 _HOURLY_ROWS_KEPT = 25
+# Internal flag on a raw row copied from the next hour to cover the hour in progress.
+_ESTIMATED_MARKER = "_ws_estimated_from_next_hour"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -198,45 +200,66 @@ class HaWeatherEntityProvider(ForecastProvider):
         return out
 
     @staticmethod
-    def _drop_elapsed_hours(raw: list[dict]) -> list[dict]:
-        """Drop hourly rows whose hour has fully passed, keeping up to ``_HOURLY_ROWS_KEPT`` rows.
+    def _row_start_utc(entry: dict) -> Any:
+        when = _to_datetime(entry.get("datetime"))
+        if when is None:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=dt_util.get_default_time_zone())
+        return when.astimezone(UTC)
+
+    @classmethod
+    def _usable_hourly_rows(cls, raw: list[dict]) -> list[dict]:
+        """Return up to ``_HOURLY_ROWS_KEPT`` rows covering the in-progress hour and the next 24.
 
         Some weather entities list hours earlier in the day; slicing those first would leave
-        only a few future hours. Rows without a parseable time are kept as is.
+        only a few future hours, so rows whose hour has fully passed are dropped. Others
+        (for example Home Assistant's Open-Meteo integration) start at the next full hour, so
+        nothing covers the hour in progress: Weather Windows could then never report
+        "suitable now" and the next start would move forward every hour. In that case the
+        first row also stands in for the hour in progress, marked as estimated. Rows
+        without a parseable time are kept as is.
         """
         now_utc = dt_util.utcnow()
         kept: list[dict] = []
         for entry in raw:
             if not isinstance(entry, dict):
                 continue
-            when = _to_datetime(entry.get("datetime"))
-            if when is not None:
-                if when.tzinfo is None:
-                    when = when.replace(tzinfo=dt_util.get_default_time_zone())
-                if when.astimezone(UTC) + timedelta(hours=1) <= now_utc:
-                    continue
+            start = cls._row_start_utc(entry)
+            if start is not None and start + timedelta(hours=1) <= now_utc:
+                continue
             kept.append(entry)
             if len(kept) >= _HOURLY_ROWS_KEPT:
                 break
+        if kept:
+            first_start = cls._row_start_utc(kept[0])
+            if first_start is not None and 0 < (first_start - now_utc).total_seconds() <= 3600:
+                current = {
+                    **kept[0],
+                    "datetime": (first_start - timedelta(hours=1)).isoformat(),
+                    _ESTIMATED_MARKER: True,
+                }
+                kept = [current, *kept[: _HOURLY_ROWS_KEPT - 1]]
         return kept
 
     def _normalise_hourly(self, raw: list[dict]) -> list[dict]:
         out: list[dict] = []
-        for entry in self._drop_elapsed_hours(raw):
-            out.append(
-                {
-                    "datetime": self._parse_dt(entry.get("datetime")) or "",
-                    "utc_datetime": utc_datetime_str(entry.get("datetime")),
-                    "temp_c": self._temp_c(entry, "temperature", "native_temperature"),
-                    "apparent_temp_c": self._temp_c(entry, "apparent_temperature", "native_apparent_temperature"),
-                    "dewpoint_c": self._temp_c(entry, "dew_point", "native_dew_point"),
-                    "precip_prob": entry.get("precipitation_probability"),
-                    "precip_mm": self._precip_mm(entry, "precipitation", "native_precipitation"),
-                    "weathercode": self._condition_to_wmo(entry.get("condition")),
-                    "wind_kmh": self._speed_kmh(entry, "wind_speed", "native_wind_speed"),
-                    "gust_kmh": self._speed_kmh(entry, "wind_gust_speed", "native_wind_gust_speed"),
-                    "humidity": entry.get("humidity"),
-                    "cloud_cover": entry.get("cloud_coverage"),
-                }
-            )
+        for entry in self._usable_hourly_rows(raw):
+            row = {
+                "datetime": self._parse_dt(entry.get("datetime")) or "",
+                "utc_datetime": utc_datetime_str(entry.get("datetime")),
+                "temp_c": self._temp_c(entry, "temperature", "native_temperature"),
+                "apparent_temp_c": self._temp_c(entry, "apparent_temperature", "native_apparent_temperature"),
+                "dewpoint_c": self._temp_c(entry, "dew_point", "native_dew_point"),
+                "precip_prob": entry.get("precipitation_probability"),
+                "precip_mm": self._precip_mm(entry, "precipitation", "native_precipitation"),
+                "weathercode": self._condition_to_wmo(entry.get("condition")),
+                "wind_kmh": self._speed_kmh(entry, "wind_speed", "native_wind_speed"),
+                "gust_kmh": self._speed_kmh(entry, "wind_gust_speed", "native_wind_gust_speed"),
+                "humidity": entry.get("humidity"),
+                "cloud_cover": entry.get("cloud_coverage"),
+            }
+            if entry.get(_ESTIMATED_MARKER):
+                row["estimated_from_next_hour"] = True
+            out.append(row)
         return out
