@@ -2055,6 +2055,13 @@
           }
         }
       },
+      "data_status": {
+        "name": "Stato dei dati",
+        "state": {
+          "ok": "OK",
+          "attention": "Richiede attenzione"
+        }
+      },
       "pattern_forecast_status": {
         "name": "Previsione per schemi: stato",
         "state": {

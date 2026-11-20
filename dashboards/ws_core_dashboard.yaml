@@ -248,20 +248,52 @@ views:
           - sensor.ws_wind_direction_variability
 
       # Agrometeorological (enable_comfort_indices + enable_degree_days)
+      # Solar-radiation rows only show when the station provides them: they need a
+      # W/m² sensor (or, for the estimated ones, the illuminance fallback).
       - type: entities
         title: Agrometeorological
         entities:
           - sensor.ws_et0_daily
-          - sensor.ws_et0_penman_monteith
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_et0_penman_monteith
+                state_not: unavailable
+            row:
+              entity: sensor.ws_et0_penman_monteith
           - sensor.ws_irrigation_deficit
           - sensor.ws_wind_run
           - sensor.ws_wind_run_month
-          - sensor.ws_solar_energy_today
-          - sensor.ws_peak_sun_hours
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_solar_energy_today
+                state_not: unavailable
+            row:
+              entity: sensor.ws_solar_energy_today
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_peak_sun_hours
+                state_not: unavailable
+            row:
+              entity: sensor.ws_peak_sun_hours
           - sensor.ws_max_solar_radiation
-          - sensor.ws_net_radiation
-          - sensor.ws_clearness_index
-          - sensor.ws_cloud_cover
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_net_radiation
+                state_not: unavailable
+            row:
+              entity: sensor.ws_net_radiation
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_clearness_index
+                state_not: unavailable
+            row:
+              entity: sensor.ws_clearness_index
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_cloud_cover
+                state_not: unavailable
+            row:
+              entity: sensor.ws_cloud_cover
           - sensor.ws_hdd_today
           - sensor.ws_cdd_today
           - sensor.ws_gdd_today
@@ -352,6 +384,8 @@ views:
         title: Station Health
         entities:
           - sensor.ws_station_health
+          # OK or Needs attention; its attributes say why any sensor is empty
+          - sensor.ws_data_status
           - sensor.ws_data_quality_banner
           - sensor.ws_data_quality_score
           - sensor.ws_package_status

@@ -1230,6 +1230,13 @@
           }
         }
       },
+      "data_status": {
+        "name": "Estado de los datos",
+        "state": {
+          "ok": "OK",
+          "attention": "Requiere atención"
+        }
+      },
       "pattern_forecast_status": {
         "name": "Pronóstico por patrones: estado",
         "state": {

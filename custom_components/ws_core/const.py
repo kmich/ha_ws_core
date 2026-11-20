@@ -623,6 +623,11 @@ DEFAULT_CHILL_SEASON_RESET_DAY = 1
 KEY_HEAT_INDEX = "heat_index_c"
 KEY_WIND_CHILL = "wind_chill_c"
 KEY_HUMIDEX = "humidex"
+# v3.0: feels-like formulas that ran but are outside their range (sensors show air temp)
+KEY_FEELS_LIKE_AIR_TEMP = "_feels_like_air_temp"
+# v3.0: Data Status sensor and the lasting source problems it reports
+KEY_DATA_STATUS = "data_status"
+KEY_SOURCE_PROBLEMS = "_source_problems"
 
 # Data keys - humidity / vapour
 KEY_VPD = "vpd_kpa"

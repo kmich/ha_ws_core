@@ -1230,6 +1230,13 @@
           }
         }
       },
+      "data_status": {
+        "name": "Data Status",
+        "state": {
+          "ok": "OK",
+          "attention": "Needs attention"
+        }
+      },
       "pattern_forecast_status": {
         "name": "Pattern Forecast Status",
         "state": {

@@ -2881,17 +2881,36 @@ _SOLAR_SOURCE_KEYS = frozenset(
     (KEY_ET0_PM_DAILY_MM, KEY_SOLAR_ENERGY_TODAY_WHM2, KEY_PEAK_SUN_HOURS, KEY_NET_RADIATION)
 )
 _MEASURED_SOLAR_KEYS = frozenset((KEY_CLEARNESS_INDEX, KEY_CLOUD_COVER_PCT))
+# Part of a feature group (its toggle still applies), but can only ever have a value
+# with a measured solar radiation sensor.
+_SOLAR_REQUIRED_TOGGLED_KEYS = frozenset((KEY_THSW_INDEX,))
+# Every sensor that this station's hardware decides, whatever the feature toggles say.
+STATION_DEPENDENT_KEYS = _SOLAR_SOURCE_KEYS | _MEASURED_SOLAR_KEYS | _SOLAR_REQUIRED_TOGGLED_KEYS
 
 
-def sensor_selected(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
-    """Whether a configured entity family should be instantiated."""
+def station_supports(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
+    """Whether this station's mapped hardware can ever give the sensor a value.
+
+    Kept separate from the feature toggles so that turning a feature off never
+    deletes entities; only sensors the station cannot provide are cleaned up.
+    """
     if key in _SOLAR_SOURCE_KEYS:
         return bool(
             sources.get(SRC_SOLAR_RADIATION)
             or (options.get(CONF_ET0_ILLUMINANCE_FALLBACK, False) and sources.get(SRC_LUX))
         )
-    if key in _MEASURED_SOLAR_KEYS:
+    if key in _MEASURED_SOLAR_KEYS or key in _SOLAR_REQUIRED_TOGGLED_KEYS:
         return bool(sources.get(SRC_SOLAR_RADIATION))
+    return True
+
+
+def sensor_selected(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
+    """Whether a configured entity family should be instantiated."""
+    if not station_supports(key, options, sources):
+        return False
+    if key in _SOLAR_SOURCE_KEYS or key in _MEASURED_SOLAR_KEYS:
+        # The local solar family follows its source, not a feature toggle.
+        return True
     toggle = _FEATURE_TOGGLE_MAP.get(key)
     return toggle is None or bool(options.get(toggle, False))
 
@@ -2900,7 +2919,9 @@ __all__ = [
     "SENSORS",
     "WSSensorDescription",
     "_FEATURE_TOGGLE_MAP",
+    "STATION_DEPENDENT_KEYS",
     "sensor_selected",
+    "station_supports",
     "_WIND_FACTORS",
     "_PRESSURE_FACTORS",
     "_DISTANCE_FACTORS",

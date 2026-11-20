@@ -391,6 +391,7 @@ from .const import (
     KEY_ET0_PM_PERIOD,
     KEY_ET0_PM_RADIATION_SOURCE,
     KEY_ET0_PM_REASON,
+    KEY_FEELS_LIKE_AIR_TEMP,
     KEY_FEELS_LIKE_C,
     KEY_FFDI,
     KEY_FFWI,
@@ -524,6 +525,7 @@ from .const import (
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
+    KEY_SOURCE_PROBLEMS,
     KEY_SPECIFIC_HUMIDITY,
     KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_ANOMALY_90D,
@@ -1128,6 +1130,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
         # When source entities were first found missing (None while all exist)
         self._missing_sources_since: datetime | None = None
+        self._source_problem_since: datetime | None = None
 
         # Alert hysteresis: count consecutive ticks above/below threshold
         self._alert_debounce_raw: dict[str, int] = {}  # ticks above threshold
@@ -2058,6 +2061,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 solar_rad = self._get_solar_radiation()
                 if solar_rad is not None:
                     data[KEY_THSW_INDEX] = calculate_thsw_index(float(tc), float(rh), float(wind_ms), float(solar_rad))
+            # Formulas that ran but are outside their valid range. Their sensors show the
+            # air temperature (as Davis and NWS stations do); the data keys stay None so
+            # MQTT and exports still tell "not applicable" apart from a real index value.
+            data[KEY_FEELS_LIKE_AIR_TEMP] = [
+                key
+                for key in (KEY_HEAT_INDEX, KEY_WIND_CHILL, KEY_THW_INDEX, KEY_THSW_INDEX, KEY_HUMIDEX)
+                if key in data and data[key] is None
+            ]
             wet_bulb = data.get(KEY_WET_BULB_C)
             if wet_bulb is not None:
                 data[KEY_DELTA_T] = calculate_delta_t(float(tc), float(wet_bulb))
@@ -3896,6 +3907,28 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         model_inputs = (KEY_NORM_TEMP_C, KEY_NORM_HUMIDITY, KEY_NORM_PRESSURE_HPA, KEY_NORM_WIND_SPEED_MS)
         data["model_ready"] = data["source_healthy"] and all(data.get(key) is not None for key in model_inputs)
         data["model_readiness_reason"] = "ok" if data["model_ready"] else "source readings missing or stale"
+
+        # Real source problems for the Data Status sensor, reported only once they have
+        # lasted past the grace period so a restart does not raise a false alarm.
+        problems: list[str] = []
+        if missing:
+            problems.append("Required source not mapped: " + ", ".join(missing))
+        if missing_entities:
+            problems.append("Mapped source entity not found: " + ", ".join(missing_entities))
+        if unavailable:
+            problems.append("No valid reading from: " + ", ".join(unavailable))
+        if stale:
+            problems.append("No recent update from: " + ", ".join(stale))
+        if problems:
+            if getattr(self, "_source_problem_since", None) is None:
+                self._source_problem_since = now
+        else:
+            self._source_problem_since = None
+        lasting = (
+            self._source_problem_since is not None
+            and (now - self._source_problem_since).total_seconds() >= MISSING_SOURCE_GRACE_S
+        )
+        data[KEY_SOURCE_PROBLEMS] = problems if lasting else []
         ok = data["source_healthy"]
         parts: list[str] = []
         if missing:

@@ -176,15 +176,25 @@ Services: `ws_core.reset_learning_state` accepts target `pattern_forecast`;
 
 ## Optional: Comfort Indices (`enable_comfort_indices`)
 
-All 23 sensors are created when the feature is enabled.
-THSW index, clearness index, cloud cover, solar energy, max solar radiation,
-peak sun hours, and net radiation also require a solar radiation sensor.
+All 23 sensors are created when the feature is enabled, except the solar-radiation
+ones below. Clearness index, cloud cover and the THSW index are only created when a
+solar radiation sensor (W/m²) is mapped. Solar energy, peak sun hours and net
+radiation (and Penman-Monteith ET₀) are created with a solar radiation sensor, or
+with the illuminance fallback and a lux sensor, as estimates. Entries for these
+sensors left by earlier versions on stations without such a sensor are removed
+automatically, and `sensor.ws_data_status` lists them under `not_on_this_station`.
+
+**Feels-like sensors outside their range.** Heat index, THW, THSW, wind chill and
+humidex only apply in certain weather. Outside it they show the air temperature,
+as Davis and NWS stations do, with `formula_applies: false` and an `explanation`
+attribute; inside it, `formula_applies` is `true`. Before 3.0.0 they showed
+`unknown`. MQTT and exports still send no value when the formula does not apply.
 
 | Entity ID | Unit | Formula / reference | Notes |
 |---|---|---|---|
-| `sensor.ws_heat_index` | °C | Rothfusz (1990) | Active when T ≥ 27 °C and RH ≥ 40% |
-| `sensor.ws_wind_chill` | °C | WMO/NWS (2001) | Active when T ≤ 10 °C and wind > 1.34 m/s |
-| `sensor.ws_humidex` | °C | Masterton & Richardson (1979) | Active when result exceeds ambient T |
+| `sensor.ws_heat_index` | °C | Rothfusz (1990) | Applies when T ≥ 27 °C and RH ≥ 40%; air temperature otherwise |
+| `sensor.ws_wind_chill` | °C | WMO/NWS (2001) | Applies when T ≤ 10 °C and wind > 1.34 m/s; air temperature otherwise |
+| `sensor.ws_humidex` | °C | Masterton & Richardson (1979) | Applies when it exceeds the air temperature; air temperature otherwise |
 | `sensor.ws_thw_index` | °C | Davis Instruments | THW — heat index with wind cooling |
 | `sensor.ws_thsw_index` | °C | Davis Instruments | THSW — THW plus solar heating; needs solar radiation |
 | `sensor.ws_vpd` | kPa | FAO-56 (Allen 1998) | Vapour Pressure Deficit |
@@ -359,6 +369,28 @@ Via Open-Meteo Marine API (free, no API key).
 | `sensor.ws_vigilance` | Météo-France Vigilance — `vert` / `jaune` / `orange` / `rouge` |
 | `sensor.ws_river_level` | Vigicrues water height at nearest station (m) |
 | `sensor.ws_river_flow` | Vigicrues water flow at nearest station (m³/s, converted from Hub'Eau's L/s) |
+
+---
+
+## Always-on: Data Status {#data-status}
+
+`sensor.ws_data_status` answers "is an empty sensor a problem?" in one place. Its
+state is **OK** or **Needs attention**.
+
+- **Needs attention** only when a station source has a lasting problem: a required
+  source is not mapped, a mapped entity is missing, or a source gives no valid or
+  recent reading for over 5 minutes. These are the same problems that raise Repairs
+  issues. A restart does not trigger it.
+- The `summary` attribute says what is going on in one sentence.
+- `needs_attention` lists the problems.
+- `waiting` lists every sensor that is empty for a normal reason, with that reason.
+  Examples: no rain expected, no lightning strike yet, Pattern Forecast still
+  collecting data, no frost event yet.
+- `not_on_this_station` lists features this station's sensors or settings cannot
+  provide, and what would make them work. Examples: clearness index without a W/m²
+  solar sensor, or lightning with no detector and no Blitzortung integration.
+
+Each empty sensor also carries its own `reason` and `explanation` attributes.
 
 ---
 

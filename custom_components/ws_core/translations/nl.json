@@ -1990,6 +1990,13 @@
           }
         }
       },
+      "data_status": {
+        "name": "Gegevensstatus",
+        "state": {
+          "ok": "OK",
+          "attention": "Aandacht nodig"
+        }
+      },
       "pattern_forecast_status": {
         "name": "Patroonvoorspelling status",
         "state": {

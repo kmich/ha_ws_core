@@ -1274,6 +1274,13 @@
           }
         }
       },
+      "data_status": {
+        "name": "Stan danych",
+        "state": {
+          "ok": "OK",
+          "attention": "Wymaga uwagi"
+        }
+      },
       "pattern_forecast_status": {
         "name": "Prognoza wzorców: stan",
         "state": {

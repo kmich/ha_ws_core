@@ -2023,6 +2023,13 @@
           }
         }
       },
+      "data_status": {
+        "name": "Datenstatus",
+        "state": {
+          "ok": "OK",
+          "attention": "Aufmerksamkeit erforderlich"
+        }
+      },
       "pattern_forecast_status": {
         "name": "Musterprognose Status",
         "state": {
