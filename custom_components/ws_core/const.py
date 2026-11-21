@@ -739,7 +739,10 @@ PATTERN_RAIN_JUMP_CAP_MM = 60.0  # per-tick rain jump that invalidates a window
 PATTERN_STRIKE_JUMP_CAP = 2000.0  # per-tick lightning jump that invalidates a window
 PATTERN_PENDING_MAX = 48  # pending-buffer cap
 PATTERN_BIN_COUNT = 13  # 15-min history bins kept (3 h plus the current one)
-PATTERN_PRESSURE_SLOTS = 97  # 24 h of 15-min pressure samples
+# Pressure history for the 24 h change is kept by time, not by count: every restart
+# adds one off-grid point, and a 97-point cap pushed the reading from 24 h ago out early.
+PATTERN_PRESSURE_WINDOW_S = 86400.0 + 1800.0  # 24.5 h of pressure points
+PATTERN_PRESSURE_SLOTS = 400  # safety cap only: 24.5 h of 15-min points plus restart points
 PATTERN_DRY_HOURS_CAP = 48.0
 
 # Online logistic regression

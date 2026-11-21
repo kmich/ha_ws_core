@@ -910,9 +910,10 @@ class TestPressureSeed:
     def test_replay_seeds_a_day_of_pressure(self, learned):
         coord, rt = learned
         eng = rt.engine
-        assert len(eng.pressure) == PATTERN_PRESSURE_SLOTS
+        # Kept by time (24.5 h), not by count: at least a full day of 15-min points
+        assert 97 <= len(eng.pressure) <= PATTERN_PRESSURE_SLOTS
         first, last = eng.pressure[0][0], eng.pressure[-1][0]
-        assert last <= NOW.timestamp() and last - first >= 23.5 * 3600
+        assert last <= NOW.timestamp() and last - first >= 24 * 3600
         assert all(p[0] % 900.0 == 0 for p in eng.pressure)
         # the next live issues all find their reading from 24 h before
         for k in range(4):

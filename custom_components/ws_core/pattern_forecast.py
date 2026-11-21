@@ -52,6 +52,7 @@ from .const import (
     PATTERN_PENDING_MAX,
     PATTERN_POOL_ID,
     PATTERN_PRESSURE_SLOTS,
+    PATTERN_PRESSURE_WINDOW_S,
     PATTERN_PRIOR_RATE,
     PATTERN_RAIN_JUMP_CAP_MM,
     PATTERN_RAIN_THRESHOLD_MM,
@@ -1373,8 +1374,22 @@ class PatternEngine:
         ]
         merged = sorted(live + seeds, key=lambda p: p[0])[-PATTERN_PRESSURE_SLOTS:]
         self.pressure = deque(merged, maxlen=PATTERN_PRESSURE_SLOTS)
-        kept = {p[0] for p in merged}
+        self._trim_pressure()
+        kept = {p[0] for p in self.pressure}
         return sum(1 for s in seeds if s[0] in kept)
+
+    def _trim_pressure(self) -> None:
+        """Keep the last 24.5 h of pressure points, by time rather than by count.
+
+        Each restart or reload issues one extra, off-grid forecast that adds a point.
+        With a 97-point cap a few restarts pushed the reading from 24 h ago out early,
+        so ``dp_24h`` went missing and every target paused for up to a day.
+        """
+        if not self.pressure:
+            return
+        newest = self.pressure[-1][0]
+        while self.pressure and self.pressure[0][0] < newest - PATTERN_PRESSURE_WINDOW_S:
+            self.pressure.popleft()
 
     _BIN_KEYS = ("t", "d", "u", "v", "s", "g", "r", "k")
 
@@ -1503,6 +1518,7 @@ class PatternEngine:
         feats, now_flags = self._features(ts, inst)
         if inst.mslp is not None:
             self.pressure.append([ts, float(inst.mslp)])
+            self._trim_pressure()
         vec: list[float | None] = [feats[name] for name in POOL]
         for i, x in enumerate(vec):
             if x is not None and math.isfinite(x):
@@ -2075,6 +2091,7 @@ class PatternEngine:
         for t, v in data.get("pressure_24h", []):
             if _finite(t) and _finite(v):
                 eng.pressure.append([float(t), float(v)])
+        eng._trim_pressure()
         for b in data.get("recent_bins", []):
             if isinstance(b, dict) and _finite(b.get("ts")) and _finite(b.get("n")):
                 eng.bins.append(dict(b))
