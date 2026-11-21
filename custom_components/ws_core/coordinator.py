@@ -3782,6 +3782,34 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._blitzortung_sources[SRC_LIGHTNING_AZIMUTH] = eid
                 _LOGGER.debug("Blitzortung lightning azimuth auto-detected: %s", eid)
 
+    def _restore_last_strike_ts(self, now: Any) -> Any:
+        """Time of the last strike from the lightning event entity's restored state, or None.
+
+        Sets ``_lightning_strike_restored`` once the event entity has a state (a time or
+        "unknown"), so the lookup stops; while it is still loading it is retried.
+        """
+        from homeassistant.helpers import entity_registry as er  # local import to avoid circular
+
+        entry_id = self.entry_data.get("entry_id") if isinstance(getattr(self, "entry_data", None), dict) else None
+        if not entry_id or self.hass is None:
+            self._lightning_strike_restored = True
+            return None
+        entity_id = er.async_get(self.hass).async_get_entity_id("event", DOMAIN, f"{entry_id}_lightning_event")
+        state = self.hass.states.get(entity_id) if entity_id else None
+        if entity_id is None:
+            self._lightning_strike_restored = True
+            return None
+        if state is None or state.state == "unavailable":
+            return None  # not loaded yet: try again on the next update
+        self._lightning_strike_restored = True
+        when = dt_util.parse_datetime(state.state) if isinstance(state.state, str) else None
+        if when is None or when.tzinfo is None:
+            return None
+        try:
+            return when if when <= now else None
+        except TypeError:
+            return None
+
     def _compute_lightning(self, data: dict, now: Any) -> None:
         """Derive lightning sensors from optional strike count + distance inputs.  (v2.0)"""
         if not self.lightning_enabled:
@@ -3820,6 +3848,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if dist_raw is not None:
             prox_km = self._lightning_proximity_km
             data[KEY_LIGHTNING_PROXIMITY] = "near" if float(dist_raw) <= prox_km else "clear"
+        elif self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE):
+            # A distance source that reports no strike means nothing nearby: "clear", not unknown.
+            data[KEY_LIGHTNING_PROXIMITY] = "clear"
+
+        # The last strike time is in memory only; after a restart pick it up from the
+        # lightning event entity (which Home Assistant restores) so the clearance timer
+        # keeps counting instead of going unknown until the next strike.
+        if self._lightning_last_strike_ts is None and not getattr(self, "_lightning_strike_restored", False):
+            self._lightning_last_strike_ts = self._restore_last_strike_ts(now)
 
         # 1h rolling strike count (accumulates increases in cumulative counter)
         new_strikes = 0

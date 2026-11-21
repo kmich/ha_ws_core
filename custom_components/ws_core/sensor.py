@@ -252,7 +252,7 @@ from .entity_descriptions import (
     sensor_selected,
     station_supports,
 )
-from .sensor_status import unknown_status
+from .sensor_status import status_text, unknown_status
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1083,8 +1083,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             attrs["formula_applies"] = not out_of_range
             if out_of_range:
                 attrs["explanation"] = _FEELS_LIKE_NOTES[self._desc.key]
-        if native is None and "maturity" in attrs and not attrs.get("explanation"):
-            attrs.update(_PATTERN_FIRST_RUN)
+        if native is None and "maturity" in attrs:
+            if not attrs.get("explanation"):
+                attrs.update(_PATTERN_FIRST_RUN)
+            attrs.setdefault("status_text", status_text(attrs.get("reason"), explanation=attrs.get("explanation")))
         return attrs
 
     @property

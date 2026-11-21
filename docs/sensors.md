@@ -247,8 +247,8 @@ FWI sub-components (`enable_fwi_components`) run the FWI calculation even when t
 | `sensor.ws_lightning_count_1h` | strikes | Strikes in the past hour |
 | `sensor.ws_lightning_distance` | km | Nearest detected strike |
 | `sensor.ws_lightning_rate` | /min | Average strike rate |
-| `sensor.ws_lightning_clearance` | min | Minutes since the last strike (safe at ≥30) |
-| `sensor.ws_lightning_proximity` | — | `near` / `clear` vs configurable threshold |
+| `sensor.ws_lightning_clearance` | min | Minutes since the last strike (safe at ≥30); keeps counting across restarts from the last strike the lightning event recorded |
+| `sensor.ws_lightning_proximity` | — | `near` / `clear` vs configurable threshold; `clear` when the distance source reports no strike |
 
 Supports WH57, AS3935, and Blitzortung. Blitzortung is auto-discovered if installed.
 
@@ -424,7 +424,13 @@ state is **OK** or **Needs attention**.
   provide, and what would make them work. Examples: clearness index without a W/m²
   solar sensor, or lightning with no detector and no Blitzortung integration.
 
-Each empty sensor also carries its own `reason` and `explanation` attributes.
+Each empty sensor also carries its own `reason` and `explanation` attributes, plus a
+short `status_text` such as "No rain expected", "No recent strike" or "Learning (2 of 5
+events)". Home Assistant only allows numbers in a sensor with a unit and shows
+"Unknown" when there is none, so the bundled dashboards show `status_text` there
+instead. To do the same on your own dashboard, use an entities-card row of
+`type: attribute` with `attribute: status_text` behind a conditional on
+`state: unknown`.
 
 ---
 

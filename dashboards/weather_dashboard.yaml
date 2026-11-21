@@ -4159,18 +4159,102 @@ views:
               entities:
                 - entity: sensor.ws_pattern_forecast_status
                   name: Status
-                - entity: sensor.ws_pattern_rain_1h
-                  name: Rain, 1 h
-                - entity: sensor.ws_pattern_rain_3h
-                  name: Rain, 3 h
-                - entity: sensor.ws_pattern_rain_6h
-                  name: Rain, 6 h
-                - entity: sensor.ws_pattern_frost_12h
-                  name: Frost, 12 h
-                - entity: sensor.ws_pattern_heat_24h
-                  name: Hot day, 24 h
-                - entity: sensor.ws_pattern_gust_3h
-                  name: Strong gust, 3 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_rain_1h
+                      state_not: unknown
+                  row:
+                    entity: sensor.ws_pattern_rain_1h
+                    name: Rain, 1 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_rain_1h
+                      state: unknown
+                  row:
+                    type: attribute
+                    entity: sensor.ws_pattern_rain_1h
+                    attribute: status_text
+                    name: Rain, 1 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_rain_3h
+                      state_not: unknown
+                  row:
+                    entity: sensor.ws_pattern_rain_3h
+                    name: Rain, 3 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_rain_3h
+                      state: unknown
+                  row:
+                    type: attribute
+                    entity: sensor.ws_pattern_rain_3h
+                    attribute: status_text
+                    name: Rain, 3 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_rain_6h
+                      state_not: unknown
+                  row:
+                    entity: sensor.ws_pattern_rain_6h
+                    name: Rain, 6 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_rain_6h
+                      state: unknown
+                  row:
+                    type: attribute
+                    entity: sensor.ws_pattern_rain_6h
+                    attribute: status_text
+                    name: Rain, 6 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_frost_12h
+                      state_not: unknown
+                  row:
+                    entity: sensor.ws_pattern_frost_12h
+                    name: Frost, 12 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_frost_12h
+                      state: unknown
+                  row:
+                    type: attribute
+                    entity: sensor.ws_pattern_frost_12h
+                    attribute: status_text
+                    name: Frost, 12 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_heat_24h
+                      state_not: unknown
+                  row:
+                    entity: sensor.ws_pattern_heat_24h
+                    name: Hot day, 24 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_heat_24h
+                      state: unknown
+                  row:
+                    type: attribute
+                    entity: sensor.ws_pattern_heat_24h
+                    attribute: status_text
+                    name: Hot day, 24 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_gust_3h
+                      state_not: unknown
+                  row:
+                    entity: sensor.ws_pattern_gust_3h
+                    name: Strong gust, 3 h
+                - type: conditional
+                  conditions:
+                    - entity: sensor.ws_pattern_gust_3h
+                      state: unknown
+                  row:
+                    type: attribute
+                    entity: sensor.ws_pattern_gust_3h
+                    attribute: status_text
+                    name: Strong gust, 3 h
 
           - type: conditional
             conditions:

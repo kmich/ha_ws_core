@@ -150,6 +150,8 @@ def _dashboard_entity_refs(yaml_path: pathlib.Path) -> dict[str, list[int]]:
 # ---------------------------------------------------------------------------
 
 KNOWN_BUILTIN_CARD_TYPES: set[str] = {
+    # Entities-card row type: shows one attribute (used for status_text when unknown)
+    "attribute",
     "conditional",
     "entities",
     "entity",

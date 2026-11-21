@@ -78,6 +78,11 @@ action:
       - conditions:
           - condition: trigger
             id: lightning_clear
+          # Only a real rise past the threshold, not a jump from "unknown" or
+          # "unavailable" after a restart (the clearance timer resumes from the
+          # last strike, so it can come back already above the threshold).
+          - condition: template
+            value_template: "{{ trigger.from_state is not none and trigger.from_state.state | is_number }}"
         sequence:
           - action: !input notify_target
             data:

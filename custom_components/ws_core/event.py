@@ -65,12 +65,16 @@ if _HAS_EVENT:
     class WSEventEntity(CoordinatorEntity, EventEntity):
         """Explain the normal empty state before the first weather transition."""
 
+        # Short wording for dashboards while no event has happened yet
+        _empty_status_text = "Nothing yet"
+
         @property
         def extra_state_attributes(self) -> dict[str, Any]:
             if self.state is None:
                 return {
                     "reason": "no_event_recorded",
                     "explanation": "No matching weather event has been recorded yet.",
+                    "status_text": self._empty_status_text,
                 }
             return {}
 
@@ -80,6 +84,7 @@ if _HAS_EVENT:
         _attr_event_types = ["started", "stopped"]
         _attr_has_entity_name = True
         _attr_translation_key = "ws_rain_event"
+        _empty_status_text = "No rain event yet"
         _attr_icon = "mdi:weather-pouring"
 
         def __init__(self, coordinator, entry: ConfigEntry, prefix: str) -> None:
@@ -128,6 +133,7 @@ if _HAS_EVENT:
         _attr_event_types = ["frost", "thaw"]
         _attr_has_entity_name = True
         _attr_translation_key = "ws_frost_event"
+        _empty_status_text = "No frost yet"
         _attr_icon = "mdi:snowflake-alert"
 
         def __init__(self, coordinator, entry: ConfigEntry, prefix: str) -> None:
@@ -175,6 +181,7 @@ if _HAS_EVENT:
         _attr_event_types = ["strike_detected", "proximity_alert"]
         _attr_has_entity_name = True
         _attr_translation_key = "ws_lightning_event"
+        _empty_status_text = "No strike yet"
         _attr_icon = "mdi:lightning-bolt"
 
         def __init__(self, coordinator, entry: ConfigEntry, prefix: str) -> None:
