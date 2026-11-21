@@ -135,6 +135,52 @@ def test_reset_for_meters_forgets_actuals_only():
     assert st.backfilled is False
 
 
+SITE_30 = [37.9, 23.7, 30.0, 180.0]
+SITE_18 = [37.9, 23.7, 18.0, 180.0]
+
+
+def _stored_days():
+    return {
+        "2026-11-01": {"gti": 4000.0, "actual": 20.0, "da_local": 19.0},
+        "2026-11-02": {"gti": 3500.0, "actual": 17.0},
+    }
+
+
+def test_reset_for_site_drops_irradiance_when_the_plane_changes():
+    st = sl.SolarLocalState()
+    st.days = _stored_days()
+    st.site = list(SITE_30)
+    st.backfilled = True
+    assert st.reset_for_site(SITE_30) is False
+    assert st.backfilled is True and st.days["2026-11-01"]["gti"] == 4000.0
+
+    assert st.reset_for_site(SITE_18) is True
+    # Measured energy and day-ahead snapshots stay; the irradiance is refetched
+    assert st.days == {"2026-11-01": {"actual": 20.0, "da_local": 19.0}, "2026-11-02": {"actual": 17.0}}
+    assert st.backfilled is False
+    assert st.site == SITE_18
+    assert sl.SolarLocalState.from_dict(st.to_dict()).site == SITE_18
+
+
+def test_reset_for_site_treats_a_store_without_a_site_as_changed():
+    st = sl.SolarLocalState.from_dict({"days": _stored_days(), "meters": ["sensor.pv"], "backfilled": True})
+    assert st.site is None
+    assert st.reset_for_site(SITE_18) is True
+    assert all("gti" not in rec for rec in st.days.values())
+    assert st.backfilled is False
+
+
+def test_reset_for_site_on_a_fresh_store_only_records_the_site():
+    st = sl.SolarLocalState()
+    assert st.reset_for_site(SITE_30) is False
+    assert st.site == SITE_30 and st.backfilled is False
+
+
+def test_state_ignores_a_malformed_site():
+    for bad in ([1, 2, 3], "x", [1, 2, 3, float("nan")], [1, 2, 3, "4"]):
+        assert sl.SolarLocalState.from_dict({"site": bad}).site is None
+
+
 def test_prune_keeps_recent_days():
     st = sl.SolarLocalState()
     st.set_value((TODAY - timedelta(days=sl.KEEP_DAYS + 1)).isoformat(), "gti", 1.0)
@@ -326,6 +372,35 @@ async def test_runtime_ignores_stale_forecast_solar_and_non_energy_meters():
     assert rt.state.backfilled is False  # retried with a backfill on the next refresh
     assert rt.status == sl.STATUS_PRIOR and rt.k == pytest.approx(4.0)
     assert "da_fs" not in rt.state.days[(TODAY + timedelta(days=1)).isoformat()]
+
+
+async def test_runtime_refetches_history_after_a_tilt_change():
+    stored = {"days": _stored_days(), "meters": ["sensor.pv"], "backfilled": True, "site": SITE_30}
+    coord = _coord()
+    coord.solar_panel_tilt = 18
+    rt = SolarLocalRuntime(coord, ["sensor.pv"])
+    store = MagicMock(async_load=AsyncMock(return_value=stored), async_save=AsyncMock())
+    with patch("homeassistant.helpers.storage.Store", return_value=store):
+        await rt.async_load("abc")
+    assert rt.state.site == SITE_18
+    assert rt.state.backfilled is False
+    assert all("gti" not in rec for rec in rt.state.days.values())
+    assert rt.state.days["2026-11-01"]["actual"] == 20.0
+
+    now = datetime(2026, 11, 20, 20, 0, tzinfo=ATHENS)
+    js = _om_response({TODAY: _bell(400), TODAY + timedelta(days=1): _bell(500)})
+    fetch = await _run_update(rt, js, {"sensor.pv": _rows(TODAY - timedelta(days=1), 1.0)}, {"sensor.pv": "kWh"}, now)
+    fetch.assert_awaited_once_with(sl.BACKFILL_DAYS)
+
+
+async def test_runtime_keeps_history_when_the_plane_is_unchanged():
+    stored = {"days": _stored_days(), "meters": ["sensor.pv"], "backfilled": True, "site": SITE_30}
+    rt = SolarLocalRuntime(_coord(), ["sensor.pv"])
+    store = MagicMock(async_load=AsyncMock(return_value=stored))
+    with patch("homeassistant.helpers.storage.Store", return_value=store):
+        await rt.async_load("abc")
+    assert rt.state.backfilled is True
+    assert rt.state.days["2026-11-01"]["gti"] == 4000.0
 
 
 async def test_runtime_keeps_last_values_when_fetch_fails():

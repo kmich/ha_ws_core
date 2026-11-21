@@ -94,6 +94,23 @@ class SolarLocalRuntime:
             self.state = SolarLocalState()
         if self.state.reset_for_meters(self.meters):
             _LOGGER.info("ws_core: PV meters changed, local PV forecast will relearn from their history")
+        site = self._site()
+        if site is not None and self.state.reset_for_site(site):
+            _LOGGER.info(
+                "ws_core: panel tilt, direction or location changed, local PV forecast will refetch its irradiance history"
+            )
+
+    def _site(self) -> list[float] | None:
+        """Location (rounded to about 1 km) and panel plane the irradiance is fetched for."""
+        coord = self.coord
+        if coord.forecast_lat is None or coord.forecast_lon is None:
+            return None
+        return [
+            round(float(coord.forecast_lat), 2),
+            round(float(coord.forecast_lon), 2),
+            float(coord.solar_panel_tilt),
+            float(coord.solar_panel_azimuth),
+        ]
 
     async def _async_save(self) -> None:
         if self.store is not None:

@@ -179,9 +179,11 @@ class SolarLocalState:
         self.days: dict[str, dict[str, float]] = {}
         self.meters: list[str] = []
         self.backfilled: bool = False
+        # [lat, lon, tilt, compass azimuth] the stored ``gti`` sums were fetched for
+        self.site: list[float] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"days": self.days, "meters": self.meters, "backfilled": self.backfilled}
+        return {"days": self.days, "meters": self.meters, "backfilled": self.backfilled, "site": self.site}
 
     @classmethod
     def from_dict(cls, data: Any) -> SolarLocalState:
@@ -205,7 +207,34 @@ class SolarLocalState:
         if isinstance(meters, list):
             st.meters = [str(m) for m in meters]
         st.backfilled = bool(data.get("backfilled", False))
+        site = data.get("site")
+        if (
+            isinstance(site, list)
+            and len(site) == 4
+            and all(isinstance(v, (int, float)) and math.isfinite(v) for v in site)
+        ):
+            st.site = [float(v) for v in site]
         return st
+
+    def reset_for_site(self, site: list[float]) -> bool:
+        """Forget the irradiance history if the panel geometry or location changed.
+
+        Each stored ``gti`` sum is for the plane it was fetched for. Fitting the site
+        factor on one plane and forecasting on another skews every forecast (a tilt
+        change from 30 to 18 degrees moved a November forecast by about 13%), so the
+        sums are dropped and refetched by a new backfill. Measured energy and the
+        day-ahead snapshots stay. A store without a recorded site counts as changed.
+        """
+        wanted = [round(float(v), 3) for v in site]
+        if self.site == wanted:
+            return False
+        self.site = wanted
+        had_gti = False
+        for rec in self.days.values():
+            had_gti = rec.pop("gti", None) is not None or had_gti
+        if had_gti:
+            self.backfilled = False
+        return had_gti
 
     def reset_for_meters(self, meters: list[str]) -> bool:
         """Forget measured energy and the backfill flag if the meter set changed."""
