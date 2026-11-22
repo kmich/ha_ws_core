@@ -19,6 +19,7 @@ run an older Home Assistant.
 | **Lightning proximity and clearance always have a value** | With a lightning detector or Blitzortung, `sensor.ws_lightning_proximity` reads `clear` when no strike is reported (`unknown` while the detector is unavailable), and `sensor.ws_lightning_clearance` keeps counting from the last strike across restarts | If you use the **Lightning Safety** blueprint, re-import it so a restart cannot send a false "all clear" |
 | **Actions raise clear errors** | All ws_core actions now fail with an error message for an unknown station, an unknown profile or invalid limits, instead of returning `{}` or an `error` key | Scripts that checked the response for an error should handle the action error instead (for example `continue_on_error`) |
 | **Leftover solar sensors are removed** | On stations without a solar radiation sensor (W/m²), the clearness index, cloud cover, THSW, solar energy, peak sun hours, net radiation and Penman-Monteith ET₀ entries left over from earlier versions are removed. They could never have a value. With the illuminance fallback and a lux sensor, only clearness index, cloud cover and THSW are removed | Remove dashboard cards that pointed at them. Mapping a solar radiation sensor later creates them again |
+| **Clearing the PV meter list removes Local PV Forecast entities** | The Today, Tomorrow and Remaining Today entities are removed on reload when no PV energy meter is selected | Select a PV energy meter again to recreate the entities |
 | **Turning a feature off removes its entities** | Unticking Weather Windows or one of its profiles removes those entities on reload | Nothing |
 | **Removing the integration deletes its stored data** | Deleting a Weather Station Core entry also deletes its learning state, history, climate normals and Pattern Forecast files in `.storage` | Back up first if you might want that data back |
 | **Alert messages stay stable; live readings move to attributes** | `sensor.ws_alert_message` now shows stable localized alert titles (e.g. `"Freeze risk"`) instead of changing state with every 0.1° reading, and the 3-tick clear debounce + hysteresis deadband (`+0.5 °C`, `-1.5 m/s`, `-1.0 mm/h`) now hold alerts steadily | Automations or templates parsing numbers from `sensor.ws_alert_message` state should read `detail_message` or `active_alerts` attributes instead |
@@ -38,6 +39,8 @@ forecast is trusted.
 - The pressure input relearns straight away from up to 365 days of your recorder history.
 - The solar inputs relearn from live daylight readings over the following days and weeks.
   Forecasts keep working meanwhile.
+
+## AQI and Beaufort attributes
 
 The AQI sensor now prefers the provider's US index when the US scale is selected.
 It uses pollutant-specific averaging periods and can differ from the previous
@@ -61,7 +64,7 @@ are just easier to find.
   anything needs attention, and why any other sensor is empty. See
   [sensors](sensors.md#data-status).
 - **Local PV forecast:** pick your PV energy meters under *Features & Diagnostics → Solar
-  Forecast* and ws_core learns a forecast from your real yield. See
+  Forecast Settings* and ws_core learns a forecast from your real yield. See
   [sensors](sensors.md#optional-solar-pv-forecast-enable_solar_forecast).
 
 The [changelog](https://github.com/kmich/ha_ws_core/blob/main/CHANGELOG.md) lists every

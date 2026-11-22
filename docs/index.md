@@ -8,7 +8,7 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 !!! tip "New in 3.0"
     - **[Weather Windows](guides/weather_windows.md):** when in the next 24 hours the weather suits drying laundry, garden work or your own activity, with a notification blueprint.
-    - **Data Status:** one sensor that tells you whether anything needs attention, and a plain reason on every empty sensor instead of a bare "Unknown".
+    - **[Data Status](sensors.md#data-status):** see whether a source or PV meter needs attention and why other readings are waiting.
     - **Local PV forecast** learned from your own PV meters, and feels-like sensors that show the air temperature when their formula does not apply.
     - Upgrading from 2.x? Read **[Upgrading to 3.0](upgrading.md)** first: it needs Home Assistant 2024.12 and has a few breaking changes.
 
@@ -100,7 +100,7 @@ If your weather station is connected to Home Assistant, `ws_core` can use it. Su
 
 ## 🛠️ Ready-Made Resources
 
-* **[3-Minute Quickstart](quickstart.md):** Step-by-step installation via HACS with auto-discovery.
+* **[Quickstart](quickstart.md):** Install from Marketplace or HACS and map your station's sensors.
 * **[Blueprints](blueprints.md):** 1-click importable automations for rain alerts, wind protection, and irrigation skips.
 * **[Dashboards](dashboards.md):** Drop-in Lovelace dashboards: native cards only, Mushroom, an animated Enhanced dashboard and a mobile-first Bubble Card dashboard.
 * **[Sensor Reference](sensors.md):** Complete catalog of all 170+ available derived sensors and feature groups.

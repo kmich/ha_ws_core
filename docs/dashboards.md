@@ -48,8 +48,7 @@ additional HACS frontend integrations.
 Includes a **Recent Weather Events** logbook card (Station page) showing the last
 72h of rain start/stop, frost/thaw, and lightning-strike events from the built-in
 event entities, and a **Windows** page (`path: windows`) displaying Weather Windows
-status, next window start/end timestamps, and reason explanations when **Decision Profiles**
-are enabled.
+status, next window start/end timestamps, and reason explanations for enabled profiles.
 
 ---
 
@@ -217,8 +216,8 @@ Markdown card that lists every forecast with its maturity; paste it in.
 
 ## Plain status instead of "Unknown"
 
-Home Assistant only allows numbers in a sensor with a unit and shows "Unknown" when there
-is none. Since 3.0.0 every empty ws_core sensor carries a short `status_text` attribute
+Home Assistant shows "Unknown" when a numeric sensor has no value.
+Derived sensors covered by Data Status carry a short `status_text` attribute when empty
 ("No rain expected", "Learning (2 of 5 events)", "Starting up"), and the Enhanced and
 Bubble dashboards show it in place of "Unknown" for the nowcast and Pattern Forecast
 sensors. To do the same on your own dashboard, pair two conditional rows in an entities

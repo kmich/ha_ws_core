@@ -18,8 +18,8 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 - **Weather Windows.** Tell ws_core what a job needs (dry laundry, garden work, or your own limits for rain, temperature, humidity, wind, gusts, cloud and daylight) and it shows when the next suitable window in the next 24 hours starts and ends, with the reason in plain words: *"Next suitable window starts at 10:00 tomorrow for 3 hours."* Your station's live rain and gusts override the forecast, a notification blueprint warns you ahead of time, and the Vanilla and Full dashboards have a **Windows** view. [Guide](https://kmich.github.io/ha_ws_core/guides/weather_windows/).
 - **Actions for scripts and voice.** `ws_core.get_weather_windows` returns every window and each hour's verdict, and can try other limits without saving them. `ws_core.get_station_summary` gives a compact snapshot for Assist. `ws_core.export_learning_state` now returns its summary directly.
-- **Data Status: is anything wrong?** `sensor.ws_data_status` reads **OK** or **Needs attention**, and only turns to Needs attention for a source problem that lasts over 5 minutes. It lists every sensor that is empty for a normal reason, and what your station's hardware cannot provide and what would.
-- **No more bare "Unknown".** Every empty sensor carries a short `status_text` ("No rain expected", "No recent strike", "Learning (2 of 5 events)"), and the bundled dashboards show it. Heat index, wind chill and the other feels-like sensors show the air temperature when their formula does not apply, lightning proximity reads `clear` without a strike, and the clearance timer survives restarts.
+- **Data Status.** `sensor.ws_data_status` reports source problems that persist for five minutes and problems reading usable PV meter history. Its attributes explain why other readings are waiting or which inputs would make them available. [Sensor reference](docs/sensors.md#data-status).
+- **Explanations for empty readings.** Derived sensors covered by Data Status carry a short `status_text` ("No rain expected", "No recent strike", "Learning (2 of 5 events)"). The Enhanced and Bubble dashboards show it for Nowcast and Pattern Forecast. Heat index, wind chill and the other feels-like sensors show the air temperature when their formula does not apply, lightning proximity reads `clear` without a strike, and the clearance timer survives restarts.
 - **A local PV forecast.** Pick your PV energy meters (as in the Energy dashboard) and ws_core learns how much your panels really produce from Open-Meteo's irradiance for your panel angle, with today, tomorrow and remaining-today sensors.
 - **A tidier setup.** **Configure** is now a menu (sources, forecast, Weather Windows, rooms, thresholds, uploads, features), setup help is translated into all eight languages, and sensors your station can never fill are no longer created.
 - **Sturdier Pattern Forecast.** Frequent restarts no longer pause it for up to a day, and a few inputs that earlier versions computed inconsistently are relearned once on upgrade.
@@ -30,7 +30,7 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 2. **Feels-like sensors** (heat index, THW, THSW, wind chill, humidex) show the air temperature outside their range instead of `unknown`. Automations should check the `formula_applies` attribute.
 3. **Lightning:** `sensor.ws_lightning_proximity` reads `clear` without a strike (unknown while the detector is unavailable), and `sensor.ws_lightning_clearance` keeps counting across restarts. **Re-import the Lightning Safety blueprint** so a restart cannot send a false all-clear.
 4. **Actions raise errors:** every ws_core action fails with a clear error for an unknown station, an unknown profile or invalid limits, instead of returning `{}` or an `error` key.
-5. **Leftover solar sensors are removed** on stations without a solar radiation sensor (W/m²), including THSW. They could never have a value.
+5. **Unsupported solar sensors are removed.** Removing the last PV meter also removes the three Local PV Forecast entities. The upgrade guide lists which sensors require mapped solar radiation or an illuminance fallback.
 6. **Turning Weather Windows or a profile off removes its entities.**
 7. **Removing the integration deletes its stored data** (learning state, history, climate normals, Pattern Forecast).
 
@@ -38,7 +38,7 @@ Read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) for what 
 
 ## What it does
 
-**Rain.** A rain rate filtered from your gauge's running total, totals from the last hour to the year, days since rain and an adaptive rain chance (see [below](#forecasts-that-learn)). The opt-in precipitation nowcast combines Open-Meteo's 15-minute forecast with your gauge for `sensor.ws_minutes_until_rain` and `sensor.ws_minutes_until_dry`.
+**Rain.** A rain rate filtered from increases in your gauge's [rainfall counter](docs/hardware_mapping.md#rainfall-sources), totals from the last hour to the year, days since rain and an adaptive rain chance (see [below](#forecasts-that-learn)). The opt-in precipitation nowcast combines Open-Meteo's 15-minute forecast with your gauge for `sensor.ws_minutes_until_rain` and `sensor.ws_minutes_until_dry`.
 
 **Garden and irrigation.** Reference evapotranspiration (FAO-56 Penman-Monteith with a solar radiation sensor, Hargreaves-Samani without one), a water deficit, VPD, Delta-T for spraying, and leaf wetness. The ET₀ sensors can feed [Smart Irrigation](docs/guides/smart_irrigation.md).
 
@@ -167,7 +167,7 @@ No. The default forecast and the optional nowcast and air quality features use O
 
 <details>
 <summary><b>What happens when a sensor goes offline?</b></summary>
-Values that depend on it report <code>unavailable</code> or <code>unknown</code>, with the reason in the sensor's attributes, and everything that doesn't depend on it keeps working. If the source stays offline for more than 5 minutes, <code>sensor.ws_data_status</code> turns to <b>Needs attention</b> and names it. A missing or stale source also raises a Repairs issue.
+Values that depend on it report <code>unavailable</code> or <code>unknown</code>, with the reason in the sensor's attributes, and everything that doesn't depend on it keeps working. If the source stays offline for five minutes, <code>sensor.ws_data_status</code> turns to <b>Needs attention</b> and names it. A missing or stale source can also raise a Repairs issue.
 </details>
 
 ## Support

@@ -6,16 +6,16 @@ An `unknown` value means that a calculation cannot currently return a meaningful
 number; it does not by itself mean the station is offline.
 
 **Start with `sensor.ws_data_status`** (3.0.0). It reads **OK** or **Needs attention**,
-and only turns to Needs attention for a source problem that lasts over 5 minutes. Its
-`waiting` attribute lists every sensor that is empty for a normal reason, and
+and reports source problems that persist for five minutes or problems reading usable
+PV meter history. Its `waiting` attribute lists readings that are empty for a normal reason, and
 `not_on_this_station` lists what your station's sensors or settings cannot provide. See
 [Data Status](sensors.md#data-status).
 
-Each empty entity also has its own attributes: a short `status_text` such as "No rain
+Derived sensors covered by Data Status also have their own attributes: a short `status_text` such as "No rain
 expected" or "Learning (2 of 5 events)", the longer `explanation`, and the
 machine-readable `reason` (also `data_status` on ordinary sensors). They disappear when a
-valid value returns. Home Assistant only allows numbers in a sensor with a unit and shows
-"Unknown" otherwise; the bundled dashboards show `status_text` there instead.
+valid value returns. The Enhanced and Bubble dashboards show `status_text` for empty
+Nowcast and Pattern Forecast readings.
 
 | Entity group | Why it can be unknown | Action |
 |---|---|---|

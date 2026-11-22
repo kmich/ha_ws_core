@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate docs/entity_map.html - a visual entity map for WS Core.
 
-Derives everything from source code (sensor.py, switch.py, manifest.json).
+Reads sensor descriptions, entity ID overrides, feature switches and the manifest.
 Injects: version, generation timestamp, sensor count.
 Never hand-maintained.
 
@@ -18,6 +18,7 @@ import pathlib
 import re
 import sys
 from datetime import UTC, datetime
+from html import escape
 
 ROOT = pathlib.Path(__file__).parent.parent
 
@@ -28,11 +29,12 @@ ROOT = pathlib.Path(__file__).parent.parent
 
 
 def _manifest() -> dict:
-    return json.loads((ROOT / "custom_components/ws_core/manifest.json").read_text())
+    return json.loads((ROOT / "custom_components/ws_core/manifest.json").read_text(encoding="utf-8"))
 
 
 def _sensor_descriptions() -> list[dict]:
-    sensor_py = (ROOT / "custom_components/ws_core/sensor.py").read_text()
+    sensor_py = (ROOT / "custom_components/ws_core/sensor.py").read_text(encoding="utf-8")
+    descriptions_py = (ROOT / "custom_components/ws_core/entity_descriptions.py").read_text(encoding="utf-8")
 
     # Slug overrides: KEY_* -> "slug"
     start = sensor_py.find("overrides = {")
@@ -43,21 +45,15 @@ def _sensor_descriptions() -> list[dict]:
     slug_map: dict[str, str] = dict(re.findall(r'(KEY_\w+):\s*"([^"]+)"', block))
 
     # _FEATURE_TOGGLE_MAP
-    tm_start = sensor_py.find("_FEATURE_TOGGLE_MAP")
-    tm_end = sensor_py.find("\n}", tm_start) + 2
-    tm_block = sensor_py[tm_start:tm_end]
+    tm_start = descriptions_py.index("_FEATURE_TOGGLE_MAP:")
+    tm_end = descriptions_py.index("\n}", tm_start)
+    tm_block = descriptions_py[tm_start:tm_end]
     toggle_map: dict[str, str] = dict(re.findall(r"(KEY_\w+):\s*(CONF_\w+)", tm_block))
 
-    # _DISABLED_BY_DEFAULT
-    db_start = sensor_py.find("_DISABLED_BY_DEFAULT")
-    db_end = sensor_py.find("\n    }", db_start) + 6
-    db_block = sensor_py[db_start:db_end]
-    disabled: set[str] = set(re.findall(r"KEY_\w+", db_block))
-
     # Parse WSSensorDescription entries
-    sensors_start = sensor_py.find("SENSORS: list[WSSensorDescription] = [")
-    sensors_end = sensor_py.find("\n# Sensor-to-feature-toggle mapping", sensors_start)
-    sensors_block = sensor_py[sensors_start:sensors_end]
+    sensors_start = descriptions_py.index("SENSORS: list[WSSensorDescription] = [")
+    sensors_end = descriptions_py.index("\n# Sensor-to-feature-toggle mapping", sensors_start)
+    sensors_block = descriptions_py[sensors_start:sensors_end]
 
     descs = []
     for m in re.finditer(r"WSSensorDescription\((.+?)\n    \)", sensors_block, re.DOTALL):
@@ -85,20 +81,22 @@ def _sensor_descriptions() -> list[dict]:
                 "category": cat_m.group(1) if cat_m else None,
                 "has_attrs": has_attrs,
                 "toggle": toggle_map.get(key),
-                "disabled_default": key in disabled,
+                "disabled_default": "entity_registry_enabled_default=False" in body,
             }
         )
 
+    if not descs:
+        sys.exit("ERROR: No sensor descriptions matched entity ID overrides")
     return descs
 
 
 def _switch_entities() -> list[dict]:
-    switch_py = (ROOT / "custom_components/ws_core/switch.py").read_text()
-    const_py = (ROOT / "custom_components/ws_core/const.py").read_text()
+    switch_py = (ROOT / "custom_components/ws_core/switch.py").read_text(encoding="utf-8")
+    const_py = (ROOT / "custom_components/ws_core/const.py").read_text(encoding="utf-8")
     conf_keys = set(re.findall(r"CONF_ENABLE_\w+", switch_py))
     switches = []
     for const_name in sorted(conf_keys):
-        m = re.search(rf'^{const_name}\s*=\s*"([^"]+)"', const_py, re.MULTILINE)
+        m = re.search(rf'^{const_name}\s*=\s*\(?\s*"([^"]+)"', const_py, re.MULTILINE)
         if m:
             switches.append({"entity_id": f"switch.ws_{m.group(1)}", "const": const_name})
     switches.append({"entity_id": "switch.ws_enable_animations", "const": "static"})
@@ -225,7 +223,7 @@ def _badge(desc: dict) -> str:
     elif desc.get("category") == "DIAGNOSTIC":
         parts.append('<span class="badge diag">diagnostic</span>')
     else:
-        parts.append('<span class="badge ok">always-on</span>')
+        parts.append('<span class="badge ok">base</span>')
     if desc["has_attrs"]:
         parts.append('<span class="badge attrs">attrs</span>')
     if desc["disabled_default"]:
@@ -238,7 +236,6 @@ def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> 
     generated = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     sections_html = ""
-    ungrouped = []
     for sec_name, icon in _SECTIONS:
         rows = [d for d in sensors if _SECTION_MAP.get(d["key"]) == sec_name]
         if not rows:
@@ -249,7 +246,7 @@ def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> 
             rows_html += f"""
         <tr>
           <td><code>sensor.ws_{d["slug"]}</code></td>
-          <td>{d["name"]}{unit}</td>
+          <td>{escape(d["name"])}{unit}</td>
           <td>{_badge(d)}</td>
         </tr>"""
         sections_html += f"""
@@ -268,7 +265,7 @@ def generate_html(sensors: list[dict], switches: list[dict], manifest: dict) -> 
         rows_html = ""
         for d in ungrouped:
             rows_html += f"""
-        <tr><td><code>sensor.ws_{d["slug"]}</code></td><td>{d["name"]}</td><td>{_badge(d)}</td></tr>"""
+        <tr><td><code>sensor.ws_{d["slug"]}</code></td><td>{escape(d["name"])}</td><td>{_badge(d)}</td></tr>"""
         sections_html += f"""
   <section>
     <h2>❓ Uncategorised <span class="count">({len(ungrouped)})</span></h2>
@@ -325,16 +322,19 @@ small{{font-size:10px}}
   <h1>⛅ Weather Station Core - Entity Map</h1>
   <div class="meta">
     <span>🔖 v{version}</span>
-    <span>📦 {len(sensors)} sensor entities + {len(switches)} switches</span>
+    <span>📦 {len(sensors)} sensor definitions + {len(switches)} switches</span>
     <span>🕐 Generated {generated}</span>
   </div>
 </header>
 <div class="legend">
-  <span class="badge ok">always-on</span> Always registered
+  See the <a href="sensors/">sensor reference</a> for entities generated from your
+  configuration, including Data Status, Weather Windows and indoor rooms.
+  <br>
+  <span class="badge ok">base</span> May require a source
   <span class="badge diag">diagnostic</span> EntityCategory.DIAGNOSTIC
   <span class="badge cond">gated:*</span> Requires feature switch ON
   <span class="badge attrs">attrs</span> Exposes extra_state_attributes
-  <span class="badge off">off-default</span> Disabled by default in entity registry
+  <span class="badge off">off-default</span> Disabled by default unless enabled by a feature
 </div>
 {sections_html}
 </body>

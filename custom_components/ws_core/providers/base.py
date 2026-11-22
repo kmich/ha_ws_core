@@ -68,7 +68,7 @@ class ForecastProvider(ABC):
     Normalized return format from async_fetch():
     {
         "provider": str,          # matches PROVIDER_ID
-        "daily": [                # exactly 7 entries
+        "daily": [                # available daily forecast, oldest first
             {
                 "date": str,          # local date "YYYY-MM-DD"
                 "tmax_c": float|None,
@@ -81,7 +81,7 @@ class ForecastProvider(ABC):
             },
             ...
         ],
-        "hourly": [               # up to 24 entries (next 24 h)
+        "hourly": [               # available hourly forecast, oldest first
             {
                 "datetime": str,       # "YYYY-MM-DDTHH:MM", local time in HA's
                                        # timezone (use local_datetime_str)

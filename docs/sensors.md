@@ -376,8 +376,8 @@ Attributes of `sensor.ws_solar_local_forecast_today`:
 | `days_rejected` | Days with complete data whose yield fell outside the fitting band |
 | `site_factor` / `prior_site_factor` | Learned and kWp-based kWh per kWh/m² of plane irradiance |
 | `skill_local` / `skill_forecast_solar` | Day-ahead error over the last 30 days for this forecast and for forecast.solar: `days`, `mae_kwh`, `bias_kwh`, `correlation` (shown from 5 days) |
-| `hourly` | Hourly forecast for today and tomorrow (`start`, `kwh`); not recorded in history |
-| `meter_problem` / `last_error` | Why measured energy or the forecast is missing, if it is |
+| `hourly` | Hourly forecast for today and tomorrow (`start`, `kwh`). Home Assistant Recorder excludes this attribute |
+| `meter_problem` / `last_error` | Problems reading usable meter data or refreshing the irradiance forecast |
 
 Skill is scored fairly: only the last forecast made **before** a day started is compared with what the meters measured that day, for both forecasts, and on the same days when both exist. The day-ahead history starts when the feature is turned on, so `skill_*` appear after about 5 days.
 
@@ -385,7 +385,9 @@ Notes and limits:
 
 - The meters need long-term statistics (`state_class` `total` or `total_increasing`, unit Wh, kWh or MWh). Lifetime and daily-reset counters both work.
 - Each selected meter must cover every modeled hour with at least 25 Wh/m² of panel-plane irradiance. Meters that go offline at night can still qualify. Incomplete productive hours exclude that day. Data Status reports meter statistics problems. A failed history backfill is retried after six hours while short forecast refreshes continue.
-- The fit uses least squares on days near the typical yield of the highest-producing fifth of recent days, using at least seven days for that reference when available. This helps when a majority of days are curtailed or snow-covered if enough productive days remain. A system that is consistently curtailed can still learn a lower factor. The model uses re-fetched irradiance for fitting and forecast irradiance for prediction.
+- The fit uses least squares on days near the typical yield of the highest-producing fifth of recent days, using at least seven days for that reference when available. This helps when a majority of days are curtailed or snow-covered if enough productive days remain. Consistently curtailed systems can learn a lower factor. With a mix of heavily curtailed and productive days, all days can fall outside the fitting band. In that case the model uses the kWp-based prior and reports the number of rejected days.
+- If the irradiance refresh fails, the forecast may keep its last values until local midnight. Check `updated_at` for the last successful refresh and `last_error` for the failure.
+- Clearing the PV meter list removes the three Local PV Forecast entities on reload.
 - One tilt and azimuth are used for the whole system. For arrays facing different ways, set the orientation of the largest array; the site factor absorbs the rest, but the hourly shape follows that one orientation.
 - Uses the forecast latitude and longitude. Removing the integration deletes the learned data (`.storage/ws_core_<entry>_solar_local`).
 
@@ -647,7 +649,7 @@ a coordinator reload automatically.
 
 ---
 
-## Optional: Weather Windows Decision Engine (`Decision Profiles`) {#weather-windows}
+## Optional: Weather Windows {#weather-windows}
 
 Off by default (`enable_weather_windows = false`). Configure under **Settings → Devices & Services → Weather Station Core → Configure → Decision Engine & Weather Windows**.
 
@@ -659,7 +661,7 @@ For each enabled profile `<pid>` (`outdoor_drying`, `garden_work`, `custom`):
 
 | Entity ID | Device Class | Description |
 |---|---|---|
-| `sensor.ws_window_<pid>_status` | none | Current suitability state: `suitable_now`, `window_upcoming`, `unsuitable`, or `unknown` |
+| `sensor.ws_window_<pid>_status` | `enum` | Current suitability state: `suitable_now`, `window_upcoming`, `unsuitable`, or `unknown` |
 | `sensor.ws_window_<pid>_next_start` | `timestamp` | Start time of the active or next suitable interval (`unknown` if none) |
 | `sensor.ws_window_<pid>_next_end` | `timestamp` | End time of the active or next suitable interval (`unknown` if none) |
 
@@ -673,15 +675,15 @@ Default profile criteria (all numeric custom limits accept °C/°F, mm/in, and k
 
 ### Attributes, Live Station Checks & Provider Coverage
 
-- `sensor.ws_window_<pid>_status` exposes `reasons` (localized summary sentences in configured display units, with times shown as local `HH:MM`), `reason_codes`, `not_assessed_by_provider`, `is_truncated`, and `horizon_hours`. These attributes only change when the evaluation changes, not every minute. The remaining duration (`duration_h`) is returned by `ws_core.get_weather_windows`, not stored as an attribute.
-- **Live station checks:** Active station rainfall blocks the current hour, while instantaneous anemometer wind gusts require a 3-minute sustained exceedance (with a 5-minute clear hold) before blocking it. Stale or unavailable gust and rain sensors are ignored.
+- `sensor.ws_window_<pid>_status` exposes localized `reasons`, stable `reason_codes`, `not_assessed_by_provider`, `substituted_by`, `gust_unavailable`, `is_truncated`, and `horizon_hours`. The action `ws_core.get_weather_windows` also returns `duration_h` for the full window and `remaining_h` for the time still available.
+- **Live station checks:** Active station rainfall blocks the current hour. Gusts above the limit for three minutes block the window until five minutes of observed calm. An unavailable gust reading preserves an active hold for up to 30 minutes after the last valid reading.
 - **Interrupted windows:** When live rain or a sustained gust blocks a window that the forecast says is open now, the status becomes `unsuitable` with `window_interrupted` plus the live reason, and `next_start` / `next_end` keep the forecast window's original times. The rest of the window stays visible and the notification blueprint does not re-fire for it.
 - **Action calls:** `ws_core.get_weather_windows` reads the live gust hold but never starts, resets or advances it, so calling the action (even with custom limits) does not change the sensors.
 - **Horizon:** windows are evaluated up to 24 hours ahead, ending on the last full local hour, so a window that runs to the end of the horizon keeps a stable end time. For that reason the minimum duration is limited to 1 to 23 hours.
-- **What "suitable now" means:** the status is `suitable_now` while you could still start the activity and finish it within the window, so it changes to `window_upcoming` (or `unsuitable`) once less than the minimum duration remains. Example: with a 2-hour minimum and a window ending at 15:00, it stops being `suitable_now` at 13:01. `next_end` still shows 15:00 until then.
+- **What "suitable now" means:** a window must meet the minimum duration when it opens. Once open, it stays `suitable_now` until the end while conditions hold, even when less than the minimum duration remains. Use the action's `remaining_h` if an automation needs to decide whether there is enough time to start.
 - **`next_start` of an open window** is the time the window opened, and stays fixed while it remains open. After a Home Assistant restart it shows the start of the current hour until the window ends.
-- **Forecast availability and resolution:** with no usable hourly forecast (forecast disabled, expired or not fetched yet) the status is `unknown` with `forecast_unavailable`. If the forecast rows are more than an hour apart (for example a weather entity that only provides 3-hourly data), the status is `unknown` with `forecast_too_coarse`, because single rows cannot show when conditions change within those hours.
-- **Provider capability handling:** If your forecast provider omits an entire variable across every forecast hour (for example gusts on Met.no, or gusts and cloud cover on NWS/NOAA), limits depending on that variable are skipped and listed in `not_assessed_by_provider` rather than falsely failing to `unknown`. Either precipitation probability or rainfall amount satisfies rain checks where both limits exist. Real mid-forecast gaps still report `unknown` (`missing_data`), and shorter-than-minimum passing forecasts report `unknown` (`insufficient_horizon`).
+- **Forecast availability and resolution:** an unavailable forecast reports `unknown` with `forecast_unavailable`. Coarse and sub-hourly data report `forecast_too_coarse` and `forecast_too_fine`, respectively.
+- **Provider capability handling:** Limits that depend on a missing forecast field appear in `not_assessed_by_provider`. If the provider supplies one rain signal, Weather Windows uses its configured limit. If only the missing signal has a limit, the available signal must be zero and the substitution appears in `substituted_by`. Gaps can report `unknown` with `missing_data`. A passing interval shorter than the minimum can report `unsuitable` with `short_window`. A forecast too short to tell reports `unknown` with `insufficient_horizon`.
 
 ---
 

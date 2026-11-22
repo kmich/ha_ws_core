@@ -69,7 +69,7 @@ they are not calculated separately for each room.
 
 ### Step 1: Install ws_core alongside Thermal Comfort
 
-Install Weather Station Core via HACS without removing Thermal Comfort. Both can run
+Install Weather Station Core from Marketplace or HACS before removing Thermal Comfort. Both can run
 simultaneously. This lets you verify that ws_core values match before switching
 automations.
 

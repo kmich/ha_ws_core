@@ -26,18 +26,21 @@ UV index, dew point, battery level, solar radiation (W/m²).
 
 ---
 
-## Step 1: Install via HACS
+## Step 1: Install Weather Station Core
 
 [![Open Weather Station Core in HACS on your Home Assistant.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
-Weather Station Core is in the default HACS list, so there's no repository to add.
+Weather Station Core is in the default catalog. The button opens its Marketplace
+or HACS listing, depending on your Home Assistant version.
 
-1. Open HACS in your Home Assistant sidebar
-2. Search for "Weather Station Core" and open it
-3. Click **Download**
-4. Restart Home Assistant
+**Home Assistant 2026.11 and newer:** Open **Settings → Marketplace**, search for
+**Weather Station Core**, and select **Install**. Continue to the setup wizard
+when it opens. [Home Assistant Marketplace](https://www.home-assistant.io/integrations/marketplace/)
 
-The button above opens it in HACS directly.
+**Home Assistant 2024.12 through 2026.10:** Open HACS, search for **Weather Station
+Core**, select **Download**, then restart Home Assistant. Continue to Step 2.
+
+Restart Home Assistant after updating an existing installation.
 
 ### Manual installation (alternative)
 
@@ -47,6 +50,8 @@ Copy the `custom_components/ws_core/` directory from the repository into your HA
 ---
 
 ## Step 2: Add the integration
+
+Go directly to Step 3 if the Marketplace has already opened the setup wizard.
 
 1. Go to **Settings → Devices & Services**
 2. Click **+ Add Integration**

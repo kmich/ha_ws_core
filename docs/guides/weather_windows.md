@@ -118,25 +118,45 @@ data:
 response_variable: windows
 ```
 
-The response, per station and profile, contains `status`, `next_start`, `next_end`,
+The response is keyed by config entry ID. When you specify a profile or pass limits,
+each station contains one evaluation. With neither argument, each station contains a
+mapping of enabled profile IDs to evaluations. Each evaluation contains `status`, `next_start`, `next_end`,
 `duration_h` (the full window), `remaining_h` (the unelapsed part), `windows` (every
 suitable window in the horizon), `slots` (each hour with
 its result and reasons), `evaluated_limits`, `reason_codes`, `reasons_text`,
-`not_assessed_by_provider` and `data_quality`:
+`not_assessed_by_provider` and `data_quality`. This excerpt shows the single-profile
+response with the hourly slots and evaluated limits omitted.
 
 ```json
 {
-  "outdoor_drying": {
+  "example_entry_id": {
+    "profile_id": "garden_work",
     "status": "window_upcoming",
     "next_start": "2026-11-21T10:00:00+02:00",
     "next_end": "2026-11-21T13:00:00+02:00",
     "duration_h": 3,
+    "remaining_h": 3,
+    "reason_codes": ["window_upcoming"],
     "reasons_text": ["Next suitable window starts at 10:00 tomorrow for 3 hours."],
     "windows": [
-      {"start_iso": "2026-11-21T10:00:00+02:00", "end_iso": "2026-11-21T13:00:00+02:00", "duration_h": 3},
-      {"start_iso": "2026-11-21T15:00:00+02:00", "end_iso": "2026-11-21T17:00:00+02:00", "duration_h": 2}
+      {
+        "start_iso": "2026-11-21T10:00:00+02:00",
+        "end_iso": "2026-11-21T13:00:00+02:00",
+        "duration_h": 3,
+        "remaining_h": 3,
+        "is_truncated": false
+      }
     ],
-    "data_quality": {"unassessed_slots": 0, "not_assessed_by_provider": [], "current_hour_estimated": false}
+    "not_assessed_by_provider": [],
+    "data_quality": {
+      "horizon_hours": 24,
+      "is_truncated": false,
+      "unassessed_slots": 0,
+      "substituted_by": {},
+      "gust_unavailable": false,
+      "not_assessed_by_provider": [],
+      "current_hour_estimated": false
+    }
   }
 }
 ```

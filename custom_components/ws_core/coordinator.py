@@ -2796,9 +2796,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The cache is considered stale once older than NOWCAST_STALE_MULTIPLIER x
         the configured fetch interval. When fresh, blends the NWP buckets with
         the local rain-gauge rate for the first 30 minutes. When stale or never
-        fetched, falls back to a coarser rain-expected signal derived from the
-        local pressure-trend/Zambretti forecast (KEY_ZAMBRETTI_NUMBER) instead of
-        silently reusing an old NWP value or leaving the entity unavailable.
+        fetched, the rain-expected flag confirms rain detected by the local
+        gauge. With a dry gauge the flag stays unknown until the forecast is fresh.
         KEY_RAIN_EXPECTED_SOURCE tags which path produced the current value.
         """
         nc = self._nowcast_cache
