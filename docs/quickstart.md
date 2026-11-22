@@ -15,7 +15,7 @@ This page gets you from zero to a working installation in about 5 minutes.
 | Wind speed | `sensor.gw2000a_wind_speed` |
 | Wind gust | `sensor.gw2000a_wind_gust` |
 | Wind direction (degrees) | `sensor.gw2000a_wind_direction` |
-| Cumulative rainfall | `sensor.gw2000a_rain_total` |
+| Rainfall counter | `sensor.gw2000a_yearly_rain` |
 
 Any HA-integrated weather station brand works (Ecowitt, Davis, WeatherFlow, Shelly,
 Froggit, and others). The integration does not care which integration produced the
@@ -70,6 +70,11 @@ Map the 7 mandatory sensor entities from your weather station.
 Use the entity picker to find each one. You can type the entity ID directly or browse
 the picker. The integration accepts any sensor regardless of brand or integration source.
 
+For **Rainfall Counter**, prefer a lifetime or yearly amount counter in `mm` or `in`.
+An event counter also works if it increases during each rain event and resets between
+events. The WS Core Rainfall Counter displays the mapped counter's current amount.
+[Rainfall source mapping](hardware_mapping.md#rainfall-sources)
+
 ### Step 3 — Optional sensors
 
 Map illuminance, UV index, dew point, battery level, and solar radiation sensors
@@ -77,6 +82,9 @@ if your station provides them. Leave any field blank to skip it.
 
 - **Solar radiation (W/m²):** enables Penman-Monteith ET₀ and THSW index
 - **Illuminance (lx):** enables cloud cover estimation and the 36-condition classifier
+- **Year-to-date rainfall:** supplies the station's **Rain This Year** value, including
+  rain measured before you installed WS Core. You can select the same yearly entity
+  in both rain fields. [Rainfall source mapping](hardware_mapping.md#rainfall-sources)
 
 ### Step 4 — Location and climate
 

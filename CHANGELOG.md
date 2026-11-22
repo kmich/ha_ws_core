@@ -73,6 +73,7 @@ This major release builds directly on the v2.14.0–2.14.3 correctness fixes (al
 ### Fixed
 
 - **Feature sensor enablement ([#215](https://github.com/kmich/ha_ws_core/issues/215)):** Turning on a feature enables its selected sensors without a separate entity-registry step. Existing sensors disabled by the integration are enabled on reload. Home Assistant preserves entities disabled by the user.
+- **Rainfall source help ([#211](https://github.com/kmich/ha_ws_core/issues/211#issuecomment-7086726767)):** Setup and Configure explain which counters to use for rainfall and year-to-date rainfall. The Rainfall Counter sensor displays the mapped source's current reading and keeps the entity ID `sensor.ws_rain_total` with the default prefix.
 - **Setup help texts:** The feature toggles in the setup wizard and the options flow now show their help text in every language (several were only available in French), and a stale French string was removed.
 - **Rain probability rounding:** OpenWeatherMap and Pirate Weather rain probabilities are rounded instead of truncated (a reported 0.29 is now 29%, not 28%).
 - **`ws_core.get_weather_windows` validation:** `min_duration_h` above 23 is rejected with a validation error, since the 24-hour horizon can never fit a longer window.

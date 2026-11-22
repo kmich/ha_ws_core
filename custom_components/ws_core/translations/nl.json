@@ -19,8 +19,11 @@
           "wind_speed": "Windsnelheidssensor",
           "wind_gust": "Windvlaagsensor",
           "wind_direction": "Windrichtingssensor (graden)",
-          "rain_total": "Cumulatieve neerslagsensor",
+          "rain_total": "Neerslagteller",
           "_go_back": "← Terug naar vorige stap"
+        },
+        "data_description": {
+          "rain_total": "Kies een teller in mm of in. Gebruik bij voorkeur een totaal- of jaarteller. Een teller per regenperiode is ook geschikt als de waarde tijdens elke regenperiode stijgt en tussen perioden op nul wordt gezet. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Eenheid van de bodemvochtsensor",
           "soil_temperature": "Bodemtemperatuursensor",
           "_go_back": "← Terug naar vorige stap"
+        },
+        "data_description": {
+          "rain_year": "Kies de neerslag van het station sinds 1 januari in mm of in. Je kunt in beide velden dezelfde jaarteller kiezen. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "location": {
@@ -491,7 +497,10 @@
           "wind_speed": "Windsnelheidssensor",
           "wind_gust": "Windvlaagsensor",
           "wind_direction": "Windrichtingssensor (graden)",
-          "rain_total": "Cumulatieve neerslagsensor"
+          "rain_total": "Neerslagteller"
+        },
+        "data_description": {
+          "rain_total": "Kies een teller in mm of in. Gebruik bij voorkeur een totaal- of jaarteller. Een teller per regenperiode is ook geschikt als de waarde tijdens elke regenperiode stijgt en tussen perioden op nul wordt gezet. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -513,6 +522,9 @@
           "soil_moisture": "Bodemvochtigheidssensor (0-100% of 0-1 volumetrisch)",
           "soil_moisture_unit": "Eenheid van de bodemvochtsensor",
           "soil_temperature": "Bodemtemperatuursensor"
+        },
+        "data_description": {
+          "rain_year": "Kies de neerslag van het station sinds 1 januari in mm of in. Je kunt in beide velden dezelfde jaarteller kiezen. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "features_opt": {
@@ -831,7 +843,7 @@
         "name": "Windrichting"
       },
       "rain_total": {
-        "name": "Neerslag totaal"
+        "name": "Neerslagteller"
       },
       "rain_rate": {
         "name": "Neerslagintensiteit"

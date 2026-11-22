@@ -19,8 +19,11 @@
           "wind_speed": "Anémomètre",
           "wind_gust": "Anémomètre (rafales)",
           "wind_direction": "Girouette",
-          "rain_total": "Pluviomètre (entité cumul sur 24h)",
+          "rain_total": "Compteur de pluie",
           "_go_back": "← Retour à l'étape précédente"
+        },
+        "data_description": {
+          "rain_total": "Choisissez un compteur de quantité en mm ou in. Privilégiez un cumul total ou annuel. Un compteur par épisode convient aussi s’il augmente pendant chaque épisode de pluie et revient à zéro entre les épisodes. Pour les statistiques à long terme, privilégiez la classe d’état total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Unité du capteur d'humidité du sol",
           "soil_temperature": "Capteur de température du sol",
           "_go_back": "← Retour à l'étape précédente"
+        },
+        "data_description": {
+          "rain_year": "Choisissez le cumul de pluie de la station depuis le 1er janvier, en mm ou in. Vous pouvez choisir le même compteur annuel pour les deux champs. Pour les statistiques à long terme, privilégiez la classe d’état total_increasing."
         }
       },
       "location": {
@@ -491,7 +497,10 @@
           "wind_speed": "Anémomètre",
           "wind_gust": "Anémomètre (rafales)",
           "wind_direction": "Girouette",
-          "rain_total": "Pluviomètre (entité cumul sur 24h)"
+          "rain_total": "Compteur de pluie"
+        },
+        "data_description": {
+          "rain_total": "Choisissez un compteur de quantité en mm ou in. Privilégiez un cumul total ou annuel. Un compteur par épisode convient aussi s’il augmente pendant chaque épisode de pluie et revient à zéro entre les épisodes. Pour les statistiques à long terme, privilégiez la classe d’état total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -513,6 +522,9 @@
           "soil_moisture": "Capteur d'humidité du sol",
           "soil_moisture_unit": "Unité du capteur d'humidité du sol",
           "soil_temperature": "Capteur de température du sol"
+        },
+        "data_description": {
+          "rain_year": "Choisissez le cumul de pluie de la station depuis le 1er janvier, en mm ou in. Vous pouvez choisir le même compteur annuel pour les deux champs. Pour les statistiques à long terme, privilégiez la classe d’état total_increasing."
         }
       },
       "features_opt": {
@@ -831,7 +843,7 @@
         "name": "Direction du vent"
       },
       "rain_total": {
-        "name": "Cumul de pluie"
+        "name": "Compteur de pluie"
       },
       "rain_rate": {
         "name": "Intensité de la pluie"

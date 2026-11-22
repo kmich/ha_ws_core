@@ -19,8 +19,11 @@
           "wind_speed": "Czujnik prędkości wiatru",
           "wind_gust": "Czujnik porywów wiatru",
           "wind_direction": "Czujnik kierunku wiatru (stopnie)",
-          "rain_total": "Czujnik skumulowanych opadów",
+          "rain_total": "Licznik opadów",
           "_go_back": "← Wróć do poprzedniego kroku"
+        },
+        "data_description": {
+          "rain_total": "Wybierz licznik ilości opadów w mm lub in. Najlepszy jest licznik całkowity lub roczny. Licznik zdarzenia też się sprawdzi, jeśli jego wartość rośnie w trakcie opadu i jest zerowana pomiędzy zdarzeniami. Do statystyk długoterminowych zalecana jest klasa stanu total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Jednostka czujnika wilgotności gleby",
           "soil_temperature": "Czujnik temperatury gleby",
           "_go_back": "← Wróć do poprzedniego kroku"
+        },
+        "data_description": {
+          "rain_year": "Wybierz sumę opadów stacji od 1 stycznia w mm lub in. W obu polach możesz wskazać ten sam licznik roczny. Do statystyk długoterminowych zalecana jest klasa stanu total_increasing."
         }
       },
       "location": {
@@ -491,7 +497,10 @@
           "wind_speed": "Czujnik prędkości wiatru",
           "wind_gust": "Czujnik porywów wiatru",
           "wind_direction": "Czujnik kierunku wiatru (stopnie)",
-          "rain_total": "Czujnik skumulowanych opadów"
+          "rain_total": "Licznik opadów"
+        },
+        "data_description": {
+          "rain_total": "Wybierz licznik ilości opadów w mm lub in. Najlepszy jest licznik całkowity lub roczny. Licznik zdarzenia też się sprawdzi, jeśli jego wartość rośnie w trakcie opadu i jest zerowana pomiędzy zdarzeniami. Do statystyk długoterminowych zalecana jest klasa stanu total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -513,6 +522,9 @@
           "soil_moisture": "Czujnik wilgotności gleby (0-100% lub 0-1 objętościowo)",
           "soil_moisture_unit": "Jednostka czujnika wilgotności gleby",
           "soil_temperature": "Czujnik temperatury gleby"
+        },
+        "data_description": {
+          "rain_year": "Wybierz sumę opadów stacji od 1 stycznia w mm lub in. W obu polach możesz wskazać ten sam licznik roczny. Do statystyk długoterminowych zalecana jest klasa stanu total_increasing."
         }
       },
       "features_opt": {
@@ -831,7 +843,7 @@
         "name": "Kierunek wiatru"
       },
       "rain_total": {
-        "name": "Opady całkowite"
+        "name": "Licznik opadów"
       },
       "rain_rate": {
         "name": "Intensywność deszczu"

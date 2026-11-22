@@ -19,8 +19,11 @@
           "wind_speed": "Wind speed sensor",
           "wind_gust": "Wind gust sensor",
           "wind_direction": "Wind direction sensor (degrees)",
-          "rain_total": "Cumulative precipitation sensor",
+          "rain_total": "Rainfall Counter",
           "_go_back": "← Go back to previous step"
+        },
+        "data_description": {
+          "rain_total": "Use an amount counter in mm or in. Prefer a lifetime or yearly counter. An event counter also works if it increases during each event and resets between events. For long-term statistics, prefer state class total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Soil moisture sensor unit",
           "soil_temperature": "Soil temperature sensor",
           "_go_back": "← Go back to previous step"
+        },
+        "data_description": {
+          "rain_year": "Use the station's rainfall since January 1 in mm or in. You can select the same yearly counter for both fields. For long-term statistics, prefer state class total_increasing."
         }
       },
       "location": {
@@ -491,7 +497,10 @@
           "wind_speed": "Wind speed sensor",
           "wind_gust": "Wind gust sensor",
           "wind_direction": "Wind direction sensor (degrees)",
-          "rain_total": "Cumulative precipitation sensor"
+          "rain_total": "Rainfall Counter"
+        },
+        "data_description": {
+          "rain_total": "Use an amount counter in mm or in. Prefer a lifetime or yearly counter. An event counter also works if it increases during each event and resets between events. For long-term statistics, prefer state class total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -513,6 +522,9 @@
           "soil_moisture": "Soil moisture sensor (0-100% or 0-1 volumetric)",
           "soil_moisture_unit": "Soil moisture sensor unit",
           "soil_temperature": "Soil temperature sensor"
+        },
+        "data_description": {
+          "rain_year": "Use the station's rainfall since January 1 in mm or in. You can select the same yearly counter for both fields. For long-term statistics, prefer state class total_increasing."
         }
       },
       "features_opt": {
@@ -831,7 +843,7 @@
         "name": "Wind Direction"
       },
       "rain_total": {
-        "name": "Rain Total"
+        "name": "Rainfall Counter"
       },
       "rain_rate": {
         "name": "Rain Rate"

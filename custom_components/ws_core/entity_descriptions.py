@@ -411,7 +411,7 @@ SENSORS: list[WSSensorDescription] = [
     WSSensorDescription(
         key=KEY_NORM_RAIN_TOTAL_MM,
         translation_key="rain_total",
-        name="WS Rain Total",
+        name="WS Rainfall Counter",
         icon="mdi:water",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit=UNIT_RAIN_MM,

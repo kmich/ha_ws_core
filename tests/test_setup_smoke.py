@@ -40,13 +40,28 @@ def _entry() -> MockConfigEntry:
 async def test_real_setup_options_flow_and_unload(hass, enable_custom_integrations):
     hass.states.async_set("sensor.smoke_temp", "21.5", {"unit_of_measurement": "°C"})
     hass.states.async_set("sensor.smoke_hum", "55", {"unit_of_measurement": "%"})
+    hass.states.async_set(
+        "sensor.smoke_event_rain", "21.4", {"unit_of_measurement": "mm", "state_class": "total_increasing"}
+    )
     entry = _entry()
     entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            **entry.data,
+            c.CONF_SOURCES: {**entry.data[c.CONF_SOURCES], c.SRC_RAIN_TOTAL: "sensor.smoke_event_rain"},
+        },
+    )
 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
     assert hass.states.get("sensor.ws_data_status") is not None
+    await entry.runtime_data.async_refresh()
+    rainfall_counter = hass.states.get("sensor.ws_rain_total")
+    assert rainfall_counter is not None
+    assert float(rainfall_counter.state) == 21.4
+    assert rainfall_counter.name.endswith("Rainfall Counter")
     assert hass.services.has_service(c.DOMAIN, "get_weather_windows")
 
     result = await hass.config_entries.options.async_init(entry.entry_id)

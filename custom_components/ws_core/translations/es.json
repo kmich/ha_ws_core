@@ -19,8 +19,11 @@
           "wind_speed": "Sensor de velocidad del viento",
           "wind_gust": "Sensor de racha de viento",
           "wind_direction": "Sensor de dirección del viento (grados)",
-          "rain_total": "Sensor de precipitación acumulada",
+          "rain_total": "Contador de lluvia",
           "_go_back": "← Volver al paso anterior"
+        },
+        "data_description": {
+          "rain_total": "Elige un contador de cantidad en mm o in. Es preferible un contador total o anual. También sirve un contador de eventos si aumenta durante cada episodio de lluvia y se reinicia entre episodios. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Unidad del sensor de humedad del suelo",
           "soil_temperature": "Sensor de temperatura del suelo",
           "_go_back": "← Volver al paso anterior"
+        },
+        "data_description": {
+          "rain_year": "Elige la precipitación de la estación desde el 1 de enero en mm o in. Puedes elegir el mismo contador anual en ambos campos. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "location": {
@@ -491,7 +497,10 @@
           "wind_speed": "Sensor de velocidad del viento",
           "wind_gust": "Sensor de racha de viento",
           "wind_direction": "Sensor de dirección del viento (grados)",
-          "rain_total": "Sensor de precipitación acumulada"
+          "rain_total": "Contador de lluvia"
+        },
+        "data_description": {
+          "rain_total": "Elige un contador de cantidad en mm o in. Es preferible un contador total o anual. También sirve un contador de eventos si aumenta durante cada episodio de lluvia y se reinicia entre episodios. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -513,6 +522,9 @@
           "soil_moisture": "Sensor de humedad del suelo (0-100% o 0-1 volumétrico)",
           "soil_moisture_unit": "Unidad del sensor de humedad del suelo",
           "soil_temperature": "Sensor de temperatura del suelo"
+        },
+        "data_description": {
+          "rain_year": "Elige la precipitación de la estación desde el 1 de enero en mm o in. Puedes elegir el mismo contador anual en ambos campos. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "features_opt": {
@@ -831,7 +843,7 @@
         "name": "Dirección del viento"
       },
       "rain_total": {
-        "name": "Precipitación total"
+        "name": "Contador de lluvia"
       },
       "rain_rate": {
         "name": "Intensidad de lluvia"

@@ -28,7 +28,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_wind_speed` | m/s | measurement | Sustained wind speed |
 | `sensor.ws_wind_gust` | m/s | measurement | Wind gust speed |
 | `sensor.ws_wind_direction` | ° | measurement_angle | Wind direction |
-| `sensor.ws_rain_total` | mm | total_increasing | Cumulative rainfall |
+| `sensor.ws_rain_total` | mm | total_increasing | **Rainfall Counter.** Current amount from the mapped rain source, in your display units. The value follows that source's accumulation period, such as the current rain event or year. See [rainfall sources](hardware_mapping.md#rainfall-sources) |
 | `sensor.ws_rain_rate` | mm/h | measurement | Kalman-filtered rain rate |
 | `sensor.ws_dew_point` | °C | measurement | Dew point — Magnus formula (Alduchov & Eskridge 1996) |
 | `sensor.ws_illuminance` | lx | measurement | Solar illuminance (if mapped) |

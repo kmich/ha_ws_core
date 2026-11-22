@@ -19,8 +19,11 @@
           "wind_speed": "Windgeschwindigkeitssensor",
           "wind_gust": "Windböensensor",
           "wind_direction": "Windrichtungssensor (Grad)",
-          "rain_total": "Kumulativer Niederschlagssensor",
+          "rain_total": "Niederschlagszähler",
           "_go_back": "← Zurück zum vorherigen Schritt"
+        },
+        "data_description": {
+          "rain_total": "Wähle einen Mengenzähler in mm oder in. Ein Gesamt- oder Jahreszähler ist vorzuziehen. Ein Ereigniszähler eignet sich ebenfalls, wenn er während jedes Regenereignisses steigt und zwischen den Ereignissen zurückgesetzt wird. Für Langzeitstatistiken empfiehlt sich die Zustandsklasse total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Einheit des Bodenfeuchtesensors",
           "soil_temperature": "Bodentemperatursensor",
           "_go_back": "← Zurück zum vorherigen Schritt"
+        },
+        "data_description": {
+          "rain_year": "Wähle den Niederschlag der Station seit dem 1. Januar in mm oder in. Du kannst denselben Jahreszähler in beiden Feldern auswählen. Für Langzeitstatistiken empfiehlt sich die Zustandsklasse total_increasing."
         }
       },
       "location": {
@@ -491,7 +497,10 @@
           "wind_speed": "Windgeschwindigkeitssensor",
           "wind_gust": "Windböensensor",
           "wind_direction": "Windrichtungssensor (Grad)",
-          "rain_total": "Kumulativer Niederschlagssensor"
+          "rain_total": "Niederschlagszähler"
+        },
+        "data_description": {
+          "rain_total": "Wähle einen Mengenzähler in mm oder in. Ein Gesamt- oder Jahreszähler ist vorzuziehen. Ein Ereigniszähler eignet sich ebenfalls, wenn er während jedes Regenereignisses steigt und zwischen den Ereignissen zurückgesetzt wird. Für Langzeitstatistiken empfiehlt sich die Zustandsklasse total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -513,6 +522,9 @@
           "soil_moisture": "Bodenfeuchtigkeitssensor (0-100% oder 0-1 volumetrisch)",
           "soil_moisture_unit": "Einheit des Bodenfeuchtesensors",
           "soil_temperature": "Bodentemperatursensor"
+        },
+        "data_description": {
+          "rain_year": "Wähle den Niederschlag der Station seit dem 1. Januar in mm oder in. Du kannst denselben Jahreszähler in beiden Feldern auswählen. Für Langzeitstatistiken empfiehlt sich die Zustandsklasse total_increasing."
         }
       },
       "features_opt": {
@@ -831,7 +843,7 @@
         "name": "Windrichtung"
       },
       "rain_total": {
-        "name": "Niederschlag gesamt"
+        "name": "Niederschlagszähler"
       },
       "rain_rate": {
         "name": "Niederschlagsrate"
