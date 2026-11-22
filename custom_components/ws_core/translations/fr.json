@@ -291,7 +291,8 @@
         "description": "Données de qualité de l'air (PM2.5, PM10, NO₂, ozone) via Open-Meteo. Gratuit, sans clé API. Utilise la latitude/longitude des prévisions.",
         "data": {
           "aqi_interval_min": "Intervalle d'actualisation",
-          "_go_back": "← Retour à l'étape précédente"
+          "_go_back": "← Retour à l'étape précédente",
+          "aqi_scale": "Échelle IQA"
         }
       },
       "pollen": {
@@ -654,7 +655,8 @@
         "title": "Qualité de l'air",
         "description": "API Open-Meteo Air Quality. Gratuit, sans clé.",
         "data": {
-          "aqi_interval_min": "Intervalle d'actualisation"
+          "aqi_interval_min": "Intervalle d'actualisation",
+          "aqi_scale": "Échelle IQA"
         }
       },
       "pollen_opt": {
@@ -915,6 +917,9 @@
           },
           "alert_count": {
             "name": "Nombre d'alertes"
+          },
+          "detail_message": {
+            "name": "Message détaillé"
           }
         }
       },
@@ -929,6 +934,12 @@
           },
           "color": {
             "name": "Couleur"
+          },
+          "detail_message": {
+            "name": "Message détaillé"
+          },
+          "active_alerts": {
+            "name": "Alertes actives"
           }
         }
       },
@@ -1768,7 +1779,11 @@
               "unhealthy_sensitive": "Dégradé pour les groupes sensibles",
               "unhealthy": "Mauvais",
               "very_unhealthy": "Très mauvais",
-              "hazardous": "Dangereux"
+              "hazardous": "Dangereux",
+              "fair": "Assez bon",
+              "poor": "Mauvais",
+              "very_poor": "Très mauvais",
+              "extremely_poor": "Extrêmement mauvais"
             }
           },
           "pm2_5_ug_m3": {
@@ -1782,6 +1797,13 @@
           },
           "ozone_ug_m3": {
             "name": "Ozone (µg/m³)"
+          },
+          "scale": {
+            "name": "Échelle IQA",
+            "state": {
+              "european": "Européenne (EAQI)",
+              "us": "Américaine (US EPA)"
+            }
           }
         }
       },
@@ -2016,6 +2038,20 @@
           "unlikely": "Faible",
           "probable": "Probable",
           "high": "Elevé"
+        },
+        "state_attributes": {
+          "min_temp_c": {
+            "name": "Température minimale prise en compte (°C)"
+          },
+          "forecast_min_c": {
+            "name": "Minimum prévu (°C)"
+          },
+          "threshold_c": {
+            "name": "Seuil de gel (°C)"
+          },
+          "frost_point_c": {
+            "name": "Point de givre (°C)"
+          }
         }
       },
       "sensor_drift": {
@@ -2105,7 +2141,7 @@
         }
       },
       "auto_calibration": {
-        "name": "Auto Calibration",
+        "name": "Calibration automatique",
         "state": {
           "learning": "Apprentissage",
           "stable": "Stable",
@@ -2148,6 +2184,13 @@
           },
           "zambretti_forecast": {
             "name": "Prévision Zambretti"
+          },
+          "comparison_window": {
+            "name": "Fenêtre de comparaison",
+            "state": {
+              "hourly_12h": "12 prochaines heures (horaire)",
+              "daily": "Aujourd'hui (quotidien)"
+            }
           }
         }
       },
@@ -2789,6 +2832,32 @@
       },
       "window_custom_next_end": {
         "name": "{profile_name} Prochaine Fin"
+      },
+      "wind_beaufort_description": {
+        "name": "Description Beaufort du vent",
+        "state": {
+          "calm": "Calme",
+          "light_air": "Très légère brise",
+          "light_breeze": "Légère brise",
+          "gentle_breeze": "Petite brise",
+          "moderate_breeze": "Jolie brise",
+          "fresh_breeze": "Bonne brise",
+          "strong_breeze": "Vent frais",
+          "near_gale": "Grand frais",
+          "gale": "Coup de vent",
+          "strong_gale": "Fort coup de vent",
+          "storm": "Tempête",
+          "violent_storm": "Violente tempête",
+          "hurricane": "Ouragan"
+        },
+        "state_attributes": {
+          "beaufort": {
+            "name": "Échelle Beaufort"
+          },
+          "speed_ms": {
+            "name": "Vitesse du vent (m/s)"
+          }
+        }
       }
     },
     "select": {
@@ -3136,6 +3205,13 @@
         "outdoor_drying": "Séchage du linge en extérieur",
         "garden_work": "Jardinage et travaux extérieurs",
         "custom": "Profil de créneau personnalisé"
+      }
+    },
+    "aqi_scale": {
+      "options": {
+        "auto": "Auto (EAQI européen en Europe, US EPA ailleurs)",
+        "european": "Indice européen de qualité de l'air (EAQI)",
+        "us": "Indice US EPA"
       }
     }
   }

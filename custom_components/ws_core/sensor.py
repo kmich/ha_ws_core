@@ -214,6 +214,7 @@ from .const import (
     KEY_WEATHER_WINDOWS,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
+    KEY_WIND_BEAUFORT_KEY,
     KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_DIR_VARIABILITY,
@@ -269,7 +270,9 @@ _FEELS_LIKE_NOTES: dict[str, str] = {
 }
 # Reasons meaning "this station or its settings cannot provide the value", as opposed
 # to "nothing to report right now".
-_NOT_ON_STATION_REASONS = frozenset(("missing_solar_radiation", "missing_lightning_source", "feature_disabled"))
+_NOT_ON_STATION_REASONS = frozenset(
+    ("missing_solar_radiation", "missing_lightning_source", "feature_disabled", "provider_missing_precip_prob")
+)
 # A Pattern Forecast target whose learning details are known but that has not published
 # a forecast since the last restart (it does on its next run, within 15 minutes).
 _PATTERN_FIRST_RUN = {
@@ -809,6 +812,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_ZAMBRETTI_FORECAST: "zambretti_forecast",
             KEY_ZAMBRETTI_NUMBER: "zambretti_number",
             KEY_WIND_BEAUFORT: "wind_beaufort",
+            KEY_WIND_BEAUFORT_KEY: "wind_beaufort_description",
             KEY_WIND_QUADRANT: "wind_quadrant",
             KEY_WIND_DIR_SMOOTH_DEG: "wind_direction_smooth",
             KEY_CURRENT_CONDITION: "current_condition",
@@ -1101,6 +1105,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             alerts = d.get("_active_alerts", [])
             return {
                 "message": d.get(KEY_ALERT_MESSAGE, "All clear"),
+                "detail_message": d.get("_alert_detail_message"),
                 "icon": d.get("_alert_icon", "mdi:check-circle-outline"),
                 "color": d.get("_alert_color", "rgba(74,222,128,0.8)"),
                 "active_alerts": alerts,
@@ -1109,6 +1114,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         if self._desc.key == KEY_ALERT_MESSAGE:
             return {
                 "alert_state": d.get(KEY_ALERT_STATE, "clear"),
+                "detail_message": d.get("_alert_detail_message"),
+                "active_alerts": d.get("_active_alerts", []),
                 "icon": d.get("_alert_icon", "mdi:check-circle-outline"),
                 "color": d.get("_alert_color", "rgba(74,222,128,0.8)"),
             }

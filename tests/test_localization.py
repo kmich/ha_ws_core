@@ -27,9 +27,23 @@ class TestLocalize:
         assert localize.alert("en", "freeze", v="-1.0°C") == "Freeze risk: -1.0°C"
 
     def test_unknown_language_falls_back_to_english(self):
-        # German is not provided -> English fallback, no KeyError.
-        assert localize.summary("de", "humidity", v="50") == "RH 50%"
+        # Unsupported language -> English fallback, no KeyError.
+        assert localize.summary("ja", "humidity", v="50") == "RH 50%"
         assert localize.alert(None, "clear") == "All clear"
+        assert localize.alert_title("ja", "freeze") == "Freeze risk"
+        assert localize.beaufort("ja", 4) == "Moderate Breeze"
+
+    def test_german_and_all_supported_languages(self):
+        assert localize.summary("de", "humidity", v="50") == "rF 50%"
+        assert localize.alert("de", "freeze", v="-1.0°C") == "Frostgefahr: -1.0°C"
+        assert localize.alert_title("de", "freeze") == "Frostgefahr"
+        assert localize.beaufort("de", 4) == "Mäßige Brise"
+        for lang in ("en", "fr", "de", "es", "it", "nl", "pl", "pt"):
+            assert localize.summary(lang, "no_data")
+            assert localize.alert_title(lang, "clear")
+            assert localize.alert(lang, "wind", v="20 m/s")
+            for bft in range(13):
+                assert localize.beaufort(lang, bft)
 
     def test_region_variant_falls_back(self):
         # "fr-CA" should resolve to the "fr" table.

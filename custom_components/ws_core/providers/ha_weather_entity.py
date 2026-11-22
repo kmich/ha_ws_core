@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from datetime import UTC, timedelta
 from typing import Any
@@ -11,14 +12,14 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import (
     DistanceConverter,
+    PressureConverter,
     SpeedConverter,
     TemperatureConverter,
 )
 
+from ..algorithms import calculate_apparent_temperature
 from .base import ForecastProvider, _to_datetime, local_date_str, local_datetime_str, utc_datetime_str
 
-# Rows kept from an entity's hourly forecast: the in-progress hour plus the next 24.
-_HOURLY_ROWS_KEPT = 25
 # Internal flag on a raw row copied from the next hour to cover the hour in progress.
 _ESTIMATED_MARKER = "_ws_estimated_from_next_hour"
 
@@ -36,7 +37,7 @@ _CONDITION_TO_WMO: dict[str, int] = {
     "hail": 96,
     "lightning": 95,
     "lightning-rainy": 95,
-    "pouring": 63,
+    "pouring": 80,
     "rainy": 61,
     "snowy": 71,
     "snowy-rainy": 68,
@@ -48,6 +49,8 @@ _CONDITION_TO_WMO: dict[str, int] = {
 _TEMP_UNIT_ATTR = "temperature_unit"
 _WIND_UNIT_ATTR = "wind_speed_unit"
 _PRECIP_UNIT_ATTR = "precipitation_unit"
+_PRESSURE_UNIT_ATTR = "pressure_unit"
+_VISIBILITY_UNIT_ATTR = "visibility_unit"
 
 
 def _first(entry: dict, *keys: str) -> Any:
@@ -124,11 +127,21 @@ class HaWeatherEntityProvider(ForecastProvider):
         daily_out = self._normalise_daily(daily_forecast)
         hourly_out = self._normalise_hourly(hourly_forecast or [])
 
-        return {
+        result: dict[str, Any] = {
             "provider": self.PROVIDER_ID,
             "daily": daily_out,
             "hourly": hourly_out,
         }
+        if state is not None:
+            attr = state.attributes.get("attribution")
+            if isinstance(attr, str) and attr.strip():
+                result["source_attribution"] = attr.strip()
+            name = state.attributes.get("friendly_name") or getattr(state, "name", None) or entity_id
+            if isinstance(name, str) and name.strip():
+                result["source_name"] = name.strip()
+        elif entity_id:
+            result["source_name"] = entity_id
+        return result
 
     async def _get_forecast_via_service(self, entity_id: str, forecast_type: str) -> list[dict]:
         """Call weather.get_forecasts service and return the forecast list."""
@@ -154,6 +167,17 @@ class HaWeatherEntityProvider(ForecastProvider):
     def _precip_mm(self, entry: dict, *keys: str) -> float | None:
         return _convert(_first(entry, *keys), DistanceConverter, self._units.get(_PRECIP_UNIT_ATTR), "mm")
 
+    def _pressure_hpa(self, entry: dict, *keys: str) -> float | None:
+        return _convert(_first(entry, *keys), PressureConverter, self._units.get(_PRESSURE_UNIT_ATTR), "hPa")
+
+    def _visibility_km(self, entry: dict, *keys: str) -> float | None:
+        return _convert(_first(entry, *keys), DistanceConverter, self._units.get(_VISIBILITY_UNIT_ATTR), "km")
+
+    @staticmethod
+    def _clean_condition(entry: dict) -> str | None:
+        cond = entry.get("condition")
+        return cond.strip() if isinstance(cond, str) and cond.strip() else None
+
     def _condition_to_wmo(self, condition: str | None) -> int | None:
         if not condition:
             return None
@@ -166,11 +190,12 @@ class HaWeatherEntityProvider(ForecastProvider):
 
     def _normalise_daily(self, raw: list[dict]) -> list[dict]:
         out: list[dict] = []
-        for entry in raw[:7]:
+        for entry in raw:
             dt_str = entry.get("datetime") or entry.get("date") or ""
             # A daily entry is often local midnight sent as UTC (23:00Z the day
             # before in Central Europe), so the date comes from local time.
             date = (local_date_str(dt_str) or str(dt_str)[:10]) if dt_str else ""
+            cond = self._clean_condition(entry)
             out.append(
                 {
                     "date": date,
@@ -179,8 +204,15 @@ class HaWeatherEntityProvider(ForecastProvider):
                     "precip_mm": self._precip_mm(entry, "precipitation", "native_precipitation"),
                     "wind_kmh": self._speed_kmh(entry, "wind_speed", "native_wind_speed"),
                     "gust_kmh": self._speed_kmh(entry, "wind_gust_speed", "native_wind_gust_speed"),
-                    "weathercode": self._condition_to_wmo(entry.get("condition")),
+                    "weathercode": self._condition_to_wmo(cond),
+                    "condition": cond,
                     "precip_prob": entry.get("precipitation_probability"),
+                    "cloud_cover": _first(entry, "cloud_coverage"),
+                    "humidity": _first(entry, "humidity"),
+                    "pressure_hpa": self._pressure_hpa(entry, "pressure", "native_pressure"),
+                    "visibility_km": self._visibility_km(entry, "visibility", "native_visibility"),
+                    "uv_index": _first(entry, "uv_index"),
+                    "wind_bearing": _first(entry, "wind_bearing"),
                 }
             )
         # Pad to 7 days with None entries if fewer returned
@@ -194,7 +226,14 @@ class HaWeatherEntityProvider(ForecastProvider):
                     "wind_kmh": None,
                     "gust_kmh": None,
                     "weathercode": None,
+                    "condition": None,
                     "precip_prob": None,
+                    "cloud_cover": None,
+                    "humidity": None,
+                    "pressure_hpa": None,
+                    "visibility_km": None,
+                    "uv_index": None,
+                    "wind_bearing": None,
                 }
             )
         return out
@@ -210,7 +249,7 @@ class HaWeatherEntityProvider(ForecastProvider):
 
     @classmethod
     def _usable_hourly_rows(cls, raw: list[dict]) -> list[dict]:
-        """Return up to ``_HOURLY_ROWS_KEPT`` rows covering the in-progress hour and the next 24.
+        """Return all rows covering the in-progress hour and future hours.
 
         Some weather entities list hours earlier in the day; slicing those first would leave
         only a few future hours, so rows whose hour has fully passed are dropped. Others
@@ -229,8 +268,6 @@ class HaWeatherEntityProvider(ForecastProvider):
             if start is not None and start + timedelta(hours=1) <= now_utc:
                 continue
             kept.append(entry)
-            if len(kept) >= _HOURLY_ROWS_KEPT:
-                break
         if kept:
             first_start = cls._row_start_utc(kept[0])
             if first_start is not None and 0 < (first_start - now_utc).total_seconds() <= 3600:
@@ -239,25 +276,38 @@ class HaWeatherEntityProvider(ForecastProvider):
                     "datetime": (first_start - timedelta(hours=1)).isoformat(),
                     _ESTIMATED_MARKER: True,
                 }
-                kept = [current, *kept[: _HOURLY_ROWS_KEPT - 1]]
+                kept = [current, *kept]
         return kept
 
     def _normalise_hourly(self, raw: list[dict]) -> list[dict]:
         out: list[dict] = []
         for entry in self._usable_hourly_rows(raw):
+            temp_c = self._temp_c(entry, "temperature", "native_temperature")
+            apparent_temp_c = self._temp_c(entry, "apparent_temperature", "native_apparent_temperature")
+            humidity = entry.get("humidity")
+            wind_kmh = self._speed_kmh(entry, "wind_speed", "native_wind_speed")
+            if apparent_temp_c is None and temp_c is not None and humidity is not None and wind_kmh is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    apparent_temp_c = calculate_apparent_temperature(temp_c, float(humidity), wind_kmh / 3.6)
+            cond = self._clean_condition(entry)
             row = {
                 "datetime": self._parse_dt(entry.get("datetime")) or "",
                 "utc_datetime": utc_datetime_str(entry.get("datetime")),
-                "temp_c": self._temp_c(entry, "temperature", "native_temperature"),
-                "apparent_temp_c": self._temp_c(entry, "apparent_temperature", "native_apparent_temperature"),
+                "temp_c": temp_c,
+                "apparent_temp_c": apparent_temp_c,
                 "dewpoint_c": self._temp_c(entry, "dew_point", "native_dew_point"),
                 "precip_prob": entry.get("precipitation_probability"),
                 "precip_mm": self._precip_mm(entry, "precipitation", "native_precipitation"),
-                "weathercode": self._condition_to_wmo(entry.get("condition")),
-                "wind_kmh": self._speed_kmh(entry, "wind_speed", "native_wind_speed"),
+                "weathercode": self._condition_to_wmo(cond),
+                "condition": cond,
+                "wind_kmh": wind_kmh,
                 "gust_kmh": self._speed_kmh(entry, "wind_gust_speed", "native_wind_gust_speed"),
-                "humidity": entry.get("humidity"),
+                "humidity": humidity,
                 "cloud_cover": entry.get("cloud_coverage"),
+                "pressure_hpa": self._pressure_hpa(entry, "pressure", "native_pressure"),
+                "visibility_km": self._visibility_km(entry, "visibility", "native_visibility"),
+                "uv_index": _first(entry, "uv_index"),
+                "wind_bearing": _first(entry, "wind_bearing"),
             }
             if entry.get(_ESTIMATED_MARKER):
                 row["estimated_from_next_hour"] = True

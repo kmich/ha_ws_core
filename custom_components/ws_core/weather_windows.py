@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
@@ -55,6 +55,9 @@ _ONE_HOUR = timedelta(hours=1)
 _LIVE_GUST_ON_HOLD_S = 180.0
 _LIVE_GUST_OFF_HOLD_S = 300.0
 _LIVE_HOLD_STALE_GAP_S = 1800.0
+# Station gusts kept for actions: covers one onset (3 min) plus one clear hold (5 min).
+_GUST_SAMPLE_WINDOW_S = 600.0
+_NON_LIMIT_FIELDS = frozenset(("profile_id", "name", "description", "enabled"))
 
 _NUMERIC_LIMIT_FIELDS: tuple[str, ...] = (
     "max_rain_prob_pct",
@@ -640,6 +643,7 @@ class WeatherWindowsEngine:
         self._parse_dt_cache: dict[str, datetime | None] = {}
         self._slot_time_cache: dict[tuple[str, tzinfo], tuple[datetime, float, str] | None] = {}
         self._gust_hold_state: dict[str, dict[str, Any]] = {}
+        self._gust_samples: list[tuple[float, float]] = []
         self._open_window_start: dict[str, dict[str, Any]] = {}
 
     def _sync_solar_cache(self, lat_f: float, lon_f: float) -> dict[datetime, float]:
@@ -870,56 +874,28 @@ class WeatherWindowsEngine:
         prepared = self._prepare_evaluation(hourly_forecast, current_data, now)
         return self._evaluate_prepared_profile(profile, prepared, as_dict=False, update_live_hold=update_live_hold)
 
-    def _resolve_live_gust_active(
-        self,
-        profile: WeatherWindowProfile,
-        live_gust_ms: float | None,
-        now_ts: float,
-        *,
-        update: bool = True,
-    ) -> bool:
-        """Apply onset/clear hold hysteresis to instantaneous station gusts.
+    @staticmethod
+    def _new_gust_hold(threshold: float, exceeds: bool, now_ts: float) -> dict[str, Any]:
+        return {
+            "threshold": threshold,
+            "active": False,
+            "exceeded_since": now_ts if exceeds else None,
+            "clear_since": None,
+            "last_ts": now_ts,
+        }
 
-        With ``update=False`` the tracked hold is only read and never created, reset or
-        advanced. It applies while fresh when it was tracked for the same threshold, and an
-        active hold also applies to a tighter (lower) threshold: gusts sustained above the
-        tracked limit were sustained above the lower one too.
-        """
-        threshold = profile.max_wind_gust_kmh
-        if not update:
-            state = self._gust_hold_state.get(profile.profile_id)
-            if (
-                live_gust_ms is None
-                or threshold is None
-                or state is None
-                or now_ts < state["last_ts"]
-                or (now_ts - state["last_ts"]) > _LIVE_HOLD_STALE_GAP_S
-            ):
-                return False
-            if state["threshold"] == threshold:
-                return bool(state["active"])
-            return bool(state["active"]) and threshold < state["threshold"]
-        if live_gust_ms is None or threshold is None:
-            self._gust_hold_state.pop(profile.profile_id, None)
-            return False
+    @staticmethod
+    def _gust_hold_fresh(state: dict[str, Any] | None, threshold: float, now_ts: float) -> bool:
+        return (
+            state is not None
+            and state["threshold"] == threshold
+            and state["last_ts"] <= now_ts
+            and (now_ts - state["last_ts"]) <= _LIVE_HOLD_STALE_GAP_S
+        )
 
-        exceeds = (live_gust_ms * 3.6) > threshold
-        state = self._gust_hold_state.get(profile.profile_id)
-        if (
-            state is None
-            or state["threshold"] != threshold
-            or now_ts < state["last_ts"]
-            or (now_ts - state["last_ts"]) > _LIVE_HOLD_STALE_GAP_S
-        ):
-            self._gust_hold_state[profile.profile_id] = {
-                "threshold": threshold,
-                "active": False,
-                "exceeded_since": now_ts if exceeds else None,
-                "clear_since": None,
-                "last_ts": now_ts,
-            }
-            return False
-
+    @staticmethod
+    def _step_gust_hold(state: dict[str, Any], exceeds: bool, now_ts: float) -> None:
+        """Advance one onset/clear hold by one station reading."""
         if not state["active"]:
             if exceeds:
                 if state["exceeded_since"] is None:
@@ -938,8 +914,70 @@ class WeatherWindowsEngine:
                 state["active"] = False
                 state["exceeded_since"] = None
                 state["clear_since"] = None
-
         state["last_ts"] = now_ts
+
+    def _record_gust_sample(self, live_gust_ms: float | None, now_ts: float) -> None:
+        """Keep recent station gusts so an action can test any gust limit against them."""
+        samples = self._gust_samples
+        if samples and now_ts < samples[-1][0]:
+            samples.clear()  # the clock went back: the history no longer lines up
+        if live_gust_ms is None:
+            return
+        if samples and samples[-1][0] == now_ts:
+            samples[-1] = (now_ts, live_gust_ms)  # several profiles evaluate the same reading
+        else:
+            samples.append((now_ts, live_gust_ms))
+        cutoff = now_ts - _GUST_SAMPLE_WINDOW_S
+        while samples and samples[0][0] < cutoff:
+            samples.pop(0)
+
+    def _replay_gust_hold(self, threshold: float, live_gust_ms: float, now_ts: float) -> bool:
+        """Hold state for ``threshold`` rebuilt from the recent station gusts plus this reading."""
+        readings = [(ts, g) for ts, g in self._gust_samples if ts < now_ts]
+        readings.append((now_ts, live_gust_ms))
+        state: dict[str, Any] | None = None
+        for ts, gust in readings:
+            exceeds = (gust * 3.6) > threshold
+            if state is None or (ts - state["last_ts"]) > _LIVE_HOLD_STALE_GAP_S:
+                state = self._new_gust_hold(threshold, exceeds, ts)
+            else:
+                self._step_gust_hold(state, exceeds, ts)
+        return bool(state and state["active"])
+
+    def _resolve_live_gust_active(
+        self,
+        profile: WeatherWindowProfile,
+        live_gust_ms: float | None,
+        now_ts: float,
+        *,
+        update: bool = True,
+    ) -> bool:
+        """Apply onset/clear hold hysteresis to instantaneous station gusts.
+
+        With ``update=False`` (actions) nothing tracked is created, reset or advanced. The
+        sensor's hold is used when it was tracked for the same limit; for any other limit the
+        hold is rebuilt from the last few minutes of station gusts, so a limit supplied by the
+        caller is judged on the same sustained evidence.
+        """
+        threshold = profile.max_wind_gust_kmh
+        if not update:
+            if live_gust_ms is None or threshold is None:
+                return False
+            state = self._gust_hold_state.get(profile.profile_id)
+            if self._gust_hold_fresh(state, threshold, now_ts):
+                return bool(state["active"])
+            return self._replay_gust_hold(threshold, live_gust_ms, now_ts)
+        self._record_gust_sample(live_gust_ms, now_ts)
+        if live_gust_ms is None or threshold is None:
+            self._gust_hold_state.pop(profile.profile_id, None)
+            return False
+
+        exceeds = (live_gust_ms * 3.6) > threshold
+        state = self._gust_hold_state.get(profile.profile_id)
+        if not self._gust_hold_fresh(state, threshold, now_ts):
+            self._gust_hold_state[profile.profile_id] = self._new_gust_hold(threshold, exceeds, now_ts)
+            return False
+        self._step_gust_hold(state, exceeds, now_ts)
         return bool(state["active"])
 
     def _stable_open_start(
@@ -949,18 +987,22 @@ class WeatherWindowsEngine:
         now_ts: float,
         *,
         update: bool,
+        limits: tuple[Any, ...],
     ) -> tuple[float, str]:
         """Return the start of a window that is open now, remembered across hourly slot drops.
 
         Elapsed hours leave the horizon, so an open window would otherwise report the start of
         the current hour. The remembered start is reused only while the window has stayed open
-        without a break (its last known end reaches this window's start, and it was seen recently).
+        without a break (its last known end reaches this window's start, and it was seen recently),
+        and only for the limits it was found with: an action with other limits never borrows the
+        sensor's earlier start, since those hours may not have suited its limits.
         """
         start_ts, end_ts, w = window
         chosen = (start_ts, str(w["start_iso"]))
         prev = self._open_window_start.get(profile_id)
         if (
             prev is not None
+            and prev.get("limits") == limits
             and prev["start_ts"] < start_ts
             and prev["end_ts"] >= start_ts - 1.0
             and 0.0 <= now_ts - prev["last_ts"] <= _LIVE_HOLD_STALE_GAP_S
@@ -972,8 +1014,14 @@ class WeatherWindowsEngine:
                 "start_iso": chosen[1],
                 "end_ts": end_ts,
                 "last_ts": now_ts,
+                "limits": limits,
             }
         return chosen
+
+    @staticmethod
+    def _limits_key(profile: WeatherWindowProfile) -> tuple[Any, ...]:
+        """Every limit of a profile, for comparing what two evaluations were judged on."""
+        return tuple(getattr(profile, f.name) for f in fields(profile) if f.name not in _NON_LIMIT_FIELDS)
 
     def _txt(self, key: str, **fmt: object) -> str:
         """Return localized explanation string using engine language."""
@@ -1468,7 +1516,7 @@ class WeatherWindowsEngine:
         windows = [w for _, _, w in (forecast_bounds if interrupted is not None else window_bounds)]
         if open_window is not None:
             _start_ts, stable_iso = self._stable_open_start(
-                profile.profile_id, open_window, now_ts, update=update_live_hold
+                profile.profile_id, open_window, now_ts, update=update_live_hold, limits=self._limits_key(profile)
             )
             if stable_iso != next_start:
                 orig_iso = next_start

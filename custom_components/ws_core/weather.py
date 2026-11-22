@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import math
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
@@ -25,6 +26,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .algorithms import calculate_apparent_temperature
 from .const import (
     CONF_PREFIX,
     DEFAULT_PREFIX,
@@ -137,11 +139,19 @@ def _weathercode_to_condition(code: int | None) -> str | None:
         return "snowy"
     if c in (80, 81, 82):
         return "pouring"
-    if c in (85, 86):
+    if c in (68, 69, 85, 86):
         return "snowy-rainy"
     if c in (95, 96, 99):
         return "lightning-rainy"
     return None
+
+
+def _resolve_forecast_condition(item: dict[str, Any]) -> str | None:
+    """Prefer a provider's HA condition string when present; fall back to WMO code."""
+    cond = item.get("condition")
+    if isinstance(cond, str) and cond.strip():
+        return cond.strip()
+    return _weathercode_to_condition(item.get("weathercode"))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
@@ -276,6 +286,12 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
     @property
     def attribution(self) -> str:
         fc = (self.coordinator.data or {}).get(KEY_FORECAST) or {}
+        src_attr = fc.get("source_attribution")
+        if isinstance(src_attr, str) and src_attr.strip():
+            return f"Local station data processed by Weather Station Core – {src_attr.strip()}"
+        src_name = fc.get("source_name")
+        if isinstance(src_name, str) and src_name.strip():
+            return f"Local station data processed by Weather Station Core – forecast by {src_name.strip()}"
         prov = str(fc.get("provider") or "").strip()
         credit = self._PROVIDER_ATTRIBUTION.get(prov)
         if credit:
@@ -350,7 +366,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                     else str(item.get("datetime", "")).startswith(now_iso)
                 )
                 if matched:
-                    h_cond = _weathercode_to_condition(item.get("weathercode"))
+                    h_cond = _resolve_forecast_condition(item)
                     if h_cond:
                         return h_cond
                     break
@@ -358,10 +374,26 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         # 3. Fallback: Open-Meteo daily summary (least-preferred).
         daily = fc.get("daily") or []
         if daily:
-            api_cond = _weathercode_to_condition(daily[0].get("weathercode"))
+            api_cond = _resolve_forecast_condition(daily[0])
             if api_cond:
                 return api_cond
         return None
+
+    @staticmethod
+    def _add_optional_forecast_fields(entry: dict[str, Any], item: dict[str, Any], *, include_daily: bool) -> None:
+        if include_daily:
+            if item.get("cloud_cover") is not None:
+                entry["cloud_coverage"] = item["cloud_cover"]
+            if item.get("humidity") is not None:
+                entry["humidity"] = item["humidity"]
+        if item.get("pressure_hpa") is not None:
+            entry["native_pressure"] = item["pressure_hpa"]
+        if item.get("visibility_km") is not None:
+            entry["visibility"] = item["visibility_km"]
+        if item.get("uv_index") is not None:
+            entry["uv_index"] = item["uv_index"]
+        if item.get("wind_bearing") is not None:
+            entry["wind_bearing"] = item["wind_bearing"]
 
     def _build_daily_forecast(self) -> list[dict[str, Any]] | None:
         d = self.coordinator.data or {}
@@ -379,19 +411,19 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
-            out.append(
-                {
-                    "datetime": dt,
-                    "native_temperature": item.get("tmax_c"),
-                    "native_templow": item.get("tmin_c"),
-                    "native_precipitation": item.get("precip_mm"),
-                    "precipitation_probability": item.get("precip_prob"),
-                    "native_wind_speed": wind_ms,
-                    "native_wind_gust_speed": gust_ms,
-                    "condition": _weathercode_to_condition(item.get("weathercode")),
-                    ATTR_ATTRIBUTION: self.attribution,
-                }
-            )
+            entry: dict[str, Any] = {
+                "datetime": dt,
+                "native_temperature": item.get("tmax_c"),
+                "native_templow": item.get("tmin_c"),
+                "native_precipitation": item.get("precip_mm"),
+                "precipitation_probability": item.get("precip_prob"),
+                "native_wind_speed": wind_ms,
+                "native_wind_gust_speed": gust_ms,
+                "condition": _resolve_forecast_condition(item),
+                ATTR_ATTRIBUTION: self.attribution,
+            }
+            self._add_optional_forecast_fields(entry, item, include_daily=True)
+            out.append(entry)
         return out
 
     def _build_hourly_forecast(self) -> list[dict[str, Any]] | None:
@@ -449,7 +481,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                 if lead_h == 0 and local_condition:
                     condition = self._LOCAL_CONDITION_MAP.get(local_condition, "partlycloudy")
                 else:
-                    condition = _weathercode_to_condition(item.get("weathercode"))
+                    condition = _resolve_forecast_condition(item)
                 # Precipitation: use rain rate as a 1h proxy for slot 0
                 if lead_h == 0 and local_rain_rate is not None:
                     precip = _nowcast_blend(local_rain_rate, item.get("precip_mm"), lw)
@@ -460,25 +492,29 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                 apparent = item.get("apparent_temp_c")
                 dew = item.get("dewpoint_c")
                 humidity = item.get("humidity")
-                condition = _weathercode_to_condition(item.get("weathercode"))
+                condition = _resolve_forecast_condition(item)
                 precip = item.get("precip_mm")
 
-            out.append(
-                {
-                    "datetime": dt,
-                    "native_temperature": temperature,
-                    "native_apparent_temperature": apparent,
-                    "native_dew_point": dew,
-                    "precipitation_probability": item.get("precip_prob"),
-                    "native_precipitation": precip,
-                    "native_wind_speed": wind_ms,
-                    "native_wind_gust_speed": gust_ms,
-                    "humidity": humidity,
-                    "cloud_coverage": item.get("cloud_cover"),
-                    "condition": condition,
-                    ATTR_ATTRIBUTION: self.attribution,
-                }
-            )
+            if apparent is None and temperature is not None and humidity is not None and wind_ms is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    apparent = calculate_apparent_temperature(float(temperature), float(humidity), float(wind_ms))
+
+            entry = {
+                "datetime": dt,
+                "native_temperature": temperature,
+                "native_apparent_temperature": apparent,
+                "native_dew_point": dew,
+                "precipitation_probability": item.get("precip_prob"),
+                "native_precipitation": precip,
+                "native_wind_speed": wind_ms,
+                "native_wind_gust_speed": gust_ms,
+                "humidity": humidity,
+                "cloud_coverage": item.get("cloud_cover"),
+                "condition": condition,
+                ATTR_ATTRIBUTION: self.attribution,
+            }
+            self._add_optional_forecast_fields(entry, item, include_daily=False)
+            out.append(entry)
         return out
 
     @property

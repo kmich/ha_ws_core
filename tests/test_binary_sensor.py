@@ -20,6 +20,7 @@ from custom_components.ws_core.const import (
     KEY_NOWCAST_STALE,
     KEY_RAIN_EXPECTED_1H,
     KEY_RAIN_EXPECTED_SOURCE,
+    RAIN_EXPECTED_SOURCE_LOCAL_RAIN,
 )
 
 
@@ -46,15 +47,29 @@ class TestAvailability:
         assert ent.available is True
         assert ent.is_on is True
 
-    def test_available_with_local_fallback_value(self):
-        ent = _make_entity({KEY_RAIN_EXPECTED_1H: False, KEY_RAIN_EXPECTED_SOURCE: "local_fallback"})
+    def test_available_with_local_rain_value(self):
+        ent = _make_entity({KEY_RAIN_EXPECTED_1H: True, KEY_RAIN_EXPECTED_SOURCE: RAIN_EXPECTED_SOURCE_LOCAL_RAIN})
         assert ent.available is True
-        assert ent.is_on is False
+        assert ent.is_on is True
 
-    def test_unavailable_when_no_value_at_all(self):
-        # Stale/failed nowcast and no Zambretti reading either.
-        ent = _make_entity({KEY_RAIN_EXPECTED_1H: None, KEY_RAIN_EXPECTED_SOURCE: None})
-        assert ent.available is False
+    def test_unknown_when_no_value_at_all(self):
+        # Stale/failed nowcast and dry locally: available is True, state is None (unknown) with status_text.
+        ent = _make_entity({KEY_RAIN_EXPECTED_1H: None, KEY_RAIN_EXPECTED_SOURCE: None, KEY_NOWCAST_STALE: True})
+        assert ent.available is True
+        assert ent.is_on is None
+        attrs = ent.extra_state_attributes
+        assert attrs["reason"] == "waiting_for_nowcast"
+        assert attrs["status_text"] == "Waiting for nowcast"
+
+        ent_stale = _make_entity(
+            {
+                KEY_RAIN_EXPECTED_1H: None,
+                KEY_RAIN_EXPECTED_SOURCE: None,
+                KEY_NOWCAST_FETCHED_AT: "2026-09-26T10:00:00+00:00",
+                KEY_NOWCAST_STALE: True,
+            }
+        )
+        assert ent_stale.extra_state_attributes["status_text"] == "Nowcast unavailable"
 
     def test_unavailable_when_coordinator_update_failed(self):
         ent = _make_entity({KEY_RAIN_EXPECTED_1H: True}, last_update_success=False)

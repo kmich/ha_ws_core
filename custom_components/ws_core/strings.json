@@ -291,7 +291,8 @@
         "description": "Air quality data (PM2.5, PM10, NO₂, ozone) from Open-Meteo. Free, no API key required. Uses forecast lat/lon.",
         "data": {
           "aqi_interval_min": "Refresh interval",
-          "_go_back": "← Go back to previous step"
+          "_go_back": "← Go back to previous step",
+          "aqi_scale": "AQI scale"
         }
       },
       "pollen": {
@@ -654,7 +655,8 @@
         "title": "Air Quality Settings",
         "description": "Open-Meteo Air Quality API. Free, no key required.",
         "data": {
-          "aqi_interval_min": "Refresh interval"
+          "aqi_interval_min": "Refresh interval",
+          "aqi_scale": "AQI scale"
         }
       },
       "pollen_opt": {
@@ -915,6 +917,9 @@
           },
           "alert_count": {
             "name": "Alert count"
+          },
+          "detail_message": {
+            "name": "Detail message"
           }
         }
       },
@@ -929,6 +934,12 @@
           },
           "color": {
             "name": "Color"
+          },
+          "detail_message": {
+            "name": "Detail message"
+          },
+          "active_alerts": {
+            "name": "Active alerts"
           }
         }
       },
@@ -1768,7 +1779,11 @@
               "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
               "unhealthy": "Unhealthy",
               "very_unhealthy": "Very Unhealthy",
-              "hazardous": "Hazardous"
+              "hazardous": "Hazardous",
+              "fair": "Fair",
+              "poor": "Poor",
+              "very_poor": "Very Poor",
+              "extremely_poor": "Extremely Poor"
             }
           },
           "pm2_5_ug_m3": {
@@ -1782,6 +1797,13 @@
           },
           "ozone_ug_m3": {
             "name": "Ozone (µg/m³)"
+          },
+          "scale": {
+            "name": "AQI scale",
+            "state": {
+              "european": "European (EAQI)",
+              "us": "US (EPA)"
+            }
           }
         }
       },
@@ -2016,6 +2038,20 @@
           "unlikely": "Unlikely",
           "probable": "Probable",
           "high": "High"
+        },
+        "state_attributes": {
+          "min_temp_c": {
+            "name": "Lowest temperature considered (°C)"
+          },
+          "forecast_min_c": {
+            "name": "Forecast low (°C)"
+          },
+          "threshold_c": {
+            "name": "Freeze threshold (°C)"
+          },
+          "frost_point_c": {
+            "name": "Frost point (°C)"
+          }
         }
       },
       "sensor_drift": {
@@ -2148,6 +2184,13 @@
           },
           "zambretti_forecast": {
             "name": "Zambretti forecast"
+          },
+          "comparison_window": {
+            "name": "Comparison window",
+            "state": {
+              "hourly_12h": "Next 12 hours (hourly)",
+              "daily": "Today (daily)"
+            }
           }
         }
       },
@@ -2789,6 +2832,32 @@
       },
       "window_custom_next_end": {
         "name": "{profile_name} Next End"
+      },
+      "wind_beaufort_description": {
+        "name": "Wind Beaufort Description",
+        "state": {
+          "calm": "Calm",
+          "light_air": "Light Air",
+          "light_breeze": "Light Breeze",
+          "gentle_breeze": "Gentle Breeze",
+          "moderate_breeze": "Moderate Breeze",
+          "fresh_breeze": "Fresh Breeze",
+          "strong_breeze": "Strong Breeze",
+          "near_gale": "Near Gale",
+          "gale": "Gale",
+          "strong_gale": "Strong Gale",
+          "storm": "Storm",
+          "violent_storm": "Violent Storm",
+          "hurricane": "Hurricane"
+        },
+        "state_attributes": {
+          "beaufort": {
+            "name": "Beaufort"
+          },
+          "speed_ms": {
+            "name": "Wind speed (m/s)"
+          }
+        }
       }
     },
     "select": {
@@ -3136,6 +3205,13 @@
         "outdoor_drying": "Outdoor Clothes Drying",
         "garden_work": "Garden & Yard Work",
         "custom": "Custom Window Profile"
+      }
+    },
+    "aqi_scale": {
+      "options": {
+        "auto": "Auto (European EAQI in Europe, US EPA elsewhere)",
+        "european": "European Air Quality Index (EAQI)",
+        "us": "US EPA Air Quality Index"
       }
     }
   }

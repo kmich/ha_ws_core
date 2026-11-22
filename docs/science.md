@@ -156,10 +156,26 @@ Delta-T = T − T_wetbulb
 ### Zambretti Barometric Forecaster (Negretti & Zambra, 1915) {#zambretti}
 
 The Zambretti forecaster produces a forecast letter A-Z (Z-number 1-26) from three
-observable surface quantities: MSLP, pressure trend, and wind direction. The final
-Z-number indexes the authentic 26-entry Negretti & Zambra lookup table.
+observable surface quantities: MSLP, 3-hour pressure trend, and wind direction. The final
+Z-number indexes the authentic 26-entry Negretti & Zambra lookup table for a ~6–12 hour
+synoptic outlook.
 
-**Accuracy:** 65-75% for 6-12h forecasts in maritime and Mediterranean climates.
+**Scope & limitations:**
+- **Maritime calibration:** Negretti & Zambra calibrated the table for British Isles /
+  maritime coastal conditions. In continental, alpine-foreland, or complex terrain where
+  synoptic wind regimes and local thermal circulations behave differently, accuracy is lower
+  and no universal accuracy figure applies across all climates.
+- **Elevation / MSLP sensitivity:** At higher elevations (e.g. 500 m+), small errors in the
+  station's configured `elevation_m` bias the calculated sea-level pressure and shift the
+  resulting Z-number.
+- **Climate region auto-suggestion:** Setup infers `climate_region` from Home Assistant's
+  coordinates (including `continental_europe` inland east of 9°E between 47°N and 55°N, or
+  east of 15°E); adjust it under **Weather Forecast & Location** if needed.
+- **Horizon matching:** Because Zambretti is a 6–12 hour method, it is not used for
+  `binary_sensor.ws_rain_expected_1h` (60-minute nowcast). `sensor.ws_forecast_agreement`
+  compares Zambretti's implied rain likelihood against the forecast provider's peak hourly
+  precipitation probability over the next 12 hours when hourly probabilities are available
+  (falling back to today's daily value otherwise).
 
 **References:**
 - Negretti & Zambra (1915). *A Treatise on Meteorological Instruments.* London.
@@ -235,6 +251,49 @@ Computed from Julian Date using simplified lunar orbital equations without exter
 
 ---
 
+### Frost Point & Frost Risk {#frost-risk}
+
+**Frost point (`sensor.ws_frost_point`):** the temperature at which air becomes saturated
+with respect to ice, using Buck (1981) ice constants below 0 °C. Above 0 °C it equals the
+dew point.
+
+**Frost risk (`sensor.ws_frost_risk`):** a four-step early-warning category for ground and
+grass frost. On clear, calm nights the ground and plants cool by radiation and are often
+2–4 °C colder than the air at the standard 2 m sensor height, so frost can form on the
+grass while the station still reads a few degrees above freezing. The steps reflect that
+margin above the freeze threshold `thresh_freeze_c` (`number.ws_thresh_freeze`, default
+`0.0 °C`):
+
+| State | `min_temp` |
+|---|---|
+| `high` | ≤ `thresh_freeze_c` |
+| `probable` | ≤ `thresh_freeze_c` + 2 °C |
+| `unlikely` | ≤ `thresh_freeze_c` + 4 °C |
+| `no_risk` | above `thresh_freeze_c` + 4 °C |
+
+- **Input:** `min_temp` is the lower of the current air temperature and the lowest
+  forecast temperature over the next 12 hours (hourly forecast). Without an hourly
+  forecast it uses today's daily low (`tmin_c`); without any forecast, the air temperature
+  alone. The values used are in the `min_temp_c`, `forecast_min_c` and `threshold_c`
+  attributes.
+- **Not used:** frost point, humidity, wind and cloud cover. Wind and cloud reduce
+  radiative cooling and dry air lowers the frost point, so the category can overstate the
+  risk on windy or overcast nights and understate it on very clear, calm ones. The frost
+  point is exposed as the `frost_point_c` attribute so automations can combine both.
+- **Stability:** stepping down requires the temperature to rise more than 0.5 °C above
+  the boundary of the current step (hysteresis). A new step is adopted after 2
+  consecutive 60-second ticks when the risk rises and after 3 when it falls, as for the
+  alerts.
+- **Versus the freeze alert:** the freeze alert in `sensor.ws_alert_state` /
+  `sensor.ws_alert_message` uses only the measured air temperature and fires at
+  `thresh_freeze_c`. Frost risk can therefore read `probable` or `high` (because of the
+  forecast low) while the freeze alert is still clear.
+
+**Reference:** Buck, A.L. (1981). *New equations for computing vapor pressure and
+enhancement factor.* J. Appl. Meteor., 20, 1527–1532.
+
+---
+
 ### Update Cadence {#cadence}
 
 Derived values are recomputed whenever a source sensor updates, so dashboards stay
@@ -251,6 +310,18 @@ stored, so their behaviour does not depend on how often your station reports.
 Optimal recursive smoothing eliminates tipping-bucket spike-and-drop artefacts.
 The filter takes one measurement per 60-second tick.
 Configurable measurement noise (`number.ws_rain_filter_alpha`).
+
+---
+
+### Wind Smoothing & Circular Statistics {#wind-smoothing}
+
+- **Smoothed direction (`sensor.ws_wind_direction_smooth`):** Circular exponential moving
+  average (`alpha = 0.3`) updated once per 60-second tick along the shortest angular arc
+  (handles the 359° → 0° wrap cleanly). `sensor.ws_wind_quadrant` uses this smoothed angle
+  when available (`using_smoothed: true`) to prevent N/E/S/W boundary chatter.
+- **Dominant direction & variability (`sensor.ws_dominant_wind_direction`):** Rolling
+  24-hour circular mean (`atan2(mean(sin θ), mean(cos θ))`) and circular standard deviation
+  (`variability_deg`, `sqrt(-2 ln R)` in degrees, from ~0° steady to >100° shifting).
 
 ---
 
@@ -305,16 +376,24 @@ value for several minutes.
 
 ---
 
-### US Air Quality Index
+### Air Quality Index (European EAQI & US EPA)
 
-`sensor.ws_air_quality_index` is the higher of the PM2.5 and PM10 sub-indices, computed
-from Open-Meteo's current concentrations with the US EPA breakpoints, including the
-2024 PM2.5 revision (Good = 0-9.0 µg/m³). Concentrations are truncated as the EPA
-specifies (PM2.5 to 0.1 µg/m³, PM10 to 1 µg/m³) before lookup. The EPA index is defined
-on 24h averages; ws_core applies it to current values, so treat it as an indicator.
+`sensor.ws_air_quality_index` supports both the **European Air Quality Index (EAQI)** and
+the **US EPA AQI**, selectable via `aqi_scale` (`auto`, `european`, `us`):
 
-**Reference:** US EPA (2024). *Technical Assistance Document for the Reporting of Daily Air
-Quality — the Air Quality Index (AQI).*
+- **Auto-detection (`auto`, default):** Selects `european` for coordinates in Europe
+  (34°–72° N, 25° W–45° E, or European climate regions) and `us` elsewhere.
+- **European EAQI (`european`):** Uses Open-Meteo's `european_aqi` value (0–100+ EEA
+  continuous scale covering PM2.5, PM10, NO₂ and O₃: 0–20 Good, 21–40 Fair, 41–60 Moderate,
+  61–80 Poor, 81–100 Very Poor, >100 Extremely Poor), with a local EEA breakpoint fallback
+  from PM2.5, PM10, NO₂ and O₃ if `european_aqi` is omitted.
+- **US EPA AQI (`us`):** Uses Open-Meteo's `us_aqi` or falls back to the higher of the
+  PM2.5 and PM10 sub-indices using US EPA breakpoints including the 2024 PM2.5 revision
+  (Good = 0–9.0 µg/m³), truncating PM2.5 to 0.1 µg/m³ and PM10 to 1 µg/m³ before lookup.
+
+**References:**
+- European Environment Agency (EEA). *European Air Quality Index.*
+- US EPA (2024). *Technical Assistance Document for the Reporting of Daily Air Quality — the Air Quality Index (AQI).*
 
 ---
 

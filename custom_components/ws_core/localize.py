@@ -6,7 +6,7 @@ system only localizes fixed state keys, not dynamic text, so these are
 localized here in Python using the HA-configured language, falling back to
 English for any unsupported language (issue #104).
 
-Add a new language by adding its two-letter code to both tables below.
+Add a new language by adding its two-letter code to the tables below.
 """
 
 from __future__ import annotations
@@ -28,9 +28,111 @@ _SUMMARY: dict[str, dict[str, str]] = {
         "humidity": "HR {v}%",
         "no_data": "Aucune donnée",
     },
+    "de": {
+        "feels_like": "gefühlt {v}",
+        "rain": "{v} Regen",
+        "gusting": "Böen {v}",
+        "humidity": "rF {v}%",
+        "no_data": "Keine Daten",
+    },
+    "es": {
+        "feels_like": "sensación {v}",
+        "rain": "{v} lluvia",
+        "gusting": "rachas {v}",
+        "humidity": "HR {v}%",
+        "no_data": "Sin datos",
+    },
+    "it": {
+        "feels_like": "percepiti {v}",
+        "rain": "{v} pioggia",
+        "gusting": "raffiche {v}",
+        "humidity": "UR {v}%",
+        "no_data": "Nessun dato",
+    },
+    "nl": {
+        "feels_like": "voelt als {v}",
+        "rain": "{v} regen",
+        "gusting": "windstoten {v}",
+        "humidity": "RV {v}%",
+        "no_data": "Geen gegevens",
+    },
+    "pl": {
+        "feels_like": "odczuwalna {v}",
+        "rain": "{v} deszcz",
+        "gusting": "porywy {v}",
+        "humidity": "wilg. {v}%",
+        "no_data": "Brak danych",
+    },
+    "pt": {
+        "feels_like": "sensação {v}",
+        "rain": "{v} chuva",
+        "gusting": "rajadas {v}",
+        "humidity": "HR {v}%",
+        "no_data": "Sem dados",
+    },
 }
 
-# Alert-message fragments. ``{v}`` is a pre-formatted value, unit included.
+# Stable alert-message titles (without fluctuating live readings).
+_ALERT_TITLE: dict[str, dict[str, str]] = {
+    "en": {
+        "wind": "Extreme wind",
+        "rain": "Heavy rain",
+        "freeze": "Freeze risk",
+        "lightning": "Lightning detected nearby — stay indoors",
+        "clear": "All clear",
+    },
+    "fr": {
+        "wind": "Vent extrême",
+        "rain": "Pluie forte",
+        "freeze": "Risque de gel",
+        "lightning": "Foudre détectée à proximité — restez à l'intérieur",
+        "clear": "Tout est normal",
+    },
+    "de": {
+        "wind": "Extremer Wind",
+        "rain": "Starkregen",
+        "freeze": "Frostgefahr",
+        "lightning": "Blitz in der Nähe erkannt — drinnen bleiben",
+        "clear": "Keine Warnungen",
+    },
+    "es": {
+        "wind": "Viento extremo",
+        "rain": "Lluvia intensa",
+        "freeze": "Riesgo de helada",
+        "lightning": "Rayos detectados cerca — permanezca en el interior",
+        "clear": "Sin alertas",
+    },
+    "it": {
+        "wind": "Vento estremo",
+        "rain": "Pioggia intensa",
+        "freeze": "Rischio gelo",
+        "lightning": "Fulmini rilevati nelle vicinanze — restare al chiuso",
+        "clear": "Nessun allarme",
+    },
+    "nl": {
+        "wind": "Extreme wind",
+        "rain": "Zware regen",
+        "freeze": "Vorstgevaar",
+        "lightning": "Bliksem in de buurt gedetecteerd — blijf binnen",
+        "clear": "Geen waarschuwingen",
+    },
+    "pl": {
+        "wind": "Silny wiatr",
+        "rain": "Ulewny deszcz",
+        "freeze": "Ryzyko mrozu",
+        "lightning": "Wykryto wyładowania w pobliżu — pozostań w budynku",
+        "clear": "Brak ostrzeżeń",
+    },
+    "pt": {
+        "wind": "Vento extremo",
+        "rain": "Chuva forte",
+        "freeze": "Risco de geada",
+        "lightning": "Raios detetados por perto — permaneça em casa",
+        "clear": "Sem alertas",
+    },
+}
+
+# Alert-message fragments with live values. ``{v}`` is a pre-formatted value, unit included.
 _ALERT: dict[str, dict[str, str]] = {
     "en": {
         "wind": "Extreme wind: {v}",
@@ -46,12 +148,177 @@ _ALERT: dict[str, dict[str, str]] = {
         "lightning": "Foudre détectée à proximité — restez à l'intérieur",
         "clear": "Tout est normal",
     },
+    "de": {
+        "wind": "Extremer Wind: {v}",
+        "rain": "Starkregen: {v}",
+        "freeze": "Frostgefahr: {v}",
+        "lightning": "Blitz in der Nähe erkannt — drinnen bleiben",
+        "clear": "Keine Warnungen",
+    },
+    "es": {
+        "wind": "Viento extremo: {v}",
+        "rain": "Lluvia intensa: {v}",
+        "freeze": "Riesgo de helada: {v}",
+        "lightning": "Rayos detectados cerca — permanezca en el interior",
+        "clear": "Sin alertas",
+    },
+    "it": {
+        "wind": "Vento estremo: {v}",
+        "rain": "Pioggia intensa: {v}",
+        "freeze": "Rischio gelo: {v}",
+        "lightning": "Fulmini rilevati nelle vicinanze — restare al chiuso",
+        "clear": "Nessun allarme",
+    },
+    "nl": {
+        "wind": "Extreme wind: {v}",
+        "rain": "Zware regen: {v}",
+        "freeze": "Vorstgevaar: {v}",
+        "lightning": "Bliksem in de buurt gedetecteerd — blijf binnen",
+        "clear": "Geen waarschuwingen",
+    },
+    "pl": {
+        "wind": "Silny wiatr: {v}",
+        "rain": "Ulewny deszcz: {v}",
+        "freeze": "Ryzyko mrozu: {v}",
+        "lightning": "Wykryto wyładowania w pobliżu — pozostań w budynku",
+        "clear": "Brak ostrzeżeń",
+    },
+    "pt": {
+        "wind": "Vento extremo: {v}",
+        "rain": "Chuva forte: {v}",
+        "freeze": "Risco de geada: {v}",
+        "lightning": "Raios detetados por perto — permaneça em casa",
+        "clear": "Sem alertas",
+    },
+}
+
+_BEAUFORT: dict[str, tuple[str, ...]] = {
+    "en": (
+        "Calm",
+        "Light Air",
+        "Light Breeze",
+        "Gentle Breeze",
+        "Moderate Breeze",
+        "Fresh Breeze",
+        "Strong Breeze",
+        "Near Gale",
+        "Gale",
+        "Strong Gale",
+        "Storm",
+        "Violent Storm",
+        "Hurricane",
+    ),
+    "fr": (
+        "Calme",
+        "Très légère brise",
+        "Légère brise",
+        "Petite brise",
+        "Jolie brise",
+        "Bonne brise",
+        "Vent frais",
+        "Grand frais",
+        "Coup de vent",
+        "Fort coup de vent",
+        "Tempête",
+        "Violente tempête",
+        "Ouragan",
+    ),
+    "de": (
+        "Windstille",
+        "Leiser Zug",
+        "Leichte Brise",
+        "Schwache Brise",
+        "Mäßige Brise",
+        "Frische Brise",
+        "Starker Wind",
+        "Steifer Wind",
+        "Stürmischer Wind",
+        "Sturm",
+        "Schwerer Sturm",
+        "Orkanartiger Sturm",
+        "Orkan",
+    ),
+    "es": (
+        "Calma",
+        "Ventolina",
+        "Brisa muy débil",
+        "Brisa débil",
+        "Brisa moderada",
+        "Brisa fresca",
+        "Brisa fuerte",
+        "Viento fuerte",
+        "Temporal",
+        "Temporal fuerte",
+        "Temporal duro",
+        "Temporal muy duro",
+        "Huracán",
+    ),
+    "it": (
+        "Calma",
+        "Bava di vento",
+        "Brezza leggera",
+        "Brezza tesa",
+        "Vento moderato",
+        "Vento teso",
+        "Vento fresco",
+        "Vento forte",
+        "Burrasca",
+        "Burrasca forte",
+        "Tempesta",
+        "Tempesta violenta",
+        "Uragano",
+    ),
+    "nl": (
+        "Windstil",
+        "Flauw en stil",
+        "Zwakke wind",
+        "Lichte wind",
+        "Matige wind",
+        "Vrij krachtige wind",
+        "Krachtige wind",
+        "Harde wind",
+        "Stormachtige wind",
+        "Storm",
+        "Zware storm",
+        "Zeer zware storm",
+        "Orkaan",
+    ),
+    "pl": (
+        "Cisza",
+        "Powiew",
+        "Słaby wiatr",
+        "Łagodny wiatr",
+        "Umiarkowany wiatr",
+        "Dość silny wiatr",
+        "Silny wiatr",
+        "Bardzo silny wiatr",
+        "Wicher",
+        "Silny sztorm",
+        "Sztorm",
+        "Gwałtowny sztorm",
+        "Huragan",
+    ),
+    "pt": (
+        "Calma",
+        "Aragem",
+        "Brisa ligeira",
+        "Brisa fraca",
+        "Brisa moderada",
+        "Brisa fresca",
+        "Brisa forte",
+        "Vento fresco",
+        "Vento muito fresco",
+        "Vento forte",
+        "Temporal",
+        "Temporal muito forte",
+        "Furacão",
+    ),
 }
 
 
 def _lang(language: str | None) -> str:
     """Normalise an HA language code to a supported key, defaulting to English."""
-    if not language:
+    if not isinstance(language, str) or not language:
         return "en"
     code = language.split("-")[0].lower()
     return code if code in _SUMMARY else "en"
@@ -62,9 +329,20 @@ def summary(language: str | None, key: str, **fmt: str) -> str:
     return _SUMMARY[_lang(language)][key].format(**fmt)
 
 
+def alert_title(language: str | None, key: str) -> str:
+    """Return a stable localized alert title without live measurements."""
+    return _ALERT_TITLE[_lang(language)][key]
+
+
 def alert(language: str | None, key: str, **fmt: str) -> str:
     """Return a localized alert-message fragment."""
     return _ALERT[_lang(language)][key].format(**fmt)
+
+
+def beaufort(language: str | None, scale: int) -> str:
+    """Return a localized WMO Beaufort scale description (0-12)."""
+    idx = max(0, min(int(scale), 12))
+    return _BEAUFORT[_lang(language)][idx]
 
 
 _WINDOW_TEXT: dict[str, dict[str, str]] = {

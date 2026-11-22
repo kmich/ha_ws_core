@@ -401,6 +401,28 @@ def wind_speed_to_beaufort(wind_speed_ms: float) -> int:
     return 12
 
 
+BEAUFORT_KEYS: tuple[str, ...] = (
+    "calm",
+    "light_air",
+    "light_breeze",
+    "gentle_breeze",
+    "moderate_breeze",
+    "fresh_breeze",
+    "strong_breeze",
+    "near_gale",
+    "gale",
+    "strong_gale",
+    "storm",
+    "violent_storm",
+    "hurricane",
+)
+
+
+def beaufort_key(beaufort: int) -> str:
+    """WMO Beaufort scale enum key for localized Home Assistant sensors."""
+    return BEAUFORT_KEYS[max(0, min(int(beaufort), 12))]
+
+
 def beaufort_description(beaufort: int) -> str:
     """WMO Beaufort scale description."""
     descriptions = [
@@ -418,7 +440,7 @@ def beaufort_description(beaufort: int) -> str:
         "Violent Storm",
         "Hurricane",
     ]
-    return descriptions[min(beaufort, 12)]
+    return descriptions[max(0, min(int(beaufort), 12))]
 
 
 # ---------------------------------------------------------------------------
@@ -1642,6 +1664,131 @@ def aqi_color(aqi: int) -> str:
     if aqi <= 300:
         return "#8F3F97"
     return "#7E0023"
+
+
+# European Environment Agency (EEA) European Air Quality Index (EAQI), mapped
+# continuously onto the 0-100+ scale used by Open-Meteo (20 points per band).
+_EAQI_PM25_BREAKPOINTS = [
+    (0.0, 10.0, 0, 20),
+    (10.0, 20.0, 20, 40),
+    (20.0, 25.0, 40, 60),
+    (25.0, 50.0, 60, 80),
+    (50.0, 75.0, 80, 100),
+    (75.0, 800.0, 100, 500),
+]
+_EAQI_PM10_BREAKPOINTS = [
+    (0.0, 20.0, 0, 20),
+    (20.0, 40.0, 20, 40),
+    (40.0, 50.0, 40, 60),
+    (50.0, 100.0, 60, 80),
+    (100.0, 150.0, 80, 100),
+    (150.0, 1200.0, 100, 500),
+]
+_EAQI_NO2_BREAKPOINTS = [
+    (0.0, 40.0, 0, 20),
+    (40.0, 90.0, 20, 40),
+    (90.0, 120.0, 40, 60),
+    (120.0, 230.0, 60, 80),
+    (230.0, 340.0, 80, 100),
+    (340.0, 1000.0, 100, 500),
+]
+_EAQI_OZONE_BREAKPOINTS = [
+    (0.0, 50.0, 0, 20),
+    (50.0, 100.0, 20, 40),
+    (100.0, 130.0, 40, 60),
+    (130.0, 240.0, 60, 80),
+    (240.0, 380.0, 80, 100),
+    (380.0, 800.0, 100, 500),
+]
+
+_EUROPEAN_CLIMATE_REGIONS = frozenset(("atlantic_europe", "continental_europe", "mediterranean", "scandinavia"))
+
+
+def is_european_location(lat: float | None, lon: float | None, climate_region: str | None = None) -> bool:
+    """Return True when coordinates (or climate region fallback) fall in Europe."""
+    if lat is not None and lon is not None:
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+        except (TypeError, ValueError):
+            pass
+        else:
+            return 34.0 <= lat_f <= 72.0 and -25.0 <= lon_f <= 45.0
+    return climate_region in _EUROPEAN_CLIMATE_REGIONS
+
+
+def resolve_aqi_scale(
+    configured: str | None,
+    lat: float | None,
+    lon: float | None,
+    climate_region: str | None = None,
+) -> str:
+    """Resolve effective AQI scale ('european' or 'us') from configuration and location."""
+    choice = (configured or "auto").strip().lower()
+    if choice in ("european", "us"):
+        return choice
+    return "european" if is_european_location(lat, lon, climate_region) else "us"
+
+
+def _eaqi_subindex(value: float, breakpoints: list[tuple[float, float, int, int]]) -> int:
+    c = max(0.0, float(value))
+    for c_lo, c_hi, i_lo, i_hi in breakpoints:
+        if c <= c_hi:
+            return round(((i_hi - i_lo) / (c_hi - c_lo)) * (c - c_lo) + i_lo)
+    return 500
+
+
+def calculate_european_aqi(
+    pm2_5: float | None,
+    pm10: float | None,
+    no2: float | None = None,
+    ozone: float | None = None,
+) -> int | None:
+    """European AQI (0-100+) - highest sub-index of PM2.5, PM10, NO₂ and O₃.
+
+    Uses EEA concentration bands mapped linearly (20 points per category) to match
+    Open-Meteo's continuous ``european_aqi`` scale. Returns None when all inputs are None.
+    """
+    sub: list[int] = []
+    for raw, bps in (
+        (pm2_5, _EAQI_PM25_BREAKPOINTS),
+        (pm10, _EAQI_PM10_BREAKPOINTS),
+        (no2, _EAQI_NO2_BREAKPOINTS),
+        (ozone, _EAQI_OZONE_BREAKPOINTS),
+    ):
+        if raw is not None:
+            sub.append(_eaqi_subindex(float(raw), bps))
+    return max(sub) if sub else None
+
+
+def european_aqi_level(eaqi: int) -> str:
+    """European EAQI category label (i18n key)."""
+    if eaqi <= 20:
+        return "good"
+    if eaqi <= 40:
+        return "fair"
+    if eaqi <= 60:
+        return "moderate"
+    if eaqi <= 80:
+        return "poor"
+    if eaqi <= 100:
+        return "very_poor"
+    return "extremely_poor"
+
+
+def european_aqi_color(eaqi: int) -> str:
+    """European EAQI colour hex (EEA palette)."""
+    if eaqi <= 20:
+        return "#50F0E6"
+    if eaqi <= 40:
+        return "#50CCAA"
+    if eaqi <= 60:
+        return "#F0E641"
+    if eaqi <= 80:
+        return "#FF5050"
+    if eaqi <= 100:
+        return "#960032"
+    return "#7D2181"
 
 
 def pollen_level(index: int | None) -> str:

@@ -1138,10 +1138,35 @@ class TestReleaseReviewFixes:
         svc = eng.evaluate_profile(tighter, hourly, current_data=gust, now=t_svc, update_live_hold=False)
         assert svc.status == STATUS_UNSUITABLE
         assert REASON_CURRENT_GUST_HIGH in svc.reason_codes
-        # A looser limit than the tracked one has no sustained evidence and is not held
-        looser = apply_profile_overrides(profile, {"max_wind_gust_kmh": 50}, profile_id=profile.profile_id)
+        # A limit above every recent gust is not held
+        looser = apply_profile_overrides(profile, {"max_wind_gust_kmh": 60}, profile_id=profile.profile_id)
         svc = eng.evaluate_profile(looser, hourly, current_data=gust, now=t_svc, update_live_hold=False)
         assert REASON_CURRENT_GUST_HIGH not in svc.reason_codes
+
+    def test_action_limit_is_judged_on_sustained_station_gusts_below_the_profile_limit(self):
+        eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
+        t0 = datetime(2026, 6, 21, 9, 30, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0.replace(minute=0), hours=8)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]  # gusts up to 45 km/h
+        # 11 m/s = 39.6 km/h for 4 minutes: fine for the profile, so its own hold stays off
+        res = self._sustain_gust(eng, profile, hourly, t0, gust_ms=11.0)
+        assert REASON_CURRENT_GUST_HIGH not in res.reason_codes
+
+        tight = apply_profile_overrides(profile, {"max_wind_gust_kmh": 30}, profile_id=profile.profile_id)
+        t_svc = t0 + timedelta(minutes=5)
+        svc = eng.evaluate_profile(
+            tight, hourly, current_data={KEY_NORM_WIND_GUST_MS: 11.0}, now=t_svc, update_live_hold=False
+        )
+        assert svc.status == STATUS_UNSUITABLE
+        assert REASON_CURRENT_GUST_HIGH in svc.reason_codes
+        # A single gust above the caller's limit, with nothing sustained before it, is not held
+        fresh = WeatherWindowsEngine(lat=38.0, lon=23.7)
+        svc = fresh.evaluate_profile(
+            tight, hourly, current_data={KEY_NORM_WIND_GUST_MS: 11.0}, now=t_svc, update_live_hold=False
+        )
+        assert REASON_CURRENT_GUST_HIGH not in svc.reason_codes
+        # The action changed nothing the sensor tracks
+        assert eng._gust_hold_state[profile.profile_id]["threshold"] == profile.max_wind_gust_kmh
 
     def test_upcoming_window_text_uses_local_clock_and_tomorrow(self):
         eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
@@ -1234,6 +1259,24 @@ class TestDeepReviewFixes:
         svc = fresh.evaluate_profile(profile, hourly, now=t0 + timedelta(hours=2, minutes=5), update_live_hold=False)
         assert svc.next_start == (t0 + timedelta(hours=2)).isoformat()
         assert fresh._open_window_start == {}
+
+    def test_action_with_other_limits_does_not_borrow_the_remembered_start(self):
+        eng = WeatherWindowsEngine(lat=37.9, lon=23.7)
+        t0 = datetime(2026, 6, 21, 6, 0, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0, hours=30)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        for m in range(5, 130, 15):
+            eng.evaluate_profile(profile, hourly, now=t0 + timedelta(minutes=m))
+        t_svc = t0 + timedelta(hours=2, minutes=5)
+        same = eng.evaluate_profile(profile, hourly, now=t_svc, update_live_hold=False)
+        assert same.next_start == t0.isoformat()
+        # Other limits: the earlier hours were never judged against them
+        other = apply_profile_overrides(profile, {"min_temp_c": 15}, profile_id=profile.profile_id)
+        svc = eng.evaluate_profile(other, hourly, now=t_svc, update_live_hold=False)
+        assert svc.status == STATUS_SUITABLE_NOW
+        assert svc.next_start == (t0 + timedelta(hours=2)).isoformat()
+        # The sensor keeps its own start
+        assert eng.evaluate_profile(profile, hourly, now=t_svc).next_start == t0.isoformat()
 
     def test_open_window_start_resets_after_the_window_closes(self):
         eng = WeatherWindowsEngine(lat=37.9, lon=23.7)

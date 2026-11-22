@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.helpers.entity import EntityCategory
 
+from .algorithms import BEAUFORT_KEYS
 from .const import (
     CONF_ENABLE_ADVANCED_SENSORS,
     CONF_ENABLE_AIR_QUALITY,
@@ -49,6 +50,7 @@ from .const import (
     KEY_ALERT_STATE,
     KEY_AQI,
     KEY_AQI_LEVEL,
+    KEY_AQI_SCALE,
     KEY_AUTO_CAL_BIAS_HUMIDITY,
     KEY_AUTO_CAL_BIAS_PRESSURE_HPA,
     KEY_AUTO_CAL_BIAS_TEMP_C,
@@ -256,6 +258,7 @@ from .const import (
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
+    KEY_WIND_BEAUFORT_KEY,
     KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_DIR_VARIABILITY,
@@ -1181,6 +1184,20 @@ SENSORS: list[WSSensorDescription] = [
         },
     ),
     WSSensorDescription(
+        key=KEY_WIND_BEAUFORT_KEY,
+        translation_key="wind_beaufort_description",
+        name="WS Wind Beaufort Description",
+        icon="mdi:weather-windy",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(BEAUFORT_KEYS),
+        native_unit=None,
+        state_class=None,
+        attrs_fn=lambda d: {
+            "beaufort": d.get(KEY_WIND_BEAUFORT),
+            "speed_ms": d.get(KEY_NORM_WIND_SPEED_MS),
+        },
+    ),
+    WSSensorDescription(
         key=KEY_WIND_QUADRANT,
         translation_key="wind_quadrant",
         name="WS Wind Quadrant",
@@ -2092,6 +2109,7 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "level": d.get(KEY_AQI_LEVEL),
+            "scale": d.get(KEY_AQI_SCALE),
             "pm2_5_ug_m3": d.get(KEY_PM2_5),
             "pm10_ug_m3": d.get(KEY_PM10),
             "no2_ug_m3": d.get(KEY_NO2),
@@ -2441,8 +2459,16 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="frost_risk",
         name="WS Frost Risk",
         icon="mdi:snowflake-alert",
+        device_class=SensorDeviceClass.ENUM,
+        options=["no_risk", "unlikely", "probable", "high"],
         native_unit=None,
         state_class=None,
+        attrs_fn=lambda d: {
+            "min_temp_c": d.get("_frost_risk_min_temp_c"),
+            "forecast_min_c": d.get("_frost_risk_forecast_min_c"),
+            "threshold_c": d.get("_frost_risk_threshold_c"),
+            "frost_point_c": d.get(KEY_FROST_POINT_C),
+        },
     ),
     # =========================================================================
     # v1.2.0 - STATION INTELLIGENCE
@@ -2622,6 +2648,7 @@ SENSORS: list[WSSensorDescription] = [
             "zambretti_implied_rain_pct": d.get("_forecast_agreement_z_rain_pct"),
             "openmeteo_precip_prob": d.get("_forecast_agreement_api_precip_prob"),
             "delta_pp": d.get("_forecast_agreement_delta"),
+            "comparison_window": d.get("_forecast_agreement_basis"),
             "zambretti_forecast": d.get(KEY_ZAMBRETTI_FORECAST),
         },
     ),

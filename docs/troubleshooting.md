@@ -64,7 +64,7 @@ does not replace a stored dashboard.
 | Repairs shows a "stuck sensors" issue | A reading has not changed for hours | Temperature is flagged after 4 h without any change, humidity and pressure after 6 h (humidity at 0-2 % or 98-100 % is never flagged). Check the sensor and its radiation shield; the issue clears as soon as the value moves. With several stations, each entry raises its own issue. |
 | Nowcast always shows unknown | Coordinates not set, or Open-Meteo timeout | Verify forecast coordinates are set in Configure → Weather Forecast & Location. Check internet connectivity. |
 | Lightning sensor rejected as "entity not found" during setup | Older versions rejected sensors sitting at `unknown` | Update to 2.4.1+. Lightning distance/azimuth/count sensors are idle (`unknown`) outside a strike and are now accepted as long as the entity exists. |
-| Hemisphere / climate region shows a raw value like `atlantic_europe` | Translation not loaded for your language | These are localized in English and French (2.5.0+); other languages fall back to English. Restart HA after updating so new translations load. |
+| Hemisphere / climate region shows a raw value like `atlantic_europe` | Translation not loaded for your language | These are localized in all 8 supported languages (`en`, `fr`, `de`, `es`, `it`, `nl`, `pl`, `pt`); other languages fall back to English. Restart HA after updating so new translations load. |
 
 ---
 

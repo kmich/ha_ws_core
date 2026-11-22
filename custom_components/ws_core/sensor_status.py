@@ -29,6 +29,7 @@ _STATUS_TEXT: dict[str, str] = {
     "no_event_recorded": "Nothing yet",
     "collecting_training_data": "Learning",
     "waiting_for_first_run": "Starting up",
+    "provider_missing_precip_prob": "No rain probability from provider",
 }
 
 _EVENTS_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s+(?:live\s+)?events")
@@ -145,6 +146,25 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
     elif key == c.KEY_LIGHTNING_CLEARANCE_MIN:
         reason = "no_strike_recorded"
         explanation = "No lightning strike has been recorded yet, so there is no time since the last one."
+    elif key == c.KEY_FORECAST_AGREEMENT:
+        if not getattr(coord, "forecast_enabled", True):
+            reason = "feature_disabled"
+            explanation = "Enable weather forecast to compare Zambretti with the forecast provider."
+            short = "Forecast is off"
+        elif data.get(c.KEY_ZAMBRETTI_NUMBER) is None:
+            reason = "waiting_for_data"
+            explanation = (
+                "Waiting for a local Zambretti barometric forecast before comparing with the forecast provider."
+            )
+        elif data.get("_forecast_agreement_reason") == "provider_missing_precip_prob":
+            reason = "provider_missing_precip_prob"
+            explanation = (
+                "The selected forecast provider does not supply precipitation probability, "
+                "which Forecast Agreement requires."
+            )
+        else:
+            reason = "waiting_for_forecast"
+            explanation = "Waiting for a fresh forecast to compare against the local Zambretti outlook."
     return {
         "data_status": reason,
         "reason": reason,

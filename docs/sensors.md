@@ -3,7 +3,11 @@
 Complete list of entities created by Weather Station Core.
 
 Entity IDs shown use the default prefix `ws`. If you chose a different prefix during
-setup, replace `ws` with your prefix.
+setup, replace `ws` with your prefix. Note: Home Assistant's entity registry preserves
+user-chosen or pre-existing entity IDs across upgrades, and renaming the Weather Station
+device in Home Assistant can offer to regenerate entity IDs using your UI language
+(for example `sensor.wetterstation_frostrisiko` in German); fresh setups assign the
+English `sensor.<prefix>_*` IDs directly and localize the display name.
 
 ---
 
@@ -33,17 +37,19 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_feels_like` | °C | Apparent temperature (BOM/Steadman 1994) |
 | `sensor.ws_wet_bulb` | °C | Wet-bulb temperature (Stull 2011, ±0.3 °C) |
 | `sensor.ws_frost_point` | °C | Frost point with Buck (1981) ice constants below 0 °C; equals the dew point above 0 °C |
-| `sensor.ws_frost_risk` | — | Frost risk category: `high` / `probable` / `unlikely` / `no_risk` (state is localized) |
+| `sensor.ws_frost_risk` | — | Frost risk category (enum): `high` / `probable` / `unlikely` / `no_risk` (state is localized). Compares the lower of the current air temperature and the forecast low for the next 12 h against `thresh_freeze_c` +0 / +2 / +4 °C, with a `+0.5 °C` hysteresis and 2-tick on / 3-tick off debounce. Attributes: `min_temp_c`, `forecast_min_c`, `threshold_c`, `frost_point_c`. See [Frost risk](science.md#frost-risk) |
 | `sensor.ws_zambretti_forecast` | — | Zambretti text forecast (26 phrases) |
 | `sensor.ws_zambretti_number` | — | Z-number 1-26 |
-| `sensor.ws_wind_beaufort` | — | Beaufort scale classification |
-| `sensor.ws_wind_quadrant` | — | N / E / S / W compass quadrant |
+| `sensor.ws_wind_beaufort` | — | Beaufort scale number (0–12); `description` attribute is localized in all 8 languages |
+| `sensor.ws_wind_beaufort_description` | — | Localized Beaufort scale label (`calm` .. `hurricane`, Home Assistant enum sensor translated per user language) |
+| `sensor.ws_wind_direction_smooth` | ° | Circular EMA-smoothed wind direction (`alpha = 0.3` per 60 s tick; see [Wind smoothing](science.md#wind-smoothing)) |
+| `sensor.ws_wind_quadrant` | — | N / E / S / W compass quadrant derived from the smoothed wind direction (`using_smoothed` attribute indicates whether smoothed or raw direction was used) |
 | `sensor.ws_current_condition` | — | 36-condition weather classifier from measured readings. A new condition is reported once it has held for 5 minutes; hurricane and severe storm are reported at once |
 | `sensor.ws_rain_probability` | % | Local sensor-based rain index |
 | `sensor.ws_rain_probability_combined` | % | Brier-score blended local + NWP |
-| `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` |
+| `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` comparing Zambretti's 6–12 h outlook against the forecast provider's peak `precipitation_probability` over the next 12 h (`comparison_window: hourly_12h`, falling back to `daily`). Reports `unknown` (`provider_missing_precip_prob`) if the provider omits rain probability |
 | `sensor.ws_pressure_trend` | — | WMO No. 306 classification + rate |
-| `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Localized to the HA language (English/French, English fallback). Useful for TTS and Assist. |
+| `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Localized in all 8 supported languages (`en`, `fr`, `de`, `es`, `it`, `nl`, `pl`, `pt`, English fallback). Useful for TTS and Assist. |
 | `sensor.ws_rain_last_1h` | mm | Rolling 1-hour rainfall |
 | `sensor.ws_rain_last_24h` | mm | Rolling 24-hour rainfall |
 | `sensor.ws_rain_today_mm` | mm | Today's accumulated rainfall |
@@ -83,8 +89,8 @@ covered completed day is available; missing history is not filled retrospectivel
 | `sensor.ws_cloud_base` | m | Cloud base height (lifted condensation level) |
 | `sensor.ws_freezing_level` | m | Freezing-level altitude (ISA lapse rate) |
 | `sensor.ws_wind_gust_factor` | — | Gust ÷ mean wind speed ratio |
-| `sensor.ws_dominant_wind_direction` | ° | Circular-mean wind direction (24h) |
-| `sensor.ws_wind_direction_variability` | ° | Circular standard deviation of wind direction |
+| `sensor.ws_dominant_wind_direction` | ° | Circular-mean wind direction over the rolling 24 h buffer; exposes `variability_deg` (24 h circular standard deviation, 0° steady to >100° shifting) |
+| `sensor.ws_wind_direction_variability` | ° | Circular standard deviation of wind direction over the rolling 24 h buffer |
 | `sensor.ws_rain_this_week` | mm | Rainfall since Monday |
 | `sensor.ws_rain_this_month` | mm | Rainfall since the 1st of the month |
 | `sensor.ws_rain_this_year` | mm | Station year-to-date total when mapped; otherwise rainfall since January 1 |
@@ -302,7 +308,9 @@ Free via Open-Meteo. No API key required.
 
 | Entity ID | Unit | Description |
 |---|---|---|
-| `sensor.ws_air_quality_index` | AQI | US EPA AQI, higher of the PM2.5 and PM10 sub-indices (2024 PM2.5 breakpoints) |
+| `sensor.ws_air_quality_index` | AQI | Air Quality Index (`aqi_scale`: `auto` selects European EAQI 0–100+ in Europe and US EPA AQI 0–500 elsewhere; configurable to `european` or `us`). Exposes `scale`, `level`, and pollutant concentrations |
+| `sensor.ws_pm2_5` | µg/m³ | Fine particulate matter (PM2.5) |
+| `sensor.ws_pm10` | µg/m³ | Coarse particulate matter (PM10) |
 | `sensor.ws_no2` | µg/m³ | Nitrogen dioxide |
 | `sensor.ws_ozone` | µg/m³ | Ozone |
 
@@ -406,6 +414,43 @@ Via Open-Meteo Marine API (free, no API key).
 
 ---
 
+## Always-on: Alerts {#alerts}
+
+Always created (`EntityCategory.DIAGNOSTIC`):
+
+| Entity ID | Description |
+|---|---|
+| `sensor.ws_alert_state` | Overall alert severity (`clear`, `advisory`, or `warning`). Exposes `message`, `detail_message`, `active_alerts`, `alert_count`, `icon`, `color` |
+| `sensor.ws_alert_message` | Stable localized alert title(s) (e.g. `"Freeze risk"`, or multiple active alerts joined with `" \| "`, or `"All clear"` when clear). Live measurements are exposed in `detail_message` and `active_alerts` attributes so state history does not flap on every reading |
+
+**Triggers, thresholds, hysteresis & debounce:**
+
+| Alert | Severity | Config option | Default | Hysteresis deadband to clear |
+|---|---|---|---|---|
+| Wind | `warning` | `thresh_wind_gust_ms` (`number.ws_thresh_wind_gust`) | `17.0 m/s` (61.2 km/h) | Drops below `threshold - 1.5 m/s` |
+| Rain | `warning` | `thresh_rain_rate_mmph` (`number.ws_thresh_rain_rate`) | `10.0 mm/h` | Drops below `threshold - 1.0 mm/h` |
+| Freeze | `advisory` | `thresh_freeze_c` (`number.ws_thresh_freeze`) | `0.0 °C` | Rises above `threshold + 0.5 °C` |
+| Lightning | `warning` | Nearby strike / `lightning_proximity_km` | Immediate, 30 min hold | Clears 30 min after last nearby strike |
+
+- **Debounce:** Wind, rain and freeze alerts advance on the fixed **60-second tick** and require **2 consecutive ticks** meeting the trigger condition to fire (`ALERT_DEBOUNCE_ON_TICKS = 2`) and **3 consecutive ticks** clear of the hysteresis deadband to turn off (`ALERT_DEBOUNCE_OFF_TICKS = 3`). Lightning triggers immediately with no onset delay.
+- **Combining:** `sensor.ws_alert_state` takes the highest active severity (`warning` beats `advisory`). Active alert titles are joined with `" | "` in `sensor.ws_alert_message`, and live formatted values are joined in `detail_message` and listed per alert in `active_alerts`.
+
+**Freeze alert vs `sensor.ws_frost_risk`:** the two answer different questions.
+
+- The **freeze alert** (`sensor.ws_alert_state` = `advisory`, `sensor.ws_alert_message` = "Freeze risk") fires only when the **measured** air temperature is at or below `thresh_freeze_c` (`number.ws_thresh_freeze`, default `0.0 °C`).
+- **`sensor.ws_frost_risk`** is an early-warning indicator for ground and grass frost. It uses the lower of the current air temperature and the forecast low over the next 12 hours, so it can rise before the air itself reaches the threshold:
+
+  | State | Lowest temperature considered |
+  |---|---|
+  | `high` | ≤ `thresh_freeze_c` |
+  | `probable` | ≤ `thresh_freeze_c` + 2 °C |
+  | `unlikely` | ≤ `thresh_freeze_c` + 4 °C |
+  | `no_risk` | above `thresh_freeze_c` + 4 °C |
+
+  It does **not** look at frost point, humidity, wind or cloud cover. The frost point is available separately (`sensor.ws_frost_point`, and the `frost_point_c` attribute). Like the alerts, it needs 2 ticks to step up and 3 ticks to step down, and only steps down once the temperature is more than 0.5 °C above the boundary. See [Frost risk](science.md#frost-risk).
+
+---
+
 ## Always-on: Data Status {#data-status}
 
 `sensor.ws_data_status` answers "is an empty sensor a problem?" in one place. Its
@@ -446,7 +491,7 @@ instead. To do the same on your own dashboard, use an entities-card row of
 | `sensor.ws_climatology_30d` | Rolling 30-day climatology summary |
 | `sensor.ws_temperature_anomaly_30d` | Today's mean temperature vs 30-day rolling mean |
 | `sensor.ws_rain_anomaly_30d` | Today's rain vs 30-day rolling daily average |
-| `sensor.ws_frost_risk` | Frost risk diagnostic (`no_risk`, `unlikely`, `probable`, `high`) |
+| `sensor.ws_frost_risk` | Frost risk (`no_risk`, `unlikely`, `probable`, `high`); see [Alerts](#alerts) |
 | `sensor.ws_forecast_brier_local` | Brier score for local sensor model (lower is better; requires ≥10 outcomes) |
 | `sensor.ws_forecast_brier_api` | Brier score for the forecast provider, scored on its highest hourly probability over each 6-hour window ([method](science.md#rain-blend)) |
 | `sensor.ws_forecast_blend_weight_local` | Current learned weight (%) of the local model in the blended probability |
@@ -541,14 +586,19 @@ MQTT integration to be set up.
 
 | Entity | Type | Description |
 |---|---|---|
-| `weather.ws` | weather | Standard HA weather entity with daily forecast |
+| `weather.ws` | weather | Standard HA weather entity with daily and hourly forecast |
 | `binary_sensor.ws_package_ok` | binary_sensor | On when all required sources are mapped and available |
-| `binary_sensor.ws_rain_expected_1h` | binary_sensor | On when rain is expected within 60 minutes (nowcast) |
+| `binary_sensor.ws_rain_expected_1h` | binary_sensor | On when nowcast predicts rain in the next 60 minutes (or when the local gauge currently measures ≥ 0.1 mm/h while nowcast is unavailable); `unknown` with `status_text` when nowcast is unavailable and the station is dry |
 | `event.ws_rain_event` | event | Fires on rain start and rain stop |
 | `event.ws_frost_event` | event | Fires on frost onset and thaw |
 | `event.ws_lightning_event` | event | Fires on lightning strike or proximity change |
 | `select.ws_graph_range` | select | Dashboard graph time range: 6h / 24h / 3d |
 | `sensor.ws_forecast_provider` | sensor | Active forecast provider name (`forecast_status` attribute shows `ok` / `degraded` / `local_only`) |
+
+**Forecast provider coverage (`weather.ws`):**
+
+- `ha_weather_entity` passes through all daily and hourly forecast entries returned by the source entity, forwards extra fields when supplied (`cloud_coverage`, `humidity`, `pressure`, `visibility`, `uv_index`, `wind_bearing`), preserves HA condition strings directly, forwards the source entity's `attribution`, and derives missing hourly `apparent_temperature` from temperature, humidity and wind speed when available.
+- Fields a source entity or provider omits (for example, DWD does not publish `precipitation_probability`, Met.no omits `wind_gust_speed`, NWS omits `wind_gust_speed` and `cloud_coverage`) remain `null` in the forecast; `sensor.ws_forecast_agreement` reports `unknown` (`provider_missing_precip_prob`) when precipitation probability is absent.
 
 ---
 

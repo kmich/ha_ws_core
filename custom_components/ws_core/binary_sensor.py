@@ -116,13 +116,7 @@ class WSRainExpected1h(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        # Explicitly unavailable once the Open-Meteo nowcast is stale/failed
-        # and the local Zambretti fallback couldn't produce a value either,
-        # rather than silently holding the last (possibly hours-old) reading.
-        if not super().available:
-            return False
-        d = self.coordinator.data or {}
-        return d.get(KEY_RAIN_EXPECTED_1H) is not None
+        return super().available
 
     @property
     def is_on(self) -> bool | None:
@@ -135,11 +129,18 @@ class WSRainExpected1h(CoordinatorEntity, BinarySensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self.coordinator.data or {}
-        return {
+        attrs: dict[str, Any] = {
             "source": d.get(KEY_RAIN_EXPECTED_SOURCE),
             "nowcast_fetched_at": d.get(KEY_NOWCAST_FETCHED_AT),
             "nowcast_stale": d.get(KEY_NOWCAST_STALE),
         }
+        if d.get(KEY_RAIN_EXPECTED_1H) is None:
+            attrs["reason"] = "waiting_for_nowcast"
+            attrs["explanation"] = (
+                "Precipitation nowcast is unavailable or stale, and no rain is currently detected at the station."
+            )
+            attrs["status_text"] = "Nowcast unavailable" if d.get(KEY_NOWCAST_FETCHED_AT) else "Waiting for nowcast"
+        return attrs
 
 
 class WSSnowFalling(CoordinatorEntity, BinarySensorEntity):

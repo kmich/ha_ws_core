@@ -200,6 +200,7 @@ KEY_ZAMBRETTI_FORECAST = "zambretti_forecast"
 KEY_ZAMBRETTI_NUMBER = "zambretti_number"
 KEY_WIND_BEAUFORT = "wind_beaufort"
 KEY_WIND_BEAUFORT_DESC = "wind_beaufort_desc"
+KEY_WIND_BEAUFORT_KEY = "wind_beaufort_key"
 KEY_WIND_QUADRANT = "wind_quadrant"
 KEY_WIND_DIR_SMOOTH_DEG = "wind_dir_smooth_deg"
 KEY_CURRENT_CONDITION = "current_condition"
@@ -410,6 +411,9 @@ CONFIG_VERSION = 4
 # Alert hysteresis: ticks above/below threshold before state changes
 ALERT_DEBOUNCE_ON_TICKS: int = 2  # consecutive ticks above threshold → fire
 ALERT_DEBOUNCE_OFF_TICKS: int = 3  # consecutive ticks below threshold → clear
+ALERT_HYSTERESIS_FREEZE_C: float = 0.5
+ALERT_HYSTERESIS_WIND_MS: float = 1.5
+ALERT_HYSTERESIS_RAIN_MMPH: float = 1.0
 
 # Source entities can register a few minutes after startup (Ecowitt creates them on
 # the first packet), so the missing-sources repair waits this long before it is raised
@@ -420,8 +424,14 @@ MISSING_SOURCE_GRACE_S: int = 300
 # ---------------------------------------------------------------------------
 CONF_ENABLE_AIR_QUALITY = "enable_air_quality"
 CONF_AQI_INTERVAL_MIN = "aqi_interval_min"
+CONF_AQI_SCALE = "aqi_scale"
+AQI_SCALE_AUTO = "auto"
+AQI_SCALE_EUROPEAN = "european"
+AQI_SCALE_US = "us"
+AQI_SCALE_OPTIONS = [AQI_SCALE_AUTO, AQI_SCALE_EUROPEAN, AQI_SCALE_US]
 DEFAULT_ENABLE_AIR_QUALITY = False
 DEFAULT_AQI_INTERVAL_MIN = 60
+DEFAULT_AQI_SCALE = AQI_SCALE_AUTO
 
 # v0.7.0 - Pollen (Tomorrow.io, free API key required)
 CONF_ENABLE_POLLEN = "enable_pollen"
@@ -469,6 +479,7 @@ ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE = "illuminance_estimate"
 # ---------------------------------------------------------------------------
 KEY_AQI = "air_quality_index"
 KEY_AQI_LEVEL = "air_quality_level"
+KEY_AQI_SCALE = "aqi_scale"
 KEY_PM2_5 = "pm2_5_ug_m3"
 KEY_PM10 = "pm10_ug_m3"
 KEY_NO2 = "no2_ug_m3"
@@ -850,8 +861,9 @@ KEY_NOWCAST_CONFIDENCE = "nowcast_confidence"  # "high", "medium", "low"
 KEY_RAIN_EXPECTED_1H = "rain_expected_1h"
 KEY_NOWCAST_FETCHED_AT = "_nowcast_fetched_at"
 KEY_NOWCAST_STALE = "nowcast_stale"
-KEY_RAIN_EXPECTED_SOURCE = "rain_expected_source"  # "nowcast" or "local_fallback"
+KEY_RAIN_EXPECTED_SOURCE = "rain_expected_source"  # "nowcast" or "local_rain"
 RAIN_EXPECTED_SOURCE_NOWCAST = "nowcast"
+RAIN_EXPECTED_SOURCE_LOCAL_RAIN = "local_rain"
 RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK = "local_fallback"
 # Z-number implied rain probability (%) at/above which the Zambretti-derived
 # local fallback reports rain expected. Coarser than the 15-min NWP nowcast.

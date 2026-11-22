@@ -291,7 +291,8 @@
         "description": "Luchtkwaliteitsgegevens (PM2,5, PM10, NO₂, ozon) van Open-Meteo. Gratis, geen API-sleutel vereist. Gebruikt de breedtegraad/lengtegraad van de verwachting.",
         "data": {
           "aqi_interval_min": "Verversingsinterval",
-          "_go_back": "← Terug naar vorige stap"
+          "_go_back": "← Terug naar vorige stap",
+          "aqi_scale": "AQI-schaal"
         }
       },
       "pollen": {
@@ -654,7 +655,8 @@
         "title": "Luchtkwaliteitsinstellingen",
         "description": "Open-Meteo Air Quality API. Gratis, geen sleutel vereist.",
         "data": {
-          "aqi_interval_min": "Verversingsinterval"
+          "aqi_interval_min": "Verversingsinterval",
+          "aqi_scale": "AQI-schaal"
         }
       },
       "pollen_opt": {
@@ -915,6 +917,9 @@
           },
           "alert_count": {
             "name": "Aantal waarschuwingen"
+          },
+          "detail_message": {
+            "name": "Detailbericht"
           }
         }
       },
@@ -929,6 +934,12 @@
           },
           "color": {
             "name": "Kleur"
+          },
+          "detail_message": {
+            "name": "Detailbericht"
+          },
+          "active_alerts": {
+            "name": "Actieve waarschuwingen"
           }
         }
       },
@@ -1448,7 +1459,11 @@
               "unhealthy_sensitive": "Ongezond voor gevoelige groepen",
               "unhealthy": "Ongezond",
               "very_unhealthy": "Zeer ongezond",
-              "hazardous": "Gevaarlijk"
+              "hazardous": "Gevaarlijk",
+              "fair": "Redelijk",
+              "poor": "Slecht",
+              "very_poor": "Zeer slecht",
+              "extremely_poor": "Extreem slecht"
             }
           },
           "pm2_5_ug_m3": {
@@ -1462,6 +1477,13 @@
           },
           "ozone_ug_m3": {
             "name": "Ozon (µg/m³)"
+          },
+          "scale": {
+            "name": "AQI-schaal",
+            "state": {
+              "european": "Europees (EAQI)",
+              "us": "VS (EPA)"
+            }
           }
         }
       },
@@ -1675,6 +1697,20 @@
           "probable": "Waarschijnlijk",
           "unlikely": "Onwaarschijnlijk",
           "no_risk": "Geen risico"
+        },
+        "state_attributes": {
+          "min_temp_c": {
+            "name": "Laagste meegenomen temperatuur (°C)"
+          },
+          "forecast_min_c": {
+            "name": "Verwacht minimum (°C)"
+          },
+          "threshold_c": {
+            "name": "Vorstdrempel (°C)"
+          },
+          "frost_point_c": {
+            "name": "Rijppunt (°C)"
+          }
         }
       },
       "sensor_drift": {
@@ -1792,6 +1828,13 @@
           },
           "zambretti_forecast": {
             "name": "Zambretti-voorspelling"
+          },
+          "comparison_window": {
+            "name": "Vergelijkingsvenster",
+            "state": {
+              "hourly_12h": "Komende 12 uur (uurlijks)",
+              "daily": "Vandaag (dagelijks)"
+            }
           }
         }
       },
@@ -2602,43 +2645,43 @@
         "name": "{river} - Rivierdebiete"
       },
       "temperature_high_year": {
-        "name": "Temperature High (Year)"
+        "name": "Temperatuur max (Jaar)"
       },
       "temperature_low_year": {
-        "name": "Temperature Low (Year)"
+        "name": "Temperatuur min (Jaar)"
       },
       "temperature_high_all_time": {
-        "name": "Temperature High (All-Time)"
+        "name": "Temperatuur max (Record)"
       },
       "temperature_low_all_time": {
-        "name": "Temperature Low (All-Time)"
+        "name": "Temperatuur min (Record)"
       },
       "temperature_high_week": {
-        "name": "Temperature High (Week)"
+        "name": "Temperatuur max (Week)"
       },
       "temperature_low_week": {
-        "name": "Temperature Low (Week)"
+        "name": "Temperatuur min (Week)"
       },
       "temperature_high_month": {
-        "name": "Temperature High (Month)"
+        "name": "Temperatuur max (Maand)"
       },
       "temperature_low_month": {
-        "name": "Temperature Low (Month)"
+        "name": "Temperatuur min (Maand)"
       },
       "wind_gust_max_month": {
-        "name": "Wind Gust Max (Month)"
+        "name": "Max. windvlaag (Maand)"
       },
       "wind_gust_max_year": {
-        "name": "Wind Gust Max (Year)"
+        "name": "Max. windvlaag (Jaar)"
       },
       "wind_gust_max_all_time": {
-        "name": "Wind Gust Max (All-Time)"
+        "name": "Max. windvlaag (Record)"
       },
       "dry_streak_record": {
-        "name": "Dry Streak Record"
+        "name": "Record droogteperiode"
       },
       "heat_streak_record": {
-        "name": "Heat Streak Record",
+        "name": "Record hitteperiode",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2646,7 +2689,7 @@
         }
       },
       "frost_streak_record": {
-        "name": "Frost Streak Record",
+        "name": "Record vorstperiode",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2654,7 +2697,7 @@
         }
       },
       "temp_high_normal": {
-        "name": "Temperature High (Normal)",
+        "name": "Temperatuur max (Normaal)",
         "state_attributes": {
           "sample_years": {
             "name": "Sample years"
@@ -2665,19 +2708,19 @@
         }
       },
       "temp_low_normal": {
-        "name": "Temperature Low (Normal)"
+        "name": "Temperatuur min (Normaal)"
       },
       "rain_normal": {
-        "name": "Rain (Normal)"
+        "name": "Neerslag (Normaal)"
       },
       "temp_anomaly_normal": {
-        "name": "Temperature Anomaly (Normal)"
+        "name": "Temperatuuranomalie (Normaal)"
       },
       "rain_anomaly_normal": {
-        "name": "Rain Anomaly (Normal)"
+        "name": "Neerslaganomalie (Normaal)"
       },
       "auto_calibration": {
-        "name": "Auto Calibration",
+        "name": "Automatische kalibratie",
         "state": {
           "learning": "Learning",
           "stable": "Stable",
@@ -2702,7 +2745,7 @@
         }
       },
       "snow_phase": {
-        "name": "Precipitation Phase",
+        "name": "Neerslagfase",
         "state": {
           "snow": "Snow",
           "sleet": "Sleet",
@@ -2711,19 +2754,19 @@
         }
       },
       "snow_rate": {
-        "name": "Snow Rate"
+        "name": "Sneeuwintensiteit"
       },
       "snow_today": {
-        "name": "Snow Today"
+        "name": "Sneeuw vandaag"
       },
       "snow_this_month": {
-        "name": "Snow This Month"
+        "name": "Sneeuw deze maand"
       },
       "snow_this_year": {
-        "name": "Snow This Year"
+        "name": "Sneeuw dit jaar"
       },
       "snow_record_day": {
-        "name": "Snowiest Day",
+        "name": "Sneeuwrijkste dag",
         "state_attributes": {
           "date": {
             "name": "Date"
@@ -2731,10 +2774,10 @@
         }
       },
       "indoor_room_delta": {
-        "name": "Temp Delta - {room_name}"
+        "name": "Temp. verschil - {room_name}"
       },
       "indoor_room_humidity": {
-        "name": "Humidity - {room_name}"
+        "name": "Luchtvochtigheid - {room_name}"
       },
       "indoor_room_absolute_humidity": {
         "name": "Absolute luchtvochtigheid - {room_name}"
@@ -2776,7 +2819,7 @@
         "name": "Tuinwerk Volgend Einde"
       },
       "window_custom_status": {
-        "name": "{profile_name} Status",
+        "name": "Status {profile_name}",
         "state": {
           "suitable_now": "Nu geschikt",
           "window_upcoming": "Venster op komst",
@@ -2789,6 +2832,32 @@
       },
       "window_custom_next_end": {
         "name": "{profile_name} Volgend Einde"
+      },
+      "wind_beaufort_description": {
+        "name": "Beaufort-windbeschrijving",
+        "state": {
+          "calm": "Windstil",
+          "light_air": "Flauw en stil",
+          "light_breeze": "Zwakke wind",
+          "gentle_breeze": "Lichte wind",
+          "moderate_breeze": "Matige wind",
+          "fresh_breeze": "Vrij krachtige wind",
+          "strong_breeze": "Krachtige wind",
+          "near_gale": "Harde wind",
+          "gale": "Stormachtige wind",
+          "strong_gale": "Storm",
+          "storm": "Zware storm",
+          "violent_storm": "Zeer zware storm",
+          "hurricane": "Orkaan"
+        },
+        "state_attributes": {
+          "beaufort": {
+            "name": "Beaufort"
+          },
+          "speed_ms": {
+            "name": "Windsnelheid (m/s)"
+          }
+        }
       }
     },
     "select": {
@@ -2943,7 +3012,7 @@
         "name": "Functie: Windy upload"
       },
       "ws_enable_auto_calibration": {
-        "name": "Feature: Adaptive Sensor Calibration"
+        "name": "Functie: Adaptieve sensorkalibratie"
       },
       "ws_enable_neighbor_qc": {
         "name": "Functie: Sensorcontrole"
@@ -2952,10 +3021,10 @@
         "name": "Functie: Patroonvoorspelling"
       },
       "ws_enable_climate_normals": {
-        "name": "Feature: Historical Climate Normals"
+        "name": "Functie: Historische klimaatnormalen"
       },
       "ws_enable_snow": {
-        "name": "Feature: Snow"
+        "name": "Functie: Sneeuw"
       }
     },
     "binary_sensor": {
@@ -2990,7 +3059,7 @@
         "name": "Dauwpunt overschrijdt temperatuur"
       },
       "ws_snow_falling": {
-        "name": "Snow Falling"
+        "name": "Sneeuwval"
       }
     },
     "event": {
@@ -3136,6 +3205,13 @@
         "outdoor_drying": "Was buiten drogen",
         "garden_work": "Tuin- en erfwerk",
         "custom": "Aangepast vensterprofiel"
+      }
+    },
+    "aqi_scale": {
+      "options": {
+        "auto": "Auto (Europese EAQI in Europa, US EPA elders)",
+        "european": "Europese luchtkwaliteitsindex (EAQI)",
+        "us": "US EPA-luchtkwaliteitsindex"
       }
     }
   }

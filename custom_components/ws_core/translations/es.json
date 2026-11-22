@@ -291,7 +291,8 @@
         "description": "Datos de calidad del aire (PM2,5, PM10, NO₂, ozono) de Open-Meteo. Gratuito, sin clave API. Usa latitud/longitud de la previsión.",
         "data": {
           "aqi_interval_min": "Intervalo de actualización",
-          "_go_back": "← Volver al paso anterior"
+          "_go_back": "← Volver al paso anterior",
+          "aqi_scale": "Escala ICA"
         }
       },
       "pollen": {
@@ -654,7 +655,8 @@
         "title": "Ajustes de calidad del aire",
         "description": "API de Calidad del Aire de Open-Meteo. Gratuito, sin clave requerida.",
         "data": {
-          "aqi_interval_min": "Intervalo de actualización"
+          "aqi_interval_min": "Intervalo de actualización",
+          "aqi_scale": "Escala ICA"
         }
       },
       "pollen_opt": {
@@ -915,6 +917,9 @@
           },
           "alert_count": {
             "name": "Número de alertas"
+          },
+          "detail_message": {
+            "name": "Mensaje detallado"
           }
         }
       },
@@ -929,6 +934,12 @@
           },
           "color": {
             "name": "Color"
+          },
+          "detail_message": {
+            "name": "Mensaje detallado"
+          },
+          "active_alerts": {
+            "name": "Alertas activas"
           }
         }
       },
@@ -1735,7 +1746,11 @@
               "unhealthy_sensitive": "No saludable para grupos sensibles",
               "unhealthy": "No saludable",
               "very_unhealthy": "Muy no saludable",
-              "hazardous": "Peligroso"
+              "hazardous": "Peligroso",
+              "fair": "Aceptable",
+              "poor": "Malo",
+              "very_poor": "Muy malo",
+              "extremely_poor": "Extremadamente malo"
             }
           },
           "pm2_5_ug_m3": {
@@ -1749,6 +1764,13 @@
           },
           "ozone_ug_m3": {
             "name": "Ozono (µg/m³)"
+          },
+          "scale": {
+            "name": "Escala ICA",
+            "state": {
+              "european": "Europea (EAQI)",
+              "us": "EE. UU. (EPA)"
+            }
           }
         }
       },
@@ -1964,6 +1986,20 @@
           "probable": "Probable",
           "unlikely": "Improbable",
           "no_risk": "Sin riesgo"
+        },
+        "state_attributes": {
+          "min_temp_c": {
+            "name": "Temperatura mínima considerada (°C)"
+          },
+          "forecast_min_c": {
+            "name": "Mínima prevista (°C)"
+          },
+          "threshold_c": {
+            "name": "Umbral de helada (°C)"
+          },
+          "frost_point_c": {
+            "name": "Punto de escarcha (°C)"
+          }
         }
       },
       "sensor_drift": {
@@ -2048,6 +2084,13 @@
           },
           "zambretti_forecast": {
             "name": "Previsión Zambretti"
+          },
+          "comparison_window": {
+            "name": "Ventana de comparación",
+            "state": {
+              "hourly_12h": "Próximas 12 horas (horario)",
+              "daily": "Hoy (diario)"
+            }
           }
         }
       },
@@ -2602,43 +2645,43 @@
         "name": "{river} - Caudal del río"
       },
       "temperature_high_year": {
-        "name": "Temperature High (Year)"
+        "name": "Temperatura máx. (Año)"
       },
       "temperature_low_year": {
-        "name": "Temperature Low (Year)"
+        "name": "Temperatura mín. (Año)"
       },
       "temperature_high_all_time": {
-        "name": "Temperature High (All-Time)"
+        "name": "Temperatura máx. (Histórico)"
       },
       "temperature_low_all_time": {
-        "name": "Temperature Low (All-Time)"
+        "name": "Temperatura mín. (Histórico)"
       },
       "temperature_high_week": {
-        "name": "Temperature High (Week)"
+        "name": "Temperatura máx. (Semana)"
       },
       "temperature_low_week": {
-        "name": "Temperature Low (Week)"
+        "name": "Temperatura mín. (Semana)"
       },
       "temperature_high_month": {
-        "name": "Temperature High (Month)"
+        "name": "Temperatura máx. (Mes)"
       },
       "temperature_low_month": {
-        "name": "Temperature Low (Month)"
+        "name": "Temperatura mín. (Mes)"
       },
       "wind_gust_max_month": {
-        "name": "Wind Gust Max (Month)"
+        "name": "Racha máx. de viento (Mes)"
       },
       "wind_gust_max_year": {
-        "name": "Wind Gust Max (Year)"
+        "name": "Racha máx. de viento (Año)"
       },
       "wind_gust_max_all_time": {
-        "name": "Wind Gust Max (All-Time)"
+        "name": "Racha máx. de viento (Histórico)"
       },
       "dry_streak_record": {
-        "name": "Dry Streak Record"
+        "name": "Récord de racha seca"
       },
       "heat_streak_record": {
-        "name": "Heat Streak Record",
+        "name": "Récord de racha de calor",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2646,7 +2689,7 @@
         }
       },
       "frost_streak_record": {
-        "name": "Frost Streak Record",
+        "name": "Récord de racha de heladas",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2654,7 +2697,7 @@
         }
       },
       "temp_high_normal": {
-        "name": "Temperature High (Normal)",
+        "name": "Temperatura máx. (Normal)",
         "state_attributes": {
           "sample_years": {
             "name": "Sample years"
@@ -2665,19 +2708,19 @@
         }
       },
       "temp_low_normal": {
-        "name": "Temperature Low (Normal)"
+        "name": "Temperatura mín. (Normal)"
       },
       "rain_normal": {
-        "name": "Rain (Normal)"
+        "name": "Lluvia (Normal)"
       },
       "temp_anomaly_normal": {
-        "name": "Temperature Anomaly (Normal)"
+        "name": "Anomalía de temperatura (Normal)"
       },
       "rain_anomaly_normal": {
-        "name": "Rain Anomaly (Normal)"
+        "name": "Anomalía de lluvia (Normal)"
       },
       "auto_calibration": {
-        "name": "Auto Calibration",
+        "name": "Calibración automática",
         "state": {
           "learning": "Learning",
           "stable": "Stable",
@@ -2702,7 +2745,7 @@
         }
       },
       "snow_phase": {
-        "name": "Precipitation Phase",
+        "name": "Fase de precipitación",
         "state": {
           "snow": "Snow",
           "sleet": "Sleet",
@@ -2711,19 +2754,19 @@
         }
       },
       "snow_rate": {
-        "name": "Snow Rate"
+        "name": "Tasa de nieve"
       },
       "snow_today": {
-        "name": "Snow Today"
+        "name": "Nieve hoy"
       },
       "snow_this_month": {
-        "name": "Snow This Month"
+        "name": "Nieve este mes"
       },
       "snow_this_year": {
-        "name": "Snow This Year"
+        "name": "Nieve este año"
       },
       "snow_record_day": {
-        "name": "Snowiest Day",
+        "name": "Día con más nieve",
         "state_attributes": {
           "date": {
             "name": "Date"
@@ -2731,10 +2774,10 @@
         }
       },
       "indoor_room_delta": {
-        "name": "Temp Delta - {room_name}"
+        "name": "Diferencia temp. - {room_name}"
       },
       "indoor_room_humidity": {
-        "name": "Humidity - {room_name}"
+        "name": "Humedad - {room_name}"
       },
       "indoor_room_absolute_humidity": {
         "name": "Humedad absoluta - {room_name}"
@@ -2743,7 +2786,7 @@
         "name": "CO₂ - {room_name}"
       },
       "indoor_room_comfort": {
-        "name": "Comfort - {room_name}"
+        "name": "Confort - {room_name}"
       },
       "window_outdoor_drying_status": {
         "name": "Secado Exterior Estado",
@@ -2789,6 +2832,32 @@
       },
       "window_custom_next_end": {
         "name": "{profile_name} Próximo Fin"
+      },
+      "wind_beaufort_description": {
+        "name": "Descripción Beaufort del viento",
+        "state": {
+          "calm": "Calma",
+          "light_air": "Ventolina",
+          "light_breeze": "Brisa muy débil",
+          "gentle_breeze": "Brisa débil",
+          "moderate_breeze": "Brisa moderada",
+          "fresh_breeze": "Brisa fresca",
+          "strong_breeze": "Brisa fuerte",
+          "near_gale": "Viento fuerte",
+          "gale": "Temporal",
+          "strong_gale": "Temporal fuerte",
+          "storm": "Temporal duro",
+          "violent_storm": "Temporal muy duro",
+          "hurricane": "Huracán"
+        },
+        "state_attributes": {
+          "beaufort": {
+            "name": "Beaufort"
+          },
+          "speed_ms": {
+            "name": "Velocidad del viento (m/s)"
+          }
+        }
       }
     },
     "select": {
@@ -2943,7 +3012,7 @@
         "name": "Función: Subida Windy"
       },
       "ws_enable_auto_calibration": {
-        "name": "Feature: Adaptive Sensor Calibration"
+        "name": "Función: Calibración adaptativa de sensores"
       },
       "ws_enable_neighbor_qc": {
         "name": "Función: Comprobación de sensores"
@@ -2952,10 +3021,10 @@
         "name": "Función: Pronóstico por patrones"
       },
       "ws_enable_climate_normals": {
-        "name": "Feature: Historical Climate Normals"
+        "name": "Función: Normales climáticas históricas"
       },
       "ws_enable_snow": {
-        "name": "Feature: Snow"
+        "name": "Función: Nieve"
       }
     },
     "event": {
@@ -3028,7 +3097,7 @@
         "name": "Punto de rocío supera temperatura"
       },
       "ws_snow_falling": {
-        "name": "Snow Falling"
+        "name": "Nevando"
       }
     }
   },
@@ -3136,6 +3205,13 @@
         "outdoor_drying": "Secado de ropa al aire libre",
         "garden_work": "Trabajo en el jardín y patio",
         "custom": "Perfil de ventana personalizado"
+      }
+    },
+    "aqi_scale": {
+      "options": {
+        "auto": "Auto (EAQI europeo en Europa, US EPA en el resto)",
+        "european": "Índice Europeo de Calidad del Aire (EAQI)",
+        "us": "Índice US EPA"
       }
     }
   }

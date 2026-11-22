@@ -713,8 +713,8 @@ async def test_meteo_france_documented_routes_and_wind_units():
 
 
 @pytest.mark.asyncio
-async def test_ha_entity_provider_drops_elapsed_hours_before_keeping_25_rows():
-    """An entity that lists hours earlier in the day still yields the next 24 hours."""
+async def test_ha_entity_provider_drops_elapsed_hours_and_keeps_all_future_rows():
+    """An entity listing earlier hours drops elapsed rows and passes through all remaining ones."""
     from datetime import timedelta
 
     now = datetime(2026, 11, 20, 18, 20, tzinfo=UTC)
@@ -724,7 +724,7 @@ async def test_ha_entity_provider_drops_elapsed_hours_before_keeping_25_rows():
     with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=now):
         result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.any")
     hourly = result["hourly"]
-    assert len(hourly) == 25
+    assert len(hourly) == 38
     assert hourly[0]["utc_datetime"] == now.replace(minute=0).isoformat()  # the in-progress hour
 
 
@@ -757,7 +757,7 @@ async def test_ha_entity_provider_fills_the_hour_in_progress_from_the_next_row()
     with patch("custom_components.ws_core.providers.ha_weather_entity.dt_util.utcnow", return_value=now):
         result = await HaWeatherEntityProvider(hass).async_fetch(MagicMock(), 0, 0, api_key="weather.openmeteo")
     hourly = result["hourly"]
-    assert len(hourly) == 25
+    assert len(hourly) == 49
     assert hourly[0]["utc_datetime"] == datetime(2026, 11, 20, 14, 0, tzinfo=UTC).isoformat()
     assert hourly[0]["estimated_from_next_hour"] is True
     assert hourly[0]["temp_c"] == hourly[1]["temp_c"]  # copied from 15:00

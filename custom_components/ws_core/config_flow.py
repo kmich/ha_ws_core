@@ -27,9 +27,11 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     ALTITUDE_UNIT_OPTIONS,
+    AQI_SCALE_OPTIONS,
     CLIMATE_REGION_OPTIONS,
     CONF_ALTITUDE_UNIT,
     CONF_AQI_INTERVAL_MIN,
+    CONF_AQI_SCALE,
     CONF_CAL_HUMIDITY,
     CONF_CAL_PRESSURE_HPA,
     CONF_CAL_TEMP_C,
@@ -130,6 +132,7 @@ from .const import (
     CONFIG_VERSION,
     DEFAULT_ALTITUDE_UNIT,
     DEFAULT_AQI_INTERVAL_MIN,
+    DEFAULT_AQI_SCALE,
     DEFAULT_CAL_HUMIDITY,
     DEFAULT_CAL_PRESSURE_HPA,
     DEFAULT_CAL_TEMP_C,
@@ -516,8 +519,9 @@ def _guess_climate_region(hass: HomeAssistant) -> str:
     # North America
     if -170 <= lon <= -50:
         return "north_america_east" if lon > -100 else "north_america_west"
-    # Continental Europe (east of 15°E)
-    if lon > 15:
+    # Continental Europe (Central & Eastern Europe: east of 9°E north of the Alps,
+    # or anywhere east of 15°E)
+    if lon > 15 or (47 <= lat <= 55 and lon > 9):
         return "continental_europe"
     # Default Atlantic Europe
     return "atlantic_europe"
@@ -1435,6 +1439,7 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             if back:
                 return back
             self._data[CONF_AQI_INTERVAL_MIN] = int(user_input.get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
+            self._data[CONF_AQI_SCALE] = str(user_input.get(CONF_AQI_SCALE, DEFAULT_AQI_SCALE))
             if self._data.get(CONF_ENABLE_POLLEN):
                 return await self.async_step_pollen()
             if self._data.get(CONF_ENABLE_SOLAR_FORECAST):
@@ -1449,6 +1454,13 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             step_id="air_quality",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_AQI_SCALE, default=DEFAULT_AQI_SCALE): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=AQI_SCALE_OPTIONS,
+                            mode="dropdown",
+                            translation_key="aqi_scale",
+                        )
+                    ),
                     vol.Optional(CONF_AQI_INTERVAL_MIN, default=DEFAULT_AQI_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=15, max=360, step=15, mode="box", unit_of_measurement="min")
                     ),
@@ -2856,12 +2868,20 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
     async def async_step_air_quality_opt(self, user_input: dict[str, Any] | None = None):
         g = self._get
         if user_input is not None:
+            self._opt[CONF_AQI_SCALE] = str(user_input.get(CONF_AQI_SCALE, DEFAULT_AQI_SCALE))
             self._opt[CONF_AQI_INTERVAL_MIN] = int(user_input.get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
             return await self._finish_or_next("air_quality_opt")
         return self.async_show_form(
             step_id="air_quality_opt",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_AQI_SCALE, default=g(CONF_AQI_SCALE, DEFAULT_AQI_SCALE)): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=AQI_SCALE_OPTIONS,
+                            mode="dropdown",
+                            translation_key="aqi_scale",
+                        )
+                    ),
                     vol.Optional(
                         CONF_AQI_INTERVAL_MIN, default=g(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN)
                     ): selector.NumberSelector(

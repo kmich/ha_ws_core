@@ -65,7 +65,7 @@ from custom_components.ws_core.const import (
     KEY_WIND_QUADRANT,
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
-    RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK,
+    RAIN_EXPECTED_SOURCE_LOCAL_RAIN,
     RAIN_EXPECTED_SOURCE_NOWCAST,
     SRC_GUST,
     SRC_HUM,
@@ -1376,27 +1376,27 @@ class TestComputeNowcast:
         assert data[KEY_RAIN_EXPECTED_SOURCE] == RAIN_EXPECTED_SOURCE_NOWCAST
         assert data[KEY_RAIN_EXPECTED_1H] is False
 
-    def test_stale_cache_falls_back_to_zambretti_high_rain_pct(self):
-        # Z-number 26 ("Very Unsettled, Rain") sits at the high-rain-probability
-        # end of ZAMBRETTI_RAIN_PCT.
+    def test_stale_cache_does_not_fall_back_to_zambretti_when_dry(self):
+        # Z-number 26 is a 6-12h outlook; when nowcast is stale and the gauge
+        # is dry, rain_expected_1h stays None rather than guessing from Zambretti.
         coord, data = self._coord_with_zambretti(26)
         old_iso = (dt_util.now() - timedelta(hours=2)).isoformat()
         coord._nowcast_cache = {"fetched_at": old_iso, "next_60min_mm": 0.0, "rain_expected_1h": False}
         coord._compute_nowcast(data)
         assert data[KEY_NOWCAST_STALE] is True
-        assert data[KEY_RAIN_EXPECTED_SOURCE] == RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK
-        assert data[KEY_RAIN_EXPECTED_1H] is True
+        assert data[KEY_RAIN_EXPECTED_1H] is None
+        assert data[KEY_RAIN_EXPECTED_SOURCE] is None
 
-    def test_never_fetched_falls_back_to_zambretti_low_rain_pct(self):
-        # Z-number 1 ("Settled Fine") sits at the low-rain-probability end.
+    def test_never_fetched_reports_true_only_when_raining_locally(self):
         coord, data = self._coord_with_zambretti(1)
+        data[KEY_RAIN_RATE_FILT] = 1.5
         coord._nowcast_cache = None
         coord._compute_nowcast(data)
         assert data[KEY_NOWCAST_STALE] is True
-        assert data[KEY_RAIN_EXPECTED_SOURCE] == RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK
-        assert data[KEY_RAIN_EXPECTED_1H] is False
+        assert data[KEY_RAIN_EXPECTED_SOURCE] == RAIN_EXPECTED_SOURCE_LOCAL_RAIN
+        assert data[KEY_RAIN_EXPECTED_1H] is True
 
-    def test_no_nowcast_and_no_zambretti_is_unavailable(self):
+    def test_no_nowcast_and_dry_is_unknown(self):
         coord, data = self._coord_with_zambretti(None)
         coord._nowcast_cache = None
         coord._compute_nowcast(data)
