@@ -44,7 +44,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_wind_beaufort_description` | — | Localized Beaufort scale label (`calm` .. `hurricane`, Home Assistant enum sensor translated per user language) |
 | `sensor.ws_wind_direction_smooth` | ° | Circular EMA-smoothed wind direction (`alpha = 0.3` per 60 s tick; see [Wind smoothing](science.md#wind-smoothing)) |
 | `sensor.ws_wind_quadrant` | — | N / E / S / W compass quadrant derived from the smoothed wind direction (`using_smoothed` attribute indicates whether smoothed or raw direction was used) |
-| `sensor.ws_current_condition` | — | 36-condition weather classifier from measured readings. A new condition is reported once it has held for 5 minutes; hurricane and severe storm are reported at once |
+| `sensor.ws_current_condition` | — | 36-condition weather classifier from measured readings. A new condition is reported once it has held for 5 minutes, with immediate reporting for hurricane and severe storm. Clearing after rain requires at least 0.1 mm accumulated in the last 3 hours and a measured light reading |
 | `sensor.ws_rain_probability` | % | Local sensor-based rain index |
 | `sensor.ws_rain_probability_combined` | % | Brier-score blended local + NWP |
 | `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` comparing Zambretti's 6–12 h outlook against the forecast provider's peak `precipitation_probability` over the next 12 h (`comparison_window: hourly_12h`, falling back to `daily`). Reports `unknown` (`provider_missing_precip_prob`) if the provider omits rain probability |
@@ -308,7 +308,7 @@ Free via Open-Meteo. No API key required.
 
 | Entity ID | Unit | Description |
 |---|---|---|
-| `sensor.ws_air_quality_index` | AQI | Air Quality Index (`aqi_scale`: `auto` selects European EAQI 0–100+ in Europe and US EPA AQI 0–500 elsewhere; configurable to `european` or `us`). Exposes `scale`, `level`, and pollutant concentrations |
+| `sensor.ws_air_quality_index` | AQI | Air Quality Index (`aqi_scale`: `auto` selects European EAQI 0–100+ in Europe and US EPA AQI 0–500 elsewhere). Exposes `scale`, `level`, `color`, `source`, `missing_pollutants` for the local estimate, and pollutant concentrations |
 | `sensor.ws_pm2_5` | µg/m³ | Fine particulate matter (PM2.5) |
 | `sensor.ws_pm10` | µg/m³ | Coarse particulate matter (PM10) |
 | `sensor.ws_no2` | µg/m³ | Nitrogen dioxide |
@@ -597,7 +597,7 @@ MQTT integration to be set up.
 
 **Forecast provider coverage (`weather.ws`):**
 
-- `ha_weather_entity` passes through all daily and hourly forecast entries returned by the source entity, forwards extra fields when supplied (`cloud_coverage`, `humidity`, `pressure`, `visibility`, `uv_index`, `wind_bearing`), preserves HA condition strings directly, forwards the source entity's `attribution`, and derives missing hourly `apparent_temperature` from temperature, humidity and wind speed when available.
+- `ha_weather_entity` retains the source entity's full forecast horizon and forwards extra fields when supplied (`cloud_coverage`, `humidity`, `pressure`, `visibility`, `uv_index`, `wind_bearing`). Visibility uses the WS weather entity's selected units. The provider preserves HA condition strings and source attribution and derives missing hourly `apparent_temperature` when temperature, humidity and wind speed are available.
 - Fields a source entity or provider omits (for example, DWD does not publish `precipitation_probability`, Met.no omits `wind_gust_speed`, NWS omits `wind_gust_speed` and `cloud_coverage`) remain `null` in the forecast; `sensor.ws_forecast_agreement` reports `unknown` (`provider_missing_precip_prob`) when precipitation probability is absent.
 
 ---

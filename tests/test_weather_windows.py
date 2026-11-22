@@ -1168,6 +1168,25 @@ class TestReleaseReviewFixes:
         # The action changed nothing the sensor tracks
         assert eng._gust_hold_state[profile.profile_id]["threshold"] == profile.max_wind_gust_kmh
 
+    def test_action_gust_override_starts_over_after_station_data_gap(self):
+        eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
+        t0 = datetime(2026, 6, 21, 9, 30, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0.replace(minute=0), hours=8)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        tight = apply_profile_overrides(profile, {"max_wind_gust_kmh": 30}, profile_id=profile.profile_id)
+        gust = {KEY_NORM_WIND_GUST_MS: 14.0}
+        for minutes, current in [(0, gust), (1, {}), (3, gust)]:
+            now = t0 + timedelta(minutes=minutes)
+            eng.evaluate_profile(profile, hourly, current_data=current, now=now)
+
+        resumed = eng.evaluate_profile(tight, hourly, current_data=gust, now=now, update_live_hold=False)
+        assert resumed.status == STATUS_SUITABLE_NOW
+        assert REASON_CURRENT_GUST_HIGH not in resumed.reason_codes
+        now += timedelta(minutes=3)
+        sustained = eng.evaluate_profile(tight, hourly, current_data=gust, now=now, update_live_hold=False)
+        assert sustained.status == STATUS_UNSUITABLE
+        assert REASON_CURRENT_GUST_HIGH in sustained.reason_codes
+
     def test_upcoming_window_text_uses_local_clock_and_tomorrow(self):
         eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
         now = datetime(2026, 6, 21, 20, 0, tzinfo=UTC)

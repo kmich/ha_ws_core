@@ -6,11 +6,9 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
-from homeassistant.util import dt as dt_util
 
 from custom_components.ws_core import coordinator as cmod
 from custom_components.ws_core.algorithms import determine_current_condition
-from custom_components.ws_core.const import CLEARING_AFTER_RAIN_WINDOW_H
 from tests.test_coordinator import _make_coordinator
 
 
@@ -58,17 +56,33 @@ def _condition_kwargs(coord, data):
 
 def test_coordinator_uses_measured_recent_rain():
     coord = _make_coordinator()
-    coord.runtime.last_rain_event_ts = None
     assert _condition_kwargs(coord, {})["rained_recently"] is False
     assert _condition_kwargs(coord, {"_rain_recent_mm": 0.0})["rained_recently"] is False
     assert _condition_kwargs(coord, {"_rain_recent_mm": 0.4})["rained_recently"] is True
 
 
-@pytest.mark.parametrize(("hours_ago", "expected"), [(1.0, True), (CLEARING_AFTER_RAIN_WINDOW_H + 0.5, False)])
-def test_coordinator_uses_last_rain_event_time(hours_ago, expected):
+@pytest.mark.parametrize(
+    ("counter_increase", "expected"),
+    [
+        (0.03, "sunny"),
+        (0.095, "sunny"),
+        (0.1, "clearing-after-rain"),
+    ],
+)
+def test_condition_uses_accumulation_even_when_filtered_rate_was_positive(counter_increase, expected):
     coord = _make_coordinator()
-    coord.runtime.last_rain_event_ts = dt_util.utcnow() - timedelta(hours=hours_ago)
-    assert _condition_kwargs(coord, {})["rained_recently"] is expected
+    start = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
+    coord._compute_derived_precipitation({}, start, 10.0)
+    rates = []
+    for minute in range(1, 35):
+        data = {}
+        now = start + timedelta(minutes=minute)
+        rates.append(coord._compute_derived_precipitation(data, now, 10.0 + counter_increase))
+    assert max(rates) > 0
+    assert rates[-1] == 0
+    assert data["_rain_recent_mm"] == pytest.approx(counter_increase)
+    condition = coord._compute_condition(data, 1.5, 88.0, 1.5, 3.0, rates[-1], -0.3, 45000.0, 2.0)
+    assert condition == expected
 
 
 def test_coordinator_reports_missing_light_reading():
@@ -87,3 +101,5 @@ def test_recent_rain_amount_is_published_from_rain_history():
     data: dict = {}
     coord._compute_derived_precipitation(data, now, 10.6, sample=False)
     assert data["_rain_recent_mm"] == pytest.approx(0.6)
+    coord._compute_derived_precipitation(data, now + timedelta(hours=3), 10.6, sample=False)
+    assert data["_rain_recent_mm"] == 0.0

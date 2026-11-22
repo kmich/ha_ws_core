@@ -175,7 +175,9 @@ synoptic outlook.
   `binary_sensor.ws_rain_expected_1h` (60-minute nowcast). `sensor.ws_forecast_agreement`
   compares Zambretti's implied rain likelihood against the forecast provider's peak hourly
   precipitation probability over the next 12 hours when hourly probabilities are available
-  (falling back to today's daily value otherwise).
+  (falling back to today's daily value otherwise). The peak hourly value is a proxy for
+  a wet outlook. It represents one hour, while the daily fallback covers a calendar
+  day. Treat the agreement state as a heuristic check, especially on the daily basis.
 
 **References:**
 - Negretti & Zambra (1915). *A Treatise on Meteorological Instruments.* London.
@@ -383,16 +385,20 @@ the **US EPA AQI**, selectable via `aqi_scale` (`auto`, `european`, `us`):
 
 - **Auto-detection (`auto`, default):** Selects `european` for coordinates in Europe
   (34°–72° N, 25° W–45° E, or European climate regions) and `us` elsewhere.
-- **European EAQI (`european`):** Uses Open-Meteo's `european_aqi` value (0–100+ EEA
-  continuous scale covering PM2.5, PM10, NO₂ and O₃: 0–20 Good, 21–40 Fair, 41–60 Moderate,
-  61–80 Poor, 81–100 Very Poor, >100 Extremely Poor), with a local EEA breakpoint fallback
-  from PM2.5, PM10, NO₂ and O₃ if `european_aqi` is omitted.
+- **European EAQI (`european`):** Uses Open-Meteo's `european_aqi` value. It uses the
+  highest sub-index of PM2.5, PM10, NO₂, O₃ and SO₂ on the 0–100+ scale
+  (0–20 Good, 21–40 Fair, 41–60 Moderate, 61–80 Poor, 81–100 Very Poor, >100 Extremely Poor).
+  If the API omits the index, the integration estimates it from the available
+  concentrations using the EEA's revised hourly bands. The sensor reports
+  `source: local_estimate` and lists unavailable fallback inputs in `missing_pollutants`.
+  Missing inputs can make the estimate lower than the index calculated with all five pollutants.
 - **US EPA AQI (`us`):** Uses Open-Meteo's `us_aqi` or falls back to the higher of the
   PM2.5 and PM10 sub-indices using US EPA breakpoints including the 2024 PM2.5 revision
   (Good = 0–9.0 µg/m³), truncating PM2.5 to 0.1 µg/m³ and PM10 to 1 µg/m³ before lookup.
 
 **References:**
-- European Environment Agency (EEA). *European Air Quality Index.*
+- European Environment Agency (EEA). [European Air Quality Index](https://airindex.eea.europa.eu/AQI/).
+- Open-Meteo. [Air Quality API](https://open-meteo.com/en/docs/air-quality-api).
 - US EPA (2024). *Technical Assistance Document for the Reporting of Daily Air Quality — the Air Quality Index (AQI).*
 
 ---

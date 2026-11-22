@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import ATTR_ATTRIBUTION
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 
 from custom_components.ws_core import const as c
 from custom_components.ws_core.algorithms import (
@@ -30,6 +31,7 @@ from custom_components.ws_core.sensor import WSDataStatusSensor, WSSensor, async
 from custom_components.ws_core.sensor_status import unknown_status
 from custom_components.ws_core.weather import WSStationWeather, _weathercode_to_condition
 from tests.test_coordinator import _make_coordinator
+from tests.test_health_solar_regression import _full_coord
 from tests.test_providers import _ha_entity_hass
 
 # ---------------------------------------------------------------------------
@@ -245,6 +247,25 @@ class TestFrostRisk:
         assert attrs["threshold_c"] == 0.0
         assert attrs["frost_point_c"] == -3.4
 
+    def test_missing_sample_resets_pending_frost_risk_change(self):
+        coord = _make_coordinator()
+        assert self._run(coord, 4.1)[c.KEY_FROST_RISK] == "no_risk"
+        assert self._run(coord, 1.9)[c.KEY_FROST_RISK] == "no_risk"
+        assert c.KEY_FROST_RISK not in self._run(coord, None)
+        assert self._run(coord, -0.1)[c.KEY_FROST_RISK] == "no_risk"
+        assert self._run(coord, -0.1)[c.KEY_FROST_RISK] == "high"
+
+    def test_frost_risk_only_moves_to_a_tier_supported_across_the_run(self):
+        coord = _make_coordinator()
+        assert self._run(coord, 4.1)[c.KEY_FROST_RISK] == "no_risk"
+        assert self._run(coord, 1.9)[c.KEY_FROST_RISK] == "no_risk"
+        assert self._run(coord, -0.1)[c.KEY_FROST_RISK] == "probable"
+        assert self._run(coord, -0.1)[c.KEY_FROST_RISK] == "probable"
+        assert self._run(coord, -0.1)[c.KEY_FROST_RISK] == "high"
+        assert self._run(coord, 1.0)[c.KEY_FROST_RISK] == "high"
+        assert self._run(coord, 5.0)[c.KEY_FROST_RISK] == "high"
+        assert self._run(coord, 5.0)[c.KEY_FROST_RISK] == "probable"
+
 
 # ---------------------------------------------------------------------------
 # Issue #210 — Localization, Beaufort enum sensor, translation sweep
@@ -394,6 +415,8 @@ class TestHaWeatherEntityFixes:
         coord.data = {c.KEY_CURRENT_CONDITION: "cloudy", c.KEY_FORECAST: fc}
         entry = MagicMock(entry_id="e", data={c.CONF_PREFIX: "ws"}, options={})
         w = WSStationWeather(coord, entry, "ws")
+        w.hass = MagicMock()
+        w.hass.config.units = US_CUSTOMARY_SYSTEM
         assert w.attribution.endswith("Data provided by DWD")
 
         daily_out = await w.async_forecast_daily()
@@ -409,7 +432,7 @@ class TestHaWeatherEntityFixes:
         assert daily_out[0]["cloud_coverage"] == 80
         assert daily_out[0]["humidity"] == 88
         assert daily_out[0]["native_pressure"] == pytest.approx(1013.21, abs=0.1)
-        assert daily_out[0]["visibility"] == pytest.approx(16.09, abs=0.1)
+        assert w._convert_forecast(daily_out)[0]["visibility"] == 10.0
         assert daily_out[0]["uv_index"] == 2.0
         assert daily_out[0]["wind_bearing"] == 240
         assert daily_out[0][ATTR_ATTRIBUTION] == w.attribution
@@ -419,6 +442,12 @@ class TestHaWeatherEntityFixes:
         assert len(hourly_out) == 216
         assert hourly_out[10]["native_apparent_temperature"] == pytest.approx(expected_at, abs=0.05)
         assert hourly_out[10]["condition"] == "pouring"
+        assert w._convert_forecast(hourly_out)[10]["visibility"] == 5.0
+
+        w.hass.config.units = METRIC_SYSTEM
+        assert w._convert_forecast(await w.async_forecast_daily())[0]["visibility"] == 16.09
+        with patch("custom_components.ws_core.weather.dt_util.now", return_value=now):
+            assert w._convert_forecast(await w.async_forecast_hourly())[10]["visibility"] == 8.05
 
         # weather.py also derives missing apparent_temperature when a forecast row omits it
         coord.data = {
@@ -536,19 +565,34 @@ class TestIssue214ZambrettiAndAqi:
         assert resolve_aqi_scale("european", 40.71, -74.01) == "european"
 
         # Low pollutants -> Good (<= 20)
-        val_good = calculate_european_aqi(pm2_5=5.0, pm10=10.0, no2=20.0, ozone=40.0)
+        val_good = calculate_european_aqi(pm2_5=5.0, pm10=10.0, no2=10.0, ozone=40.0)
         assert val_good is not None and val_good <= 20
         assert european_aqi_level(val_good) == "good"
         assert european_aqi_color(val_good) == "#50F0E6"
 
         # Elevated NO2/O3 drives EAQI even if PM is low
-        val_no2 = calculate_european_aqi(pm2_5=4.0, pm10=8.0, no2=175.0, ozone=40.0)
-        assert val_no2 is not None and 60 < val_no2 <= 80
+        val_no2 = calculate_european_aqi(pm2_5=4.0, pm10=8.0, no2=100.0, ozone=40.0)
+        assert val_no2 == 80
         assert european_aqi_level(val_no2) == "poor"
+
+    @pytest.mark.parametrize(
+        ("pollutants", "index"),
+        [
+            ({"pm2_5": 9.0}, 28),
+            ({"pm10": 120.0}, 60),
+            ({"ozone": 160.0}, 80),
+            ({"so2": 275.0}, 100),
+            ({"so2": 360.0}, 120),
+            ({"pm2_5": float("nan"), "so2": -1.0}, None),
+        ],
+    )
+    def test_european_aqi_revised_thresholds(self, pollutants, index):
+        assert calculate_european_aqi(**({"pm2_5": None, "pm10": None} | pollutants)) == index
 
     @pytest.mark.asyncio
     async def test_coordinator_fetch_aqi_auto_european_and_fallback(self):
-        coord = _make_coordinator()
+        coord = _full_coord()
+        coord.async_request_refresh = AsyncMock()
         coord.aqi_enabled = True
         coord.pollen_enabled = False
         coord.aqi_scale = "auto"
@@ -582,15 +626,30 @@ class TestIssue214ZambrettiAndAqi:
         assert coord._aqi_cache["aqi"] == 24
         assert coord._aqi_cache["aqi_scale"] == "european"
         assert coord._aqi_cache["aqi_level"] == "fair"
+        assert coord._aqi_cache["aqi_color"] == "#50CCAA"
+        assert coord._aqi_cache["aqi_source"] == "open_meteo"
+        assert "sulphur_dioxide" in session.get.call_args.args[0]
 
         # Without Open-Meteo's european_aqi field, falls back to local EAQI calculation
         mock_resp.json = AsyncMock(
-            return_value={"current": {"pm2_5": 6.0, "pm10": 12.0, "nitrogen_dioxide": 175.0, "ozone": 40.0}}
+            return_value={"current": {"pm2_5": 6.0, "sulphur_dioxide": 232.5, "european_aqi": float("inf")}}
         )
         with patch("custom_components.ws_core.coordinator.async_get_clientsession", return_value=session):
             await coord._async_fetch_aqi()
         assert coord._aqi_cache["aqi_scale"] == "european"
-        assert coord._aqi_cache["aqi_level"] == "poor"
+        assert coord._aqi_cache["aqi"] == 90
+        assert coord._aqi_cache["aqi_level"] == "very_poor"
+        assert coord._aqi_cache["aqi_color"] == "#960032"
+        assert coord._aqi_cache["aqi_source"] == "local_estimate"
+        assert coord._aqi_cache["missing_pollutants"] == ["pm10", "no2", "ozone"]
+        coord.data = coord._compute(sample=False)
+        desc = next(d for d in SENSORS if d.key == c.KEY_AQI)
+        attrs = WSSensor(coord, MagicMock(entry_id="e"), desc, "ws").extra_state_attributes
+        assert attrs["scale"] == "european"
+        assert attrs["source"] == "local_estimate"
+        assert attrs["missing_pollutants"] == ["pm10", "no2", "ozone"]
+        assert attrs["so2_ug_m3"] == 232.5
+        assert attrs["color"] == "#960032"
 
         # Explicit US override outside or inside Europe uses US EPA scale
         coord.aqi_scale = "us"

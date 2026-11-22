@@ -2110,10 +2110,14 @@ SENSORS: list[WSSensorDescription] = [
         attrs_fn=lambda d: {
             "level": d.get(KEY_AQI_LEVEL),
             "scale": d.get(KEY_AQI_SCALE),
+            "color": d.get("_aqi_color"),
+            "source": d.get("_aqi_source"),
+            "missing_pollutants": d.get("_aqi_missing_pollutants"),
             "pm2_5_ug_m3": d.get(KEY_PM2_5),
             "pm10_ug_m3": d.get(KEY_PM10),
             "no2_ug_m3": d.get(KEY_NO2),
             "ozone_ug_m3": d.get(KEY_OZONE),
+            "so2_ug_m3": d.get("_aqi_so2"),
         },
     ),
     WSSensorDescription(

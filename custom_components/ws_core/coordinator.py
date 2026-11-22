@@ -53,6 +53,7 @@ from .algorithms import (
     ZAMBRETTI_RAIN_PCT,
     ConditionHold,
     KalmanFilter,
+    aqi_color,
     aqi_level,
     beaufort_key,
     calculate_absolute_humidity,
@@ -103,6 +104,7 @@ from .algorithms import (
     et0_hargreaves,
     et0_hourly_estimate,
     et0_penman_monteith,
+    european_aqi_color,
     european_aqi_level,
     ffdi_danger_level,
     fog_probability,
@@ -705,7 +707,6 @@ class WSStationRuntime:
     last_rain_total_mm: float | None = None
     last_rain_ts: Any | None = None
     last_rain_rate_filt: float = 0.0
-    last_rain_event_ts: Any | None = None
 
     # Pressure tracking
     pressure_history: deque = field(default_factory=lambda: deque(maxlen=PRESSURE_HISTORY_SAMPLES))
@@ -1160,7 +1161,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._alert_last_info: dict[str, dict[str, Any]] = {}
         # Frost risk hysteresis & debounce state (issue #209)
         self._frost_risk_state: str | None = None
-        self._frost_risk_pending_dir: str | None = None
+        self._frost_risk_pending_tier: str | None = None
         self._frost_risk_pending_ticks: int = 0
 
         # Wind run accumulator - resets at local midnight (like rain_today)
@@ -2447,9 +2448,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rain_hist), 1)
             # Recent rain for the "clearing after rain" condition; the 24h history is
             # persisted, so this survives a restart (issue #207).
-            data["_rain_recent_mm"] = round(
-                self._rain_accum_window_from_totals(rain_hist, now, CLEARING_AFTER_RAIN_WINDOW_H), 2
-            )
+            data["_rain_recent_mm"] = self._rain_accum_window_from_totals(rain_hist, now, CLEARING_AFTER_RAIN_WINDOW_H)
 
         # Rain today - resets at local midnight (use local time, not UTC)
         rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
@@ -2473,10 +2472,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._rain_today_last_total = float(rain_total_mm)
         data["_rain_today_mm"] = round(self._rain_today_mm, 1)
         data[KEY_RAIN_TODAY_MM] = self._rain_today_mm
-
-        # Track last rain event timestamp (used by streak counters)
-        if float(rain_rate) > 0.0:
-            rt.last_rain_event_ts = now
 
         # v2.0 — Weekly / monthly / yearly rain accumulators
         # Weekly
@@ -2564,17 +2559,12 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if tc is None or rh is None:
             return "sunny" if is_day else "clear-night"
 
-        # Rain in the last few hours: measured accumulation, or a positive filtered rate
-        # seen by this run. Without either, "clearing after rain" cannot be claimed.
-        recent_mm = data.get("_rain_recent_mm")
-        rained_recently = isinstance(recent_mm, (int, float)) and recent_mm >= CLEARING_AFTER_RAIN_MIN_MM
-        last_event = getattr(self.runtime, "last_rain_event_ts", None)
-        if not rained_recently and last_event is not None:
-            try:
-                age_s = (dt_util.utcnow() - last_event).total_seconds()
-            except (TypeError, AttributeError):
-                age_s = None
-            rained_recently = age_s is not None and 0.0 <= age_s <= CLEARING_AFTER_RAIN_WINDOW_H * 3600.0
+        # Use measured accumulation so the filtered rate cannot turn counter noise
+        # into evidence of rain. Allow for roundoff when subtracting gauge totals.
+        recent_mm = data.get("_rain_recent_mm", 0.0)
+        rained_recently = recent_mm >= CLEARING_AFTER_RAIN_MIN_MM or math.isclose(
+            recent_mm, CLEARING_AFTER_RAIN_MIN_MM, abs_tol=1e-9
+        )
 
         condition = determine_current_condition(
             temp_c=float(tc),
@@ -4548,6 +4538,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         (de-escalating) consecutive 60 s sample ticks.
         """
         if tc is None:
+            if sample:
+                self._frost_risk_pending_tier = None
+                self._frost_risk_pending_ticks = 0
             return
 
         freeze_thr = float(getattr(self, "entry_options", {}).get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
@@ -4564,26 +4557,32 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if cur_state not in order:
             cur_state = candidate
             self._frost_risk_state = candidate
-            self._frost_risk_pending_dir = None
+            self._frost_risk_pending_tier = None
             self._frost_risk_pending_ticks = 0
         elif sample:
             cur_idx = order.index(cur_state)
             cand_idx = order.index(candidate)
             if cand_idx == cur_idx:
-                self._frost_risk_pending_dir = None
+                self._frost_risk_pending_tier = None
                 self._frost_risk_pending_ticks = 0
             else:
-                direction = "up" if cand_idx > cur_idx else "down"
-                if getattr(self, "_frost_risk_pending_dir", None) != direction:
-                    self._frost_risk_pending_dir = direction
-                    self._frost_risk_pending_ticks = 1
+                pending = self._frost_risk_pending_tier
+                pending_idx = order.index(pending) if pending is not None else cur_idx
+                # Only adopt a tier that every tick in the run supported.
+                if cand_idx > cur_idx:
+                    needed = ALERT_DEBOUNCE_ON_TICKS
+                    continuing = pending_idx > cur_idx
+                    target_idx = min(pending_idx, cand_idx) if continuing else cand_idx
                 else:
-                    self._frost_risk_pending_ticks = getattr(self, "_frost_risk_pending_ticks", 0) + 1
-                needed = ALERT_DEBOUNCE_ON_TICKS if direction == "up" else ALERT_DEBOUNCE_OFF_TICKS
+                    needed = ALERT_DEBOUNCE_OFF_TICKS
+                    continuing = pending_idx < cur_idx
+                    target_idx = max(pending_idx, cand_idx) if continuing else cand_idx
+                self._frost_risk_pending_tier = order[target_idx]
+                self._frost_risk_pending_ticks = self._frost_risk_pending_ticks + 1 if continuing else 1
                 if self._frost_risk_pending_ticks >= needed:
-                    cur_state = candidate
-                    self._frost_risk_state = candidate
-                    self._frost_risk_pending_dir = None
+                    cur_state = order[target_idx]
+                    self._frost_risk_state = cur_state
+                    self._frost_risk_pending_tier = None
                     self._frost_risk_pending_ticks = 0
 
         data[KEY_FROST_RISK] = cur_state
@@ -5509,6 +5508,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_AQI] = aq.get("aqi")
             data[KEY_AQI_LEVEL] = aq.get("aqi_level")
             data[KEY_AQI_SCALE] = aq.get("aqi_scale")
+            data["_aqi_color"] = aq.get("aqi_color")
+            data["_aqi_source"] = aq.get("aqi_source")
+            data["_aqi_missing_pollutants"] = aq.get("missing_pollutants")
+            data["_aqi_so2"] = aq.get("so2")
             data[KEY_PM2_5] = aq.get("pm2_5")
             data[KEY_PM10] = aq.get("pm10")
             data[KEY_NO2] = aq.get("no2")
@@ -6511,7 +6514,16 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         current_params = []
         if self.aqi_enabled:
             current_params.extend(
-                ["pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide", "ozone", "european_aqi", "us_aqi"]
+                [
+                    "pm10",
+                    "pm2_5",
+                    "carbon_monoxide",
+                    "nitrogen_dioxide",
+                    "ozone",
+                    "sulphur_dioxide",
+                    "european_aqi",
+                    "us_aqi",
+                ]
             )
         if self.pollen_enabled:
             current_params.extend(
@@ -6534,43 +6546,53 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # AQI side
             if self.aqi_enabled:
-                pm25 = cur.get("pm2_5")
-                pm10 = cur.get("pm10")
-                no2 = cur.get("nitrogen_dioxide")
-                ozone = cur.get("ozone")
-                co = cur.get("carbon_monoxide")
+
+                def reading(key: str) -> float | None:
+                    try:
+                        value = float(cur.get(key))
+                    except (TypeError, ValueError, OverflowError):
+                        return None
+                    return value if math.isfinite(value) and value >= 0 else None
+
+                concentrations = {
+                    "pm2_5": reading("pm2_5"),
+                    "pm10": reading("pm10"),
+                    "no2": reading("nitrogen_dioxide"),
+                    "ozone": reading("ozone"),
+                    "so2": reading("sulphur_dioxide"),
+                    "co": reading("carbon_monoxide"),
+                }
                 scale = resolve_aqi_scale(
                     getattr(self, "aqi_scale", DEFAULT_AQI_SCALE),
                     lat,
                     lon,
                     getattr(self, "climate_region", None),
                 )
-                aqi_val: int | None = None
-                if scale == "european":
-                    raw_eaqi = cur.get("european_aqi")
-                    if raw_eaqi is not None:
-                        with contextlib.suppress(TypeError, ValueError):
-                            aqi_val = round(float(raw_eaqi))
-                    if aqi_val is None:
-                        aqi_val = calculate_european_aqi(pm25, pm10, no2, ozone)
-                    level = european_aqi_level(aqi_val) if aqi_val is not None else None
+                european = scale == "european"
+                raw_aqi = reading(f"{scale}_aqi")
+                missing_pollutants = []
+                if raw_aqi is not None:
+                    aqi_val = round(raw_aqi)
+                    source = "open_meteo"
                 else:
-                    raw_us = cur.get("us_aqi")
-                    if raw_us is not None:
-                        with contextlib.suppress(TypeError, ValueError):
-                            aqi_val = round(float(raw_us))
-                    if aqi_val is None:
-                        aqi_val = calculate_us_aqi(pm25, pm10)
-                    level = aqi_level(aqi_val) if aqi_val is not None else None
+                    pollutant_keys = ("pm2_5", "pm10", "no2", "ozone", "so2") if european else ("pm2_5", "pm10")
+                    inputs = {key: concentrations[key] for key in pollutant_keys}
+                    calculate = calculate_european_aqi if european else calculate_us_aqi
+                    aqi_val = calculate(**inputs)
+                    missing_pollutants = [key for key, value in inputs.items() if value is None]
+                    source = "local_estimate" if aqi_val is not None else None
+                level = color = None
+                if aqi_val is not None:
+                    level = (european_aqi_level if european else aqi_level)(aqi_val)
+                    color = (european_aqi_color if european else aqi_color)(aqi_val)
                 self._aqi_cache = {
-                    "pm2_5": pm25,
-                    "pm10": pm10,
-                    "no2": no2,
-                    "ozone": ozone,
-                    "co": co,
+                    **concentrations,
                     "aqi": aqi_val,
                     "aqi_level": level,
                     "aqi_scale": scale,
+                    "aqi_color": color,
+                    "aqi_source": source,
+                    "missing_pollutants": missing_pollutants,
                     "fetched_at": dt_util.utcnow().isoformat(),
                 }
                 self.runtime.last_aqi_fetch = dt_util.utcnow()

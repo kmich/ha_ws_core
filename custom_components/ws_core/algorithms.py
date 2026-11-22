@@ -17,6 +17,7 @@ References:
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -1666,40 +1667,13 @@ def aqi_color(aqi: int) -> str:
     return "#7E0023"
 
 
-# European Environment Agency (EEA) European Air Quality Index (EAQI), mapped
-# continuously onto the 0-100+ scale used by Open-Meteo (20 points per band).
-_EAQI_PM25_BREAKPOINTS = [
-    (0.0, 10.0, 0, 20),
-    (10.0, 20.0, 20, 40),
-    (20.0, 25.0, 40, 60),
-    (25.0, 50.0, 60, 80),
-    (50.0, 75.0, 80, 100),
-    (75.0, 800.0, 100, 500),
-]
-_EAQI_PM10_BREAKPOINTS = [
-    (0.0, 20.0, 0, 20),
-    (20.0, 40.0, 20, 40),
-    (40.0, 50.0, 40, 60),
-    (50.0, 100.0, 60, 80),
-    (100.0, 150.0, 80, 100),
-    (150.0, 1200.0, 100, 500),
-]
-_EAQI_NO2_BREAKPOINTS = [
-    (0.0, 40.0, 0, 20),
-    (40.0, 90.0, 20, 40),
-    (90.0, 120.0, 40, 60),
-    (120.0, 230.0, 60, 80),
-    (230.0, 340.0, 80, 100),
-    (340.0, 1000.0, 100, 500),
-]
-_EAQI_OZONE_BREAKPOINTS = [
-    (0.0, 50.0, 0, 20),
-    (50.0, 100.0, 20, 40),
-    (100.0, 130.0, 40, 60),
-    (130.0, 240.0, 60, 80),
-    (240.0, 380.0, 80, 100),
-    (380.0, 800.0, 100, 500),
-]
+# EEA's revised hourly concentration thresholds (ETC HE Report 2024/17).
+# Open-Meteo maps these thresholds to index values 0, 20, 40, 60, 80 and 100.
+_EAQI_PM25_BREAKPOINTS = (0, 5, 15, 50, 90, 140)
+_EAQI_PM10_BREAKPOINTS = (0, 15, 45, 120, 195, 270)
+_EAQI_NO2_BREAKPOINTS = (0, 10, 25, 60, 100, 150)
+_EAQI_OZONE_BREAKPOINTS = (0, 60, 100, 120, 160, 180)
+_EAQI_SO2_BREAKPOINTS = (0, 20, 40, 125, 190, 275)
 
 _EUROPEAN_CLIMATE_REGIONS = frozenset(("atlantic_europe", "continental_europe", "mediterranean", "scandinavia"))
 
@@ -1730,12 +1704,11 @@ def resolve_aqi_scale(
     return "european" if is_european_location(lat, lon, climate_region) else "us"
 
 
-def _eaqi_subindex(value: float, breakpoints: list[tuple[float, float, int, int]]) -> int:
-    c = max(0.0, float(value))
-    for c_lo, c_hi, i_lo, i_hi in breakpoints:
-        if c <= c_hi:
-            return round(((i_hi - i_lo) / (c_hi - c_lo)) * (c - c_lo) + i_lo)
-    return 500
+def _eaqi_subindex(value: float, breakpoints: tuple[int, ...]) -> int:
+    # Use the last band's slope to extrapolate above 100, as Open-Meteo does.
+    upper = min(bisect_right(breakpoints, value), len(breakpoints) - 1)
+    low, high = breakpoints[upper - 1], breakpoints[upper]
+    return round(20 * (upper - 1 + (value - low) / (high - low)))
 
 
 def calculate_european_aqi(
@@ -1743,11 +1716,12 @@ def calculate_european_aqi(
     pm10: float | None,
     no2: float | None = None,
     ozone: float | None = None,
+    so2: float | None = None,
 ) -> int | None:
-    """European AQI (0-100+) - highest sub-index of PM2.5, PM10, NO₂ and O₃.
+    """European AQI (0-100+) from the highest available pollutant sub-index.
 
-    Uses EEA concentration bands mapped linearly (20 points per category) to match
-    Open-Meteo's continuous ``european_aqi`` scale. Returns None when all inputs are None.
+    Uses EEA hourly concentration bands for PM2.5, PM10, NO₂, O₃ and SO₂,
+    mapped linearly to Open-Meteo's continuous ``european_aqi`` scale.
     """
     sub: list[int] = []
     for raw, bps in (
@@ -1755,9 +1729,10 @@ def calculate_european_aqi(
         (pm10, _EAQI_PM10_BREAKPOINTS),
         (no2, _EAQI_NO2_BREAKPOINTS),
         (ozone, _EAQI_OZONE_BREAKPOINTS),
+        (so2, _EAQI_SO2_BREAKPOINTS),
     ):
-        if raw is not None:
-            sub.append(_eaqi_subindex(float(raw), bps))
+        if raw is not None and math.isfinite(raw) and raw >= 0:
+            sub.append(_eaqi_subindex(raw, bps))
     return max(sub) if sub else None
 
 

@@ -109,6 +109,22 @@ def test_temperature_tile_missing_feels_like_uses_temperature_and_its_unit():
     assert "NaN" not in html
 
 
+@pytest.mark.parametrize(
+    ("scale", "level", "color", "source", "expected_level", "expected_scale"),
+    [
+        ("european", "very_poor", "#960032", "local_estimate", "Very Poor", "EAQI estimate"),
+        ("us", "moderate", "#FFFF00", "open_meteo", "Moderate", "AQI"),
+    ],
+)
+def test_air_quality_tile_uses_sensor_scale_and_category(scale, level, color, source, expected_level, expected_scale):
+    eid = "sensor.ws_air_quality_index"
+    states = {eid: _state(90, scale=scale, level=level, color=color, source=source)}
+    html = _render(_template(eid, field="details"), states, eid)
+    assert f">{expected_level}</div>" in html
+    assert f" {expected_scale}</span>" in html
+    assert f"color:{color};" in html
+
+
 def test_summary_preserves_individual_units_and_zero():
     templates = re.findall(r"\[\[\[.*?\]\]\]", SOURCE.read_text(encoding="utf-8"), re.S)
     template = next(t for t in templates if "const location =" in t)

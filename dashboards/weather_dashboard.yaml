@@ -3250,17 +3250,23 @@ views:
                   custom_fields:
                     details: |
                       [[[
-                        var aqi = parseFloat((states['sensor.ws_air_quality_index'] || {}).state);
-                        var level = (entity && entity.attributes && entity.attributes.level) || '';
-                        if (!level || level === 'None' || level === 'unknown') {
-                          level = isNaN(aqi) ? '--' : aqi > 300 ? 'Hazardous' : aqi > 200 ? 'Very Unhealthy' : aqi > 150 ? 'Unhealthy' : aqi > 100 ? 'Unhealthy for Sensitive Groups' : aqi > 50 ? 'Moderate' : 'Good';
-                        }
+                        var aqi = parseFloat(entity && entity.state);
+                        var attrs = (entity && entity.attributes) || {};
+                        var levels = {
+                          good: 'Good', fair: 'Fair', moderate: 'Moderate', poor: 'Poor',
+                          very_poor: 'Very Poor', extremely_poor: 'Extremely Poor',
+                          unhealthy_sensitive: 'Unhealthy for Sensitive Groups',
+                          unhealthy: 'Unhealthy', very_unhealthy: 'Very Unhealthy', hazardous: 'Hazardous'
+                        };
+                        var level = Number.isFinite(aqi) ? (levels[attrs.level] || '--') : '--';
+                        var scale = attrs.scale === 'european' ? 'EAQI' : 'AQI';
+                        if (attrs.source === 'local_estimate') scale += ' estimate';
                         var pm25 = parseFloat((states['sensor.ws_pm2_5'] || {}).state);
                         var pm10 = parseFloat((states['sensor.ws_pm10'] || {}).state);
                         var fmt = function(v) { return isNaN(v) ? '--' : v.toFixed(1); };
-                        var aqiColor = aqi >= 300 ? '#7c3aed' : aqi >= 200 ? '#dc2626' : aqi >= 150 ? '#f97316' : aqi >= 100 ? '#f59e0b' : aqi >= 50 ? '#facc15' : '#10b981';
+                        var aqiColor = Number.isFinite(aqi) && /^#[0-9a-f]{6}$/i.test(attrs.color) ? attrs.color : '#9ca3af';
                         return '<div style="margin-top:8px;">'
-                          + '<div style="font-size:36px;font-weight:200;color:' + aqiColor + ';">' + (!isNaN(aqi) ? aqi.toFixed(0) : '--') + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> AQI</span></div>'
+                          + '<div style="font-size:36px;font-weight:200;color:' + aqiColor + ';">' + (Number.isFinite(aqi) ? aqi.toFixed(0) : '--') + '<span style="font-size:14px;color:rgba(255,255,255,0.5);"> ' + scale + '</span></div>'
                           + '<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:8px;background:' + aqiColor + '22;border:1px solid ' + aqiColor + '55;font-size:13px;font-weight:600;color:' + aqiColor + ';">' + level + '</div>'
                           + '<div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:10px;line-height:1.8;">'
                           + '<div><strong>PM2.5:</strong> ' + fmt(pm25) + ' \u03bcg/m\u00b3</div>'

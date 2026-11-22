@@ -16,6 +16,7 @@ except Exception:  # pragma: no cover
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
+    UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfPressure,
     UnitOfSpeed,
@@ -25,6 +26,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import DistanceConverter
 
 from .algorithms import calculate_apparent_temperature
 from .const import (
@@ -379,8 +381,9 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                 return api_cond
         return None
 
-    @staticmethod
-    def _add_optional_forecast_fields(entry: dict[str, Any], item: dict[str, Any], *, include_daily: bool) -> None:
+    def _add_optional_forecast_fields(
+        self, entry: dict[str, Any], item: dict[str, Any], *, include_daily: bool
+    ) -> None:
         if include_daily:
             if item.get("cloud_cover") is not None:
                 entry["cloud_coverage"] = item["cloud_cover"]
@@ -389,7 +392,11 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         if item.get("pressure_hpa") is not None:
             entry["native_pressure"] = item["pressure_hpa"]
         if item.get("visibility_km") is not None:
-            entry["visibility"] = item["visibility_km"]
+            # Home Assistant converts forecast pressure, but passes visibility through.
+            entry["visibility"] = round(
+                DistanceConverter.convert(item["visibility_km"], UnitOfLength.KILOMETERS, self._visibility_unit),
+                2,
+            )
         if item.get("uv_index") is not None:
             entry["uv_index"] = item["uv_index"]
         if item.get("wind_bearing") is not None:

@@ -922,6 +922,7 @@ class WeatherWindowsEngine:
         if samples and now_ts < samples[-1][0]:
             samples.clear()  # the clock went back: the history no longer lines up
         if live_gust_ms is None:
+            samples.clear()  # an unavailable reading also resets every live hold
             return
         if samples and samples[-1][0] == now_ts:
             samples[-1] = (now_ts, live_gust_ms)  # several profiles evaluate the same reading
