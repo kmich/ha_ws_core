@@ -244,6 +244,15 @@ class TestV3Services:
                 )
 
         # 5. Unknown profile_id, unknown entry_id, and contradictory limits raise ServiceValidationError
+        for limits in ({"max_rain_prob_pct": 150}, {"max_humidity_pct": -10}, {"max_wind_gust_kmh": -5}):
+            with pytest.raises(ServiceValidationError):
+                await hass.services.async_call(
+                    DOMAIN,
+                    SERVICE_GET_WEATHER_WINDOWS,
+                    {"limits": limits},
+                    blocking=True,
+                    return_response=True,
+                )
         with pytest.raises(ServiceValidationError):
             await hass.services.async_call(
                 DOMAIN,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections import deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, datetime, timedelta, tzinfo
@@ -55,8 +56,8 @@ _ONE_HOUR = timedelta(hours=1)
 _LIVE_GUST_ON_HOLD_S = 180.0
 _LIVE_GUST_OFF_HOLD_S = 300.0
 _LIVE_HOLD_STALE_GAP_S = 1800.0
-# Station gusts kept for actions: covers one onset (3 min) plus one clear hold (5 min).
-_GUST_SAMPLE_WINDOW_S = 600.0
+# Record the onset and clear holds, plus the freshness interval across an outage.
+_GUST_SAMPLE_WINDOW_S = _LIVE_HOLD_STALE_GAP_S + _LIVE_GUST_ON_HOLD_S + _LIVE_GUST_OFF_HOLD_S
 _NON_LIMIT_FIELDS = frozenset(("profile_id", "name", "description", "enabled"))
 
 _NUMERIC_LIMIT_FIELDS: tuple[str, ...] = (
@@ -107,8 +108,10 @@ REASON_NIGHTTIME = "nighttime"
 REASON_MISSING_DATA = "missing_data"
 REASON_NOT_ASSESSED_BY_PROVIDER = "not_assessed_by_provider"
 REASON_INSUFFICIENT_HORIZON = "insufficient_horizon"
+REASON_SHORT_WINDOW = "short_window"
 REASON_FORECAST_UNAVAILABLE = "forecast_unavailable"
 REASON_FORECAST_TOO_COARSE = "forecast_too_coarse"
+REASON_FORECAST_TOO_FINE = "forecast_too_fine"
 REASON_HORIZON_TRUNCATED = "horizon_truncated"
 
 
@@ -303,6 +306,10 @@ def apply_profile_overrides(
             raise ValueError(f"{field_name} must be a finite number") from err
         if not math.isfinite(num):
             raise ValueError(f"{field_name} must be finite")
+        if field_name.endswith("_pct") and not 0 <= num <= 100:
+            raise ValueError(f"{field_name} must be between 0 and 100")
+        if (field_name.endswith("_kmh") or field_name == "max_rain_mm") and num < 0:
+            raise ValueError(f"{field_name} must be non-negative")
         changes[field_name] = num
     if "require_daylight" in overrides and overrides["require_daylight"] is not None:
         changes["require_daylight"] = bool(overrides["require_daylight"])
@@ -356,6 +363,7 @@ class WeatherDecisionResult:
     next_start: str | None = None
     next_end: str | None = None
     duration_h: int | float | None = None
+    remaining_h: int | float | None = None
     horizon_hours: int = 0
     is_truncated: bool = False
     reason_codes: list[str] = field(default_factory=list)
@@ -375,6 +383,7 @@ class WeatherDecisionResult:
             "next_start": self.next_start,
             "next_end": self.next_end,
             "duration_h": self.duration_h,
+            "remaining_h": self.remaining_h,
             "horizon_hours": self.horizon_hours,
             "is_truncated": self.is_truncated,
             "reason_codes": self.reason_codes,
@@ -446,9 +455,7 @@ def parse_forecast_slot_utc(
     if raw_dt is None or raw_dt == "":
         return None
     if isinstance(raw_dt, datetime):
-        if raw_dt.tzinfo is None:
-            raw_dt = raw_dt.replace(tzinfo=display_tz)
-        return raw_dt.astimezone(UTC)
+        return _forecast_datetime_utc(raw_dt, display_tz)
     if isinstance(raw_dt, (int, float)):
         if isinstance(raw_dt, bool) or not math.isfinite(raw_dt):
             return None
@@ -459,19 +466,17 @@ def parse_forecast_slot_utc(
     parsed = _parse_raw_dt_str(raw_dt if type(raw_dt) is str else str(raw_dt), dt_cache)
     if parsed is None:
         return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=display_tz)
-    return parsed.astimezone(UTC)
+    return _forecast_datetime_utc(parsed, display_tz)
 
 
-def _localize_repeated_naive(parsed: datetime, display_tz: tzinfo) -> datetime:
-    """UTC instant for a naive local time seen a second time in one forecast.
-
-    When clocks go back, a local hour such as 02:00 happens twice. A forecast that sends
-    naive local times lists it twice; the second copy is the later (``fold=1``) instant.
-    Outside that hour both folds are the same instant, so the row is a true duplicate.
-    """
-    return parsed.replace(tzinfo=display_tz, fold=1).astimezone(UTC)
+def _forecast_datetime_utc(parsed: datetime, display_tz: tzinfo, *, fold: int = 0) -> datetime | None:
+    """Preserve repeated local hours and reject nonexistent spring-forward hours."""
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(UTC)
+    if display_tz is UTC:
+        return parsed.replace(tzinfo=UTC)
+    instant = parsed.replace(tzinfo=display_tz, fold=fold).astimezone(UTC)
+    return instant if instant.astimezone(display_tz).replace(tzinfo=None) == parsed else None
 
 
 def _collect_horizon_slots(
@@ -503,7 +508,9 @@ def _collect_horizon_slots(
                     repeated_naive = again
             seen_raw.add(raw_dt)
         if repeated_naive is not None:
-            slot_utc = _localize_repeated_naive(repeated_naive, display_tz)
+            slot_utc = _forecast_datetime_utc(repeated_naive, display_tz, fold=1)
+            if slot_utc is None:
+                continue
             slot_ts = slot_utc.timestamp()
             display_iso = slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
         elif type(raw_dt) is str and slot_time_cache is not None:
@@ -511,16 +518,12 @@ def _collect_horizon_slots(
             cached_t = slot_time_cache.get(cache_key, _MISSING)
             if cached_t is _MISSING:
                 parsed = _parse_raw_dt_str(raw_dt, dt_cache)
-                if parsed is None:
+                slot_utc = _forecast_datetime_utc(parsed, display_tz) if parsed is not None else None
+                if slot_utc is None:
                     if len(slot_time_cache) > 512:
                         slot_time_cache.clear()
                     slot_time_cache[cache_key] = None
                     continue
-                slot_utc = (
-                    parsed.replace(tzinfo=display_tz).astimezone(UTC)
-                    if parsed.tzinfo is None
-                    else parsed.astimezone(UTC)
-                )
                 slot_ts = slot_utc.timestamp()
                 display_iso = slot_utc.isoformat() if is_utc_display else slot_utc.astimezone(display_tz).isoformat()
                 if len(slot_time_cache) > 512:
@@ -568,6 +571,7 @@ def _extract_contiguous_windows(
     last_slot_ts: float,
     display_tz: tzinfo,
     is_utc_display: bool,
+    remembered: dict[str, Any] | None,
 ) -> list[tuple[float, float, dict[str, Any]]]:
     """Extract contiguous suitable/potential intervals meeting ``min_span_s``."""
     out: list[tuple[float, float, dict[str, Any]]] = []
@@ -589,7 +593,15 @@ def _extract_contiguous_windows(
         s_ts: float = s_slot[1]
         raw_e_ts: float = e_slot[1] + 3600.0
         e_ts = raw_e_ts if raw_e_ts <= horizon_end_ts else horizon_end_ts
-        span_s = e_ts - (s_ts if s_ts >= now_ts else now_ts)
+        start_iso = s_slot[2]
+        if (
+            remembered is not None
+            and s_ts <= now_ts < e_ts
+            and remembered["start_ts"] < s_ts
+            and remembered["end_ts"] >= s_ts - 1.0
+        ):
+            s_ts, start_iso = remembered["start_ts"], remembered["start_iso"]
+        span_s = e_ts - s_ts
         if span_s >= min_span_s:
             raw_h = round(span_s / 3600.0, 2)
             dur_h: int | float = int(raw_h) if raw_h.is_integer() else raw_h
@@ -604,9 +616,10 @@ def _extract_contiguous_windows(
                     s_ts,
                     e_ts,
                     {
-                        "start_iso": s_slot[2],
+                        "start_iso": start_iso,
                         "end_iso": end_iso,
                         "duration_h": dur_h,
+                        "remaining_h": round((e_ts - max(s_ts, now_ts)) / 3600.0, 2),
                         "is_truncated": e_slot[1] == last_slot_ts or raw_e_ts > horizon_end_ts,
                     },
                 )
@@ -643,7 +656,7 @@ class WeatherWindowsEngine:
         self._parse_dt_cache: dict[str, datetime | None] = {}
         self._slot_time_cache: dict[tuple[str, tzinfo], tuple[datetime, float, str] | None] = {}
         self._gust_hold_state: dict[str, dict[str, Any]] = {}
-        self._gust_samples: list[tuple[float, float]] = []
+        self._gust_samples: deque[tuple[float, float | None]] = deque()
         self._open_window_start: dict[str, dict[str, Any]] = {}
 
     def _sync_solar_cache(self, lat_f: float, lon_f: float) -> dict[datetime, float]:
@@ -774,7 +787,6 @@ class WeatherWindowsEngine:
                     wind_kmh = _as_finite_float(item.get("wind_kmh"))
                     gust_kmh = _as_finite_float(item.get("gust_kmh"))
                     cloud_cover = _as_finite_float(item.get("cloud_cover"))
-                    rain_prob_int = int(rain_prob) if rain_prob is not None else None
                     is_current = slot_ts <= now_ts < raw_end_ts
                     if is_current and item.get("estimated_from_next_hour"):
                         current_hour_estimated = True
@@ -800,7 +812,6 @@ class WeatherWindowsEngine:
                             slot_ts,
                             display_iso,
                             temp_c,
-                            rain_prob_int,
                             rain_prob,
                             rain_mm,
                             humidity,
@@ -921,23 +932,26 @@ class WeatherWindowsEngine:
         samples = self._gust_samples
         if samples and now_ts < samples[-1][0]:
             samples.clear()  # the clock went back: the history no longer lines up
-        if live_gust_ms is None:
-            samples.clear()  # an unavailable reading also resets every live hold
-            return
         if samples and samples[-1][0] == now_ts:
             samples[-1] = (now_ts, live_gust_ms)  # several profiles evaluate the same reading
         else:
             samples.append((now_ts, live_gust_ms))
         cutoff = now_ts - _GUST_SAMPLE_WINDOW_S
         while samples and samples[0][0] < cutoff:
-            samples.pop(0)
+            samples.popleft()
 
-    def _replay_gust_hold(self, threshold: float, live_gust_ms: float, now_ts: float) -> bool:
+    def _replay_gust_hold(self, threshold: float, live_gust_ms: float | None, now_ts: float) -> bool:
         """Hold state for ``threshold`` rebuilt from the recent station gusts plus this reading."""
         readings = [(ts, g) for ts, g in self._gust_samples if ts < now_ts]
         readings.append((now_ts, live_gust_ms))
         state: dict[str, Any] | None = None
         for ts, gust in readings:
+            if gust is None:
+                if self._gust_hold_fresh(state, threshold, ts):
+                    state["exceeded_since"] = state["clear_since"] = None
+                else:
+                    state = None
+                continue
             exceeds = (gust * 3.6) > threshold
             if state is None or (ts - state["last_ts"]) > _LIVE_HOLD_STALE_GAP_S:
                 state = self._new_gust_hold(threshold, exceeds, ts)
@@ -961,63 +975,41 @@ class WeatherWindowsEngine:
         caller is judged on the same sustained evidence.
         """
         threshold = profile.max_wind_gust_kmh
+        if update:
+            self._record_gust_sample(live_gust_ms, now_ts)
+        if threshold is None:
+            if update:
+                self._gust_hold_state.pop(profile.profile_id, None)
+            return False
+        state = self._gust_hold_state.get(profile.profile_id)
+        fresh = self._gust_hold_fresh(state, threshold, now_ts)
         if not update:
-            if live_gust_ms is None or threshold is None:
-                return False
-            state = self._gust_hold_state.get(profile.profile_id)
-            if self._gust_hold_fresh(state, threshold, now_ts):
+            return bool(state["active"]) if fresh else self._replay_gust_hold(threshold, live_gust_ms, now_ts)
+        if live_gust_ms is None:
+            if fresh:
+                # An outage counts toward neither a sustained gust nor a calm hold.
+                state["exceeded_since"] = state["clear_since"] = None
                 return bool(state["active"])
-            return self._replay_gust_hold(threshold, live_gust_ms, now_ts)
-        self._record_gust_sample(live_gust_ms, now_ts)
-        if live_gust_ms is None or threshold is None:
             self._gust_hold_state.pop(profile.profile_id, None)
             return False
 
         exceeds = (live_gust_ms * 3.6) > threshold
-        state = self._gust_hold_state.get(profile.profile_id)
-        if not self._gust_hold_fresh(state, threshold, now_ts):
+        if not fresh:
             self._gust_hold_state[profile.profile_id] = self._new_gust_hold(threshold, exceeds, now_ts)
             return False
         self._step_gust_hold(state, exceeds, now_ts)
         return bool(state["active"])
 
-    def _stable_open_start(
-        self,
-        profile_id: str,
-        window: tuple[float, float, dict[str, Any]],
-        now_ts: float,
-        *,
-        update: bool,
-        limits: tuple[Any, ...],
-    ) -> tuple[float, str]:
-        """Return the start of a window that is open now, remembered across hourly slot drops.
-
-        Elapsed hours leave the horizon, so an open window would otherwise report the start of
-        the current hour. The remembered start is reused only while the window has stayed open
-        without a break (its last known end reaches this window's start, and it was seen recently),
-        and only for the limits it was found with: an action with other limits never borrows the
-        sensor's earlier start, since those hours may not have suited its limits.
-        """
-        start_ts, end_ts, w = window
-        chosen = (start_ts, str(w["start_iso"]))
+    def _remembered_window(self, profile_id: str, now_ts: float, limits: tuple[Any, ...]) -> dict[str, Any] | None:
+        """Use a recent window only for evaluations with the same limits."""
         prev = self._open_window_start.get(profile_id)
         if (
             prev is not None
             and prev.get("limits") == limits
-            and prev["start_ts"] < start_ts
-            and prev["end_ts"] >= start_ts - 1.0
             and 0.0 <= now_ts - prev["last_ts"] <= _LIVE_HOLD_STALE_GAP_S
         ):
-            chosen = (prev["start_ts"], prev["start_iso"])
-        if update:
-            self._open_window_start[profile_id] = {
-                "start_ts": chosen[0],
-                "start_iso": chosen[1],
-                "end_ts": end_ts,
-                "last_ts": now_ts,
-                "limits": limits,
-            }
-        return chosen
+            return prev
+        return None
 
     @staticmethod
     def _limits_key(profile: WeatherWindowProfile) -> tuple[Any, ...]:
@@ -1079,68 +1071,62 @@ class WeatherWindowsEngine:
         prepared_slots: list[tuple[Any, ...]] = prepared["slots"]
         available_slots = len(prepared_slots)
 
-        if not prepared_slots or available_slots < min(2, profile.min_duration_h):
-            if update_live_hold:
-                self._open_window_start.pop(profile.profile_id, None)
-            if not prepared["has_forecast_rows"]:
-                reason_code, reason_key = REASON_FORECAST_UNAVAILABLE, "forecast_unavailable"
-            elif not prepared_slots:
-                reason_code, reason_key = REASON_INSUFFICIENT_HORIZON, "no_horizon_in_window"
-            else:
-                reason_code, reason_key = REASON_INSUFFICIENT_HORIZON, "insufficient_data"
-            payload = {
-                "profile_id": profile.profile_id,
-                "status": STATUS_UNKNOWN,
-                "evaluated_at": evaluated_at_iso,
-                "next_start": None,
-                "next_end": None,
-                "duration_h": None,
-                "horizon_hours": min(available_slots, MAX_HORIZON_HOURS),
-                "is_truncated": False,
-                "reason_codes": [reason_code],
-                "reasons_text": [self._txt(reason_key)],
-                "not_assessed_by_provider": [],
-                "evaluated_limits": limits_dict,
-                "windows": [],
-                "slots": [],
-                "data_quality": {"available_slots": available_slots},
-            }
-            return payload if as_dict else WeatherDecisionResult(**payload)
-
-        # Rows further apart than an hour (for example 3-hourly data) cannot be assessed as an
-        # hourly series: report unknown instead of rejecting every gap as unsuitable.
-        steps = [prepared_slots[i + 1][1] - prepared_slots[i][1] for i in range(available_slots - 1)]
-        coarse_steps = [st for st in steps if st > _HOURLY_STEP_TOLERANCE_S]
-        if steps and len(coarse_steps) * 2 > len(steps):
-            typical_h = round(sorted(steps)[len(steps) // 2] / 3600.0, 1)
-            typical_disp: int | float = int(typical_h) if typical_h.is_integer() else typical_h
-            if update_live_hold:
-                self._open_window_start.pop(profile.profile_id, None)
-            payload = {
-                "profile_id": profile.profile_id,
-                "status": STATUS_UNKNOWN,
-                "evaluated_at": evaluated_at_iso,
-                "next_start": None,
-                "next_end": None,
-                "duration_h": None,
-                "horizon_hours": min(available_slots, MAX_HORIZON_HOURS),
-                "is_truncated": False,
-                "reason_codes": [REASON_FORECAST_TOO_COARSE],
-                "reasons_text": [self._txt("forecast_too_coarse", hours=typical_disp)],
-                "not_assessed_by_provider": [],
-                "evaluated_limits": limits_dict,
-                "windows": [],
-                "slots": [],
-                "data_quality": {"available_slots": available_slots, "typical_step_h": typical_disp},
-            }
-            return payload if as_dict else WeatherDecisionResult(**payload)
-
         now_ts: float = prepared["now_ts"]
+        limits_key = self._limits_key(profile)
+        remembered = self._remembered_window(profile.profile_id, now_ts, limits_key)
+        live_rain_rate: float | None = prepared["live_rain_rate"]
+        live_gust_ms: float | None = prepared["live_gust_ms"]
+        gust_unavailable = profile.max_wind_gust_kmh is not None and live_gust_ms is None
+
+        live_blockers: list[str] = []
+        live_blocker_texts: list[str] = []
+        if (
+            live_rain_rate is not None
+            and (profile.max_rain_mm is not None or profile.max_rain_prob_pct is not None)
+            and live_rain_rate > max(0.05, float(profile.max_rain_mm or 0.0))
+        ):
+            live_blockers.append(REASON_CURRENTLY_RAINING)
+            live_blocker_texts.append(self._txt("currently_raining"))
+        if self._resolve_live_gust_active(profile, live_gust_ms, now_ts, update=update_live_hold):
+            live_blockers.append(REASON_CURRENT_GUST_HIGH)
+            live_blocker_texts.append(
+                self._txt("current_gust_high", limit=self._fmt_wind_limit(profile.max_wind_gust_kmh))
+            )
+
+        steps = [prepared_slots[i + 1][1] - prepared_slots[i][1] for i in range(available_slots - 1)]
+        unavailable_reason: tuple[str, str] | None = None
+        early_quality: dict[str, Any] = {"available_slots": available_slots, "gust_unavailable": gust_unavailable}
+        if not prepared["has_forecast_rows"]:
+            unavailable_reason = REASON_FORECAST_UNAVAILABLE, self._txt("forecast_unavailable")
+        elif not prepared_slots:
+            unavailable_reason = REASON_INSUFFICIENT_HORIZON, self._txt("no_horizon_in_window")
+        elif remembered is None and available_slots < min(2, profile.min_duration_h):
+            unavailable_reason = REASON_INSUFFICIENT_HORIZON, self._txt("insufficient_data")
+        elif any(step < 3599.0 for step in steps):
+            early_quality["typical_step_h"] = round(min(steps) / 3600.0, 2)
+            unavailable_reason = REASON_FORECAST_TOO_FINE, self._txt("forecast_too_fine")
+        elif sum(st > _HOURLY_STEP_TOLERANCE_S for st in steps) * 2 > len(steps):
+            typical_h = round(sorted(steps)[len(steps) // 2] / 3600.0, 1)
+            early_quality["typical_step_h"] = typical_h
+            unavailable_reason = REASON_FORECAST_TOO_COARSE, self._txt("forecast_too_coarse", hours=f"{typical_h:g}")
+
+        if unavailable_reason is not None:
+            code, message = unavailable_reason
+            payload = WeatherDecisionResult(
+                profile_id=profile.profile_id,
+                status=STATUS_UNSUITABLE if live_blockers else STATUS_UNKNOWN,
+                evaluated_at=evaluated_at_iso,
+                horizon_hours=min(available_slots, MAX_HORIZON_HOURS),
+                reason_codes=[*live_blockers, code],
+                reasons_text=[*live_blocker_texts, message],
+                evaluated_limits=limits_dict,
+                data_quality=early_quality,
+            )
+            return payload.to_dict() if as_dict else payload
+
         display_tz: tzinfo = prepared["display_tz"]
         horizon_end_utc: datetime = prepared["horizon_end_utc"]
         horizon_end_ts: float = prepared["horizon_end_ts"]
-        live_rain_rate: float | None = prepared["live_rain_rate"]
-        live_gust_ms: float | None = prepared["live_gust_ms"]
         avail: dict[str, bool] = prepared["available_vars"]
 
         # Bind limits to local variables for provider checks and inner loop
@@ -1164,6 +1150,16 @@ class WeatherWindowsEngine:
         has_gust = avail["gust_kmh"]
         has_cloud = avail["cloud_cover"]
 
+        substitutions: dict[str, str] = {}
+        if p_max_rp is not None and not has_rain_prob and has_rain_mm:
+            substitutions["max_rain_prob_pct"] = "max_rain_mm"
+            p_max_rm = 0.0 if p_max_rm is None else p_max_rm
+        if p_max_rm is not None and not has_rain_mm and has_rain_prob:
+            substitutions["max_rain_mm"] = "max_rain_prob_pct"
+            p_max_rp = 0.0 if p_max_rp is None else p_max_rp
+        reason_profile = (
+            replace(profile, max_rain_prob_pct=p_max_rp, max_rain_mm=p_max_rm) if substitutions else profile
+        )
         eval_rain_prob = p_max_rp is not None and has_rain_prob
         eval_rain_mm = p_max_rm is not None and has_rain_mm
         eval_min_h = p_min_h is not None and has_humidity
@@ -1174,10 +1170,15 @@ class WeatherWindowsEngine:
         eval_max_c = p_max_c is not None and has_cloud
 
         not_assessed_by_provider: list[str] = []
-        if p_max_rp is not None and not has_rain_prob and p_max_rm is None:
+        if p_max_rp is not None and not has_rain_prob:
             not_assessed_by_provider.append("max_rain_prob_pct")
-        if p_max_rm is not None and not has_rain_mm and p_max_rp is None:
+        if p_max_rm is not None and not has_rain_mm:
             not_assessed_by_provider.append("max_rain_mm")
+        if not avail["temp_c"]:
+            if p_min_t is not None:
+                not_assessed_by_provider.append("min_temp_c")
+            if p_max_t is not None:
+                not_assessed_by_provider.append("max_temp_c")
         if not has_humidity:
             if p_min_h is not None:
                 not_assessed_by_provider.append("min_humidity_pct")
@@ -1193,27 +1194,14 @@ class WeatherWindowsEngine:
         if p_max_c is not None and not has_cloud:
             not_assessed_by_provider.append("max_cloud_cover_pct")
 
-        # Precompute live station blockers without embedding volatile numeric readings
-        live_blockers: list[str] = []
-        live_blocker_texts: list[str] = []
-        if (
-            live_rain_rate is not None
-            and (p_max_rm is not None or p_max_rp is not None)
-            and live_rain_rate > max(0.05, float(p_max_rm or 0.0))
-        ):
-            live_blockers.append(REASON_CURRENTLY_RAINING)
-            live_blocker_texts.append(self._txt("currently_raining"))
-
-        if self._resolve_live_gust_active(profile, live_gust_ms, now_ts, update=update_live_hold):
-            live_blockers.append(REASON_CURRENT_GUST_HIGH)
-            live_blocker_texts.append(self._txt("current_gust_high", limit=self._fmt_wind_limit(p_max_g)))
-
         slot_dicts: list[dict[str, Any]] = []
         suit_flags: list[bool] = []
         forecast_suit_flags: list[bool] = []
         pot_flags: list[bool] = []
         unassessed_slots = 0
         current_slot_raw_end_ts: float | None = None
+        current_slot_blocked = False
+        current_slot_suitable = False
         has_forecast_limit_blocker = False
 
         for (
@@ -1221,7 +1209,6 @@ class WeatherWindowsEngine:
             _slot_ts,
             display_iso,
             temp_c,
-            rain_prob_int,
             rain_prob,
             rain_mm,
             humidity,
@@ -1238,14 +1225,12 @@ class WeatherWindowsEngine:
             if req_daylight and is_night:
                 reasons_slot.append(REASON_NIGHTTIME)
 
-            # Core required inputs per slot: temperature and at least one rain signal
+            # Only limits set on this profile require temperature or rain data.
             if temp_c is None:
                 if p_min_t is not None:
                     unassessed.append("min_temp_c")
                 if p_max_t is not None:
                     unassessed.append("max_temp_c")
-                if p_min_t is None and p_max_t is None:
-                    unassessed.append("temp_c")
             else:
                 if p_min_t is not None and temp_c < p_min_t:
                     reasons_slot.append(REASON_TOO_COLD)
@@ -1257,8 +1242,6 @@ class WeatherWindowsEngine:
                     unassessed.append("max_rain_prob_pct")
                 if p_max_rm is not None:
                     unassessed.append("max_rain_mm")
-                if p_max_rp is None and p_max_rm is None:
-                    unassessed.append("precip")
             else:
                 if eval_rain_prob:
                     if rain_prob is None:
@@ -1304,6 +1287,8 @@ class WeatherWindowsEngine:
 
             if reasons_slot:
                 has_forecast_limit_blocker = True
+                if is_current:
+                    current_slot_blocked = True
             if unassessed:
                 unassessed_slots += 1
                 reasons_slot.append(REASON_MISSING_DATA)
@@ -1322,6 +1307,8 @@ class WeatherWindowsEngine:
                     reasons_slot.append(REASON_SUITABLE)
 
             suit_flags.append(suitable)
+            if is_current:
+                current_slot_suitable = suitable
             forecast_suit_flags.append(forecast_suitable)
             pot_flags.append(suitable or (len(reasons_slot) == 1 and reasons_slot[0] == REASON_MISSING_DATA))
             slot_dicts.append(
@@ -1331,7 +1318,7 @@ class WeatherWindowsEngine:
                     "reasons": reasons_slot,
                     "unassessed_limits": unassessed,
                     "temp_c": temp_c,
-                    "rain_prob": rain_prob_int,
+                    "rain_prob": rain_prob,
                     "rain_mm": rain_mm,
                     "humidity": humidity,
                     "wind_kmh": wind_kmh,
@@ -1357,6 +1344,7 @@ class WeatherWindowsEngine:
             last_slot_ts,
             display_tz,
             is_utc_display,
+            remembered,
         )
         # A live blocker inside a forecast window that is open now interrupts that window. Report the
         # forecast window as it stands (start in the past, real end) instead of hiding it or
@@ -1374,6 +1362,7 @@ class WeatherWindowsEngine:
                 last_slot_ts,
                 display_tz,
                 is_utc_display,
+                remembered,
             )
             if forecast_bounds and forecast_bounds[0][0] <= now_ts < forecast_bounds[0][1]:
                 interrupted = forecast_bounds[0]
@@ -1393,6 +1382,7 @@ class WeatherWindowsEngine:
                 last_slot_ts,
                 display_tz,
                 is_utc_display,
+                remembered,
             )
 
         # Formulate decision status and next suitable window
@@ -1400,6 +1390,7 @@ class WeatherWindowsEngine:
         next_start: str | None = None
         next_end: str | None = None
         duration_h: int | float | None = None
+        remaining_h: int | float | None = None
         is_truncated = False
         reasons: list[str] = []
         reasons_text: list[str] = []
@@ -1412,6 +1403,7 @@ class WeatherWindowsEngine:
             next_start = iw["start_iso"]
             next_end = iw["end_iso"]
             duration_h = iw["duration_h"]
+            remaining_h = iw["remaining_h"]
             is_truncated = iw["is_truncated"]
             reasons.extend(live_blockers)
             reasons_text.extend(live_blocker_texts)
@@ -1425,6 +1417,7 @@ class WeatherWindowsEngine:
                 next_start = w0["start_iso"]
                 next_end = w0["end_iso"]
                 duration_h = w0["duration_h"]
+                remaining_h = w0["remaining_h"]
                 is_truncated = w0["is_truncated"]
                 reasons.append(REASON_SUITABLE)
                 reasons_text.append(
@@ -1437,6 +1430,7 @@ class WeatherWindowsEngine:
                 next_start = w0["start_iso"]
                 next_end = w0["end_iso"]
                 duration_h = w0["duration_h"]
+                remaining_h = w0["remaining_h"]
                 is_truncated = w0["is_truncated"]
                 reasons.append(REASON_MISSING_DATA)
                 reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
@@ -1447,6 +1441,7 @@ class WeatherWindowsEngine:
                 next_start = w0["start_iso"]
                 next_end = w0["end_iso"]
                 duration_h = w0["duration_h"]
+                remaining_h = w0["remaining_h"]
                 is_truncated = w0["is_truncated"]
                 if live_blockers:
                     reasons.extend(live_blockers)
@@ -1469,7 +1464,7 @@ class WeatherWindowsEngine:
                 abs((prepared_slots[i + 1][1] - prepared_slots[i][1]) - 3600.0) > 1.0
                 for i in range(available_slots - 1)
             )
-            contiguous_span_s = min(last_slot_ts + 3600.0, horizon_end_ts) - max(prepared_slots[0][1], now_ts)
+            contiguous_span_s = min(last_slot_ts + 3600.0, horizon_end_ts) - prepared_slots[0][1]
             has_limit_blocker = has_forecast_limit_blocker or bool(live_blockers)
             short_horizon_only = (
                 not has_limit_blocker
@@ -1481,7 +1476,7 @@ class WeatherWindowsEngine:
                 status = STATUS_UNKNOWN
                 reasons.append(REASON_INSUFFICIENT_HORIZON)
                 reasons_text.append(self._format_blocker_text(REASON_INSUFFICIENT_HORIZON, profile))
-            elif not has_limit_blocker and unassessed_slots > 0:
+            elif (not live_blockers and has_slot_gap) or (not has_limit_blocker and unassessed_slots > 0):
                 status = STATUS_UNKNOWN
                 reasons.append(REASON_MISSING_DATA)
                 reasons_text.append(self._format_blocker_text(REASON_MISSING_DATA, profile))
@@ -1491,11 +1486,15 @@ class WeatherWindowsEngine:
                     reasons.extend(live_blockers)
                     reasons_text.extend(live_blocker_texts)
 
-                top_blockers = sorted(blocker_counts.keys(), key=lambda k: -blocker_counts[k])[:3]
+                top_blockers = (
+                    [REASON_SHORT_WINDOW]
+                    if current_slot_suitable
+                    else sorted(blocker_counts.keys(), key=lambda k: -blocker_counts[k])[:3]
+                )
                 for b in top_blockers:
                     if b not in reasons:
                         reasons.append(b)
-                        reasons_text.append(self._format_blocker_text(b, profile))
+                        reasons_text.append(self._format_blocker_text(b, reason_profile))
 
                 if not reasons and unassessed_slots > 0:
                     reasons.append(REASON_MISSING_DATA)
@@ -1515,16 +1514,21 @@ class WeatherWindowsEngine:
             reasons_text.append(self._txt("not_assessed_by_provider", fields=field_list))
 
         windows = [w for _, _, w in (forecast_bounds if interrupted is not None else window_bounds)]
-        if open_window is not None:
-            _start_ts, stable_iso = self._stable_open_start(
-                profile.profile_id, open_window, now_ts, update=update_live_hold, limits=self._limits_key(profile)
-            )
-            if stable_iso != next_start:
-                orig_iso = next_start
-                next_start = stable_iso
-                windows = [{**w, "start_iso": stable_iso} if w["start_iso"] == orig_iso else w for w in windows]
-        elif update_live_hold:
-            self._open_window_start.pop(profile.profile_id, None)
+        if status == STATUS_UNKNOWN and live_blockers:
+            reasons[:0] = live_blockers
+            reasons_text[:0] = live_blocker_texts
+        if update_live_hold:
+            if open_window is not None:
+                start_ts, end_ts, window = open_window
+                self._open_window_start[profile.profile_id] = {
+                    "start_ts": start_ts,
+                    "start_iso": window["start_iso"],
+                    "end_ts": end_ts,
+                    "last_ts": now_ts,
+                    "limits": limits_key,
+                }
+            elif current_slot_blocked or remembered is None or now_ts >= remembered["end_ts"]:
+                self._open_window_start.pop(profile.profile_id, None)
         horizon_hours = min(len(slot_dicts), MAX_HORIZON_HOURS)
         result_dict = {
             "profile_id": profile.profile_id,
@@ -1533,6 +1537,7 @@ class WeatherWindowsEngine:
             "next_start": next_start,
             "next_end": next_end,
             "duration_h": duration_h,
+            "remaining_h": remaining_h,
             "horizon_hours": horizon_hours,
             "is_truncated": is_truncated,
             "reason_codes": reasons,
@@ -1545,6 +1550,8 @@ class WeatherWindowsEngine:
                 "horizon_hours": horizon_hours,
                 "is_truncated": is_truncated,
                 "unassessed_slots": unassessed_slots,
+                "substituted_by": substitutions,
+                "gust_unavailable": gust_unavailable,
                 "not_assessed_by_provider": list(not_assessed_by_provider),
                 # The source had no row for the hour in progress; the next hour's row stands in.
                 "current_hour_estimated": bool(prepared.get("current_hour_estimated")),
@@ -1554,6 +1561,8 @@ class WeatherWindowsEngine:
 
     def _format_blocker_text(self, reason: str, profile: WeatherWindowProfile) -> str:
         """Provide clear localized, unit-aware explanation for a blocker reason code."""
+        if reason == REASON_SHORT_WINDOW:
+            return self._txt("short_window", hours=profile.min_duration_h)
         if reason == REASON_NIGHTTIME:
             return self._txt("nighttime")
         if reason == REASON_RAIN_RISK:

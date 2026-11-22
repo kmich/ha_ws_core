@@ -41,32 +41,42 @@ attributes explain the state:
   hours."*
 - `reason_codes`: the same as stable codes for automations, such as `window_upcoming`,
   `rain_risk`, `high_gust`, `too_cold`, `nighttime`, `currently_raining`.
-- `not_assessed_by_provider`: limits your forecast provider cannot supply, which are
-  skipped rather than failing the whole profile.
-- `is_truncated` and `horizon_hours`: whether the window runs past the 24-hour horizon.
+- `not_assessed_by_provider` lists configured limits the provider cannot evaluate
+  directly. `substituted_by` identifies rain limits evaluated using the other rain signal.
+- `horizon_hours` counts usable hourly rows. `is_truncated` means the window reaches
+  the end of the usable forecast or the 24-hour lookahead.
 
 ### How it decides
 
 - **Hour by hour.** Each forecast hour is checked against every limit. Consecutive
-  suitable hours that last at least the minimum duration form a window.
+  suitable hours that last at least the minimum duration form a window. Once a
+  qualifying window opens, it remains suitable through its end while conditions hold.
 - **Your station overrides the forecast right now.** If your gauge says it is raining, or
   your anemometer measures gusts above the limit for three minutes, the status turns
   `unsuitable` even when the forecast was fine. The gust hold clears after five calm
-  minutes, so a single gust does not make it flap.
+  minutes. If the gust sensor goes unavailable, the hold remains active for up to
+  30 minutes after the last valid reading. A missing reading counts as neither
+  a gust nor calm weather. The status reports `gust_unavailable`.
 - **A window in progress stays put.** If a window is open, its start time does not move
   forward every hour, and a short interruption is reported as `window_interrupted`
   instead of starting a new window.
 - **Honest about missing data.** No usable forecast gives `unknown` with
-  `forecast_unavailable`; forecasts with steps longer than an hour give
-  `forecast_too_coarse`. Clock changes (DST) are handled, including the repeated hour in
-  autumn.
+  `forecast_unavailable`. A coarse or sub-hourly forecast gives
+  `forecast_too_coarse` or `forecast_too_fine`. Gaps can leave a window unconfirmed.
+  The repeated autumn hour is kept, and a nonexistent spring hour is dropped.
+- **Outdoor drying is a rule of thumb.** The profile screens for temperature,
+  relative humidity, cloud cover, wind, rain and daylight to suggest when to
+  hang laundry.
+  See [Weather Windows methods](../science.md#weather-windows).
 
 ### Forecast providers
 
 Open-Meteo, OpenWeatherMap, Pirate Weather and Météo France supply every input. Met.no has
-no rain chance or gusts (rain limits use the rain amount; gust limits are listed under
-`not_assessed_by_provider`). NWS has no rain amount, gusts or cloud cover. With a Home
-Assistant weather entity as the provider, it depends on that entity; if its hourly list
+no rain chance or gusts. NWS has no rain amount, gusts or cloud cover. If the provider
+supplies one rain signal, Weather Windows uses its configured limit. If that signal
+has no configured limit, it conservatively rejects any positive amount or probability.
+With a Home Assistant weather entity as the provider, available fields depend on
+that entity. If its hourly list
 starts at the next hour, the first hour also covers the current one and
 `current_hour_estimated: true` is reported. See
 [forecast providers](../forecast_providers.md#provider-capabilities).
@@ -109,7 +119,8 @@ response_variable: windows
 ```
 
 The response, per station and profile, contains `status`, `next_start`, `next_end`,
-`duration_h`, `windows` (every suitable window in the horizon), `slots` (each hour with
+`duration_h` (the full window), `remaining_h` (the unelapsed part), `windows` (every
+suitable window in the horizon), `slots` (each hour with
 its result and reasons), `evaluated_limits`, `reason_codes`, `reasons_text`,
 `not_assessed_by_provider` and `data_quality`:
 

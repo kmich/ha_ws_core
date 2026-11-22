@@ -202,25 +202,33 @@ def _state_with(pairs: list[tuple[float, float]]) -> sl.SolarLocalState:
 
 
 def test_fit_uses_prior_without_data():
-    k, n, status = sl.fit_factor(sl.SolarLocalState(), sl.prior_factor(5.0), TODAY)
-    assert (k, n, status) == (pytest.approx(4.0), 0, sl.STATUS_PRIOR)
+    k, n, status, rejected = sl.fit_factor(sl.SolarLocalState(), sl.prior_factor(5.0), TODAY)
+    assert (k, n, status, rejected) == (pytest.approx(4.0), 0, sl.STATUS_PRIOR, 0)
 
 
 def test_fit_learns_site_factor_and_drops_curtailed_days():
     # True site factor 6.0 kWh per kWh/m2; one curtailed day and one meter outage-like day
     pairs = [(g, 6.0 * g / 1000) for g in (3000, 3500, 4000, 4200, 2800, 3900, 4100, 3600)]
     pairs += [(4500, 9.0), (3800, 40.0)]
-    k, n, status = sl.fit_factor(_state_with(pairs), sl.prior_factor(5.0), TODAY)
+    k, n, status, rejected = sl.fit_factor(_state_with(pairs), sl.prior_factor(5.0), TODAY)
     assert status == sl.STATUS_TRAINED
     assert n == 8
+    assert rejected == 2
     assert k == pytest.approx(6.0, rel=1e-6)
 
 
 def test_fit_shrinks_toward_prior_while_learning():
     pairs = [(4000, 24.0), (4000, 24.0)]
-    k, n, status = sl.fit_factor(_state_with(pairs), 4.0, TODAY)
+    k, n, status, _ = sl.fit_factor(_state_with(pairs), 4.0, TODAY)
     assert status == sl.STATUS_LEARNING and n == 2
     assert k == pytest.approx((2 * 6.0 + 3 * 4.0) / 5)
+
+
+@pytest.mark.parametrize("curtailed", [30, 45])
+def test_fit_keeps_productive_days_even_when_curtailment_is_common(curtailed):
+    pairs = [(4000, 9.6)] * curtailed + [(4000, 24.0)] * (60 - curtailed)
+    k, used, status, rejected = sl.fit_factor(_state_with(pairs), 4.0, TODAY)
+    assert (k, used, status, rejected) == (pytest.approx(6.0), 60 - curtailed, sl.STATUS_TRAINED, curtailed)
 
 
 def test_fit_ignores_dark_days_and_today():
@@ -239,12 +247,26 @@ def test_predict_and_hourly_and_remaining():
     assert len(hourly) == 48
     total_today = sum(h["kwh"] for h in hourly[:24])
     # Before sunrise everything is still to come; halfway through 12:00 half that hour is left
-    assert sl.remaining_kwh(hourly, datetime(2026, 11, 20, 5, tzinfo=ATHENS)) == pytest.approx(total_today, abs=0.01)
+    assert sl.remaining_kwh(hourly, datetime(2026, 11, 20, 5, tzinfo=ATHENS), ATHENS) == pytest.approx(
+        total_today, abs=0.01
+    )
     noon = datetime(2026, 11, 20, 12, 30, tzinfo=ATHENS)
     expected = hourly[12]["kwh"] / 2 + sum(h["kwh"] for h in hourly[13:24])
-    assert sl.remaining_kwh(hourly, noon.astimezone(UTC)) == pytest.approx(expected, abs=0.01)
-    assert sl.remaining_kwh(hourly, datetime(2026, 11, 20, 23, 30, tzinfo=ATHENS)) == 0.0
-    assert sl.remaining_kwh([], noon) is None
+    assert sl.remaining_kwh(hourly, noon.astimezone(UTC), ATHENS) == pytest.approx(expected, abs=0.01)
+    assert sl.remaining_kwh(hourly, datetime(2026, 11, 20, 23, 30, tzinfo=ATHENS), ATHENS) == 0.0
+    assert sl.remaining_kwh([], noon, ATHENS) is None
+
+
+def test_remaining_today_uses_zone_on_fall_back_day():
+    day = date(2026, 10, 25)
+    tomorrow = day + timedelta(days=1)
+    start = datetime(2026, 10, 25, tzinfo=ATHENS).timestamp()
+    hourly = sl.hourly_kwh(6.0, [(start + h * 3600, 1000.0) for h in range(49)], ATHENS, day, tomorrow)
+    late = datetime(2026, 10, 25, 23, 30, tzinfo=ATHENS)
+    assert sl.remaining_kwh(hourly, late.astimezone(UTC), ATHENS) == 3.0
+    for fold, expected in ((0, 129.0), (1, 123.0)):
+        repeat = datetime(2026, 10, 25, 3, 30, tzinfo=ATHENS, fold=fold)
+        assert sl.remaining_kwh(hourly, repeat, ATHENS) == expected
 
 
 def test_skill_compares_both_sources_on_the_same_days():
@@ -359,7 +381,7 @@ async def test_runtime_backfills_learns_and_snapshots_day_ahead():
 
     # The next refresh only asks for the last day
     fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now)
-    fetch.assert_awaited_once_with(1)
+    fetch.assert_awaited_once_with(3)
 
 
 async def test_totals_roll_over_at_local_midnight_and_refresh_once():
@@ -403,7 +425,7 @@ async def test_runtime_ignores_stale_forecast_solar_and_non_energy_meters():
     rt = SolarLocalRuntime(_coord(fs), ["sensor.pv"])
     await _run_update(rt, js, {"sensor.pv": _rows(TODAY - timedelta(days=1), 1.0)}, {"sensor.pv": "W"}, now)
     assert rt.meter_problem == "not_an_energy_meter"
-    assert rt.state.backfilled is False  # retried with a backfill on the next refresh
+    assert rt.state.backfilled is False
     assert rt.status == sl.STATUS_PRIOR and rt.k == pytest.approx(4.0)
     assert "da_fs" not in rt.state.days[(TODAY + timedelta(days=1)).isoformat()]
 
@@ -469,15 +491,38 @@ def test_coordinator_creates_runtime_only_with_toggle_and_meters():
 async def test_runtime_reports_meters_without_complete_days_and_retries_backfill():
     now = datetime(2026, 11, 20, 20, 0, tzinfo=ATHENS)
     js = _om_response({TODAY: _bell(400), TODAY + timedelta(days=1): _bell(500)})
-    # A meter that only writes statistics in daylight: no day reaches the hour count
+    # Incomplete statistics without matching irradiance data are not enough.
     rows = {"sensor.pv": [r for i in range(1, 6) for r in _rows(TODAY - timedelta(days=i), 1.0, hours=10)]}
     rt = SolarLocalRuntime(_coord(), ["sensor.pv"])
     fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now)
     fetch.assert_awaited_once_with(sl.BACKFILL_DAYS)
     assert rt.meter_problem == "no_complete_days"
-    assert rt.state.backfilled is False
-    fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now)
+    assert not rt.state.backfilled
+    fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now + timedelta(minutes=30))
+    assert fetch.await_args.args[0] < sl.BACKFILL_DAYS
+    fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now + timedelta(hours=6))
     fetch.assert_awaited_once_with(sl.BACKFILL_DAYS)
+
+
+async def test_runtime_learns_from_meters_reporting_only_in_daylight():
+    now = datetime(2026, 11, 20, 20, 0, tzinfo=ATHENS)
+    days = {TODAY - timedelta(days=i): [600 if 8 <= h < 16 else 0 for h in range(24)] for i in range(9)}
+    rows = {
+        "sensor.pv": [
+            {"start": _hour_ts(day, h), "change": 3.6}
+            for day in days
+            if day < TODAY
+            for h in range(8, 16)
+            if day != TODAY - timedelta(days=1) or h != 11
+        ]
+    }
+    rt = SolarLocalRuntime(_coord(), ["sensor.pv"])
+    await _run_update(rt, _om_response(days), rows, {"sensor.pv": "kWh"}, now)
+    assert rt.state.backfilled
+    assert rt.meter_problem is None
+    assert rt.n_days == 7
+    assert rt.k == pytest.approx(6.0)
+    assert "actual" not in rt.state.days[(TODAY - timedelta(days=1)).isoformat()]
 
 
 def _schema_marker(schema, key_name: str):

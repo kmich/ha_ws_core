@@ -2,6 +2,10 @@
 
 Complete list of entities created by Weather Station Core.
 
+Enabling a feature also enables its default sensors. This applies to existing
+entities that Weather Station Core disabled by default, such as Fog Probability.
+Entities you disabled yourself remain disabled.
+
 Entity IDs shown use the default prefix `ws`. If you chose a different prefix during
 setup, replace `ws` with your prefix. Note: Home Assistant's entity registry preserves
 user-chosen or pre-existing entity IDs across upgrades, and renaming the Weather Station
@@ -351,7 +355,7 @@ Via forecast.solar (free). Configure your panel peak kWp, azimuth, and tilt.
 
 ### Local PV forecast (v3.0.0, optional)
 
-Pick the PV energy meters that count your solar production (the same kWh meters as in the Energy dashboard, one or several) under **Configure > Solar Forecast**. ws_core then learns a forecast for your own installation:
+Pick the PV energy meters that count your solar production (the same kWh meters as in the Energy dashboard, one or several) under **Configure → Features & Diagnostics → Solar Forecast Settings**. ws_core learns a forecast for your installation:
 
 - It fetches Open-Meteo's hourly irradiance forecast on the plane of your panels (your tilt and azimuth; free, no key).
 - From your meters' long-term statistics it learns how many kWh your system really produces per kWh/m² of that irradiance (the **site factor**). Shading, inverter losses, soiling and a wrong kWp setting are all absorbed by it.
@@ -369,6 +373,7 @@ Attributes of `sensor.ws_solar_local_forecast_today`:
 |---|---|
 | `model_status` | `prior` (from your kWp only), `learning` (fewer than 7 usable days, blended with the prior) or `trained` |
 | `days_used` | Days in the last 60 that went into the fit |
+| `days_rejected` | Days with complete data whose yield fell outside the fitting band |
 | `site_factor` / `prior_site_factor` | Learned and kWp-based kWh per kWh/m² of plane irradiance |
 | `skill_local` / `skill_forecast_solar` | Day-ahead error over the last 30 days for this forecast and for forecast.solar: `days`, `mae_kwh`, `bias_kwh`, `correlation` (shown from 5 days) |
 | `hourly` | Hourly forecast for today and tomorrow (`start`, `kwh`); not recorded in history |
@@ -379,7 +384,8 @@ Skill is scored fairly: only the last forecast made **before** a day started is 
 Notes and limits:
 
 - The meters need long-term statistics (`state_class` `total` or `total_increasing`, unit Wh, kWh or MWh). Lifetime and daily-reset counters both work.
-- Days with a meter outage, or whose yield is far from what the irradiance predicts (curtailment from a full battery or an export limit, snow on the panels), are left out of the fit. Frequent curtailment still pulls the site factor down a little.
+- Each selected meter must cover every modeled hour with at least 25 Wh/m² of panel-plane irradiance. Meters that go offline at night can still qualify. Incomplete productive hours exclude that day. Data Status reports meter statistics problems. A failed history backfill is retried after six hours while short forecast refreshes continue.
+- The fit uses least squares on days near the typical yield of the highest-producing fifth of recent days, using at least seven days for that reference when available. This helps when a majority of days are curtailed or snow-covered if enough productive days remain. A system that is consistently curtailed can still learn a lower factor. The model uses re-fetched irradiance for fitting and forecast irradiance for prediction.
 - One tilt and azimuth are used for the whole system. For arrays facing different ways, set the orientation of the largest array; the site factor absorbs the rest, but the hourly shape follows that one orientation.
 - Uses the forecast latitude and longitude. Removing the integration deletes the learned data (`.storage/ws_core_<entry>_solar_local`).
 
@@ -456,10 +462,9 @@ Always created (`EntityCategory.DIAGNOSTIC`):
 `sensor.ws_data_status` answers "is an empty sensor a problem?" in one place. Its
 state is **OK** or **Needs attention**.
 
-- **Needs attention** only when a station source has a lasting problem: a required
-  source is not mapped, a mapped entity is missing, or a source gives no valid or
-  recent reading for over 5 minutes. These are the same problems that raise Repairs
-  issues. A restart does not trigger it.
+- **Needs attention** reports station-source problems that last more than five minutes,
+  as well as problems reading usable PV meter history. Missing entities and stale
+  readings can also raise Repairs issues.
 - The `summary` attribute says what is going on in one sentence.
 - `needs_attention` lists the problems.
 - `waiting` lists every sensor that is empty for a normal reason, with that reason.
@@ -469,7 +474,7 @@ state is **OK** or **Needs attention**.
   provide, and what would make them work. Examples: clearness index without a W/m²
   solar sensor, or lightning with no detector and no Blitzortung integration.
 
-Each empty sensor also carries its own `reason` and `explanation` attributes, plus a
+Derived sensors covered by Data Status also carry `reason` and `explanation` attributes when empty, plus a
 short `status_text` such as "No rain expected", "No recent strike" or "Learning (2 of 5
 events)". Home Assistant only allows numbers in a sensor with a unit and shows
 "Unknown" when there is none, so the bundled dashboards show `status_text` there

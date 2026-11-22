@@ -770,7 +770,11 @@ class TestReplayMaskingAndDp3hAlignment:
                 },
             },
         }
-        store = _MemoryStore(rt_init.engine.to_dict())
+        legacy_payload = rt_init.engine.to_dict()
+        legacy_payload.pop("features_migration_pending")
+        for target in legacy_payload["history_learn"]["targets"].values():
+            target["method"] = PATTERN_HISTORY_METHOD - 1
+        store = _MemoryStore(legacy_payload)
 
         # Outage controller: fail inside the migration _dp3h_job while recorder outage is active,
         # while allowing ordinary _history_job replay and later retries to read recorder stats.
@@ -1904,6 +1908,62 @@ class TestReplayMaskingAndDp3hAlignment:
 
 
 class TestDowngradeTolerance:
+    def test_short_current_replay_reloads_without_pending_migration(self):
+        live = PatternEngine(Thresholds())
+        trained = _make_engine()
+        dp_slot = POOL_INDEX["dp_3h"]
+        trained.std.n[dp_slot] = 6
+        live.adopt_replay(
+            trained,
+            {"rain_3h": {"samples": 6, "first": 1000.0, "last": 2000.0}},
+            {"rain_3h": {"status": "ok", "reason": None}},
+            update_std=True,
+            now_ts=3000.0,
+        )
+        assert live.history_learn["targets"]["rain_3h"]["features_method"] == PATTERN_HISTORY_FEATURES_METHOD
+        original = live.to_dict()
+        # A preview install had no explicit marker and could lack the alignment stamp as well.
+        original.pop("features_migration_pending")
+        original["history_learn"].pop("features_method")
+        original["history_learn"].pop("features_reset_method")
+        original["history_learn"]["targets"]["rain_3h"].pop("features_method")
+        loaded, notes = PatternEngine.from_dict(original, live.thresholds)
+        assert not notes
+        assert loaded.features_migration_pending is False
+        assert loaded.std.n[dp_slot] == 6
+
+    async def test_legacy_state_with_no_ok_history_targets_still_gets_scoped_reset(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        old = _make_engine()
+        old.history_learn = {
+            "targets": {
+                "rain_3h": {
+                    "status": "unavailable",
+                    "attempted_at": 2000.0,
+                    "reason": "recorder unavailable",
+                    "method": PATTERN_HISTORY_METHOD - 1,
+                }
+            }
+        }
+        payload = old.to_dict()
+        payload.pop("features_migration_pending")
+        restored, notes = PatternEngine.from_dict(payload, old.thresholds)
+        assert not notes
+        assert restored.features_migration_pending is True
+        rt = PatternRuntime.__new__(PatternRuntime)
+        rt.engine = restored
+        rt.coord = MagicMock(_stopped=False)
+        rt._reset_seq = 0
+        rt._async_backup_pre_migration_state = AsyncMock(return_value=True)
+        rt.async_save = AsyncMock()
+        assert not await rt._async_migrate_feature_replay(datetime(2026, 6, 21, tzinfo=UTC))
+        rt._async_backup_pre_migration_state.assert_awaited_once()
+        assert restored.std.n[POOL_INDEX["dp_3h"]] == 0
+        assert restored.std.n[POOL_INDEX["cloud_deficit"]] == 0
+        assert restored.features_migration_pending is False
+        assert restored.to_dict()["features_migration_pending"] is False
+
     """Verify that storage schema remains compatible with earlier versions."""
 
     def test_schema_version_is_unchanged(self):

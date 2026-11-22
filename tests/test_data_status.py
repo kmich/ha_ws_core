@@ -223,6 +223,13 @@ def test_lasting_source_problem_turns_status_to_attention():
     assert "wind_speed" in attrs["summary"]
 
 
+def test_pv_meter_problem_is_reported_while_forecast_uses_prior():
+    data = {c.KEY_SOLAR_LOCAL_INFO: {"model_status": "prior", "meter_problem": "no_complete_days"}}
+    state, attrs = _status(data, [], registered=[])
+    assert state == "attention"
+    assert "sufficient coverage" in attrs["needs_attention"][0]
+
+
 def test_restored_values_and_disabled_entities_are_not_listed():
     watched = [_desc(c.KEY_MINUTES_UNTIL_RAIN), _desc(c.KEY_MINUTES_UNTIL_DRY)]
     registered = [

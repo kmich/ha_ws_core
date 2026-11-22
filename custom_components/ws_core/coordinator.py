@@ -5835,6 +5835,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "status": win.get("status"),
                     "next_start": win.get("next_start"),
                     "duration_h": win.get("duration_h"),
+                    "remaining_h": win.get("remaining_h"),
                     "reasons": win.get("reasons_text", [])[:1],
                 }
                 if win.get("not_assessed_by_provider"):
@@ -6572,7 +6573,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raw_aqi = reading(f"{scale}_aqi")
                 missing_pollutants = []
                 if raw_aqi is not None:
-                    aqi_val = round(raw_aqi)
+                    aqi_val = math.floor(raw_aqi + 0.5) if european else round(raw_aqi)
                     source = "open_meteo"
                 else:
                     pollutant_keys = ("pm2_5", "pm10", "no2", "ozone", "so2") if european else ("pm2_5", "pm10")

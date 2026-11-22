@@ -178,6 +178,7 @@ from .const import (
     KEY_SOLAR_ENERGY_TODAY_WHM2,
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
+    KEY_SOLAR_LOCAL_INFO,
     KEY_SOLAR_LOCAL_REMAINING_KWH,
     KEY_SOLAR_LOCAL_TODAY_KWH,
     KEY_SOLAR_LOCAL_TOMORROW_KWH,
@@ -356,6 +357,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 continue
             if source == PATTERN_SOURCE_INTERNET:
                 desc = dataclasses.replace(desc, translation_key="pattern_storm_3h_internet")
+        feature = _FEATURE_TOGGLE_MAP.get(desc.key)
+        if not desc.entity_registry_enabled_default and feature is not None and opts.get(feature):
+            # A selected feature is an explicit opt-in. Repair old integration
+            # defaults while preserving entities disabled by the user or entry.
+            desc = dataclasses.replace(desc, entity_registry_enabled_default=True)
+            registry = er.async_get(hass)
+            entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{desc.key}")
+            if entity_id is not None:
+                registry_entry = registry.async_get(entity_id)
+                if registry_entry is not None and registry_entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION:
+                    registry.async_update_entity(entity_id, disabled_by=None)
         filtered.append(desc)
 
     entities: list[SensorEntity] = [WSSensor(coordinator, entry, desc, prefix) for desc in filtered]
@@ -561,6 +573,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                             "not_assessed_by_provider": (d.get(KEY_WEATHER_WINDOWS) or {})
                             .get(_pid, {})
                             .get("not_assessed_by_provider", []),
+                            "substituted_by": (d.get(KEY_WEATHER_WINDOWS) or {})
+                            .get(_pid, {})
+                            .get("data_quality", {})
+                            .get("substituted_by", {}),
+                            "gust_unavailable": (d.get(KEY_WEATHER_WINDOWS) or {})
+                            .get(_pid, {})
+                            .get("data_quality", {})
+                            .get("gust_unavailable", False),
                             # No remaining-duration attribute: it would change every minute while a
                             # window is open. next_start/next_end carry the window; the action
                             # response still returns duration_h.
@@ -1136,8 +1156,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
 class WSDataStatusSensor(WSSensor):
     """Say whether anything needs attention, and why other sensors are empty.
 
-    State is ``ok`` or ``attention``. Only lasting source problems (the same ones that
-    raise Repairs issues) count as ``attention``; empty values with a normal reason are
+    State is ``ok`` or ``attention``. Source problems and PV meter history problems
+    count as ``attention``; empty values with a normal reason are
     listed under ``waiting``, and sensors this station's hardware or settings cannot
     provide under ``not_on_this_station``.
     """
@@ -1145,6 +1165,13 @@ class WSDataStatusSensor(WSSensor):
     _unrecorded_attributes = WSSensor._unrecorded_attributes | frozenset(
         {"summary", "needs_attention", "waiting", "not_on_this_station"}
     )
+    _PV_METER_PROBLEMS = {
+        "recorder_unavailable": "Local PV forecast needs the Recorder integration",
+        "statistics_unavailable": "Local PV forecast could not read energy meter statistics",
+        "no_statistics": "Local PV forecast has no statistics for the selected energy meters",
+        "not_an_energy_meter": "A selected PV meter does not report energy units",
+        "no_complete_days": "Local PV forecast has no day with sufficient coverage from all selected meters",
+    }
 
     def __init__(self, coordinator, entry: ConfigEntry, prefix: str, watched: list[WSSensorDescription]):
         super().__init__(
@@ -1165,12 +1192,19 @@ class WSDataStatusSensor(WSSensor):
 
     @property
     def native_value(self) -> str:
-        return "attention" if (self.coordinator.data or {}).get(KEY_SOURCE_PROBLEMS) else "ok"
+        return "attention" if self._problems(self.coordinator.data or {}) else "ok"
+
+    def _problems(self, data: Mapping[str, Any]) -> list[str]:
+        problems = list(data.get(KEY_SOURCE_PROBLEMS) or [])
+        meter_problem = (data.get(KEY_SOLAR_LOCAL_INFO) or {}).get("meter_problem")
+        if explanation := self._PV_METER_PROBLEMS.get(meter_problem):
+            problems.append(explanation)
+        return problems
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         d = self.coordinator.data or {}
-        problems = list(d.get(KEY_SOURCE_PROBLEMS) or [])
+        problems = self._problems(d)
         waiting: dict[str, str] = {}
         not_here = self._station_notes()
         registry = er.async_get(self.hass) if self.hass is not None else None

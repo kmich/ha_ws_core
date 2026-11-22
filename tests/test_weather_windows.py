@@ -87,6 +87,12 @@ def _make_hourly_forecast(
     return out
 
 
+def test_naive_spring_forward_hour_does_not_shadow_the_first_real_hour():
+    berlin = ZoneInfo("Europe/Berlin")
+    assert parse_forecast_slot_utc({"datetime": "2026-03-29T02:00:00"}, berlin) is None
+    assert parse_forecast_slot_utc({"datetime": "2026-03-29T03:00:00"}, berlin) == datetime(2026, 3, 29, 1, tzinfo=UTC)
+
+
 class TestWeatherWindowsEngine:
     """Test the Weather Windows Decision Engine evaluation logic."""
 
@@ -259,7 +265,7 @@ class TestWeatherWindowsEngine:
         assert result.next_start == forecast_start.isoformat()
         assert result.duration_h == 4
 
-    def test_active_window_remaining_duration_below_minimum_is_not_suitable_now(self, engine: WeatherWindowsEngine):
+    def test_exact_minimum_window_stays_open_until_its_end(self, engine: WeatherWindowsEngine):
         # 2-hour window [10:00, 12:00), followed by rain at 12:00 and sunny later [13:00, 15:00)
         slot_start = datetime(2026, 6, 21, 10, 0, tzinfo=UTC)
         hourly = _make_hourly_forecast(slot_start, hours=5)
@@ -270,9 +276,16 @@ class TestWeatherWindowsEngine:
         now = datetime(2026, 6, 21, 10, 45, tzinfo=UTC)
         result = engine.evaluate_profile(profile, hourly, current_data={}, now=now)
 
-        assert result.status == STATUS_WINDOW_UPCOMING
-        assert result.next_start == (slot_start + timedelta(hours=3)).isoformat()
+        assert result.status == STATUS_SUITABLE_NOW
+        assert result.next_start == slot_start.isoformat()
         assert result.duration_h == 2
+        assert result.remaining_h == 1.25
+        # The elapsed first hour drops from the forecast, but the window stays open.
+        later = engine.evaluate_profile(profile, hourly[1:], now=slot_start + timedelta(hours=1))
+        assert later.status == STATUS_SUITABLE_NOW
+        assert later.next_start == result.next_start
+        assert later.windows[0]["duration_h"] == 2
+        assert later.windows[0]["remaining_h"] == 1
 
     def test_missing_and_duplicate_forecast_hours_split_windows(self, engine: WeatherWindowsEngine):
         # Unsorted, duplicate 12:00, missing 13:00 and 14:00, contiguous [15:00, 17:00)
@@ -510,8 +523,10 @@ class TestWeatherWindowsEngine:
         result = engine.evaluate_profile(profile, hourly, current_data={}, now=now)
 
         assert result.status == STATUS_SUITABLE_NOW
-        assert result.duration_h == 2.5
-        assert result.windows[0]["duration_h"] == 2.5
+        assert result.duration_h == 3
+        assert result.remaining_h == 2.5
+        assert result.windows[0]["duration_h"] == 3
+        assert result.windows[0]["remaining_h"] == 2.5
         # The sentence names the end time, not a remaining duration that changes every minute
         assert "until 13:00" in result.reasons_text[0]
         later = engine.evaluate_profile(profile, hourly, current_data={}, now=now + timedelta(minutes=9))
@@ -634,7 +649,7 @@ class TestWeatherWindowsEngine:
 
         result = engine.evaluate_profile(drying, hourly, current_data={}, now=start_time)
         assert result.status == STATUS_UNSUITABLE
-        assert REASON_NIGHTTIME in result.reason_codes
+        assert "short_window" in result.reason_codes
         assert result.slots[0]["suitable"] is True
         assert REASON_NIGHTTIME in result.slots[1]["reasons"]
 
@@ -868,7 +883,7 @@ class TestWeatherWindowsEngine:
         assert res_two.status == "unknown"
         assert res_two.reason_codes == ["insufficient_horizon"]
         assert res_two.horizon_hours == 1
-        assert res_two.data_quality == {"available_slots": 1}
+        assert res_two.data_quality["available_slots"] == 1
 
         # Profile with min_duration_h=1 only needs 1 usable filtered slot
         prof_one = replace(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], min_duration_h=1)
@@ -887,9 +902,9 @@ class TestWeatherWindowsEngine:
 
         res_met_dry = engine.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], met_hourly, now=start_time)
         assert res_met_dry.status == STATUS_SUITABLE_NOW
-        assert res_met_dry.not_assessed_by_provider == ["max_wind_gust_kmh"]
+        assert res_met_dry.not_assessed_by_provider == ["max_rain_prob_pct", "max_wind_gust_kmh"]
         assert REASON_NOT_ASSESSED_BY_PROVIDER in res_met_dry.reason_codes
-        assert res_met_dry.data_quality["not_assessed_by_provider"] == ["max_wind_gust_kmh"]
+        assert res_met_dry.data_quality["substituted_by"] == {"max_rain_prob_pct": "max_rain_mm"}
 
         # Rain on Met.no via precip_mm still blocks
         met_hourly_wet = _make_hourly_forecast(start_time, hours=4, rain_mm=1.2)
@@ -899,7 +914,7 @@ class TestWeatherWindowsEngine:
         res_met_wet = engine.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], met_hourly_wet, now=start_time)
         assert res_met_wet.status == STATUS_UNSUITABLE
         assert REASON_RAIN_AMOUNT in res_met_wet.reason_codes
-        assert res_met_wet.not_assessed_by_provider == ["max_wind_gust_kmh"]
+        assert res_met_wet.not_assessed_by_provider == ["max_rain_prob_pct", "max_wind_gust_kmh"]
 
         # 2. NWS shape: precip_prob present; precip_mm, gust_kmh, cloud_cover absent across all hours
         nws_hourly = _make_hourly_forecast(start_time, hours=4)
@@ -910,14 +925,14 @@ class TestWeatherWindowsEngine:
 
         res_nws_dry = engine.evaluate_profile(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], nws_hourly, now=start_time)
         assert res_nws_dry.status == STATUS_SUITABLE_NOW
-        assert res_nws_dry.not_assessed_by_provider == ["max_wind_gust_kmh", "max_cloud_cover_pct"]
+        assert res_nws_dry.not_assessed_by_provider == ["max_rain_mm", "max_wind_gust_kmh", "max_cloud_cover_pct"]
         assert REASON_NOT_ASSESSED_BY_PROVIDER in res_nws_dry.reason_codes
 
         res_nws_garden = engine.evaluate_profile(DEFAULT_PROFILES[PROFILE_GARDEN_WORK], nws_hourly, now=start_time)
         assert res_nws_garden.status == STATUS_SUITABLE_NOW
-        assert res_nws_garden.not_assessed_by_provider == ["max_wind_gust_kmh"]
+        assert res_nws_garden.not_assessed_by_provider == ["max_rain_mm", "max_wind_gust_kmh"]
 
-        # 3. Core required inputs: missing BOTH rain signals across all hours stays UNKNOWN
+        # 3. Both rain signals may be absent if the profile has no rain limits.
         no_rain_signal = _make_hourly_forecast(start_time, hours=4)
         for slot in no_rain_signal:
             slot["precip_prob"] = None
@@ -927,8 +942,12 @@ class TestWeatherWindowsEngine:
             no_rain_signal,
             now=start_time,
         )
-        assert res_no_rain_sig.status == STATUS_UNKNOWN
-        assert REASON_MISSING_DATA in res_no_rain_sig.reason_codes
+        assert res_no_rain_sig.status == STATUS_SUITABLE_NOW
+        res_rain_required = engine.evaluate_profile(
+            DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], no_rain_signal, now=start_time
+        )
+        assert res_rain_required.status == STATUS_UNKNOWN
+        assert REASON_MISSING_DATA in res_rain_required.reason_codes
 
     def test_live_gust_hold_hysteresis_and_no_next_start_shift_or_churn(self):
         eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
@@ -1008,15 +1027,15 @@ class TestWeatherWindowsEngine:
         assert res.status == STATUS_UNKNOWN
         assert REASON_INSUFFICIENT_HORIZON in res.reason_codes
 
-        # Mid-hour evaluation: 4 hourly slots [11:00..15:00) at 11:30 = 3.5h < 4h, all passing -> unknown
+        # Four complete forecast hours qualify, even after the first hour starts.
         res_mid = engine.evaluate_profile(
             prof_4h,
             _make_hourly_forecast(start_time, hours=4),
             current_data={},
             now=start_time + timedelta(minutes=30),
         )
-        assert res_mid.status == STATUS_UNKNOWN
-        assert REASON_INSUFFICIENT_HORIZON in res_mid.reason_codes
+        assert res_mid.status == STATUS_SUITABLE_NOW
+        assert res_mid.remaining_h == 3.5
 
         # Whereas if an hour genuinely fails temperature limit -> unsuitable
         hourly_cold = _make_hourly_forecast(start_time, hours=3)
@@ -1186,6 +1205,61 @@ class TestReleaseReviewFixes:
         sustained = eng.evaluate_profile(tight, hourly, current_data=gust, now=now, update_live_hold=False)
         assert sustained.status == STATUS_UNSUITABLE
         assert REASON_CURRENT_GUST_HIGH in sustained.reason_codes
+
+    def test_active_gust_hold_survives_unavailable_reading_for_sensor_and_action(self):
+        eng = WeatherWindowsEngine(lat=38, lon=23.7)
+        t0 = datetime(2026, 6, 21, 9, 30, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0.replace(minute=0), hours=8)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        assert self._sustain_gust(eng, profile, hourly, t0).status == STATUS_UNSUITABLE
+        unavailable = t0 + timedelta(minutes=5)
+        sensor = eng.evaluate_profile(profile, hourly, current_data={}, now=unavailable)
+        tighter = apply_profile_overrides(profile, {"max_wind_gust_kmh": 30})
+        action = eng.evaluate_profile(tighter, hourly, current_data={}, now=unavailable, update_live_hold=False)
+        for result in (sensor, action):
+            assert result.status == STATUS_UNSUITABLE
+            assert result.data_quality["gust_unavailable"]
+            assert REASON_CURRENT_GUST_HIGH in result.reason_codes
+        calm = {KEY_NORM_WIND_GUST_MS: 2.0}
+        assert eng.evaluate_profile(profile, hourly, current_data=calm, now=unavailable).status == STATUS_UNSUITABLE
+        assert (
+            eng.evaluate_profile(profile, hourly, current_data=calm, now=unavailable + timedelta(minutes=5)).status
+            == STATUS_SUITABLE_NOW
+        )
+
+    @pytest.mark.parametrize(
+        ("limits", "missing", "available", "value", "reason"),
+        [
+            ({"max_rain_prob_pct": 20, "max_rain_mm": None}, "precip_prob", "precip_mm", 5.0, REASON_RAIN_AMOUNT),
+            ({"max_rain_prob_pct": None, "max_rain_mm": 0}, "precip_mm", "precip_prob", 90, REASON_RAIN_RISK),
+        ],
+    )
+    def test_single_rain_limit_uses_conservative_substitution(self, limits, missing, available, value, reason):
+        eng = WeatherWindowsEngine(lat=38, lon=23.7)
+        start = datetime(2026, 6, 21, 10, tzinfo=UTC)
+        rows = _make_hourly_forecast(start, hours=4)
+        for row in rows:
+            row[missing] = None
+            row[available] = value
+        profile = apply_profile_overrides(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], limits)
+        result = eng.evaluate_profile(profile, rows, now=start)
+        assert result.status == STATUS_UNSUITABLE
+        assert reason in result.reason_codes
+        assert result.data_quality["substituted_by"]
+
+    def test_sparse_and_subhourly_data_report_unknown(self):
+        eng = WeatherWindowsEngine(lat=38, lon=23.7)
+        now = datetime(2026, 6, 21, 7, tzinfo=UTC)
+        rows = _make_hourly_forecast(now, hours=8)
+        profile = replace(DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING], min_duration_h=3)
+        sparse = eng.evaluate_profile(profile, [rows[i] for i in (0, 1, 3, 4, 6, 7)], now=now)
+        assert sparse.status == STATUS_UNKNOWN
+        assert REASON_MISSING_DATA in sparse.reason_codes
+        for i, row in enumerate(rows):
+            row["datetime"] = (now + timedelta(minutes=30 * i)).isoformat()
+        fine = eng.evaluate_profile(profile, rows, now=now)
+        assert fine.status == STATUS_UNKNOWN
+        assert "forecast_too_fine" in fine.reason_codes
 
     def test_upcoming_window_text_uses_local_clock_and_tomorrow(self):
         eng = WeatherWindowsEngine(lat=38.0, lon=23.7)

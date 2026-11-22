@@ -1193,7 +1193,7 @@ class PatternRuntime:
         eng = self.engine
         hl = dict(eng.history_learn or {})
         targets = dict(hl.get("targets") or {})
-        if not targets:
+        if eng.features_migration_pending is False:
             return False
 
         def _method_int(val: Any) -> int:
@@ -1213,13 +1213,9 @@ class PatternRuntime:
             and e.get("status") == "ok"
             and _method_int(e.get("features_method")) < PATTERN_HISTORY_FEATURES_METHOD
         ]
-        if not ok_targets:
-            hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
-            hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
-            hl["targets"] = targets
-            eng.history_learn = hl
-            await self.async_save()
+        if not ok_targets and eng.features_migration_pending is not True:
             return False
+        eng.features_migration_pending = True
 
         did_reset = reset_val < PATTERN_HISTORY_FEATURES_METHOD
         if did_reset:
@@ -1251,6 +1247,7 @@ class PatternRuntime:
             hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
             hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
             eng.history_learn = hl
+            eng.features_migration_pending = False
             self._published = {}
             await self.async_save()
             return False
@@ -1384,6 +1381,7 @@ class PatternRuntime:
         )
         if all_done:
             hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            eng.features_migration_pending = False
         eng.history_learn = hl
         self._published = {}
         await self.async_save()

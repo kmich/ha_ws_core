@@ -327,6 +327,22 @@ Configurable measurement noise (`number.ws_rain_filter_alpha`).
 
 ---
 
+### Weather Windows {#weather-windows}
+
+Weather Windows groups consecutive passing forecast hours into intervals with a minimum
+full duration. A live rain or sustained-gust observation can interrupt an open interval.
+The daylight limit requires the solar elevation to stay above the horizon throughout
+the part of the hour evaluated. Hours containing sunrise or sunset may therefore be
+excluded. At high latitudes this may rule out every hour during polar night.
+
+The outdoor drying profile is a heuristic screen using forecast air temperature,
+relative humidity, wind, cloud cover, precipitation and daylight. Its fixed
+relative-humidity limit can reject a warmer hour with more drying potential than
+a cooler hour that passes the limit. The Custom profile lets you choose limits for
+your site.
+
+---
+
 ### 30-Day Rolling Climatology
 
 After approximately 14 days of operation, the integration builds a local climate baseline
@@ -386,7 +402,8 @@ the **US EPA AQI**, selectable via `aqi_scale` (`auto`, `european`, `us`):
 - **Auto-detection (`auto`, default):** Selects `european` for coordinates in Europe
   (34°–72° N, 25° W–45° E, or European climate regions) and `us` elsewhere.
 - **European EAQI (`european`):** Uses Open-Meteo's `european_aqi` value. It uses the
-  highest sub-index of PM2.5, PM10, NO₂, O₃ and SO₂ on the 0–100+ scale
+  highest sub-index of PM2.5, PM10, NO₂, O₃ and SO₂ on Open-Meteo's interpolated
+  0–100+ scale
   (0–20 Good, 21–40 Fair, 41–60 Moderate, 61–80 Poor, 81–100 Very Poor, >100 Extremely Poor).
   If the API omits the index, the integration estimates it from the available
   concentrations using the EEA's revised hourly bands. The sensor reports
@@ -398,6 +415,7 @@ the **US EPA AQI**, selectable via `aqi_scale` (`auto`, `european`, `us`):
 
 **References:**
 - European Environment Agency (EEA). [European Air Quality Index](https://airindex.eea.europa.eu/AQI/).
+- González Ortiz et al. [ETC HE Report 2024/17 on the revised AQI bands](https://www.eionet.europa.eu/etcs/etc-he/products/etc-he-products/etc-he-reports/etc-he-report-2024-17-eeas-revision-of-the-european-air-quality-index-bands/).
 - Open-Meteo. [Air Quality API](https://open-meteo.com/en/docs/air-quality-api).
 - US EPA (2024). *Technical Assistance Document for the Reporting of Daily Air Quality — the Air Quality Index (AQI).*
 

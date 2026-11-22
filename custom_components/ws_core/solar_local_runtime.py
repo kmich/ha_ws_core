@@ -33,6 +33,7 @@ from .solar_local import (
     parse_gti,
     predict_kwh,
     prior_factor,
+    productive_meter_hours,
     remaining_kwh,
     skill,
     store_key,
@@ -46,6 +47,7 @@ _LOGGER = logging.getLogger(__name__)
 # Days of meter statistics re-read on every refresh after the backfill (late
 # statistics compiles and yesterday's final hours are picked up this way).
 _RECENT_DAYS = 3
+_BACKFILL_RETRY_DELAY = timedelta(hours=6)
 
 
 def read_meter_statistics(
@@ -72,6 +74,7 @@ class SolarLocalRuntime:
         self.store: Any = None
         self.k: float | None = None
         self.n_days = 0
+        self.days_rejected = 0
         self.status = STATUS_PRIOR
         self.today_kwh: float | None = None
         self.tomorrow_kwh: float | None = None
@@ -83,6 +86,7 @@ class SolarLocalRuntime:
         self.updated_at: str | None = None
         self.error: str | None = None
         self.meter_problem: str | None = None
+        self._retry_backfill_at: datetime | None = None
 
     # -- persistence -----------------------------------------------------
 
@@ -124,7 +128,9 @@ class SolarLocalRuntime:
 
     # -- refresh -----------------------------------------------------------
 
-    async def _async_read_actuals(self, days: int, today: date, tz: tzinfo) -> dict[str, float] | None:
+    async def _async_read_actuals(
+        self, days: int, today: date, tz: tzinfo, productive_hours: dict[str, set[int]]
+    ) -> dict[str, float] | None:
         hass = self.coord.hass
         if "recorder" not in hass.config.components:
             self.meter_problem = "recorder_unavailable"
@@ -148,8 +154,7 @@ class SolarLocalRuntime:
         if bad_units:
             self.meter_problem = "not_an_energy_meter"
             return {}
-        out = actual_daily_kwh(rows, units, tz, today)
-        # Statistics exist but no day had every meter reporting most of its hours.
+        out = actual_daily_kwh(rows, units, tz, today, productive_hours)
         self.meter_problem = None if out else "no_complete_days"
         return out
 
@@ -190,9 +195,12 @@ class SolarLocalRuntime:
         now = dt_util.now()
         today = now.date()
         tomorrow = today + timedelta(days=1)
-        backfill = not self.state.backfilled
+        backfill = not self.state.backfilled and (self._retry_backfill_at is None or now >= self._retry_backfill_at)
+        if backfill:
+            self._retry_backfill_at = now + _BACKFILL_RETRY_DELAY
+        days = BACKFILL_DAYS if backfill else _RECENT_DAYS
 
-        js = await self._async_fetch_gti(BACKFILL_DAYS if backfill else 1)
+        js = await self._async_fetch_gti(days)
         if js is None:
             coord.async_update_listeners()
             return
@@ -207,14 +215,16 @@ class SolarLocalRuntime:
             if day >= recent or (backfill and "gti" not in self.state.days.get(day, {})):
                 self.state.set_value(day, "gti", gti)
 
-        actual = await self._async_read_actuals(BACKFILL_DAYS if backfill else _RECENT_DAYS, today, tz)
+        actual = await self._async_read_actuals(days, today, tz, productive_meter_hours(series, daily, tz))
         for day, kwh in (actual or {}).items():
             self.state.set_value(day, "actual", kwh)
-        # A backfill that found no usable day is tried again on the next refresh.
+        # A backfill without usable meter history is retried after the delay.
         if backfill and actual and self.meter_problem is None:
             self.state.backfilled = True
 
-        self.k, self.n_days, self.status = fit_factor(self.state, prior_factor(coord.solar_peak_kw), today)
+        self.k, self.n_days, self.status, self.days_rejected = fit_factor(
+            self.state, prior_factor(coord.solar_peak_kw), today
+        )
         self.today_kwh = predict_kwh(self.k, daily.get(today.isoformat()))
         self.tomorrow_kwh = predict_kwh(self.k, daily.get(tomorrow.isoformat()))
         self.totals_date = today
@@ -252,13 +262,15 @@ class SolarLocalRuntime:
     def apply(self, data: dict[str, Any], now: datetime) -> None:
         if self.k is None:
             return
-        self._roll_totals(dt_util.as_local(now).date())
+        local_now = dt_util.as_local(now)
+        self._roll_totals(local_now.date())
         data[KEY_SOLAR_LOCAL_TODAY_KWH] = self.today_kwh
         data[KEY_SOLAR_LOCAL_TOMORROW_KWH] = self.tomorrow_kwh
-        data[KEY_SOLAR_LOCAL_REMAINING_KWH] = remaining_kwh(self.hourly, now)
+        data[KEY_SOLAR_LOCAL_REMAINING_KWH] = remaining_kwh(self.hourly, now, local_now.tzinfo or UTC)
         data[KEY_SOLAR_LOCAL_INFO] = {
             "model_status": self.status,
             "days_used": self.n_days,
+            "days_rejected": self.days_rejected,
             "site_factor": round(self.k, 3),
             "prior_site_factor": round(prior_factor(self.coord.solar_peak_kw), 3),
             "pv_meters": list(self.meters),
@@ -278,6 +290,7 @@ class SolarLocalRuntime:
             "stored_days": len(self.state.days),
             "model_status": self.status,
             "days_used": self.n_days,
+            "days_rejected": self.days_rejected,
             "site_factor": None if self.k is None else round(self.k, 3),
             "meter_problem": self.meter_problem,
             "last_error": self.error,

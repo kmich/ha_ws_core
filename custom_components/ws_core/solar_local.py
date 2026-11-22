@@ -39,9 +39,10 @@ MIN_FIT_DAYS = 7  # below this the fit is shrunk toward the prior
 PRIOR_WEIGHT_DAYS = 3.0
 MIN_SKILL_DAYS = 5
 MIN_GTI_WHM2 = 300.0  # ignore near-dark days for fitting: ratios are noise there
-RATIO_BAND = (0.7, 1.3)  # around the median: drops outages, curtailment and snow days
+RATIO_BAND = (0.7, 1.3)  # keep days near the typical uncurtailed yield
 PRIOR_PERFORMANCE_RATIO = 0.80
-MIN_HOURS_PER_DAY = 20  # a forecast or meter day needs this many hours to count
+MIN_HOURS_PER_DAY = 20  # sanity check for the irradiance series and fallback meter coverage
+MIN_PRODUCTIVE_GTI_WHM2 = 25.0  # ignore night and low-irradiance twilight for meter coverage
 
 STATUS_PRIOR = "prior"
 STATUS_LEARNING = "learning"
@@ -66,8 +67,7 @@ def build_url(lat: float, lon: float, tilt: float, compass_azimuth: float, past_
         f"?latitude={lat}&longitude={lon}"
         "&hourly=global_tilted_irradiance"
         f"&tilt={float(tilt):g}&azimuth={open_meteo_azimuth(compass_azimuth):g}"
-        # Three GMT days: local tomorrow runs into the third UTC day for sites far from UTC
-        # (west of about UTC-4 in the afternoon, or east of UTC+2 before local midnight).
+        # Three GMT days also cover local tomorrow when it extends into the third UTC day.
         f"&past_days={max(0, min(BACKFILL_DAYS, int(past_days)))}&forecast_days=3"
         "&timeformat=unixtime&timezone=GMT"
     )
@@ -119,20 +119,21 @@ def actual_daily_kwh(
     units: dict[str, str | None],
     tz: tzinfo,
     before: date,
+    productive_hours: dict[str, set[int]] | None = None,
 ) -> dict[str, float]:
     """Measured PV energy per local date, summed over all meters.
 
     ``rows_by_id`` are hourly long-term statistics rows with a ``change`` value, which
     works for lifetime counters and daily-reset counters alike. A date only counts when
-    every meter has at least ``MIN_HOURS_PER_DAY`` hourly rows for it (so an outage does
-    not look like a dark day), and dates on or after ``before`` (today) are left out.
+    every meter covers all modeled productive hours. With no irradiance coverage
+    for a date, require ``MIN_HOURS_PER_DAY`` rows. Nighttime rows are optional
+    when productive hours are known. Today and later are excluded.
     """
     if not rows_by_id:
         return {}
-    per_meter: list[tuple[dict[str, float], dict[str, int]]] = []
+    per_meter: list[dict[str, dict[int, float]]] = []
     for stat_id, rows in rows_by_id.items():
-        sums: dict[str, float] = {}
-        counts: dict[str, int] = {}
+        by_day: dict[str, dict[int, float]] = {}
         unit = units.get(stat_id)
         for row in rows or ():
             start = row.get("start")
@@ -143,24 +144,36 @@ def actual_daily_kwh(
             kwh = energy_to_kwh(change, unit)
             if kwh is None:
                 continue
-            day = datetime.fromtimestamp(float(ts), UTC).astimezone(tz).date()
+            day = datetime.fromtimestamp(float(ts) + 1800, UTC).astimezone(tz).date()
             if day >= before:
                 continue
             key = day.isoformat()
             # A meter reset or replacement shows up as a large negative change: ignore it.
-            sums[key] = sums.get(key, 0.0) + max(0.0, kwh)
-            counts[key] = counts.get(key, 0) + 1
-        per_meter.append((sums, counts))
-    if len(per_meter) != len(rows_by_id):
-        return {}
-    days = set(per_meter[0][0])
-    for sums, _ in per_meter[1:]:
-        days &= set(sums)
+            by_day.setdefault(key, {})[int(ts)] = max(0.0, kwh)
+        per_meter.append(by_day)
+    days = set.intersection(*(set(by_day) for by_day in per_meter))
     out: dict[str, float] = {}
     for day in days:
-        if all(counts.get(day, 0) >= MIN_HOURS_PER_DAY for _, counts in per_meter):
-            out[day] = round(sum(sums[day] for sums, _ in per_meter), 3)
+        required = (productive_hours or {}).get(day)
+        meter_days = [by_day[day] for by_day in per_meter]
+        if all(
+            required <= readings.keys() if required else len(readings) >= MIN_HOURS_PER_DAY for readings in meter_days
+        ):
+            out[day] = round(sum(sum(readings.values()) for readings in meter_days), 3)
     return out
+
+
+def productive_meter_hours(
+    series: list[tuple[float, float]], complete_days: dict[str, float], tz: tzinfo
+) -> dict[str, set[int]]:
+    """Find hours with material irradiance on days covered by the forecast response."""
+    hours: dict[str, set[int]] = {}
+    for start, irradiance in series:
+        if irradiance >= MIN_PRODUCTIVE_GTI_WHM2:
+            day = datetime.fromtimestamp(start + 1800, UTC).astimezone(tz).date().isoformat()
+            if day in complete_days:
+                hours.setdefault(day, set()).add(int(start))
+    return hours
 
 
 # ---------------------------------------------------------------------------
@@ -265,13 +278,12 @@ class SolarLocalState:
 # ---------------------------------------------------------------------------
 
 
-def fit_factor(state: SolarLocalState, prior: float, today: date) -> tuple[float, int, str]:
-    """Site factor ``k`` (kWh per kWh/m2 of GTI), the number of days used, and a status.
+def fit_factor(state: SolarLocalState, prior: float, today: date) -> tuple[float, int, str, int]:
+    """Return the site factor, days used, fitting status, and days rejected.
 
-    Least squares through the origin over the last ``FIT_WINDOW_DAYS`` complete days,
-    after dropping days whose ratio falls outside ``RATIO_BAND`` of the median ratio
-    (meter outages, export or battery-full curtailment, snow on the panels). With fewer
-    than ``MIN_FIT_DAYS`` days the result is shrunk toward the prior.
+    Anchor the ratio band to the median of the highest fifth of yields (at least
+    seven days). Curtailment and snow reduce yield, so a productive minority can
+    still anchor the fit. The median of that group limits the effect of isolated spikes.
     """
     start = (today - timedelta(days=FIT_WINDOW_DAYS)).isoformat()
     end = today.isoformat()
@@ -281,17 +293,19 @@ def fit_factor(state: SolarLocalState, prior: float, today: date) -> tuple[float
         if start <= day < end and rec.get("gti", 0.0) >= MIN_GTI_WHM2 and rec.get("actual", 0.0) > 0.0
     ]
     if not pairs:
-        return prior, 0, STATUS_PRIOR
-    mid = median(a / g for g, a in pairs)
+        return prior, 0, STATUS_PRIOR, 0
+    ratios = sorted(a / g for g, a in pairs)
+    mid = median(ratios[-max(MIN_FIT_DAYS, math.ceil(len(ratios) / 5)) :])
     lo, hi = RATIO_BAND[0] * mid, RATIO_BAND[1] * mid
     kept = [(g, a) for g, a in pairs if lo <= a / g <= hi]
+    rejected = len(pairs) - len(kept)
     if not kept:
-        return prior, 0, STATUS_PRIOR
+        return prior, 0, STATUS_PRIOR, rejected
     k_fit = sum(g * a for g, a in kept) / sum(g * g for g, _ in kept)
     n = len(kept)
     if n >= MIN_FIT_DAYS:
-        return k_fit, n, STATUS_TRAINED
-    return (n * k_fit + PRIOR_WEIGHT_DAYS * prior) / (n + PRIOR_WEIGHT_DAYS), n, STATUS_LEARNING
+        return k_fit, n, STATUS_TRAINED, rejected
+    return (n * k_fit + PRIOR_WEIGHT_DAYS * prior) / (n + PRIOR_WEIGHT_DAYS), n, STATUS_LEARNING, rejected
 
 
 def predict_kwh(k: float, gti_whm2: float | None) -> float | None:
@@ -312,26 +326,21 @@ def hourly_kwh(
     return out
 
 
-def remaining_kwh(hourly: list[dict[str, Any]], now: datetime) -> float | None:
+def remaining_kwh(hourly: list[dict[str, Any]], now: datetime, tz: tzinfo) -> float | None:
     """Energy still to come today: the rest of the current hour plus later hours."""
     if not hourly:
         return None
-    now_local = now.astimezone(datetime.fromisoformat(hourly[0]["start"]).tzinfo)
-    today = now_local.date()
+    today = now.astimezone(tz).date()
+    now_ts = now.timestamp()
     total = 0.0
     found = False
     for item in hourly:
         start = datetime.fromisoformat(item["start"])
-        if start.date() != today:
+        if start.astimezone(tz).date() != today:
             continue
         found = True
-        end = start + timedelta(hours=1)
-        if end <= now:
-            continue
-        if start >= now:
-            total += item["kwh"]
-        else:
-            total += item["kwh"] * (end - now).total_seconds() / 3600.0
+        remaining_seconds = min(3600.0, max(0.0, start.timestamp() + 3600.0 - now_ts))
+        total += item["kwh"] * remaining_seconds / 3600.0
     return round(total, 2) if found else None
 
 

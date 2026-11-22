@@ -813,6 +813,7 @@ class PatternEngine:
         self.base_rate: dict[str, list[float]] = {}
         self.cond: dict[str, list[list[float]]] = {}
         self.history_learn: dict[str, Any] = {}
+        self.features_migration_pending: bool | None = None
         self.last_trained_at: float | None = None
         self.first_obs_ts: float | None = None
         self.last_rain_ts: float | None = None
@@ -1815,12 +1816,19 @@ class PatternEngine:
             self.std.n[POOL_INDEX["dp_3h"]] >= PATTERN_STD_MIN_N
             and trained.std.n[POOL_INDEX["dp_3h"]] >= PATTERN_STD_MIN_N
         )
+        fresh_alignment = self.features_migration_pending is not True and (
+            prev_fm is None or prev_fm_val >= PATTERN_HISTORY_FEATURES_METHOD
+        )
         targets = dict(prev_hl.get("targets") or {})
         for tid, st in statuses.items():
             if tid in self.models:
                 entry = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
                 needs_dp = "dp_3h" in self.models[tid].spec.features
-                if st.get("status") == "ok" and report.get(tid, {}).get("samples", 0) > 0 and (not needs_dp or dp_warm):
+                if (
+                    st.get("status") == "ok"
+                    and report.get(tid, {}).get("samples", 0) > 0
+                    and (not needs_dp or dp_warm or fresh_alignment)
+                ):
                     entry["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
                 elif tid in targets and "features_method" in targets[tid]:
                     entry["features_method"] = targets[tid]["features_method"]
@@ -1985,6 +1993,7 @@ class PatternEngine:
             "last_day_clear": list(self.last_day_clear) if self.last_day_clear else None,
             "last_trained_at": self.last_trained_at,
             "history_learn": self.history_learn,
+            "features_migration_pending": bool(self.features_migration_pending),
         }
 
     @staticmethod
@@ -2104,6 +2113,26 @@ class PatternEngine:
         ldc = data.get("last_day_clear")
         eng.last_day_clear = [float(ldc[0]), float(ldc[1])] if _floats_ok(ldc, 2) else None
         eng.history_learn = cls._clean_history(data.get("history_learn"), loaded)
+        pending = data.get("features_migration_pending")
+        if isinstance(pending, bool):
+            eng.features_migration_pending = pending
+        else:
+            history = eng.history_learn
+            targets = history.get("targets") or {}
+            feature_method = history.get("features_method", 0)
+            # v3 previews wrote the new replay method even on a short replay
+            # that never warmed the pressure scaler. Their weights are current.
+            legacy_history = any(
+                not _finite(target.get("method")) or target["method"] < PATTERN_HISTORY_METHOD
+                for target in targets.values()
+            )
+            untagged_weights = not targets and any(std.n[POOL_INDEX[name]] for name in PATTERN_CORRUPTED_FEATURES)
+            eng.features_migration_pending = feature_method < PATTERN_HISTORY_FEATURES_METHOD and (
+                legacy_history
+                or untagged_weights
+                or history.get("features_reset_method", 0) >= PATTERN_HISTORY_FEATURES_METHOD
+                or "features_method" in history
+            )
         return eng
 
     @staticmethod

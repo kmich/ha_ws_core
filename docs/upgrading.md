@@ -35,9 +35,16 @@ forecast is trusted.
 
 - A full copy of the old state is written first, to
   `.storage/ws_core_<entry_id>_pattern_forecast_pre_v3_backup`.
-- The pressure input relearns straight away from up to 90 days of your recorder history.
+- The pressure input relearns straight away from up to 365 days of your recorder history.
 - The solar inputs relearn from live daylight readings over the following days and weeks.
   Forecasts keep working meanwhile.
+
+The AQI sensor now prefers the provider's US index when the US scale is selected.
+It uses pollutant-specific averaging periods and can differ from the previous
+instantaneous particulate estimate, which remains the fallback. The Beaufort
+`description` attribute now uses Home Assistant's configured language.
+For language-independent automations, use the numeric Beaufort
+state or the `wind_beaufort_description` enum key.
 
 ## The options moved into a menu
 

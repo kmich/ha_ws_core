@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from typing import TYPE_CHECKING, Any
@@ -320,29 +321,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.runtime_data = coordinator
 
     try:
-        await coordinator.async_start()
-    except Exception as err:
-        _LOGGER.warning(
-            "ws_core: async_start raised %s - entry will still be created, sensors populate on first tick", err
+        try:
+            await coordinator.async_start()
+        except Exception as err:
+            # A failed initial fetch can be retried by the coordinator tick.
+            _LOGGER.warning(
+                "ws_core: async_start raised %s - entry will still be created, sensors populate on first tick", err
+            )
+
+        dev_reg = dr.async_get(hass)
+        integration = await async_get_integration(hass, DOMAIN)
+        dev_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.title,
+            manufacturer="Weather Station Core",
+            model="Derived Weather Package",
+            sw_version=str(integration.version) if integration.version else "unknown",
         )
-        # Do NOT re-raise - a failed initial fetch must not block entry creation.
-        # The 60s tick scheduler will retry all fetches automatically.
 
-    # Create a device for the station.
-    dev_reg = dr.async_get(hass)
-    _integration = await async_get_integration(hass, DOMAIN)
-    dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title,
-        manufacturer="Weather Station Core",
-        model="Derived Weather Package",
-        sw_version=str(_integration.version) if _integration.version else "unknown",
-    )
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        entry.async_on_unload(entry.add_update_listener(async_update_options))
+        _async_register_services(hass)
+    except (Exception, asyncio.CancelledError):
+        await coordinator.async_stop()
+        _async_remove_unused_services(hass, entry)
+        raise
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(async_update_options))
+    return True
 
+
+def _async_register_services(hass: HomeAssistant) -> None:
     def _get_targets(call: ServiceCall) -> list:
         entry_id = call.data.get(ATTR_ENTRY_ID)
         targets = _loaded_coordinators(hass, entry_id)
@@ -584,8 +593,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DOMAIN, SERVICE_APPLY_CALIBRATION, _apply_calibration, schema=SERVICE_APPLY_CALIBRATION_SCHEMA
         )
 
-    return True
-
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update."""
@@ -597,7 +604,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not unload_ok:
         return False
     await entry.runtime_data.async_stop()
-    if not hass.config_entries.async_loaded_entries(DOMAIN):
+    _async_remove_unused_services(hass, entry)
+    return True
+
+
+def _async_remove_unused_services(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    if not any(
+        other.entry_id != entry.entry_id and not getattr(getattr(other, "runtime_data", None), "_stopped", False)
+        for other in hass.config_entries.async_loaded_entries(DOMAIN)
+    ):
         for svc in (
             SERVICE_RESET_RAIN,
             SERVICE_RESET_LEARNING,
@@ -608,7 +623,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ):
             if hass.services.has_service(DOMAIN, svc):
                 hass.services.async_remove(DOMAIN, svc)
-    return True
 
 
 def entry_storage_keys(entry_id: str) -> tuple[str, ...]:

@@ -6,8 +6,11 @@ so a newer-only API in setup, the coordinator constructor or the flows fails the
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import entity_registry as er
 
 from custom_components.ws_core import const as c
 
@@ -44,6 +47,7 @@ async def test_real_setup_options_flow_and_unload(hass, enable_custom_integratio
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
     assert hass.states.get("sensor.ws_data_status") is not None
+    assert hass.services.has_service(c.DOMAIN, "get_weather_windows")
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.MENU
@@ -57,6 +61,54 @@ async def test_real_setup_options_flow_and_unload(hass, enable_custom_integratio
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.NOT_LOADED
+    assert not hass.services.has_service(c.DOMAIN, "get_weather_windows")
+
+
+async def test_failed_platform_setup_stops_coordinator(hass, enable_custom_integrations):
+    entry = _entry()
+    entry.add_to_hass(hass)
+    with patch.object(
+        type(hass.config_entries), "async_forward_entry_setups", side_effect=RuntimeError("test platform failure")
+    ):
+        assert not await hass.config_entries.async_setup(entry.entry_id)
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert entry.runtime_data._stopped
+    assert not hass.services.has_service(c.DOMAIN, "get_weather_windows")
+
+
+async def test_feature_opt_in_restores_only_integration_disabled_entities(hass, enable_custom_integrations):
+    entry = _entry()
+    entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(entry, options={c.CONF_ENABLE_THUNDERSTORM: True, c.CONF_ENABLE_MOON: True})
+    registry = er.async_get(hass)
+    old = registry.async_get_or_create(
+        "sensor",
+        c.DOMAIN,
+        f"{entry.entry_id}_{c.KEY_FOG_PROBABILITY}",
+        config_entry=entry,
+        disabled_by=er.RegistryEntryDisabler.INTEGRATION,
+        suggested_object_id="renamed_fog",
+    )
+    hidden = registry.async_get_or_create(
+        "sensor",
+        c.DOMAIN,
+        f"{entry.entry_id}_{c.KEY_THUNDERSTORM_RISK}",
+        config_entry=entry,
+        disabled_by=er.RegistryEntryDisabler.USER,
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get(old.entity_id) is None
+    await hass.services.async_call("switch", "turn_on", {"entity_id": "switch.ws_enable_fog"}, blocking=True)
+    await hass.async_block_till_done()
+    assert registry.async_get(old.entity_id).disabled_by is None
+    assert hass.states.get(old.entity_id) is not None
+    assert registry.async_get(hidden.entity_id).disabled_by is er.RegistryEntryDisabler.USER
+    assert hass.states.get(hidden.entity_id) is None
+    moon = registry.async_get_entity_id("sensor", c.DOMAIN, f"{entry.entry_id}_{c.KEY_MOON_ILLUMINATION_PCT}")
+    assert moon is not None
+    assert registry.async_get(moon).disabled_by is None
+    assert await hass.config_entries.async_unload(entry.entry_id)
 
 
 async def test_config_flow_starts(hass, enable_custom_integrations):

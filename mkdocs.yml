@@ -68,6 +68,7 @@ nav:
   - Use Cases: use_cases.md
   - Sensors Reference: sensors.md
   - Forecast Providers: forecast_providers.md
+  - Science: science.md
   - Dashboards: dashboards.md
   - Blueprints: blueprints.md
   - Guides:

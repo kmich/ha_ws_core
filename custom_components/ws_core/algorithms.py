@@ -1604,8 +1604,7 @@ _PM10_BREAKPOINTS = [
     (155, 254, 101, 150),
     (255, 354, 151, 200),
     (355, 424, 201, 300),
-    (425, 504, 301, 400),
-    (505, 604, 401, 500),
+    (425, 604, 301, 500),
 ]
 
 
@@ -1708,7 +1707,7 @@ def _eaqi_subindex(value: float, breakpoints: tuple[int, ...]) -> int:
     # Use the last band's slope to extrapolate above 100, as Open-Meteo does.
     upper = min(bisect_right(breakpoints, value), len(breakpoints) - 1)
     low, high = breakpoints[upper - 1], breakpoints[upper]
-    return round(20 * (upper - 1 + (value - low) / (high - low)))
+    return math.floor(20 * (upper - 1 + (value - low) / (high - low)) + 0.5)
 
 
 def calculate_european_aqi(
