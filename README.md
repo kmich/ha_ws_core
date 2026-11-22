@@ -24,7 +24,17 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 - **A tidier setup.** **Configure** is now a menu (sources, forecast, Weather Windows, rooms, thresholds, uploads, features), setup help is translated into all eight languages, and sensors your station can never fill are no longer created.
 - **Sturdier Pattern Forecast.** Frequent restarts no longer pause it for up to a day, and a few inputs that earlier versions computed inconsistently are relearned once on upgrade.
 
-**Upgrading from 2.x:** 3.0 needs Home Assistant 2024.10 or newer and changes a few behaviours (feels-like values, lightning values, action errors, removal of sensors that could never have a value). Read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) before updating. The [changelog](CHANGELOG.md) has every change.
+### Breaking changes when upgrading from 2.x
+
+1. **Home Assistant 2024.10 or newer is required.**
+2. **Feels-like sensors** (heat index, THW, THSW, wind chill, humidex) show the air temperature outside their range instead of `unknown`. Automations should check the `formula_applies` attribute.
+3. **Lightning:** `sensor.ws_lightning_proximity` reads `clear` without a strike, and `sensor.ws_lightning_clearance` keeps counting across restarts. **Re-import the Lightning Safety blueprint** so a restart cannot send a false all-clear.
+4. **Actions raise errors:** every ws_core action fails with a clear error for an unknown station, an unknown profile or invalid limits, instead of returning `{}` or an `error` key.
+5. **Leftover solar sensors are removed** on stations without a solar radiation sensor (W/m²), including THSW. They could never have a value.
+6. **Turning Weather Windows or a profile off removes its entities.**
+7. **Removing the integration deletes its stored data** (learning state, history, climate normals, Pattern Forecast).
+
+Read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) for what to do about each one. The [changelog](CHANGELOG.md) has every change.
 
 ## What it does
 
