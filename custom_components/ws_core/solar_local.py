@@ -367,10 +367,10 @@ def _stats(pairs: list[tuple[float, float]]) -> dict[str, Any] | None:
 
 
 def skill(state: SolarLocalState, today: date) -> dict[str, Any]:
-    """Day-ahead skill over the last SKILL_WINDOW_DAYS days, scored on the same days.
+    """Day-ahead skill over the last SKILL_WINDOW_DAYS days.
 
-    Only days where both sources have a day-ahead snapshot are compared, when both
-    exist at all, so the two sets of numbers describe the same weather.
+    Use shared dates when both sources have enough overlapping snapshots.
+    Otherwise each source is scored on its own available dates.
     """
     start = (today - timedelta(days=SKILL_WINDOW_DAYS)).isoformat()
     end = today.isoformat()

@@ -57,7 +57,8 @@ Go directly to Step 3 if the Marketplace has already opened the setup wizard.
 2. Click **+ Add Integration**
 3. Search for "Weather Station Core" and select it
 
-The setup wizard opens and guides you through 8 steps.
+The setup wizard opens. It adds screens for the optional features and forecast
+provider you select.
 
 ---
 

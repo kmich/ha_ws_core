@@ -379,7 +379,7 @@ Attributes of `sensor.ws_solar_local_forecast_today`:
 | `hourly` | Hourly forecast for today and tomorrow (`start`, `kwh`). Home Assistant Recorder excludes this attribute |
 | `meter_problem` / `last_error` | Problems reading usable meter data or refreshing the irradiance forecast |
 
-Skill is scored fairly: only the last forecast made **before** a day started is compared with what the meters measured that day, for both forecasts, and on the same days when both exist. The day-ahead history starts when the feature is turned on, so `skill_*` appear after about 5 days.
+Skill compares the last forecast made **before** each day with that day's measured yield. The model scores both forecasts on shared days when at least five are available. With fewer shared days each forecast is scored on its own qualifying dates, so the two scores can cover different days. The day-ahead history starts when the feature is turned on.
 
 Notes and limits:
 

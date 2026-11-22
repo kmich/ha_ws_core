@@ -37,11 +37,10 @@ replace `mushroom-weather-card` or `mushroom-weather-info-card` with the built-i
 
 ## Vanilla Dashboard (`weather_dashboard_vanilla.yaml`)
 
-**No HACS frontend dependencies.** Uses only native Home Assistant cards.
+**Uses only native Home Assistant cards.**
 Works immediately after installation.
 
-Best for users who want a functional weather dashboard without installing any
-additional HACS frontend integrations.
+Choose this dashboard if you want to avoid installing custom cards.
 
 **Cards used:** `entities`, `gauge`, `history-graph`, `logbook`, `weather-forecast`, `statistic`.
 
@@ -62,9 +61,9 @@ Rich visual layout with colored tiles, animations, and custom card types.
 
 *The Weather and Advanced pages on a Shelly WS90.*
 
-**HACS frontend dependencies required:**
+**Required custom cards and plugins:**
 
-| Integration | HACS type |
+| Integration | Type |
 |---|---|
 | `custom:button-card` | Frontend |
 | `custom:mini-graph-card` | Frontend |
@@ -74,7 +73,7 @@ Rich visual layout with colored tiles, animations, and custom card types.
 | `card-mod` | Frontend |
 | `kiosk-mode` | Frontend |
 
-Install all dependencies from HACS before pasting the dashboard YAML.
+Install the dependencies before pasting the dashboard YAML.
 
 **Features:**
 - Color-coded temperature, UV, and AQI tiles
@@ -128,7 +127,7 @@ Seven-view dashboard covering the full range of sensors and v3.0 Weather Windows
 6. **Indoor** - indoor comfort score, temperature and humidity deltas, plus per-room sensors (temp delta, humidity, CO₂ and comfort) for each named room
 7. **Windows** - Weather Windows summary card, outdoor drying, garden work, and optional custom profile schedules & status attributes (`enable_weather_windows`)
 
-**HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
+**Required custom cards:** `mushroom`, `mini-graph-card`.
 
 ---
 
@@ -138,7 +137,7 @@ Single-column, touch-optimised layout designed for phones using HA Sections view
 All the same data as the full dashboard but stacked vertically for portrait screens,
 including the **Recent Weather Events** logbook card.
 
-**HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
+**Required custom cards:** `mushroom`, `mini-graph-card`.
 
 ---
 
@@ -186,7 +185,7 @@ Without the photos the page keeps your theme's background. The background is dra
 by a template on the first section heading, using Bubble Card's `styles` option, and
 is hidden when you switch to another dashboard.
 
-**HACS frontend dependencies required:** Bubble Card **v3.2.0 or later**. The pop-ups use
+**Required custom card:** Bubble Card **v3.2.0 or later**. The pop-ups use
 the standalone format introduced in v3.2.0. Everything else is a built-in card.
 
 ---
@@ -198,7 +197,7 @@ temperature, humidity, pressure, wind speed, wind gust, UV index, rain rate,
 rain probability, data quality score, AQI, fire risk score, WBGT, and
 (opt-in, v2.7) snow rate.
 
-Uses only the built-in `gauge` card — no HACS dependencies.
+Uses only the built-in `gauge` card.
 
 Paste individual card definitions into any existing dashboard.
 
@@ -246,9 +245,8 @@ card:
 
 ## Keeping dashboards up to date
 
-Dashboards are not auto-updated by HACS. When a new version of ws_core adds entities
-referenced in a dashboard update, re-paste the updated YAML from the `dashboards/`
-directory.
+Integration updates leave pasted dashboard YAML as saved. To update a dashboard,
+paste the new YAML from the `dashboards/` directory.
 
 The CHANGELOG notes dashboard changes per version.
 
