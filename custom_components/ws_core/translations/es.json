@@ -19,8 +19,11 @@
           "wind_speed": "Sensor de velocidad del viento",
           "wind_gust": "Sensor de racha de viento",
           "wind_direction": "Sensor de dirección del viento (grados)",
-          "rain_total": "Sensor de precipitación acumulada",
+          "rain_total": "Contador de lluvia",
           "_go_back": "← Volver al paso anterior"
+        },
+        "data_description": {
+          "rain_total": "Elige un contador de cantidad en mm o in. Es preferible un contador total o anual. También sirve un contador de eventos si aumenta durante cada episodio de lluvia y se reinicia entre episodios. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Unidad del sensor de humedad del suelo",
           "soil_temperature": "Sensor de temperatura del suelo",
           "_go_back": "← Volver al paso anterior"
+        },
+        "data_description": {
+          "rain_year": "Elige la precipitación de la estación desde el 1 de enero en mm o in. Puedes elegir el mismo contador anual en ambos campos. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "location": {
@@ -159,12 +165,31 @@
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
+          "enable_display_sensors": "Sensores de visualización (niveles, tendencias, salud)",
+          "enable_fire_risk_score": "Puntuación de riesgo de incendio",
+          "enable_sea_temp": "Temperatura superficial del mar",
+          "enable_air_quality": "Índice de calidad del aire (Open-Meteo)",
+          "enable_pollen": "Niveles de polen (Open-Meteo)",
+          "enable_moon": "Fase lunar e iluminación",
+          "enable_solar_forecast": "Previsión solar fotovoltaica (forecast.solar)",
+          "enable_fog": "Activa el sensor de probabilidad de niebla (modelo de depresión del punto de rocío)",
+          "enable_thunderstorm_risk": "Activa el sensor de riesgo de tormenta (heurístico de superficie)",
+          "enable_comfort_indices": "Activa los índices de confort y sensores agrometeorológicos",
+          "enable_vigilance_meteo": "Activa las alertas meteorológicas departamentales de Météo-France (Vigilance Meteo)",
+          "enable_vigicrues": "Activa el nivel fluvial más cercano de Vigicrues (Hub'Eau v2)",
+          "enable_diagnostics": "Deriva del sensor, consistencia cruzada, indicadores de calidad, habilidad/concordancia de previsión, factor solar-lux, climatología 30 días",
+          "enable_fwi_components": "Códigos intermedios FWI (FFMC/DMC/DC/ISI/BUI). Requiere Riesgo de Incendio activado para producir datos",
+          "enable_advanced_sensors": "Número Zambretti (forma numérica), ET₀ horaria, dirección de viento suavizada",
+          "enable_nowcast": "Nowcast de precipitación de 15 minutos de Open-Meteo: minutos hasta que empiece/pare la lluvia, total de la próxima hora, intensidad. Sin clave API",
           "enable_degree_days": "Cálculo de grados-día de crecimiento, calefacción y refrigeración, más una estimación de humedad foliar, útil para agricultura y seguimiento energético.",
+          "enable_lightning": "Recuento de rayos, distancia más cercana y proximidad de tormenta desde un sensor de rayos (o Blitzortung si no hay sensor asignado).",
+          "enable_indoor": "Temperatura, humedad y CO₂ interiores, su diferencia con el exterior y el confort de cada habitación con nombre.",
+          "enable_soil": "Sensores de humedad y temperatura del suelo, más una necesidad de riego estimada a partir de la evapotranspiración y la lluvia.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Activada por defecto. Una vez por hora compara tu temperatura, humedad y presión con el valor de Open-Meteo para las coordenadas configuradas y muestra las diferencias grandes en sensor.ws_neighbor_qc_flags. Desactívala para detener la petición. La calibración adaptativa, si está activada, la sigue usando.",
           "enable_pattern_forecast": "Aprende del propio historial de tu estación para estimar la probabilidad de lluvia, helada, un día caluroso, rachas fuertes y (con un detector de rayos local) tormentas en las próximas horas. Cada pronóstico muestra valores cuando ha visto suficientes ejemplos de tu estación, a menudo de inmediato si Home Assistant ya tiene historial a largo plazo de tus sensores. Funciona por completo en este equipo.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "weathercloud": {
@@ -272,7 +297,8 @@
         "description": "Datos de calidad del aire (PM2,5, PM10, NO₂, ozono) de Open-Meteo. Gratuito, sin clave API. Usa latitud/longitud de la previsión.",
         "data": {
           "aqi_interval_min": "Intervalo de actualización",
-          "_go_back": "← Volver al paso anterior"
+          "_go_back": "← Volver al paso anterior",
+          "aqi_scale": "Escala ICA"
         }
       },
       "pollen": {
@@ -290,6 +316,7 @@
           "solar_panel_azimuth": "Azimut del panel",
           "solar_panel_tilt": "Inclinación del panel",
           "solar_interval_min": "Intervalo de actualización",
+          "solar_pv_energy_entities": "Contadores de energía FV (opcional)",
           "_go_back": "← Volver al paso anterior"
         }
       },
@@ -374,8 +401,58 @@
   "options": {
     "step": {
       "init": {
-        "title": "Ajustes principales",
-        "description": "Identidad, unidades, previsión, alertas y calibración.",
+        "title": "Menú de configuración",
+        "description": "Elija una sección para configurar.",
+        "menu_options": {
+          "sources": "Fuentes de sensores (asignaciones de hardware)",
+          "forecast": "Previsión meteorológica y ubicación",
+          "decision_profiles": "Motor de decisiones y ventanas meteorológicas",
+          "rooms": "Habitaciones interiores",
+          "thresholds": "Umbrales, unidades y calibración",
+          "uploads": "Servicios meteorológicos y subidas",
+          "diagnostics": "Funciones y diagnósticos"
+        }
+      },
+      "sources": {
+        "title": "Fuentes de sensores",
+        "description": "Configure las asignaciones de entidades de sensores físicos."
+      },
+      "forecast": {
+        "title": "Previsión meteorológica",
+        "description": "Configure el proveedor de previsión externo, intervalo de actualización y coordenadas.",
+        "data": {
+          "forecast_enabled": "Activar previsión",
+          "forecast_interval_min": "Intervalo de actualización de la previsión",
+          "forecast_lat": "Latitud de previsión",
+          "forecast_lon": "Longitud de previsión",
+          "forecast_provider": "Proveedor de previsión",
+          "forecast_entity": "Entidad meteorológica de HA (para proveedor Home Assistant)"
+        }
+      },
+      "decision_profiles": {
+        "title": "Perfiles de decisión y ventanas meteorológicas",
+        "description": "Configure el motor de decisiones meteorológicas y seleccione las ventanas de actividad.{provider_warning}",
+        "data": {
+          "enable_weather_windows": "Activar motor de decisiones de ventanas meteorológicas",
+          "weather_window_profiles": "Perfiles de decisión activos",
+          "custom_window_name": "Nombre del perfil personalizado",
+          "custom_min_duration_h": "Duración mínima personalizada (horas)",
+          "custom_max_rain_prob_pct": "Probabilidad máx. de lluvia personalizada (%)",
+          "custom_max_rain_mm": "Precipitación máx. personalizada",
+          "custom_min_temp_c": "Temperatura mín. personalizada",
+          "custom_max_temp_c": "Temperatura máx. personalizada",
+          "custom_min_humidity_pct": "Humedad mín. personalizada (%)",
+          "custom_max_humidity_pct": "Humedad máx. personalizada (%)",
+          "custom_min_wind_kmh": "Velocidad mín. del viento personalizada",
+          "custom_max_wind_kmh": "Velocidad máx. del viento personalizada",
+          "custom_max_wind_gust_kmh": "Racha máx. de viento personalizada",
+          "custom_max_cloud_cover_pct": "Nubosidad máx. personalizada (%)",
+          "custom_require_daylight": "El perfil personalizado requiere luz diurna"
+        }
+      },
+      "thresholds": {
+        "title": "Umbrales, unidades y calibración",
+        "description": "Identidad de la estación, unidades, umbrales de alerta y compensaciones de calibración.",
         "data": {
           "prefix": "Prefijo de entidad",
           "hemisphere": "Hemisferio",
@@ -388,52 +465,6 @@
           "rain_unit": "Unidad de precipitación",
           "distance_unit": "Unidad de distancia",
           "altitude_unit": "Unidad de altitud",
-          "forecast_enabled": "Activar previsión",
-          "forecast_interval_min": "Intervalo de actualización de la previsión",
-          "forecast_lat": "Latitud de previsión",
-          "forecast_lon": "Longitud de previsión",
-          "forecast_provider": "Proveedor de previsión",
-          "forecast_api_key": "Clave API de previsión",
-          "forecast_entity": "Entidad meteorológica de HA (para proveedor Home Assistant)",
-          "thresh_wind_gust_ms": "Umbral de alerta de racha de viento",
-          "thresh_rain_rate_mmph": "Umbral de alerta de intensidad de lluvia",
-          "thresh_freeze_c": "Umbral de advertencia de helada",
-          "staleness_s": "Tiempo de espera por antigüedad del sensor",
-          "rain_filter_alpha": "Suavizado del filtro de intensidad de lluvia",
-          "pressure_trend_window_h": "Ventana de tendencia de presión",
-          "cal_temp_c": "Desplazamiento de calibración de temperatura",
-          "cal_humidity": "Desplazamiento de calibración de humedad",
-          "cal_pressure_hpa": "Desplazamiento de calibración de presión",
-          "cal_wind_ms": "Desplazamiento de calibración de velocidad del viento",
-          "enable_display_sensors": "Sensores de visualización (niveles, tendencias, salud)",
-          "enable_fire_risk_score": "Puntuación de riesgo de incendio",
-          "enable_sea_temp": "Temperatura superficial del mar",
-          "sea_temp_lat": "Latitud para temperatura del mar",
-          "sea_temp_lon": "Longitud para temperatura del mar",
-          "enable_wunderground": "Subida a Weather Underground",
-          "wu_station_id": "ID de estación WU",
-          "wu_api_key": "Clave de estación WU (contraseña)",
-          "wu_interval_min": "Intervalo de subida WU"
-        },
-        "data_description": {
-          "prefix": "Prefijo de entidad",
-          "hemisphere": "Hemisferio",
-          "climate_region": "Región climática",
-          "elevation_m": "Altitud de la estación",
-          "units_mode": "Establece un sistema de unidades base. Las anulaciones de unidades individuales tienen prioridad.",
-          "temp_unit": "Anular visualización de temperatura. 'Auto' sigue el sistema de unidades de HA.",
-          "wind_unit": "Anular visualización de velocidad del viento. 'Auto' sigue el sistema de unidades de HA.",
-          "pressure_unit": "Anular visualización de presión. 'Auto' sigue el sistema de unidades de HA.",
-          "rain_unit": "Anular visualización de precipitación. 'Auto' sigue el sistema de unidades de HA.",
-          "distance_unit": "Anular visualización de distancia (p. ej. distancia de rayo). 'Auto' sigue el sistema de unidades de HA.",
-          "altitude_unit": "Anular visualización de altitud (p. ej. base de nubes, nivel de congelación). 'Auto' sigue el sistema de unidades de HA.",
-          "forecast_enabled": "Activar previsión",
-          "forecast_interval_min": "Intervalo de actualización de la previsión",
-          "forecast_lat": "Latitud de previsión",
-          "forecast_lon": "Longitud de previsión",
-          "forecast_provider": "Fuente de datos meteorológicos. Open-Meteo y Met.no son gratuitos sin clave API. NWS/NOAA es gratuito pero solo para EE.UU. OpenWeatherMap, Pirate Weather y Météo France requieren una clave API gratuita. 'Entidad meteorológica de Home Assistant' usa una entidad weather.* existente sin llamadas API adicionales.",
-          "forecast_api_key": "Clave API para el proveedor de previsión seleccionado (requerida para OpenWeatherMap, Pirate Weather y Météo France).",
-          "forecast_entity": "Requerido cuando se selecciona 'Entidad meteorológica de Home Assistant'. Elija cualquier entidad weather.* ya configurada en Home Assistant.",
           "thresh_wind_gust_ms": "Umbral de alerta de racha de viento",
           "thresh_rain_rate_mmph": "Umbral de alerta de intensidad de lluvia",
           "thresh_freeze_c": "Umbral de advertencia de helada",
@@ -466,7 +497,10 @@
           "wind_speed": "Sensor de velocidad del viento",
           "wind_gust": "Sensor de racha de viento",
           "wind_direction": "Sensor de dirección del viento (grados)",
-          "rain_total": "Sensor de precipitación acumulada"
+          "rain_total": "Contador de lluvia"
+        },
+        "data_description": {
+          "rain_total": "Elige un contador de cantidad en mm o in. Es preferible un contador total o anual. También sirve un contador de eventos si aumenta durante cada episodio de lluvia y se reinicia entre episodios. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -488,6 +522,9 @@
           "soil_moisture": "Sensor de humedad del suelo (0-100% o 0-1 volumétrico)",
           "soil_moisture_unit": "Unidad del sensor de humedad del suelo",
           "soil_temperature": "Sensor de temperatura del suelo"
+        },
+        "data_description": {
+          "rain_year": "Elige la precipitación de la estación desde el 1 de enero en mm o in. Puedes elegir el mismo contador anual en ambos campos. Para las estadísticas a largo plazo, se recomienda la clase de estado total_increasing."
         }
       },
       "features_opt": {
@@ -537,11 +574,15 @@
           "enable_fwi_components": "Códigos intermedios FWI (FFMC/DMC/DC/ISI/BUI). Requiere Riesgo de Incendio activado para producir datos",
           "enable_advanced_sensors": "Número Zambretti (forma numérica), ET₀ horaria, dirección de viento suavizada",
           "enable_nowcast": "Nowcast de precipitación de 15 minutos de Open-Meteo: minutos hasta que empiece/pare la lluvia, total de la próxima hora, intensidad. Sin clave API",
+          "enable_degree_days": "Cálculo de grados-día de crecimiento, calefacción y refrigeración, más una estimación de humedad foliar, útil para agricultura y seguimiento energético.",
+          "enable_lightning": "Recuento de rayos, distancia más cercana y proximidad de tormenta desde un sensor de rayos (o Blitzortung si no hay sensor asignado).",
+          "enable_indoor": "Temperatura, humedad y CO₂ interiores, su diferencia con el exterior y el confort de cada habitación con nombre.",
+          "enable_soil": "Sensores de humedad y temperatura del suelo, más una necesidad de riego estimada a partir de la evapotranspiración y la lluvia.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Activada por defecto. Una vez por hora compara tu temperatura, humedad y presión con el valor de Open-Meteo para las coordenadas configuradas y muestra las diferencias grandes en sensor.ws_neighbor_qc_flags. Desactívala para detener la petición. La calibración adaptativa, si está activada, la sigue usando.",
           "enable_pattern_forecast": "Aprende del propio historial de tu estación para estimar la probabilidad de lluvia, helada, un día caluroso, rachas fuertes y (con un detector de rayos local) tormentas en las próximas horas. Cada pronóstico muestra valores cuando ha visto suficientes ejemplos de tu estación, a menudo de inmediato si Home Assistant ya tiene historial a largo plazo de tus sensores. Funciona por completo en este equipo.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "indoor_rooms_opt": {
@@ -626,7 +667,8 @@
         "title": "Ajustes de calidad del aire",
         "description": "API de Calidad del Aire de Open-Meteo. Gratuito, sin clave requerida.",
         "data": {
-          "aqi_interval_min": "Intervalo de actualización"
+          "aqi_interval_min": "Intervalo de actualización",
+          "aqi_scale": "Escala ICA"
         }
       },
       "pollen_opt": {
@@ -641,7 +683,8 @@
           "solar_peak_kw": "Potencia pico (kWp)",
           "solar_panel_azimuth": "Azimut del panel",
           "solar_panel_tilt": "Inclinación del panel",
-          "solar_interval_min": "Intervalo de actualización"
+          "solar_interval_min": "Intervalo de actualización",
+          "solar_pv_energy_entities": "Contadores de energía FV (opcional)"
         }
       },
       "vigicrues_station_opt": {
@@ -732,7 +775,11 @@
       "invalid_api_key": "Clave API no válida o credenciales rechazadas",
       "cannot_connect": "No se pudo conectar con la API - verifique la red e inténtelo de nuevo",
       "station_not_found": "ID de estación de Weather Underground no encontrado",
-      "room_name_required": "Introduzca un nombre para la habitación."
+      "room_name_required": "Introduzca un nombre para la habitación.",
+      "invalid_duration": "La duración mínima debe ser un número entero de horas entre 1 y 23.",
+      "min_exceeds_max": "El límite mínimo no puede superar al límite máximo.",
+      "out_of_range": "El valor está fuera del rango válido.",
+      "invalid_profiles": "Uno o más perfiles seleccionados no son válidos."
     }
   },
   "issues": {
@@ -796,7 +843,7 @@
         "name": "Dirección del viento"
       },
       "rain_total": {
-        "name": "Precipitación total"
+        "name": "Contador de lluvia"
       },
       "rain_rate": {
         "name": "Intensidad de lluvia"
@@ -882,6 +929,9 @@
           },
           "alert_count": {
             "name": "Número de alertas"
+          },
+          "detail_message": {
+            "name": "Mensaje detallado"
           }
         }
       },
@@ -896,6 +946,12 @@
           },
           "color": {
             "name": "Color"
+          },
+          "detail_message": {
+            "name": "Mensaje detallado"
+          },
+          "active_alerts": {
+            "name": "Alertas activas"
           }
         }
       },
@@ -1197,6 +1253,13 @@
               "internet": "Internet"
             }
           }
+        }
+      },
+      "data_status": {
+        "name": "Estado de los datos",
+        "state": {
+          "ok": "OK",
+          "attention": "Requiere atención"
         }
       },
       "pattern_forecast_status": {
@@ -1695,7 +1758,11 @@
               "unhealthy_sensitive": "No saludable para grupos sensibles",
               "unhealthy": "No saludable",
               "very_unhealthy": "Muy no saludable",
-              "hazardous": "Peligroso"
+              "hazardous": "Peligroso",
+              "fair": "Aceptable",
+              "poor": "Malo",
+              "very_poor": "Muy malo",
+              "extremely_poor": "Extremadamente malo"
             }
           },
           "pm2_5_ug_m3": {
@@ -1709,6 +1776,13 @@
           },
           "ozone_ug_m3": {
             "name": "Ozono (µg/m³)"
+          },
+          "scale": {
+            "name": "Escala ICA",
+            "state": {
+              "european": "Europea (EAQI)",
+              "us": "EE. UU. (EPA)"
+            }
           }
         }
       },
@@ -1816,6 +1890,37 @@
       "solar_forecast_tomorrow": {
         "name": "Previsión solar mañana"
       },
+      "solar_local_forecast_today": {
+        "name": "Previsión FV local hoy",
+        "state_attributes": {
+          "model_status": {
+            "name": "Estado del modelo",
+            "state": {
+              "prior": "Según los paneles",
+              "learning": "Aprendiendo",
+              "trained": "Entrenado"
+            }
+          },
+          "days_used": {
+            "name": "Días usados"
+          },
+          "site_factor": {
+            "name": "Factor del sitio"
+          },
+          "skill_local": {
+            "name": "Precisión del día anterior (local)"
+          },
+          "skill_forecast_solar": {
+            "name": "Precisión del día anterior (forecast.solar)"
+          }
+        }
+      },
+      "solar_local_forecast_tomorrow": {
+        "name": "Previsión FV local mañana"
+      },
+      "solar_local_forecast_remaining_today": {
+        "name": "Previsión FV local restante hoy"
+      },
       "et0_pm_daily": {
         "name": "ET₀ Penman-Monteith (diaria)",
         "state_attributes": {
@@ -1893,6 +1998,20 @@
           "probable": "Probable",
           "unlikely": "Improbable",
           "no_risk": "Sin riesgo"
+        },
+        "state_attributes": {
+          "min_temp_c": {
+            "name": "Temperatura mínima considerada (°C)"
+          },
+          "forecast_min_c": {
+            "name": "Mínima prevista (°C)"
+          },
+          "threshold_c": {
+            "name": "Umbral de helada (°C)"
+          },
+          "frost_point_c": {
+            "name": "Punto de escarcha (°C)"
+          }
         }
       },
       "sensor_drift": {
@@ -1977,6 +2096,13 @@
           },
           "zambretti_forecast": {
             "name": "Previsión Zambretti"
+          },
+          "comparison_window": {
+            "name": "Ventana de comparación",
+            "state": {
+              "hourly_12h": "Próximas 12 horas (horario)",
+              "daily": "Hoy (diario)"
+            }
           }
         }
       },
@@ -2531,43 +2657,43 @@
         "name": "{river} - Caudal del río"
       },
       "temperature_high_year": {
-        "name": "Temperature High (Year)"
+        "name": "Temperatura máx. (Año)"
       },
       "temperature_low_year": {
-        "name": "Temperature Low (Year)"
+        "name": "Temperatura mín. (Año)"
       },
       "temperature_high_all_time": {
-        "name": "Temperature High (All-Time)"
+        "name": "Temperatura máx. (Histórico)"
       },
       "temperature_low_all_time": {
-        "name": "Temperature Low (All-Time)"
+        "name": "Temperatura mín. (Histórico)"
       },
       "temperature_high_week": {
-        "name": "Temperature High (Week)"
+        "name": "Temperatura máx. (Semana)"
       },
       "temperature_low_week": {
-        "name": "Temperature Low (Week)"
+        "name": "Temperatura mín. (Semana)"
       },
       "temperature_high_month": {
-        "name": "Temperature High (Month)"
+        "name": "Temperatura máx. (Mes)"
       },
       "temperature_low_month": {
-        "name": "Temperature Low (Month)"
+        "name": "Temperatura mín. (Mes)"
       },
       "wind_gust_max_month": {
-        "name": "Wind Gust Max (Month)"
+        "name": "Racha máx. de viento (Mes)"
       },
       "wind_gust_max_year": {
-        "name": "Wind Gust Max (Year)"
+        "name": "Racha máx. de viento (Año)"
       },
       "wind_gust_max_all_time": {
-        "name": "Wind Gust Max (All-Time)"
+        "name": "Racha máx. de viento (Histórico)"
       },
       "dry_streak_record": {
-        "name": "Dry Streak Record"
+        "name": "Récord de racha seca"
       },
       "heat_streak_record": {
-        "name": "Heat Streak Record",
+        "name": "Récord de racha de calor",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2575,7 +2701,7 @@
         }
       },
       "frost_streak_record": {
-        "name": "Frost Streak Record",
+        "name": "Récord de racha de heladas",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2583,7 +2709,7 @@
         }
       },
       "temp_high_normal": {
-        "name": "Temperature High (Normal)",
+        "name": "Temperatura máx. (Normal)",
         "state_attributes": {
           "sample_years": {
             "name": "Sample years"
@@ -2594,19 +2720,19 @@
         }
       },
       "temp_low_normal": {
-        "name": "Temperature Low (Normal)"
+        "name": "Temperatura mín. (Normal)"
       },
       "rain_normal": {
-        "name": "Rain (Normal)"
+        "name": "Lluvia (Normal)"
       },
       "temp_anomaly_normal": {
-        "name": "Temperature Anomaly (Normal)"
+        "name": "Anomalía de temperatura (Normal)"
       },
       "rain_anomaly_normal": {
-        "name": "Rain Anomaly (Normal)"
+        "name": "Anomalía de lluvia (Normal)"
       },
       "auto_calibration": {
-        "name": "Auto Calibration",
+        "name": "Calibración automática",
         "state": {
           "learning": "Learning",
           "stable": "Stable",
@@ -2631,7 +2757,7 @@
         }
       },
       "snow_phase": {
-        "name": "Precipitation Phase",
+        "name": "Fase de precipitación",
         "state": {
           "snow": "Snow",
           "sleet": "Sleet",
@@ -2640,19 +2766,19 @@
         }
       },
       "snow_rate": {
-        "name": "Snow Rate"
+        "name": "Tasa de nieve"
       },
       "snow_today": {
-        "name": "Snow Today"
+        "name": "Nieve hoy"
       },
       "snow_this_month": {
-        "name": "Snow This Month"
+        "name": "Nieve este mes"
       },
       "snow_this_year": {
-        "name": "Snow This Year"
+        "name": "Nieve este año"
       },
       "snow_record_day": {
-        "name": "Snowiest Day",
+        "name": "Día con más nieve",
         "state_attributes": {
           "date": {
             "name": "Date"
@@ -2660,10 +2786,10 @@
         }
       },
       "indoor_room_delta": {
-        "name": "Temp Delta - {room_name}"
+        "name": "Diferencia temp. - {room_name}"
       },
       "indoor_room_humidity": {
-        "name": "Humidity - {room_name}"
+        "name": "Humedad - {room_name}"
       },
       "indoor_room_absolute_humidity": {
         "name": "Humedad absoluta - {room_name}"
@@ -2672,7 +2798,78 @@
         "name": "CO₂ - {room_name}"
       },
       "indoor_room_comfort": {
-        "name": "Comfort - {room_name}"
+        "name": "Confort - {room_name}"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Secado Exterior Estado",
+        "state": {
+          "suitable_now": "Apto ahora",
+          "window_upcoming": "Ventana próxima",
+          "unsuitable": "No apto",
+          "unknown": "Desconocido"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Secado Exterior Próximo Inicio"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Secado Exterior Próximo Fin"
+      },
+      "window_garden_work_status": {
+        "name": "Trabajo de Jardín Estado",
+        "state": {
+          "suitable_now": "Apto ahora",
+          "window_upcoming": "Ventana próxima",
+          "unsuitable": "No apto",
+          "unknown": "Desconocido"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Trabajo de Jardín Próximo Inicio"
+      },
+      "window_garden_work_next_end": {
+        "name": "Trabajo de Jardín Próximo Fin"
+      },
+      "window_custom_status": {
+        "name": "{profile_name} Estado",
+        "state": {
+          "suitable_now": "Apto ahora",
+          "window_upcoming": "Ventana próxima",
+          "unsuitable": "No apto",
+          "unknown": "Desconocido"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "{profile_name} Próximo Inicio"
+      },
+      "window_custom_next_end": {
+        "name": "{profile_name} Próximo Fin"
+      },
+      "wind_beaufort_description": {
+        "name": "Descripción Beaufort del viento",
+        "state": {
+          "calm": "Calma",
+          "light_air": "Ventolina",
+          "light_breeze": "Brisa muy débil",
+          "gentle_breeze": "Brisa débil",
+          "moderate_breeze": "Brisa moderada",
+          "fresh_breeze": "Brisa fresca",
+          "strong_breeze": "Brisa fuerte",
+          "near_gale": "Viento fuerte",
+          "gale": "Temporal",
+          "strong_gale": "Temporal fuerte",
+          "storm": "Temporal duro",
+          "violent_storm": "Temporal muy duro",
+          "hurricane": "Huracán"
+        },
+        "state_attributes": {
+          "beaufort": {
+            "name": "Beaufort"
+          },
+          "speed_ms": {
+            "name": "Velocidad del viento (m/s)"
+          }
+        }
       }
     },
     "select": {
@@ -2827,7 +3024,7 @@
         "name": "Función: Subida Windy"
       },
       "ws_enable_auto_calibration": {
-        "name": "Feature: Adaptive Sensor Calibration"
+        "name": "Función: Calibración adaptativa de sensores"
       },
       "ws_enable_neighbor_qc": {
         "name": "Función: Comprobación de sensores"
@@ -2836,10 +3033,10 @@
         "name": "Función: Pronóstico por patrones"
       },
       "ws_enable_climate_normals": {
-        "name": "Feature: Historical Climate Normals"
+        "name": "Función: Normales climáticas históricas"
       },
       "ws_enable_snow": {
-        "name": "Feature: Snow"
+        "name": "Función: Nieve"
       }
     },
     "event": {
@@ -2912,7 +3109,7 @@
         "name": "Punto de rocío supera temperatura"
       },
       "ws_snow_falling": {
-        "name": "Snow Falling"
+        "name": "Nevando"
       }
     }
   },
@@ -3013,6 +3210,20 @@
         "auto": "Automático (detectar de la unidad del sensor)",
         "percent": "Porcentaje (0-100 %)",
         "fraction": "Fracción volumétrica (0-1 / m³/m³)"
+      }
+    },
+    "weather_window_profiles": {
+      "options": {
+        "outdoor_drying": "Secado de ropa al aire libre",
+        "garden_work": "Trabajo en el jardín y patio",
+        "custom": "Perfil de ventana personalizado"
+      }
+    },
+    "aqi_scale": {
+      "options": {
+        "auto": "Auto (EAQI europeo en Europa, US EPA en el resto)",
+        "european": "Índice Europeo de Calidad del Aire (EAQI)",
+        "us": "Índice US EPA"
       }
     }
   }

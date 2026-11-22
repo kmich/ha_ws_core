@@ -14,28 +14,41 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 ![Station sensors go into ws_core, which runs inside Home Assistant and produces sensors, a weather entity, blueprints and dashboards](screenshots/architecture_flow.svg)
 
-## What's new
+## What's new in 3.0
 
-- **Forecasts that learn from your own station.** Pattern Forecast gives the chance of rain, frost, a hot day, strong gusts and thunderstorms over the next hours. It now learns from the history Home Assistant already has, so it can show numbers minutes after you switch it on instead of weeks later.
-- **A rain chance that keeps score.** Your station's rain estimate and the forecast provider's are checked against your gauge every 6 hours, and whichever has been more accurate at your location gets more say. In 2.13.5 both are scored on the same 6-hour window, so the comparison is fair.
-- **Sensors that explain themselves.** When a value can't be calculated, the sensor tells you why (a missing source, a formula that doesn't apply right now, or a model still collecting data) instead of a bare `unknown`.
-- **Faster storm warnings.** Nearby lightning raises the alert straight away and keeps it for 30 minutes after the last strike, and heavy rain alerts start at 10 mm/h.
-- **A new phone-friendly dashboard.** The Bubble Card dashboard puts the current weather, the outlook and the station on one screen, with pop-ups for the details and an optional photo of the current weather behind it. [Screenshots below](#dashboards).
-- **Clearer station health** and fewer false "sensor spike" warnings.
+- **Weather Windows.** Tell ws_core what a job needs (dry laundry, garden work, or your own limits for rain, temperature, humidity, wind, gusts, cloud and daylight) and it shows when the next suitable window in the next 24 hours starts and ends, with the reason in plain words: *"Next suitable window starts at 10:00 tomorrow for 3 hours."* Your station's live rain and gusts override the forecast, a notification blueprint warns you ahead of time, and the Vanilla and Full dashboards have a **Windows** view. [Guide](https://kmich.github.io/ha_ws_core/guides/weather_windows/).
+- **Actions for scripts and voice.** `ws_core.get_weather_windows` returns every window and each hour's verdict, and can try other limits without saving them. `ws_core.get_station_summary` gives a compact snapshot for Assist. `ws_core.export_learning_state` now returns its summary directly.
+- **Data Status.** `sensor.ws_data_status` reports source problems that persist for five minutes and problems reading usable PV meter history. Its attributes explain why other readings are waiting or which inputs would make them available. [Sensor reference](docs/sensors.md#data-status).
+- **Explanations for empty readings.** Derived sensors covered by Data Status carry a short `status_text` ("No rain expected", "No recent strike", "Learning (2 of 5 events)"). The Enhanced and Bubble dashboards show it for Nowcast and Pattern Forecast. Heat index, wind chill and the other feels-like sensors show the air temperature when their formula does not apply, lightning proximity reads `clear` without a strike, and the clearance timer survives restarts.
+- **A local PV forecast.** Pick your PV energy meters (as in the Energy dashboard) and ws_core learns how much your panels really produce from Open-Meteo's irradiance for your panel angle, with today, tomorrow and remaining-today sensors.
+- **A tidier setup.** **Configure** is now a menu (sources, forecast, Weather Windows, rooms, thresholds, uploads, features), setup help is translated into all eight languages, and sensors your station can never fill are no longer created.
+- **Sturdier Pattern Forecast.** Frequent restarts no longer pause it for up to a day, and a few inputs that earlier versions computed inconsistently are relearned once on upgrade.
 
-The [changelog](CHANGELOG.md) has every change.
+### Breaking changes when upgrading from 2.x
+
+1. **Home Assistant 2024.12 or newer is required.**
+2. **Feels-like sensors** (heat index, THW, THSW, wind chill, humidex) show the air temperature outside their range instead of `unknown`. Automations should check the `formula_applies` attribute.
+3. **Lightning:** `sensor.ws_lightning_proximity` reads `clear` without a strike (unknown while the detector is unavailable), and `sensor.ws_lightning_clearance` keeps counting across restarts. **Re-import the Lightning Safety blueprint** so a restart cannot send a false all-clear.
+4. **Actions raise errors:** every ws_core action fails with a clear error for an unknown station, an unknown profile or invalid limits, instead of returning `{}` or an `error` key.
+5. **Unsupported solar sensors are removed.** Removing the last PV meter also removes the three Local PV Forecast entities. The upgrade guide lists which sensors require mapped solar radiation or an illuminance fallback.
+6. **Turning Weather Windows or a profile off removes its entities.**
+7. **Removing the integration deletes its stored data** (learning state, history, climate normals, Pattern Forecast).
+
+Read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) for what to do about each one. The [changelog](CHANGELOG.md) has every change.
 
 ## What it does
 
-**Rain.** A rain rate filtered from your gauge's running total, totals from the last hour to the year, days since rain and an adaptive rain chance (see [below](#forecasts-that-learn)). The opt-in precipitation nowcast combines Open-Meteo's 15-minute forecast with your gauge for `sensor.ws_minutes_until_rain` and `sensor.ws_minutes_until_dry`.
+**Rain.** A rain rate filtered from increases in your gauge's [rainfall counter](docs/hardware_mapping.md#rainfall-sources), totals from the last hour to the year, days since rain and an adaptive rain chance (see [below](#forecasts-that-learn)). The opt-in precipitation nowcast combines Open-Meteo's 15-minute forecast with your gauge for `sensor.ws_minutes_until_rain` and `sensor.ws_minutes_until_dry`.
 
 **Garden and irrigation.** Reference evapotranspiration (FAO-56 Penman-Monteith with a solar radiation sensor, Hargreaves-Samani without one), a water deficit, VPD, Delta-T for spraying, and leaf wetness. The ET₀ sensors can feed [Smart Irrigation](docs/guides/smart_irrigation.md).
 
 **Protection.** Gust alerts for awnings and blinds, frost point (Buck 1981) and freeze warnings, UTCI and WBGT heat stress, and fire danger from the Canadian FWI, McArthur FFDI and Fosberg FFWI.
 
-**Data quality.** Checks for stuck, spiking and drifting sensors, cross-sensor consistency, and a station health summary. When a value can't be calculated, the sensor's `reason` and `explanation` attributes say why.
+**Data quality.** Checks for stuck, spiking and drifting sensors, cross-sensor consistency, and a station health summary. `sensor.ws_data_status` says in one place whether anything needs attention. When a value can't be calculated, the sensor's `status_text`, `reason` and `explanation` attributes say why.
 
-**Extras you can turn on.** Snow phase and accumulation, heating and cooling degree days, 10-year climate normals (ERA5), air quality, pollen, sea temperature, a solar forecast, lightning, and uploads to Weather Underground, Windy, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP and OpenWeatherMap.
+**Weather Windows & actions (opt-in).** Evaluates hourly forecasts and live station hazards across the next 24 hours for outdoor drying, garden work, or custom limits, creating `window_*_status`, `window_*_next_start`, and `window_*_next_end` entities alongside `ws_core.get_weather_windows`, `ws_core.get_station_summary`, and `ws_core.export_learning_state`. See the [sensor and action reference](docs/sensors.md).
+
+**Extras you can turn on.** Snow phase and accumulation, heating and cooling degree days, 10-year climate normals (ERA5), air quality, pollen, sea temperature, a solar forecast (Forecast.Solar, plus a local PV forecast learned from your own PV meters), lightning, and uploads to Weather Underground, Windy, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP and OpenWeatherMap.
 
 The integration is translated into English, French, German, Spanish, Italian, Dutch, Polish and Portuguese. The formulas and their sources are in the [science documentation](docs/science.md).
 
@@ -69,14 +82,15 @@ The [hardware mapping guide](docs/hardware_mapping.md) covers each brand in deta
 2. If setup did not open automatically, go to **Settings → Devices & Services → Add Integration** and search for **Weather Station Core**. Updates to an already installed integration still require a restart.
 3. Check the entities it suggests for your station and submit.
 
-More than 50 sensors are created straight away. Optional features are under **Configure → Features**. The [quickstart](docs/quickstart.md) walks through each step.
+Requires Home Assistant 2024.12 or newer. More than 50 sensors are created straight away. Optional features are under **Configure → Features & Diagnostics**, and Weather Windows under **Configure → Decision Engine & Weather Windows**. The [quickstart](docs/quickstart.md) walks through each step.
 
 ## Blueprints
 
-Ten automation blueprints with sensible defaults, for example:
+Eleven automation blueprints with sensible defaults, for example:
 
 | Blueprint | What it does | Import |
 |---|---|---|
+| **Weather Window Notification** | Alerts ahead of an upcoming drying, garden, or custom weather window (HA 2024.10+) | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fweather_window_notification.yaml) |
 | **Rain Start Warning** | Phone or TTS alert when rain begins or is imminent | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Frain_start.yaml) |
 | **Irrigation Rain Skip** | Skips watering when rainfall or ET₀ says the soil doesn't need it | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Firrigation_rain_skip.yaml) |
 | **High Wind Protection** | Retracts awnings and blinds on strong gusts | [![Import](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkmich%2Fha_ws_core%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fws_core%2Fhigh_wind.yaml) |
@@ -91,9 +105,9 @@ The `dashboards/` folder has five dashboards and a set of gauge cards. Paste one
 
 | Dashboard | Layout | Custom cards |
 |---|---|---|
-| **Vanilla** (`weather_dashboard_vanilla.yaml`) | Four views | none |
+| **Vanilla** (`weather_dashboard_vanilla.yaml`) | Five views (including **Windows**) | none |
 | **Enhanced** (`weather_dashboard.yaml`) | Animated Weather and Advanced pages, including Pattern Forecast | `button-card` and six others |
-| **Full** (`ws_core_dashboard.yaml`) | Six views covering every sensor group | `mushroom`, `mini-graph-card` |
+| **Full** (`ws_core_dashboard.yaml`) | Seven views covering every sensor group and **Windows** | `mushroom`, `mini-graph-card` |
 | **Mobile** (`ws_core_dashboard_mobile.yaml`) | Single-column phone layout | `mushroom`, `mini-graph-card` |
 | **Bubble** (`ws_core_bubble_dashboard.yaml`) | One centred column on any screen, with pop-ups, an alert banner, the learning stats and an optional weather background | Bubble Card 3.2.0+ |
 | **Gauge presets** (`ws_core_gauge_presets.yaml`) | 13 gauge cards to add to your own dashboard | none |
@@ -124,6 +138,7 @@ ws_core sends no telemetry or analytics. These are the only features that contac
 | **Precipitation nowcast, air quality, pollen** | Open-Meteo | Configured coordinates | If enabled |
 | **Sea temperature, climate normals** | Open-Meteo Marine and Archive APIs | Configured coordinates | If enabled |
 | **Solar forecast** | Forecast.Solar | Configured coordinates | If enabled |
+| **Local PV forecast** | Open-Meteo | Configured coordinates and panel tilt/azimuth (your meter readings stay local) | If the solar forecast is enabled and PV energy meters are picked |
 | **French Vigilance** | French government geocoder (api-adresse.data.gouv.fr), then OpenDataSoft | Coordinates to the geocoder, then the department code | If enabled |
 | **Vigicrues river levels** | Hub'Eau (French government) | Coordinates or the chosen station ID | If enabled |
 | **Lightning via Blitzortung** | Blitzortung, through its own integration | Whatever the Blitzortung integration sends | If that integration is installed and no lightning sensor is mapped |
@@ -152,7 +167,7 @@ No. The default forecast and the optional nowcast and air quality features use O
 
 <details>
 <summary><b>What happens when a sensor goes offline?</b></summary>
-Values that depend on it report <code>unavailable</code> or <code>unknown</code>, with the reason in the sensor's attributes, and everything that doesn't depend on it keeps working.
+Values that depend on it report <code>unavailable</code> or <code>unknown</code>, with the reason in the sensor's attributes, and everything that doesn't depend on it keeps working. If the source stays offline for five minutes, <code>sensor.ws_data_status</code> turns to <b>Needs attention</b> and names it. A missing or stale source can also raise a Repairs issue.
 </details>
 
 ## Support

@@ -132,17 +132,13 @@ cards:
       yellow: 60
       green: 85
 
-  # Air Quality Index (0…300) — only if enable_air_quality
+  # Air Quality Index — severity thresholds depend on the configured scale.
   - type: gauge
     entity: sensor.ws_air_quality_index
     name: AQI
     min: 0
-    max: 300
+    max: 500
     needle: true
-    severity:
-      green: 0
-      yellow: 51
-      red: 101
 
   # Fire Risk Score (0…10) — only if enable_fire_risk_score
   - type: gauge

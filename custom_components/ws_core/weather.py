@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import contextlib
+import math
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 from homeassistant.components.weather import WeatherEntity
@@ -14,6 +16,7 @@ except Exception:  # pragma: no cover
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
+    UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfPressure,
     UnitOfSpeed,
@@ -23,7 +26,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
+from homeassistant.util.unit_conversion import DistanceConverter
 
+from .algorithms import calculate_apparent_temperature
 from .const import (
     CONF_PREFIX,
     DEFAULT_PREFIX,
@@ -84,6 +89,40 @@ def _local_iso(value: str) -> str:
     return dt_util.as_local(dt).isoformat()  # a naive value is taken as local
 
 
+def _current_now_context() -> tuple[datetime, datetime, tzinfo | None]:
+    """Return (actual_now_local, actual_now_utc, local_tz) without truncating minutes."""
+    now_raw = dt_util.now()
+    local_tz = now_raw.tzinfo or dt_util.get_default_time_zone()
+    now_local = now_raw.replace(tzinfo=local_tz) if now_raw.tzinfo is None else now_raw
+    return now_local, now_local.astimezone(UTC), local_tz
+
+
+def _hourly_slot_utc(item: dict[str, Any], local_tz: tzinfo | None) -> datetime | None:
+    """Parse an hourly forecast slot timestamp into UTC."""
+    dt_s = item.get("datetime")
+    utc_s = item.get("utc_datetime")
+    if not dt_s and not utc_s:
+        return None
+    slot_dt = dt_util.parse_datetime(str(utc_s)) if utc_s else None
+    if slot_dt is None and dt_s:
+        slot_dt = dt_util.parse_datetime(_local_iso(str(dt_s)))
+    if slot_dt is None:
+        return None
+    if slot_dt.tzinfo is None:
+        slot_dt = slot_dt.replace(tzinfo=local_tz)
+    return slot_dt.astimezone(UTC)
+
+
+def _hourly_lead_hours(slot_utc: datetime, actual_now_utc: datetime) -> int | None:
+    """Return lead hours for interval [slot_utc, slot_utc + 1h), or None when past."""
+    if slot_utc + timedelta(hours=1) <= actual_now_utc:
+        return None
+    if slot_utc <= actual_now_utc:
+        return 0
+    delta_s = (slot_utc - actual_now_utc).total_seconds()
+    return max(1, math.ceil((delta_s - 1e-6) / 3600.0))
+
+
 def _weathercode_to_condition(code: int | None) -> str | None:
     if code is None:
         return None
@@ -102,11 +141,19 @@ def _weathercode_to_condition(code: int | None) -> str | None:
         return "snowy"
     if c in (80, 81, 82):
         return "pouring"
-    if c in (85, 86):
+    if c in (68, 69, 85, 86):
         return "snowy-rainy"
     if c in (95, 96, 99):
         return "lightning-rainy"
     return None
+
+
+def _resolve_forecast_condition(item: dict[str, Any]) -> str | None:
+    """Prefer a provider's HA condition string when present; fall back to WMO code."""
+    cond = item.get("condition")
+    if isinstance(cond, str) and cond.strip():
+        return cond.strip()
+    return _weathercode_to_condition(item.get("weathercode"))
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
@@ -241,6 +288,12 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
     @property
     def attribution(self) -> str:
         fc = (self.coordinator.data or {}).get(KEY_FORECAST) or {}
+        src_attr = fc.get("source_attribution")
+        if isinstance(src_attr, str) and src_attr.strip():
+            return f"Local station data processed by Weather Station Core – {src_attr.strip()}"
+        src_name = fc.get("source_name")
+        if isinstance(src_name, str) and src_name.strip():
+            return f"Local station data processed by Weather Station Core – forecast by {src_name.strip()}"
         prov = str(fc.get("provider") or "").strip()
         credit = self._PROVIDER_ATTRIBUTION.get(prov)
         if credit:
@@ -305,10 +358,17 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         fc = d.get(KEY_FORECAST) or {}
         hourly = fc.get("hourly") or []
         if hourly:
-            now_iso = dt_util.now().strftime("%Y-%m-%dT%H:00")
+            now_local, now_utc, local_tz = _current_now_context()
+            now_iso = now_local.strftime("%Y-%m-%dT%H")
             for item in hourly:
-                if str(item.get("datetime", "")).startswith(now_iso[:13]):
-                    h_cond = _weathercode_to_condition(item.get("weathercode"))
+                slot_utc = _hourly_slot_utc(item, local_tz)
+                matched = (
+                    _hourly_lead_hours(slot_utc, now_utc) == 0
+                    if slot_utc is not None
+                    else str(item.get("datetime", "")).startswith(now_iso)
+                )
+                if matched:
+                    h_cond = _resolve_forecast_condition(item)
                     if h_cond:
                         return h_cond
                     break
@@ -316,10 +376,31 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         # 3. Fallback: Open-Meteo daily summary (least-preferred).
         daily = fc.get("daily") or []
         if daily:
-            api_cond = _weathercode_to_condition(daily[0].get("weathercode"))
+            api_cond = _resolve_forecast_condition(daily[0])
             if api_cond:
                 return api_cond
         return None
+
+    def _add_optional_forecast_fields(
+        self, entry: dict[str, Any], item: dict[str, Any], *, include_daily: bool
+    ) -> None:
+        if include_daily:
+            if item.get("cloud_cover") is not None:
+                entry["cloud_coverage"] = item["cloud_cover"]
+            if item.get("humidity") is not None:
+                entry["humidity"] = item["humidity"]
+        if item.get("pressure_hpa") is not None:
+            entry["native_pressure"] = item["pressure_hpa"]
+        if item.get("visibility_km") is not None:
+            # Home Assistant converts forecast pressure, but passes visibility through.
+            entry["visibility"] = round(
+                DistanceConverter.convert(item["visibility_km"], UnitOfLength.KILOMETERS, self._visibility_unit),
+                2,
+            )
+        if item.get("uv_index") is not None:
+            entry["uv_index"] = item["uv_index"]
+        if item.get("wind_bearing") is not None:
+            entry["wind_bearing"] = item["wind_bearing"]
 
     def _build_daily_forecast(self) -> list[dict[str, Any]] | None:
         d = self.coordinator.data or {}
@@ -337,19 +418,19 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
-            out.append(
-                {
-                    "datetime": dt,
-                    "native_temperature": item.get("tmax_c"),
-                    "native_templow": item.get("tmin_c"),
-                    "native_precipitation": item.get("precip_mm"),
-                    "precipitation_probability": item.get("precip_prob"),
-                    "native_wind_speed": wind_ms,
-                    "native_wind_gust_speed": gust_ms,
-                    "condition": _weathercode_to_condition(item.get("weathercode")),
-                    ATTR_ATTRIBUTION: self.attribution,
-                }
-            )
+            entry: dict[str, Any] = {
+                "datetime": dt,
+                "native_temperature": item.get("tmax_c"),
+                "native_templow": item.get("tmin_c"),
+                "native_precipitation": item.get("precip_mm"),
+                "precipitation_probability": item.get("precip_prob"),
+                "native_wind_speed": wind_ms,
+                "native_wind_gust_speed": gust_ms,
+                "condition": _resolve_forecast_condition(item),
+                ATTR_ATTRIBUTION: self.attribution,
+            }
+            self._add_optional_forecast_fields(entry, item, include_daily=True)
+            out.append(entry)
         return out
 
     def _build_hourly_forecast(self) -> list[dict[str, Any]] | None:
@@ -368,38 +449,31 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
         local_gust_ms = d.get(KEY_NORM_WIND_GUST_MS)
         local_condition = d.get(KEY_CURRENT_CONDITION)
         local_rain_rate = d.get(KEY_RAIN_RATE_FILT)  # mm/h  → approx mm in 1h
-        now_local = dt_util.now().replace(minute=0, second=0, microsecond=0)
+        now_local, now_utc, local_tz = _current_now_context()
         now_hour_iso = now_local.strftime("%Y-%m-%dT%H")
 
         out: list[dict[str, Any]] = []
         for item in hourly:
             dt_s = item.get("datetime")
-            if not dt_s:
+            utc_s = item.get("utc_datetime")
+            if not dt_s and not utc_s:
                 continue
-            # The cached forecast is refreshed every 30-60 min; hours that have
-            # already passed would otherwise lead the card, reading as an offset.
-            if str(dt_s)[:13] < now_hour_iso:
-                continue
-            dt = _local_iso(str(dt_s))
+            slot_utc = _hourly_slot_utc(item, local_tz)
+            lead_h: int | None = None
+            if slot_utc is not None:
+                lead_h = _hourly_lead_hours(slot_utc, now_utc)
+                if lead_h is None:
+                    continue
+                dt = dt_util.as_local(slot_utc).isoformat()
+            else:
+                raw_s = str(dt_s or utc_s)
+                if raw_s[:13] < now_hour_iso:
+                    continue
+                dt = _local_iso(raw_s)
             wind_kmh = item.get("wind_kmh")
             wind_ms = (float(wind_kmh) / 3.6) if wind_kmh is not None else None
             gust_kmh = item.get("gust_kmh")
             gust_ms = (float(gust_kmh) / 3.6) if gust_kmh is not None else None
-
-            # Determine lead hours from valid timestamp so sparse/future slots
-            # outside the 0-2h window never receive current local observations.
-            lead_h: int | None = None
-            slot_dt = dt_util.parse_datetime(dt)
-            if slot_dt is not None:
-                if slot_dt.tzinfo is None:
-                    slot_dt = slot_dt.replace(tzinfo=now_local.tzinfo)
-                else:
-                    slot_dt = dt_util.as_local(slot_dt)
-                lead_f = (slot_dt - now_local).total_seconds() / 3600.0
-                if abs(lead_f - round(lead_f)) < 1e-3:
-                    lead_h = int(round(lead_f))
-                elif lead_f >= 0:
-                    lead_h = int(lead_f)
 
             if lead_h is not None and 0 <= lead_h < len(_NOWCAST_LOCAL_WEIGHTS):
                 lw = _NOWCAST_LOCAL_WEIGHTS[lead_h]
@@ -414,7 +488,7 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                 if lead_h == 0 and local_condition:
                     condition = self._LOCAL_CONDITION_MAP.get(local_condition, "partlycloudy")
                 else:
-                    condition = _weathercode_to_condition(item.get("weathercode"))
+                    condition = _resolve_forecast_condition(item)
                 # Precipitation: use rain rate as a 1h proxy for slot 0
                 if lead_h == 0 and local_rain_rate is not None:
                     precip = _nowcast_blend(local_rain_rate, item.get("precip_mm"), lw)
@@ -425,25 +499,29 @@ class WSStationWeather(CoordinatorEntity, WeatherEntity):
                 apparent = item.get("apparent_temp_c")
                 dew = item.get("dewpoint_c")
                 humidity = item.get("humidity")
-                condition = _weathercode_to_condition(item.get("weathercode"))
+                condition = _resolve_forecast_condition(item)
                 precip = item.get("precip_mm")
 
-            out.append(
-                {
-                    "datetime": dt,
-                    "native_temperature": temperature,
-                    "native_apparent_temperature": apparent,
-                    "native_dew_point": dew,
-                    "precipitation_probability": item.get("precip_prob"),
-                    "native_precipitation": precip,
-                    "native_wind_speed": wind_ms,
-                    "native_wind_gust_speed": gust_ms,
-                    "humidity": humidity,
-                    "cloud_coverage": item.get("cloud_cover"),
-                    "condition": condition,
-                    ATTR_ATTRIBUTION: self.attribution,
-                }
-            )
+            if apparent is None and temperature is not None and humidity is not None and wind_ms is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    apparent = calculate_apparent_temperature(float(temperature), float(humidity), float(wind_ms))
+
+            entry = {
+                "datetime": dt,
+                "native_temperature": temperature,
+                "native_apparent_temperature": apparent,
+                "native_dew_point": dew,
+                "precipitation_probability": item.get("precip_prob"),
+                "native_precipitation": precip,
+                "native_wind_speed": wind_ms,
+                "native_wind_gust_speed": gust_ms,
+                "humidity": humidity,
+                "cloud_coverage": item.get("cloud_cover"),
+                "condition": condition,
+                ATTR_ATTRIBUTION: self.attribution,
+            }
+            self._add_optional_forecast_fields(entry, item, include_daily=False)
+            out.append(entry)
         return out
 
     @property

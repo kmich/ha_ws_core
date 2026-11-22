@@ -248,20 +248,52 @@ views:
           - sensor.ws_wind_direction_variability
 
       # Agrometeorological (enable_comfort_indices + enable_degree_days)
+      # Solar-radiation rows only show when the station provides them: they need a
+      # W/m² sensor (or, for the estimated ones, the illuminance fallback).
       - type: entities
         title: Agrometeorological
         entities:
           - sensor.ws_et0_daily
-          - sensor.ws_et0_penman_monteith
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_et0_penman_monteith
+                state_not: unavailable
+            row:
+              entity: sensor.ws_et0_penman_monteith
           - sensor.ws_irrigation_deficit
           - sensor.ws_wind_run
           - sensor.ws_wind_run_month
-          - sensor.ws_solar_energy_today
-          - sensor.ws_peak_sun_hours
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_solar_energy_today
+                state_not: unavailable
+            row:
+              entity: sensor.ws_solar_energy_today
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_peak_sun_hours
+                state_not: unavailable
+            row:
+              entity: sensor.ws_peak_sun_hours
           - sensor.ws_max_solar_radiation
-          - sensor.ws_net_radiation
-          - sensor.ws_clearness_index
-          - sensor.ws_cloud_cover
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_net_radiation
+                state_not: unavailable
+            row:
+              entity: sensor.ws_net_radiation
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_clearness_index
+                state_not: unavailable
+            row:
+              entity: sensor.ws_clearness_index
+          - type: conditional
+            conditions:
+              - entity: sensor.ws_cloud_cover
+                state_not: unavailable
+            row:
+              entity: sensor.ws_cloud_cover
           - sensor.ws_hdd_today
           - sensor.ws_cdd_today
           - sensor.ws_gdd_today
@@ -352,6 +384,8 @@ views:
         title: Station Health
         entities:
           - sensor.ws_station_health
+          # OK or Needs attention; its attributes say why any sensor is empty
+          - sensor.ws_data_status
           - sensor.ws_data_quality_banner
           - sensor.ws_data_quality_score
           - sensor.ws_package_status
@@ -463,3 +497,87 @@ views:
         show:
           labels: true
           extrema: true
+
+  # =========================================================================
+  # VIEW 7: WEATHER WINDOWS (v3.0.0)
+  # =========================================================================
+  - title: Windows
+    icon: mdi:calendar-clock
+    path: windows
+    cards:
+      - type: custom:mushroom-title-card
+        title: Weather Windows
+        subtitle: Next 24 hours - drying, garden work & custom activity windows
+
+      - type: markdown
+        content: >-
+          Enable Weather Windows under **Settings → Devices & Services → Weather Station Core →
+          Configure → Decision Profiles** to activate profile sensors and notifications.
+
+          {% for label, ent in [
+            ('Outdoor Drying', 'sensor.ws_window_outdoor_drying_status'),
+            ('Garden Work', 'sensor.ws_window_garden_work_status'),
+            ('Custom Profile', 'sensor.ws_window_custom_status')
+          ] if states(ent) not in ['unknown', 'unavailable', 'none', ''] or state_attr(ent, 'reasons') %}
+          - **{{ label }}**: {{ state_translated(ent) }}{% for r in state_attr(ent, 'reasons') or [] %}. {{ r }}{% endfor %}
+          {% endfor %}
+
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_window_outdoor_drying_status
+            state_not: "unavailable"
+        card:
+          type: vertical-stack
+          cards:
+            - type: custom:mushroom-entity-card
+              entity: sensor.ws_window_outdoor_drying_status
+              name: Outdoor Drying
+              icon: mdi:tshirt-crew-outline
+            - type: entities
+              show_header_toggle: false
+              entities:
+                - entity: sensor.ws_window_outdoor_drying_next_start
+                  name: Drying Next Start
+                - entity: sensor.ws_window_outdoor_drying_next_end
+                  name: Drying Next End
+
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_window_garden_work_status
+            state_not: "unavailable"
+        card:
+          type: vertical-stack
+          cards:
+            - type: custom:mushroom-entity-card
+              entity: sensor.ws_window_garden_work_status
+              name: Garden Work
+              icon: mdi:flower-tulip-outline
+            - type: entities
+              show_header_toggle: false
+              entities:
+                - entity: sensor.ws_window_garden_work_next_start
+                  name: Garden Next Start
+                - entity: sensor.ws_window_garden_work_next_end
+                  name: Garden Next End
+
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: sensor.ws_window_custom_status
+            state_not: "unavailable"
+        card:
+          type: vertical-stack
+          cards:
+            - type: custom:mushroom-entity-card
+              entity: sensor.ws_window_custom_status
+              name: Custom Window Profile
+              icon: mdi:tune-variant
+            - type: entities
+              show_header_toggle: false
+              entities:
+                - entity: sensor.ws_window_custom_next_start
+                  name: Custom Next Start
+                - entity: sensor.ws_window_custom_next_end
+                  name: Custom Next End

@@ -24,14 +24,14 @@ they are not calculated separately for each room.
 | Thermal Comfort sensor | ws_core equivalent | Notes |
 |---|---|---|
 | `sensor.<name>_apparent_temperature` | `sensor.ws_feels_like` | Same formula: Australian BOM / Steadman (1994). Values match within 0.1 °C for identical inputs. |
-| `sensor.<name>_heat_index` | `sensor.ws_heat_index` | Same formula: NWS Rothfusz regression. Active when T ≥ 27 °C and RH ≥ 40%. |
+| `sensor.<name>_heat_index` | `sensor.ws_heat_index` | Same formula: NWS Rothfusz regression. Active when T ≥ 27 °C and RH ≥ 40%. Outside that range it shows the air temperature, with `formula_applies: false`. |
 | `sensor.<name>_heat_index_perception` | Attribute `level` on `sensor.ws_heat_index` | Classification is in the sensor attribute, not a separate entity. |
 | `sensor.<name>_humidex` | `sensor.ws_humidex` | Same formula: Environment Canada (Masterton & Richardson 1979). |
 | `sensor.<name>_humidex_perception` | Attribute `level` on `sensor.ws_humidex` | See heat_index_perception note above. |
 | `sensor.<name>_absolute_humidity` | `sensor.ws_absolute_humidity` | Same formula: ideal gas law for water vapour. |
 | `sensor.<name>_dew_point` | `sensor.ws_dew_point` | ws_core uses Magnus formula (Alduchov & Eskridge 1996). Typical difference: < 0.2 °C. |
 | `sensor.<name>_frost_point` | `sensor.ws_frost_point` | ws_core uses Buck (1981) ice constants below 0 °C — more physically accurate. |
-| `sensor.<name>_wind_chill` | `sensor.ws_wind_chill` | Same formula: WMO/NWS 2001. Active when T ≤ 10 °C and wind > 1.34 m/s. |
+| `sensor.<name>_wind_chill` | `sensor.ws_wind_chill` | Same formula: WMO/NWS 2001. Active when T ≤ 10 °C and wind > 1.34 m/s. Outside that range it shows the air temperature, with `formula_applies: false`. |
 | `sensor.<name>_thw_index` | `sensor.ws_thw_index` | Same formula: Davis Instruments THW index. |
 | `sensor.<name>_thsw_index` | `sensor.ws_thsw_index` | Requires a solar radiation sensor mapped in ws_core. |
 | `sensor.<name>_moist_air_enthalpy` | No direct equivalent | The `sensor.ws_vpd` sensor covers related HVAC/greenhouse use cases. |
@@ -69,7 +69,7 @@ they are not calculated separately for each room.
 
 ### Step 1: Install ws_core alongside Thermal Comfort
 
-Install Weather Station Core via HACS without removing Thermal Comfort. Both can run
+Install Weather Station Core from Marketplace or HACS before removing Thermal Comfort. Both can run
 simultaneously. This lets you verify that ws_core values match before switching
 automations.
 

@@ -96,9 +96,20 @@ KNOWN_EXTERNAL: set[str] = {
 }
 
 
+def _weather_window_entity_ids(prefix: str = "ws") -> set[str]:
+    """Read dynamically generated Weather Windows sensors from const.py and sensor.py."""
+    const_py = (ROOT / "custom_components/ws_core/const.py").read_text(encoding="utf-8")
+    sensor_py = (ROOT / "custom_components/ws_core/sensor.py").read_text(encoding="utf-8")
+    if 'key=f"window_{pid}_status"' not in sensor_py:
+        return set()
+    pids = re.findall(r'^PROFILE_\w+\s*=\s*"([^"]+)"', const_py, re.MULTILINE)
+    return {f"sensor.{prefix}_window_{pid}_{suffix}" for pid in pids for suffix in ("status", "next_start", "next_end")}
+
+
 def build_known_entities(prefix: str = "ws") -> set[str]:
     return (
         _sensor_entity_ids(prefix)
+        | _weather_window_entity_ids(prefix)
         | _switch_entity_ids(prefix)
         | _binary_sensor_entity_ids(prefix)
         | _weather_entity_ids(prefix)
@@ -139,6 +150,8 @@ def _dashboard_entity_refs(yaml_path: pathlib.Path) -> dict[str, list[int]]:
 # ---------------------------------------------------------------------------
 
 KNOWN_BUILTIN_CARD_TYPES: set[str] = {
+    # Entities-card row type: shows one attribute (used for status_text when unknown)
+    "attribute",
     "conditional",
     "entities",
     "entity",

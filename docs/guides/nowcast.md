@@ -13,7 +13,7 @@ no API key, and is independent of your chosen 7-day forecast provider.
 **During setup:** enable **Precipitation Nowcast** on the Features step.
 
 **After setup:** toggle `switch.ws_enable_nowcast` on the device page, or go to
-Settings → Devices & Services → Weather Station Core → Configure → Features →
+Settings → Devices & Services → Weather Station Core → Configure → Features & Diagnostics →
 Precipitation Nowcast.
 
 Requires: forecast coordinates set in the Forecast configuration step.
@@ -31,7 +31,10 @@ Requires: forecast coordinates set in the Forecast configuration step.
 | `sensor.ws_nowcast_confidence` | — | Agreement between local gauge and NWP grid: `high` / `medium` / `low` |
 | `binary_sensor.ws_rain_expected_1h` | — | On when measurable rain is expected within 60 minutes. |
 
-All sensors update every 15 minutes.
+The Open-Meteo forecast refreshes every 15 minutes by default. When that forecast is
+unavailable or stale, `binary_sensor.ws_rain_expected_1h` reads `on` with
+`source: local_rain` if the station measures at least 0.1 mm/h.
+Otherwise it reads `unknown` until a fresh forecast arrives.
 
 ---
 

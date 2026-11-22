@@ -154,7 +154,7 @@ class TestFreezeThresholdRoundTrip:
         flow.hass.config.latitude = 40.0
         flow.hass.config.longitude = -74.0
         flow.async_step_required_sources_opt = AsyncMock(return_value={"step_id": "required_sources_opt"})
-        show_res = await flow.async_step_init(user_input=None)
+        show_res = await flow.async_step_thresholds(user_input=None)
         schema = show_res["schema"]
 
         unchanged_input = {}
@@ -164,7 +164,7 @@ class TestFreezeThresholdRoundTrip:
                 unchanged_input[name] = key.default() if callable(key.default) else key.default
 
         # Submit the exact schema defaults unchanged
-        await flow.async_step_init(user_input=unchanged_input)
+        await flow.async_step_thresholds(user_input=unchanged_input)
         assert abs(flow._opt[CONF_THRESH_FREEZE_C] - initial_freeze_c) < 0.15
 
 
@@ -220,3 +220,328 @@ class TestSoilMoistureUnitFlow:
         assert flow._opt[CONF_SOURCES][SRC_SOIL_MOISTURE] == "sensor.soil"
         assert CONF_SOIL_MOISTURE_UNIT not in flow._opt[CONF_SOURCES]
         assert flow._opt[CONF_SOIL_MOISTURE_UNIT] == "percent"
+
+
+class TestOptionsMenuNavigation:
+    """v3.0.0 Scope D: Menu-driven options flow navigation."""
+
+    async def test_options_init_displays_main_menu(self):
+        flow = _options_flow(stored={}, opt={})
+        flow.async_show_menu = MagicMock(
+            side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]}
+        )
+        res = await flow.async_step_init(None)
+        assert res["menu"] == "init"
+        assert res["options"] == [
+            "sources",
+            "forecast",
+            "decision_profiles",
+            "rooms",
+            "thresholds",
+            "uploads",
+            "diagnostics",
+        ]
+
+    async def test_options_forecast_step_saves_and_exposes_schema(self):
+        from custom_components.ws_core.const import (
+            CONF_FORECAST_ENABLED,
+            CONF_FORECAST_ENTITY,
+            CONF_FORECAST_INTERVAL_MIN,
+            CONF_FORECAST_PROVIDER,
+            FORECAST_PROVIDER_HA_ENTITY,
+        )
+
+        flow = _options_flow(
+            stored={CONF_FORECAST_PROVIDER: "open_meteo", CONF_FORECAST_ENTITY: "weather.old"},
+            opt={CONF_FORECAST_ENTITY: "weather.old"},
+        )
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {
+                "step_id": kw["step_id"],
+                "schema": kw["data_schema"],
+                "errors": kw.get("errors", {}),
+            }
+        )
+        res = await flow.async_step_forecast(None)
+        assert res["step_id"] == "forecast"
+
+        # Selecting ha_weather_entity without forecast_entity returns required error
+        err_res = await flow.async_step_forecast(
+            {CONF_FORECAST_ENABLED: True, CONF_FORECAST_PROVIDER: FORECAST_PROVIDER_HA_ENTITY}
+        )
+        assert err_res["errors"] == {CONF_FORECAST_ENTITY: "required"}
+
+        # Clearing forecast_entity explicitly resets _opt[CONF_FORECAST_ENTITY] to ""
+        save_res = await flow.async_step_forecast({CONF_FORECAST_ENABLED: False, CONF_FORECAST_INTERVAL_MIN: 60})
+        assert save_res["type"] == "create_entry"
+        assert save_res["data"][CONF_FORECAST_ENABLED] is False
+        assert save_res["data"][CONF_FORECAST_INTERVAL_MIN] == 60
+        assert save_res["data"][CONF_FORECAST_ENTITY] == ""
+
+    async def test_options_decision_profiles_step(self):
+        from custom_components.ws_core.const import (
+            CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
+            CONF_CUSTOM_MAX_TEMP_C,
+            CONF_CUSTOM_MIN_DURATION_H,
+            CONF_CUSTOM_MIN_TEMP_C,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT,
+            CONF_CUSTOM_WINDOW_NAME,
+            CONF_ENABLE_WEATHER_WINDOWS,
+            CONF_WEATHER_WINDOW_PROFILES,
+            PROFILE_CUSTOM,
+            PROFILE_OUTDOOR_DRYING,
+        )
+        from custom_components.ws_core.weather_windows import resolve_profiles
+
+        flow = _options_flow(stored={CONF_CUSTOM_MAX_CLOUD_COVER_PCT: 50.0}, opt={})
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {
+                "step_id": kw["step_id"],
+                "schema": kw["data_schema"],
+                "errors": kw.get("errors", {}),
+            }
+        )
+        res = await flow.async_step_decision_profiles(None)
+        assert res["step_id"] == "decision_profiles"
+        schema_keys = {str(getattr(k, "schema", k)) for k in res["schema"].schema}
+        assert CONF_CUSTOM_WINDOW_NAME in schema_keys
+        assert CONF_CUSTOM_MIN_DURATION_H in schema_keys
+        assert CONF_CUSTOM_MIN_TEMP_C in schema_keys
+        assert CONF_CUSTOM_REQUIRE_DAYLIGHT in schema_keys
+
+        # Invalid min > max range returns form error
+        err_res = await flow.async_step_decision_profiles(
+            {
+                CONF_ENABLE_WEATHER_WINDOWS: True,
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM],
+                CONF_CUSTOM_MIN_DURATION_H: 2,
+                CONF_CUSTOM_MIN_TEMP_C: 25.0,
+                CONF_CUSTOM_MAX_TEMP_C: 10.0,
+            }
+        )
+        assert err_res["errors"] == {CONF_CUSTOM_MIN_TEMP_C: "min_exceeds_max"}
+
+        # Saving custom limits persists values and sets omitted optional numeric limits to None
+        save_res = await flow.async_step_decision_profiles(
+            {
+                CONF_ENABLE_WEATHER_WINDOWS: True,
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_OUTDOOR_DRYING, PROFILE_CUSTOM],
+                CONF_CUSTOM_WINDOW_NAME: "Running",
+                CONF_CUSTOM_MIN_DURATION_H: 3,
+                CONF_CUSTOM_MIN_TEMP_C: 8.0,
+                CONF_CUSTOM_MAX_TEMP_C: 24.0,
+                CONF_CUSTOM_REQUIRE_DAYLIGHT: False,
+            }
+        )
+        assert save_res["type"] == "create_entry"
+        saved = save_res["data"]
+        assert saved[CONF_ENABLE_WEATHER_WINDOWS] is True
+        assert saved[CONF_WEATHER_WINDOW_PROFILES] == [PROFILE_OUTDOOR_DRYING, PROFILE_CUSTOM]
+        assert saved[CONF_CUSTOM_MAX_CLOUD_COVER_PCT] is None
+
+        resolved = resolve_profiles(saved)
+        assert resolved[PROFILE_CUSTOM].enabled is True
+        assert resolved[PROFILE_CUSTOM].name == "Running"
+        assert resolved[PROFILE_CUSTOM].min_duration_h == 3
+        assert resolved[PROFILE_CUSTOM].min_temp_c == 8.0
+        assert resolved[PROFILE_CUSTOM].max_temp_c == 24.0
+        assert resolved[PROFILE_CUSTOM].max_cloud_cover_pct is None
+        assert resolved[PROFILE_CUSTOM].require_daylight is False
+
+    async def test_options_thresholds_step_validates_and_saves(self):
+        from custom_components.ws_core.const import CONF_PREFIX
+
+        flow = _options_flow(stored={}, opt={})
+        res = await flow.async_step_thresholds(None)
+        assert res["step_id"] == "thresholds"
+
+        save_res = await flow.async_step_thresholds({CONF_PREFIX: "my_station"})
+        assert save_res["type"] == "create_entry"
+        assert save_res["data"][CONF_PREFIX] == "my_station"
+
+    async def test_options_rooms_menu_routes_and_done_creates_entry(self):
+        flow = _options_flow(stored={CONF_INDOOR_ROOMS: []}, opt={})
+        flow.async_show_menu = MagicMock(
+            side_effect=lambda **kw: {"menu": kw["step_id"], "options": kw["menu_options"]}
+        )
+        menu = await flow.async_step_rooms(None)
+        assert menu["menu"] == "indoor_rooms_opt"
+        assert flow._in_menu_rooms is True
+
+        done_res = await flow.async_step_room_done()
+        assert done_res["type"] == "create_entry"
+
+    async def test_options_sources_menu_routes_and_done_creates_entry(self):
+        from unittest.mock import patch
+
+        from custom_components.ws_core.const import CONF_SOURCES, REQUIRED_SOURCES
+
+        sources = {k: f"sensor.{k}" for k in REQUIRED_SOURCES}
+        flow = _options_flow(stored={CONF_SOURCES: sources}, opt={})
+
+        req_res = await flow.async_step_sources(None)
+        assert req_res["step_id"] == "required_sources_opt"
+
+        with patch("custom_components.ws_core.config_flow._validate_numeric_sensor", return_value=None):
+            opt_res = await flow.async_step_required_sources_opt(sources)
+            assert opt_res["step_id"] == "optional_sources_opt"
+
+            save_res = await flow.async_step_optional_sources_opt({})
+            assert save_res["type"] == "create_entry"
+
+    async def test_options_decision_profiles_validation_rejects_invalid_limits(self):
+        from custom_components.ws_core.const import (
+            CONF_CUSTOM_MAX_RAIN_MM,
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+            CONF_CUSTOM_MAX_WIND_GUST_KMH,
+            CONF_CUSTOM_MAX_WIND_KMH,
+            CONF_CUSTOM_MIN_DURATION_H,
+            CONF_CUSTOM_MIN_TEMP_C,
+            CONF_CUSTOM_MIN_WIND_KMH,
+            CONF_WEATHER_WINDOW_PROFILES,
+            PROFILE_CUSTOM,
+        )
+
+        flow = _options_flow(stored={CONF_CUSTOM_MAX_WIND_KMH: 30.0}, opt={})
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {"step_id": kw["step_id"], "errors": kw.get("errors", {})}
+        )
+
+        # Reject fractional, out-of-range, and bool duration
+        for bad_dur in (1.5, 0, 25, True):
+            res = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_DURATION_H: bad_dur})
+            assert res["errors"] == {CONF_CUSTOM_MIN_DURATION_H: "invalid_duration"}
+
+        # Reject single out-of-range / non-finite / bool limit values
+        bad_limits = await flow.async_step_decision_profiles(
+            {
+                CONF_CUSTOM_MAX_RAIN_PROB_PCT: 120.0,
+                CONF_CUSTOM_MAX_RAIN_MM: -1.0,
+                CONF_CUSTOM_MIN_TEMP_C: float("inf"),
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: True,
+                CONF_WEATHER_WINDOW_PROFILES: ["unknown_profile"],
+            }
+        )
+        assert bad_limits["errors"] == {
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT: "out_of_range",
+            CONF_CUSTOM_MAX_RAIN_MM: "out_of_range",
+            CONF_CUSTOM_MIN_TEMP_C: "out_of_range",
+            CONF_CUSTOM_MAX_WIND_GUST_KMH: "out_of_range",
+            CONF_WEATHER_WINDOW_PROFILES: "invalid_profiles",
+        }
+
+        # Reject min_wind > max_wind (using stored max_wind) and min_wind > max_wind_gust
+        wind_err = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_WIND_KMH: 40.0})
+        assert wind_err["errors"] == {CONF_CUSTOM_MIN_WIND_KMH: "min_exceeds_max"}
+
+        gust_err = await flow.async_step_decision_profiles(
+            {
+                CONF_WEATHER_WINDOW_PROFILES: [PROFILE_CUSTOM],
+                CONF_CUSTOM_MIN_WIND_KMH: 45.0,
+                CONF_CUSTOM_MAX_WIND_KMH: 50.0,
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: 35.0,
+            }
+        )
+        assert gust_err["errors"] == {CONF_CUSTOM_MIN_WIND_KMH: "min_exceeds_max"}
+
+    async def test_options_decision_profiles_imperial_units_and_provider_warning(self):
+        from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
+
+        from custom_components.ws_core.const import (
+            CONF_CUSTOM_MAX_RAIN_MM,
+            CONF_CUSTOM_MAX_WIND_GUST_KMH,
+            CONF_CUSTOM_MIN_TEMP_C,
+            CONF_FORECAST_PROVIDER,
+            FORECAST_PROVIDER_NWS,
+            FORECAST_PROVIDER_OPEN_METEO,
+        )
+
+        # With NWS and US Customary system: displays °F / in / mph and includes provider notice
+        flow = _options_flow(
+            stored={
+                CONF_FORECAST_PROVIDER: FORECAST_PROVIDER_NWS,
+                CONF_CUSTOM_MIN_TEMP_C: 12.3,
+                CONF_CUSTOM_MAX_RAIN_MM: 0.0,
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: 50.0,
+            },
+            opt={},
+        )
+        flow.hass.config.units = US_CUSTOMARY_SYSTEM
+        flow.async_show_form = MagicMock(
+            side_effect=lambda **kw: {
+                "step_id": kw["step_id"],
+                "schema": kw["data_schema"],
+                "placeholders": kw.get("description_placeholders", {}),
+            }
+        )
+        show_res = await flow.async_step_decision_profiles(None)
+        assert "NWS" in show_res["placeholders"]["provider_warning"]
+
+        # Unchanged submission preserves exact canonical Celsius value (12.3)
+        markers = {str(getattr(k, "schema", k)): k for k in show_res["schema"].schema}
+        assert markers[CONF_CUSTOM_MIN_TEMP_C].description["suggested_value"] == 54.1
+        save_unchanged = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_TEMP_C: 54.1})
+        assert save_unchanged["data"][CONF_CUSTOM_MIN_TEMP_C] == 12.3
+
+        # Edited imperial inputs (59.0 °F = 15.0 °C, 1.0 in = 25.4 mm, 25.0 mph ≈ 40.2336 km/h)
+        save_edited = await flow.async_step_decision_profiles(
+            {
+                CONF_CUSTOM_MIN_TEMP_C: 59.0,
+                CONF_CUSTOM_MAX_RAIN_MM: 1.0,
+                CONF_CUSTOM_MAX_WIND_GUST_KMH: 25.0,
+            }
+        )
+        assert abs(save_edited["data"][CONF_CUSTOM_MIN_TEMP_C] - 15.0) < 0.01
+        assert abs(save_edited["data"][CONF_CUSTOM_MAX_RAIN_MM] - 25.4) < 0.05
+        assert abs(save_edited["data"][CONF_CUSTOM_MAX_WIND_GUST_KMH] - 40.2336) < 0.1
+
+        # Open-Meteo shows no missing-variable provider warning
+        flow_om = _options_flow(stored={CONF_FORECAST_PROVIDER: FORECAST_PROVIDER_OPEN_METEO}, opt={})
+        flow_om.async_show_form = flow.async_show_form
+        show_om = await flow_om.async_step_decision_profiles(None)
+        assert show_om["placeholders"]["provider_warning"] == ""
+
+
+async def test_decision_profiles_keeps_submitted_values_after_validation_error():
+    """A rejected field must not discard the user's other edits (issue #149 class)."""
+    from custom_components.ws_core.const import (
+        CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+        CONF_CUSTOM_MAX_TEMP_C,
+        CONF_CUSTOM_MAX_WIND_KMH,
+        CONF_CUSTOM_MIN_DURATION_H,
+        CONF_CUSTOM_MIN_TEMP_C,
+        CONF_CUSTOM_REQUIRE_DAYLIGHT,
+        CONF_CUSTOM_WINDOW_NAME,
+    )
+
+    flow = _options_flow(stored={CONF_CUSTOM_MIN_TEMP_C: 12.0, CONF_CUSTOM_MAX_TEMP_C: 30.0}, opt={})
+    flow.async_show_form = MagicMock(side_effect=lambda **kw: kw)
+    res = await flow.async_step_decision_profiles(
+        {
+            CONF_CUSTOM_WINDOW_NAME: "Bike ride",
+            CONF_CUSTOM_MIN_DURATION_H: 3,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT: False,
+            CONF_CUSTOM_MIN_TEMP_C: 35.0,
+            CONF_CUSTOM_MAX_TEMP_C: 20.0,
+            CONF_CUSTOM_MAX_RAIN_PROB_PCT: 5.0,
+        }
+    )
+    assert res["errors"] == {CONF_CUSTOM_MIN_TEMP_C: "min_exceeds_max"}
+    shown = {}
+    for key in res["data_schema"].schema:
+        default = getattr(key, "default", None)
+        shown[str(key)] = (
+            default() if callable(default) else None,
+            (key.description or {}).get("suggested_value"),
+        )
+    assert shown[CONF_CUSTOM_WINDOW_NAME][0] == "Bike ride"
+    assert shown[CONF_CUSTOM_MIN_DURATION_H][0] == 3
+    assert shown[CONF_CUSTOM_REQUIRE_DAYLIGHT][0] is False
+    assert shown[CONF_CUSTOM_MIN_TEMP_C][1] == 35.0
+    assert shown[CONF_CUSTOM_MAX_RAIN_PROB_PCT][1] == 5.0
+    # A field the user cleared stays cleared rather than reverting to the stored value
+    assert shown[CONF_CUSTOM_MAX_WIND_KMH][1] is None
+
+    # The duration field is limited to 23 hours
+    too_long = await flow.async_step_decision_profiles({CONF_CUSTOM_MIN_DURATION_H: 24})
+    assert too_long["errors"] == {CONF_CUSTOM_MIN_DURATION_H: "invalid_duration"}

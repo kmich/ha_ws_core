@@ -14,7 +14,7 @@ from typing import Any
 import aiohttp
 
 from ..const import _INTEGRATION_VERSION
-from .base import ForecastProvider, local_date_str, local_datetime_str
+from .base import ForecastProvider, local_date_str, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,12 +123,13 @@ class MetNoProvider(ForecastProvider):
             wmo = _symbol_to_wmo(symbol)
             date_str = local_date_str(dt)
 
-            # Hourly: only take entries within next 24 h
+            # Hourly: keep current in-progress hour and next 24h (up to 25 slots for mid-hour windows)
             delta_h = (dt - now).total_seconds() / 3600
-            if 0 <= delta_h < 24 and len(hourly_out) < 24:
+            if -1.0 < delta_h < 24.0 and len(hourly_out) < 25:
                 hourly_out.append(
                     {
                         "datetime": local_datetime_str(dt),
+                        "utc_datetime": utc_datetime_str(dt),
                         "temp_c": temp_c,
                         "apparent_temp_c": None,  # not provided by Met.no
                         "dewpoint_c": dew_c,

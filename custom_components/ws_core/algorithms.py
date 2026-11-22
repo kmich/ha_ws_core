@@ -17,6 +17,7 @@ References:
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -401,6 +402,28 @@ def wind_speed_to_beaufort(wind_speed_ms: float) -> int:
     return 12
 
 
+BEAUFORT_KEYS: tuple[str, ...] = (
+    "calm",
+    "light_air",
+    "light_breeze",
+    "gentle_breeze",
+    "moderate_breeze",
+    "fresh_breeze",
+    "strong_breeze",
+    "near_gale",
+    "gale",
+    "strong_gale",
+    "storm",
+    "violent_storm",
+    "hurricane",
+)
+
+
+def beaufort_key(beaufort: int) -> str:
+    """WMO Beaufort scale enum key for localized Home Assistant sensors."""
+    return BEAUFORT_KEYS[max(0, min(int(beaufort), 12))]
+
+
 def beaufort_description(beaufort: int) -> str:
     """WMO Beaufort scale description."""
     descriptions = [
@@ -418,7 +441,7 @@ def beaufort_description(beaufort: int) -> str:
         "Violent Storm",
         "Hurricane",
     ]
-    return descriptions[min(beaufort, 12)]
+    return descriptions[max(0, min(int(beaufort), 12))]
 
 
 # ---------------------------------------------------------------------------
@@ -890,6 +913,8 @@ def determine_current_condition(
     pm10=0.0,
     is_wet=False,
     current_hour=None,
+    rained_recently=False,
+    illuminance_known=True,
 ) -> str:
     """Classify current weather into one of 36 conditions.
 
@@ -903,6 +928,11 @@ def determine_current_condition(
     ``current_hour`` is the local hour (0-23) in the Home Assistant timezone,
     used only to distinguish a misty morning from generic fog. Callers should
     pass ``dt_util.now().hour``; when omitted it falls back to the host clock.
+
+    ``rained_recently`` must be True for "clearing-after-rain": humid, bright
+    weather alone is not evidence that rain just ended. ``illuminance_known``
+    is False when no light reading exists (callers then substitute a default
+    lux value), so brightness cannot support that label either.
     """
     is_rising = sun_azimuth < 180
     is_golden_hour = -4 < sun_elevation < 10 and is_day
@@ -973,8 +1003,15 @@ def determine_current_condition(
     if is_golden_hour:
         return "golden-hour"
 
-    # Post-rain
-    if not is_wet and rain_rate_mmph == 0 and humidity > 80 and illuminance_lx > 30000:
+    # Post-rain: only after rain actually fell recently, with a real light reading
+    if (
+        rained_recently
+        and illuminance_known
+        and not is_wet
+        and rain_rate_mmph == 0
+        and humidity > 80
+        and illuminance_lx > 30000
+    ):
         return "clearing-after-rain"
 
     # Night
@@ -1567,8 +1604,7 @@ _PM10_BREAKPOINTS = [
     (155, 254, 101, 150),
     (255, 354, 151, 200),
     (355, 424, 201, 300),
-    (425, 504, 301, 400),
-    (505, 604, 401, 500),
+    (425, 604, 301, 500),
 ]
 
 
@@ -1628,6 +1664,105 @@ def aqi_color(aqi: int) -> str:
     if aqi <= 300:
         return "#8F3F97"
     return "#7E0023"
+
+
+# EEA's revised hourly concentration thresholds (ETC HE Report 2024/17).
+# Open-Meteo maps these thresholds to index values 0, 20, 40, 60, 80 and 100.
+_EAQI_PM25_BREAKPOINTS = (0, 5, 15, 50, 90, 140)
+_EAQI_PM10_BREAKPOINTS = (0, 15, 45, 120, 195, 270)
+_EAQI_NO2_BREAKPOINTS = (0, 10, 25, 60, 100, 150)
+_EAQI_OZONE_BREAKPOINTS = (0, 60, 100, 120, 160, 180)
+_EAQI_SO2_BREAKPOINTS = (0, 20, 40, 125, 190, 275)
+
+_EUROPEAN_CLIMATE_REGIONS = frozenset(("atlantic_europe", "continental_europe", "mediterranean", "scandinavia"))
+
+
+def is_european_location(lat: float | None, lon: float | None, climate_region: str | None = None) -> bool:
+    """Return True when coordinates (or climate region fallback) fall in Europe."""
+    if lat is not None and lon is not None:
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+        except (TypeError, ValueError):
+            pass
+        else:
+            return 34.0 <= lat_f <= 72.0 and -25.0 <= lon_f <= 45.0
+    return climate_region in _EUROPEAN_CLIMATE_REGIONS
+
+
+def resolve_aqi_scale(
+    configured: str | None,
+    lat: float | None,
+    lon: float | None,
+    climate_region: str | None = None,
+) -> str:
+    """Resolve effective AQI scale ('european' or 'us') from configuration and location."""
+    choice = (configured or "auto").strip().lower()
+    if choice in ("european", "us"):
+        return choice
+    return "european" if is_european_location(lat, lon, climate_region) else "us"
+
+
+def _eaqi_subindex(value: float, breakpoints: tuple[int, ...]) -> int:
+    # Use the last band's slope to extrapolate above 100, as Open-Meteo does.
+    upper = min(bisect_right(breakpoints, value), len(breakpoints) - 1)
+    low, high = breakpoints[upper - 1], breakpoints[upper]
+    return math.floor(20 * (upper - 1 + (value - low) / (high - low)) + 0.5)
+
+
+def calculate_european_aqi(
+    pm2_5: float | None,
+    pm10: float | None,
+    no2: float | None = None,
+    ozone: float | None = None,
+    so2: float | None = None,
+) -> int | None:
+    """European AQI (0-100+) from the highest available pollutant sub-index.
+
+    Uses EEA hourly concentration bands for PM2.5, PM10, NO₂, O₃ and SO₂,
+    mapped linearly to Open-Meteo's continuous ``european_aqi`` scale.
+    """
+    sub: list[int] = []
+    for raw, bps in (
+        (pm2_5, _EAQI_PM25_BREAKPOINTS),
+        (pm10, _EAQI_PM10_BREAKPOINTS),
+        (no2, _EAQI_NO2_BREAKPOINTS),
+        (ozone, _EAQI_OZONE_BREAKPOINTS),
+        (so2, _EAQI_SO2_BREAKPOINTS),
+    ):
+        if raw is not None and math.isfinite(raw) and raw >= 0:
+            sub.append(_eaqi_subindex(raw, bps))
+    return max(sub) if sub else None
+
+
+def european_aqi_level(eaqi: int) -> str:
+    """European EAQI category label (i18n key)."""
+    if eaqi <= 20:
+        return "good"
+    if eaqi <= 40:
+        return "fair"
+    if eaqi <= 60:
+        return "moderate"
+    if eaqi <= 80:
+        return "poor"
+    if eaqi <= 100:
+        return "very_poor"
+    return "extremely_poor"
+
+
+def european_aqi_color(eaqi: int) -> str:
+    """European EAQI colour hex (EEA palette)."""
+    if eaqi <= 20:
+        return "#50F0E6"
+    if eaqi <= 40:
+        return "#50CCAA"
+    if eaqi <= 60:
+        return "#F0E641"
+    if eaqi <= 80:
+        return "#FF5050"
+    if eaqi <= 100:
+        return "#960032"
+    return "#7D2181"
 
 
 def pollen_level(index: int | None) -> str:

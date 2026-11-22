@@ -33,6 +33,16 @@ def local_date_str(value: datetime | str | int | float | None) -> str | None:
     return dt_util.as_local(dt).strftime("%Y-%m-%d")
 
 
+def utc_datetime_str(value: datetime | str | int | float | None) -> str | None:
+    """ISO UTC timestamp preserving exact instant across DST transitions."""
+    if value is None or value == "":
+        return None
+    dt = _to_datetime(value)
+    if dt is None or dt.tzinfo is None:
+        return None
+    return dt.astimezone(UTC).isoformat()
+
+
 def _to_datetime(value: datetime | str | int | float | None) -> datetime | None:
     if value is None or value == "":
         return None
@@ -58,7 +68,7 @@ class ForecastProvider(ABC):
     Normalized return format from async_fetch():
     {
         "provider": str,          # matches PROVIDER_ID
-        "daily": [                # exactly 7 entries
+        "daily": [                # available daily forecast, oldest first
             {
                 "date": str,          # local date "YYYY-MM-DD"
                 "tmax_c": float|None,
@@ -71,7 +81,7 @@ class ForecastProvider(ABC):
             },
             ...
         ],
-        "hourly": [               # up to 24 entries (next 24 h)
+        "hourly": [               # available hourly forecast, oldest first
             {
                 "datetime": str,       # "YYYY-MM-DDTHH:MM", local time in HA's
                                        # timezone (use local_datetime_str)

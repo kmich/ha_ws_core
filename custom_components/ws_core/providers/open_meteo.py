@@ -3,13 +3,30 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 from typing import Any
 
 import aiohttp
+from homeassistant.util import dt as dt_util
 
-from .base import ForecastProvider
+from .base import ForecastProvider, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _parse_om_time(raw_t: Any, default_tz: tzinfo | None) -> datetime | None:
+    """Parse an Open-Meteo timestamp into a timezone-aware datetime."""
+    if raw_t is None or raw_t == "":
+        return None
+    if isinstance(raw_t, (int, float)) and not isinstance(raw_t, bool):
+        return datetime.fromtimestamp(raw_t, tz=UTC)
+    try:
+        dt = datetime.fromisoformat(str(raw_t).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=default_tz or dt_util.get_default_time_zone())
+    return dt
 
 
 class OpenMeteoProvider(ForecastProvider):
@@ -19,6 +36,13 @@ class OpenMeteoProvider(ForecastProvider):
     PROVIDER_NAME = "Open-Meteo"
     REQUIRES_API_KEY = False
 
+    @staticmethod
+    async def _fetch_json(session: aiohttp.ClientSession, url: str) -> dict[str, Any]:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            if resp.status != 200:
+                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
+            return await resp.json()
+
     async def async_fetch(
         self,
         session: aiohttp.ClientSession,
@@ -26,24 +50,28 @@ class OpenMeteoProvider(ForecastProvider):
         lon: float,
         api_key: str | None = None,
     ) -> dict[str, Any]:
-        url = (
+        # Daily aggregations use local calendar days; hourly series use UTC to stay DST-unambiguous.
+        daily_url = (
             "https://api.open-meteo.com/v1/forecast"
             f"?latitude={lat}&longitude={lon}"
             "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,"
             "windspeed_10m_max,windgusts_10m_max,weathercode,precipitation_probability_max"
+            "&timezone=auto"
+        )
+        hourly_url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}"
             "&hourly=temperature_2m,apparent_temperature,dewpoint_2m,"
             "precipitation_probability,precipitation,"
             "weathercode,windspeed_10m,windgusts_10m,"
             "relativehumidity_2m,cloudcover"
-            "&forecast_hours=24"
-            "&timezone=auto"
+            "&forecast_hours=26"
+            "&timezone=UTC"
         )
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
-            if resp.status != 200:
-                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
-            js = await resp.json()
+        daily_js = await self._fetch_json(session, daily_url)
+        hourly_js = await self._fetch_json(session, hourly_url)
 
-        daily = js.get("daily") or {}
+        daily = daily_js.get("daily") or {}
         times = daily.get("time") or []
         tmax = daily.get("temperature_2m_max") or []
         tmin = daily.get("temperature_2m_min") or []
@@ -67,7 +95,15 @@ class OpenMeteoProvider(ForecastProvider):
             for i in range(min(len(times), 7))
         ]
 
-        hourly = js.get("hourly") or {}
+        om_tz: tzinfo | None = UTC
+        utc_offset_s = hourly_js.get("utc_offset_seconds")
+        tz_name = hourly_js.get("timezone")
+        if isinstance(utc_offset_s, (int, float)) and not isinstance(utc_offset_s, bool):
+            om_tz = timezone(timedelta(seconds=int(utc_offset_s)))
+        elif tz_name:
+            om_tz = dt_util.get_time_zone(str(tz_name))
+
+        hourly = hourly_js.get("hourly") or {}
         h_times = hourly.get("time") or []
         h_temp = hourly.get("temperature_2m") or []
         h_app = hourly.get("apparent_temperature") or []
@@ -80,22 +116,35 @@ class OpenMeteoProvider(ForecastProvider):
         h_rh = hourly.get("relativehumidity_2m") or []
         h_cc = hourly.get("cloudcover") or []
 
-        hourly_out = [
-            {
-                "datetime": h_times[i],
-                "temp_c": h_temp[i] if i < len(h_temp) else None,
-                "apparent_temp_c": h_app[i] if i < len(h_app) else None,
-                "dewpoint_c": h_dew[i] if i < len(h_dew) else None,
-                "precip_prob": h_pp[i] if i < len(h_pp) else None,
-                "precip_mm": h_precip[i] if i < len(h_precip) else None,
-                "weathercode": h_wc[i] if i < len(h_wc) else None,
-                "wind_kmh": h_ws[i] if i < len(h_ws) else None,
-                "gust_kmh": h_wg[i] if i < len(h_wg) else None,
-                "humidity": h_rh[i] if i < len(h_rh) else None,
-                "cloud_cover": h_cc[i] if i < len(h_cc) else None,
-            }
-            for i in range(min(len(h_times), 24))
-        ]
+        parsed_dts = [_parse_om_time(t, om_tz) for t in h_times]
+        hourly_out: list[dict[str, Any]] = []
+        for i in range(min(len(h_times), 25)):
+            dt_i = parsed_dts[i]
+            dt_next = parsed_dts[i + 1] if (i + 1) < len(parsed_dts) else None
+            has_next_hour = (
+                dt_i is not None
+                and dt_next is not None
+                and abs((dt_next.astimezone(UTC) - dt_i.astimezone(UTC)).total_seconds() - 3600.0) <= 1.0
+            )
+            next_idx = i + 1
+            # Open-Meteo precipitation_probability, precipitation, and windgusts_10m are preceding-hour values,
+            # so values stamped at t_{i+1} describe the interval [t_i, t_i + 1h).
+            hourly_out.append(
+                {
+                    "datetime": (local_datetime_str(dt_i) if dt_i is not None else str(h_times[i])) or str(h_times[i]),
+                    "utc_datetime": utc_datetime_str(dt_i) if dt_i is not None else None,
+                    "temp_c": h_temp[i] if i < len(h_temp) else None,
+                    "apparent_temp_c": h_app[i] if i < len(h_app) else None,
+                    "dewpoint_c": h_dew[i] if i < len(h_dew) else None,
+                    "precip_prob": h_pp[next_idx] if has_next_hour and next_idx < len(h_pp) else None,
+                    "precip_mm": h_precip[next_idx] if has_next_hour and next_idx < len(h_precip) else None,
+                    "weathercode": h_wc[i] if i < len(h_wc) else None,
+                    "wind_kmh": h_ws[i] if i < len(h_ws) else None,
+                    "gust_kmh": h_wg[next_idx] if has_next_hour and next_idx < len(h_wg) else None,
+                    "humidity": h_rh[i] if i < len(h_rh) else None,
+                    "cloud_cover": h_cc[i] if i < len(h_cc) else None,
+                }
+            )
 
         return {
             "provider": self.PROVIDER_ID,

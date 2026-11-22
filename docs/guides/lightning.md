@@ -38,9 +38,17 @@ Features → Lightning Detection.
 | `sensor.ws_lightning_count_1h` | strikes | Strikes detected in the past hour |
 | `sensor.ws_lightning_distance` | km | Distance to the nearest detected strike |
 | `sensor.ws_lightning_rate` | /min | Average strike rate over the past 15 minutes |
-| `sensor.ws_lightning_clearance` | min | Minutes since the last strike |
+| `sensor.ws_lightning_clearance` | min | Minutes since the last strike; `safe` attribute is true from 30 minutes |
 | `sensor.ws_lightning_proximity` | — | `near` / `clear` based on configurable threshold |
 | `event.ws_lightning_event` | — | Fires on strike detection and proximity changes |
+
+Since 3.0.0, **proximity reads `clear`** whenever your distance source (a detector or
+Blitzortung) reports no strike, instead of `unknown`. While that source is unavailable (a
+detector offline, Blitzortung disconnected) proximity stays `unknown` with the status text
+"Lightning source unavailable", since it could not report a strike. The **clearance timer keeps
+counting across restarts** from the last strike the lightning event recorded. Distance
+and bearing stay empty until there is a strike; their `status_text` attribute then says
+"No recent strike".
 
 ---
 
@@ -57,40 +65,48 @@ lightning is within 10 km, resume when the clearance timer exceeds 30 minutes.
 
 ## Safe-to-go-outside automation
 
+The **Lightning Safety** blueprint does this for you. If you imported it before 3.0.0,
+re-import it: the new version ignores the jump from `unknown` after a restart, so a restart
+cannot send a false "all clear". Your own automation needs the same guard:
+
 ```yaml
 alias: "Lightning: all-clear notification"
-trigger:
-  - platform: numeric_state
+triggers:
+  - trigger: numeric_state
     entity_id: sensor.ws_lightning_clearance
     above: 30
-condition:
-  - condition: state
-    entity_id: sensor.ws_lightning_count_1h
-    state: "0"
-    for:
-      minutes: 30
-action:
-  - service: notify.mobile_app_phone
+conditions:
+  # Only a real rise past 30 minutes, not a value coming back after a restart
+  - condition: template
+    value_template: "{{ trigger.from_state is not none and trigger.from_state.state | is_number }}"
+actions:
+  - action: notify.mobile_app_phone
     data:
       title: "Lightning clear"
       message: >
-        No lightning detected for 30 minutes.
-        Last strike was {{ state_attr('sensor.ws_lightning_distance', 'distance_km') }} km away.
+        No lightning detected for {{ states('sensor.ws_lightning_clearance') | int }} minutes.
 ```
 
 ---
 
 ## Event entity
 
-`event.ws_lightning_event` fires on:
-- `lightning_strike`: when a new strike is detected
-- `proximity_near`: when proximity state changes to `near`
-- `proximity_clear`: when clearance timer reaches the safe threshold
+`event.ws_lightning_event` fires with one of two event types:
 
-Use it as an automation trigger for immediate notification:
+- `strike_detected`: new strikes were counted (attributes `count_1h`, `distance_km`, `proximity`)
+- `proximity_alert`: proximity changed from `clear` to `near` (attribute `distance_km`)
+
+Use it as an automation trigger for an immediate notification:
+
 ```yaml
-trigger:
-  - platform: state
+triggers:
+  - trigger: state
     entity_id: event.ws_lightning_event
-    event_type: lightning_strike
+conditions:
+  - condition: template
+    value_template: "{{ trigger.to_state.attributes.event_type == 'proximity_alert' }}"
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      message: "Lightning {{ trigger.to_state.attributes.distance_km }} km away"
 ```

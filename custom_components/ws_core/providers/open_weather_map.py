@@ -7,7 +7,7 @@ from typing import Any
 
 import aiohttp
 
-from .base import ForecastProvider, local_date_str, local_datetime_str
+from .base import ForecastProvider, local_date_str, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,16 +101,16 @@ class OpenWeatherMapProvider(ForecastProvider):
                     "tmax_c": temp.get("max"),
                     "tmin_c": temp.get("min"),
                     "precip_mm": daily_precip,
-                    "wind_kmh": round(day.get("wind_speed", 0) * 3.6, 1),
-                    "gust_kmh": round(day.get("wind_gust", 0) * 3.6, 1) if day.get("wind_gust") else None,
+                    "wind_kmh": round(float(day["wind_speed"]) * 3.6, 1) if day.get("wind_speed") is not None else None,
+                    "gust_kmh": round(float(day["wind_gust"]) * 3.6, 1) if day.get("wind_gust") is not None else None,
                     "weathercode": _owm_to_wmo(weather.get("id")),
-                    "precip_prob": int(day.get("pop", 0) * 100),
+                    "precip_prob": round(float(day["pop"]) * 100) if day.get("pop") is not None else None,
                 }
             )
 
-        # Hourly forecast (up to 48h, take 24)
+        # Hourly forecast (up to 48h, take 25 for full mid-hour 24h coverage)
         hourly_out: list[dict[str, Any]] = []
-        for hour in (js.get("hourly") or [])[:24]:
+        for hour in (js.get("hourly") or [])[:25]:
             dt = hour.get("dt", 0)
             dt_str = local_datetime_str(dt)
             weather = (hour.get("weather") or [{}])[0]
@@ -121,14 +121,17 @@ class OpenWeatherMapProvider(ForecastProvider):
             hourly_out.append(
                 {
                     "datetime": dt_str,
+                    "utc_datetime": utc_datetime_str(dt),
                     "temp_c": hour.get("temp"),
                     "apparent_temp_c": hour.get("feels_like"),
                     "dewpoint_c": hour.get("dew_point"),
-                    "precip_prob": int(hour.get("pop", 0) * 100),
+                    "precip_prob": round(float(hour["pop"]) * 100) if hour.get("pop") is not None else None,
                     "precip_mm": rain_1h,
                     "weathercode": _owm_to_wmo(weather.get("id")),
-                    "wind_kmh": round(hour.get("wind_speed", 0) * 3.6, 1),
-                    "gust_kmh": round(hour.get("wind_gust", 0) * 3.6, 1) if hour.get("wind_gust") else None,
+                    "wind_kmh": round(float(hour["wind_speed"]) * 3.6, 1)
+                    if hour.get("wind_speed") is not None
+                    else None,
+                    "gust_kmh": round(float(hour["wind_gust"]) * 3.6, 1) if hour.get("wind_gust") is not None else None,
                     "humidity": hour.get("humidity"),
                     "cloud_cover": hour.get("clouds"),
                 }

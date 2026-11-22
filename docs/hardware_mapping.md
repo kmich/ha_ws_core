@@ -4,6 +4,23 @@
 
 If you are using the Auto-Discovery feature during setup, your required sensors will be filled in automatically. However, if you need to map them manually, this guide shows exactly which sensors to select for the most common weather stations.
 
+## Rainfall sources
+
+| Setup field | What to select | What it controls |
+|---|---|---|
+| **Rainfall Counter** | A lifetime or yearly amount counter in `mm` or `in`. An event counter works if it rises during each rain event and resets between events. | The value of `sensor.ws_rain_total` follows this counter in your display units. WS Core calculates rain rate and period totals from observed increases. |
+| **Year-to-date rainfall** (optional) | The station's accumulation since January 1 in `mm` or `in`. You can reuse the yearly entity selected above. | **Rain This Year** follows this yearly source, including rainfall measured before WS Core was installed. |
+
+A counter that resets less often gives WS Core more opportunity to observe each
+increase. An event counter can miss rainfall if it resets between observations.
+For Home Assistant long-term statistics, look for a resetting counter with state
+class `total_increasing` or a lifetime counter with class `total`.
+[Home Assistant sensor state classes](https://developers.home-assistant.io/docs/core/entity/sensor/#available-state-classes)
+
+Without a yearly source, WS Core accumulates rainfall from the required counter
+and uses Recorder statistics when available to fill gaps. When you map a yearly
+source, **Rain This Year** becomes unknown if that source is unavailable.
+
 ## Ecowitt / Ambient Weather
 *Requires the official `ecowitt` or `ambient_network` integration.*
 
@@ -15,16 +32,14 @@ If you are using the Auto-Discovery feature during setup, your required sensors 
 | **Wind Speed** | `sensor.*_wind_speed` | |
 | **Wind Gust** | `sensor.*_wind_gust` | |
 | **Wind Direction** | `sensor.*_wind_direction` | |
-| **Rain Total** | `sensor.*_yearly_rain` or `_event_rain` | `ws_core` works best with a continually increasing counter, so `yearly_rain` is safest. |
+| **Rainfall Counter** | Prefer `sensor.*_yearly_rain` or `sensor.*_total_rain` when available. `sensor.*_event_rain` also works. | Match the counter to the physical gauge you use. |
 
 **Optional Ecowitt Sensors to Map:**
-*   **Year-to-date rainfall:** `sensor.*_yearly_rain` (or `sensor.*_yearly_piezo_rain` for the WH90). This makes **Rain This Year** match the station's annual total, including rainfall before WS Core was installed. You can select the same yearly entity for both Rain Total and Year-to-date rainfall. Existing installations can add this mapping under Configure → Optional sensors.
+*   **Year-to-date rainfall:** `sensor.*_yearly_rain` (or `sensor.*_yearly_piezo_rain` for the WH90). Existing installations can add this mapping under **Configure → Sensor Sources → Optional sensors**.
 *   **Solar Radiation:** `sensor.*_solar_radiation` (Enables Penman-Monteith ET0)
 *   **UV Index:** `sensor.*_uv_index`
 *   **Lightning Strikes:** `sensor.*_lightning_strike_count` (WH57)
 *   **Lightning Distance:** `sensor.*_lightning_strike_distance` (WH57)
-
-Without a Year-to-date rainfall source, Rain This Year accumulates new rainfall observed by WS Core and resets on January 1. It cannot recover rainfall from before installation. With the source mapped, an unavailable annual sensor makes Rain This Year unknown until that source recovers.
 
 ---
 
@@ -39,7 +54,7 @@ Without a Year-to-date rainfall source, Rain This Year accumulates new rainfall 
 | **Wind Speed** | `sensor.*_wind_speed` | |
 | **Wind Gust** | `sensor.*_wind_gust` | |
 | **Wind Direction** | `sensor.*_wind_direction` | |
-| **Rain Total** | `sensor.*_precipitation` | Maps to the accumulated precipitation sensor. |
+| **Rainfall Counter** | `sensor.*_precipitation` | Maps to the accumulated precipitation sensor. |
 
 **Optional Tempest Sensors to Map:**
 *   **Solar Illuminance:** `sensor.*_illuminance`
@@ -58,7 +73,7 @@ Without a Year-to-date rainfall source, Rain This Year accumulates new rainfall 
 | **Wind Speed** | `sensor.*_wind_speed_avg` | |
 | **Wind Gust** | `sensor.*_wind_gust_high` | |
 | **Wind Direction** | `sensor.*_wind_dir` | |
-| **Rain Total** | `sensor.*_rain_year` | |
+| **Rainfall Counter** | `sensor.*_rain_year` | |
 
 ---
 
@@ -73,7 +88,7 @@ Without a Year-to-date rainfall source, Rain This Year accumulates new rainfall 
 | **Wind Speed** | `sensor.*_wind_strength` | Requires the Anemometer accessory. |
 | **Wind Gust** | `sensor.*_gust_strength` | Requires the Anemometer accessory. |
 | **Wind Direction** | `sensor.*_wind_direction` | Requires the Anemometer accessory. |
-| **Rain Total** | `sensor.*_rain` | Requires the Rain Gauge accessory. |
+| **Rainfall Counter** | `sensor.*_rain` | Requires the Rain Gauge accessory. |
 
 ---
 

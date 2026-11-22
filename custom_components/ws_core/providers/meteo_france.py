@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import aiohttp
+from homeassistant.util import dt as dt_util
 
-from .base import ForecastProvider, local_date_str, local_datetime_str
+from .base import ForecastProvider, _to_datetime, local_date_str, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,6 +83,27 @@ class MeteoFranceProvider(ForecastProvider):
 
     _BASE_URL = "https://api.meteo-concept.com/api"
 
+    async def _fetch_endpoint(
+        self,
+        session: aiohttp.ClientSession,
+        path: str,
+        headers: dict[str, str],
+        params: dict[str, str],
+        *,
+        allow_fallback_status: bool = False,
+    ) -> dict[str, Any] | None:
+        url = f"{self._BASE_URL}/{path}"
+        async with session.get(url, headers=headers, params=params, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            if resp.status == 401:
+                raise ValueError("Météo France: invalid or unauthorized API key")
+            if resp.status == 429:
+                raise ValueError("Météo France: API rate limit exceeded")
+            if allow_fallback_status and resp.status in (403, 404):
+                return None
+            if resp.status != 200:
+                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
+            return await resp.json(content_type=None)
+
     async def async_fetch(
         self,
         session: aiohttp.ClientSession,
@@ -94,30 +117,7 @@ class MeteoFranceProvider(ForecastProvider):
         headers = {"Authorization": f"Bearer {api_key}"}
         params = {"latlng": f"{lat},{lon}"}
 
-        daily_url = f"{self._BASE_URL}/forecast/daily"
-        hourly_url = f"{self._BASE_URL}/forecast/hourly"
-
-        async with session.get(
-            daily_url, headers=headers, params=params, timeout=aiohttp.ClientTimeout(total=20)
-        ) as resp:
-            if resp.status == 401:
-                raise ValueError("Météo France: invalid or unauthorized API key")
-            if resp.status == 429:
-                raise ValueError("Météo France: API rate limit exceeded")
-            if resp.status != 200:
-                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
-            daily_data = await resp.json(content_type=None)
-
-        async with session.get(
-            hourly_url, headers=headers, params=params, timeout=aiohttp.ClientTimeout(total=20)
-        ) as resp:
-            if resp.status == 401:
-                raise ValueError("Météo France: invalid or unauthorized API key")
-            if resp.status == 429:
-                raise ValueError("Météo France: API rate limit exceeded")
-            if resp.status != 200:
-                raise aiohttp.ClientResponseError(resp.request_info, resp.history, status=resp.status)
-            hourly_data = await resp.json(content_type=None)
+        daily_data = await self._fetch_endpoint(session, "forecast/daily", headers, params) or {}
 
         daily_out: list[dict[str, Any]] = []
         for d in (daily_data.get("forecast") or [])[:7]:
@@ -128,27 +128,70 @@ class MeteoFranceProvider(ForecastProvider):
                     "tmax_c": d.get("tmax"),
                     "tmin_c": d.get("tmin"),
                     "precip_mm": d.get("rr10"),
-                    "wind_kmh": round(d.get("wind10m", 0) * 3.6, 1) if d.get("wind10m") is not None else None,
-                    "gust_kmh": round(d.get("gust10m", 0) * 3.6, 1) if d.get("gust10m") is not None else None,
+                    "wind_kmh": round(float(d["wind10m"]), 1) if d.get("wind10m") is not None else None,
+                    "gust_kmh": round(float(d["gust10m"]), 1) if d.get("gust10m") is not None else None,
                     "weathercode": _MF_TO_WMO.get(mf_code) if mf_code is not None else None,
                     "precip_prob": d.get("probarain"),
                 }
             )
 
+        # Documented hourly routes: /forecast/daily/{0,1}/hourly?hourly=true (2 days = 48h),
+        # with /forecast/nextHours?hourly=true fallback when a day route is restricted or incomplete.
+        hourly_params = {**params, "hourly": "true"}
+        now_utc = datetime.now(tz=UTC)
+        by_slot: dict[datetime, dict[str, Any]] = {}
+
+        def _collect_hourly(payload: dict[str, Any] | None) -> None:
+            if not payload:
+                return
+            for item in payload.get("forecast") or []:
+                raw_dt = item.get("datetime")
+                dt = _to_datetime(raw_dt)
+                if dt is None:
+                    continue
+                if dt.tzinfo is None:
+                    dt = dt_util.as_local(dt)
+                slot_utc = dt.astimezone(UTC)
+                if slot_utc + timedelta(hours=1) <= now_utc:
+                    continue
+                by_slot.setdefault(slot_utc, {**item, "_dt": dt})
+
+        day0 = await self._fetch_endpoint(
+            session, "forecast/daily/0/hourly", headers, hourly_params, allow_fallback_status=True
+        )
+        _collect_hourly(day0)
+        if day0 is not None and len(by_slot) < 25:
+            day1 = await self._fetch_endpoint(
+                session, "forecast/daily/1/hourly", headers, hourly_params, allow_fallback_status=True
+            )
+            _collect_hourly(day1)
+        if len(by_slot) < 25:
+            next_hours = await self._fetch_endpoint(
+                session,
+                "forecast/nextHours",
+                headers,
+                hourly_params,
+                allow_fallback_status=bool(by_slot),
+            )
+            _collect_hourly(next_hours)
+
         hourly_out: list[dict[str, Any]] = []
-        for h in (hourly_data.get("forecast") or [])[:24]:
+        for slot_utc in sorted(by_slot)[:25]:
+            h = by_slot[slot_utc]
+            dt = h["_dt"]
             mf_code = h.get("weather")
             hourly_out.append(
                 {
-                    "datetime": local_datetime_str(h.get("datetime")) or "",
+                    "datetime": local_datetime_str(dt) or "",
+                    "utc_datetime": utc_datetime_str(dt),
                     "temp_c": h.get("temp2m"),
                     "apparent_temp_c": None,  # not provided by Météo Concept
                     "dewpoint_c": None,  # not provided by Météo Concept
                     "precip_prob": h.get("probarain"),
-                    "precip_mm": h.get("rr1"),
+                    "precip_mm": h.get("rr10"),
                     "weathercode": _MF_TO_WMO.get(mf_code) if mf_code is not None else None,
-                    "wind_kmh": round(h.get("wind10m", 0) * 3.6, 1) if h.get("wind10m") is not None else None,
-                    "gust_kmh": round(h.get("gust10m", 0) * 3.6, 1) if h.get("gust10m") is not None else None,
+                    "wind_kmh": round(float(h["wind10m"]), 1) if h.get("wind10m") is not None else None,
+                    "gust_kmh": round(float(h["gust10m"]), 1) if h.get("gust10m") is not None else None,
                     "humidity": h.get("rh2m"),
                     "cloud_cover": h.get("nebulosity"),
                 }

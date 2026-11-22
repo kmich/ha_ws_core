@@ -49,7 +49,7 @@ The full attribute list is in the [Sensors Reference](../sensors.md#pattern-fore
 **During setup:** enable **Pattern Forecast** on the Features step.
 
 **After setup:** toggle `switch.ws_enable_pattern_forecast`, or go to Settings → Devices
-& Services → Weather Station Core → Configure → Features → Pattern Forecast.
+& Services → Weather Station Core → Configure → Features & Diagnostics → Pattern Forecast.
 
 Nothing extra to map: it uses the temperature, humidity, pressure, wind and rain
 sensors you already mapped. A solar radiation or illuminance sensor is optional and

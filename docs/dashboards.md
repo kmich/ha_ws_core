@@ -6,9 +6,9 @@ pasting into the raw configuration editor.
 
 | File | What it is | Custom cards needed |
 |---|---|---|
-| [`weather_dashboard_vanilla.yaml`](#vanilla-dashboard-weather_dashboard_vanillayaml) | Native-cards dashboard that works immediately | none |
+| [`weather_dashboard_vanilla.yaml`](#vanilla-dashboard-weather_dashboard_vanillayaml) | Native-cards dashboard that works immediately (5 views incl. **Windows**) | none |
 | [`weather_dashboard.yaml`](#enhanced-dashboard-weather_dashboardyaml) | Rich, animated two-page dashboard (Weather + Advanced) | `button-card` and six others |
-| [`ws_core_dashboard.yaml`](#v20-full-dashboard-ws_core_dashboardyaml) | Six-view dashboard covering every sensor group | `mushroom`, `mini-graph-card` |
+| [`ws_core_dashboard.yaml`](#v20-full-dashboard-ws_core_dashboardyaml) | Seven-view dashboard covering every sensor group and **Windows** | `mushroom`, `mini-graph-card` |
 | [`ws_core_dashboard_mobile.yaml`](#v20-mobile-dashboard-ws_core_dashboard_mobileyaml) | Single-column phone layout | `mushroom`, `mini-graph-card` |
 | [`ws_core_bubble_dashboard.yaml`](#bubble-card-dashboard-ws_core_bubble_dashboardyaml) | Mobile-first dashboard in one centred column, with pop-ups and a bottom bar | Bubble Card v3.2.0+ |
 | [`ws_core_gauge_presets.yaml`](#gauge-presets-ws_core_gauge_presetsyaml) | Not a dashboard: gauge cards to paste into your own | none |
@@ -37,17 +37,17 @@ replace `mushroom-weather-card` or `mushroom-weather-info-card` with the built-i
 
 ## Vanilla Dashboard (`weather_dashboard_vanilla.yaml`)
 
-**No HACS frontend dependencies.** Uses only native Home Assistant cards.
+**Uses only native Home Assistant cards.**
 Works immediately after installation.
 
-Best for users who want a functional weather dashboard without installing any
-additional HACS frontend integrations.
+Choose this dashboard if you want to avoid installing custom cards.
 
 **Cards used:** `entities`, `gauge`, `history-graph`, `logbook`, `weather-forecast`, `statistic`.
 
 Includes a **Recent Weather Events** logbook card (Station page) showing the last
 72h of rain start/stop, frost/thaw, and lightning-strike events from the built-in
-event entities.
+event entities, and a **Windows** page (`path: windows`) displaying Weather Windows
+status, next window start/end timestamps, and reason explanations for enabled profiles.
 
 ---
 
@@ -61,9 +61,9 @@ Rich visual layout with colored tiles, animations, and custom card types.
 
 *The Weather and Advanced pages on a Shelly WS90.*
 
-**HACS frontend dependencies required:**
+**Required custom cards and plugins:**
 
-| Integration | HACS type |
+| Integration | Type |
 |---|---|
 | `custom:button-card` | Frontend |
 | `custom:mini-graph-card` | Frontend |
@@ -73,7 +73,7 @@ Rich visual layout with colored tiles, animations, and custom card types.
 | `card-mod` | Frontend |
 | `kiosk-mode` | Frontend |
 
-Install all dependencies from HACS before pasting the dashboard YAML.
+Install the dependencies before pasting the dashboard YAML.
 
 **Features:**
 - Color-coded temperature, UV, and AQI tiles
@@ -113,20 +113,21 @@ Without the photos that card keeps its plain background.
 
 ## v2.0 Full Dashboard (`ws_core_dashboard.yaml`)
 
-Six-view dashboard covering the full range of v2.0 sensors.
+Seven-view dashboard covering the full range of sensors and v3.0 Weather Windows.
 
 **Views:**
-1. **Now** — current conditions tile grid with weather conditions, temperature,
+1. **Now** - current conditions tile grid with weather conditions, temperature,
    rain, wind, nowcast, and alerts
-2. **Charts** — 24h and 7-day trend graphs
-3. **Advanced** — UTCI, fire risk, ET₀, VPD, pressure trend, forecast agreement
-4. **Records** — rain accumulators (today/week/month/year), temperature records,
+2. **Charts** - 24h and 7-day trend graphs
+3. **Advanced** - UTCI, fire risk, ET₀, VPD, pressure trend, forecast agreement
+4. **Records** - rain accumulators (today/week/month/year), temperature records,
    streak counters
-5. **Diagnostics** — data quality score, sensor drift flags, upload status sensors,
+5. **Diagnostics** - data quality score, sensor drift flags, upload status sensors,
    and a **Recent Weather Events** logbook (rain start/stop, frost/thaw, lightning)
-6. **Indoor** — indoor comfort score, temperature and humidity deltas, plus per-room sensors (temp delta, humidity, CO₂ and comfort) for each named room
+6. **Indoor** - indoor comfort score, temperature and humidity deltas, plus per-room sensors (temp delta, humidity, CO₂ and comfort) for each named room
+7. **Windows** - Weather Windows summary card, outdoor drying, garden work, and optional custom profile schedules & status attributes (`enable_weather_windows`)
 
-**HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
+**Required custom cards:** `mushroom`, `mini-graph-card`.
 
 ---
 
@@ -136,7 +137,7 @@ Single-column, touch-optimised layout designed for phones using HA Sections view
 All the same data as the full dashboard but stacked vertically for portrait screens,
 including the **Recent Weather Events** logbook card.
 
-**HACS frontend dependencies required:** `mushroom`, `mini-graph-card`.
+**Required custom cards:** `mushroom`, `mini-graph-card`.
 
 ---
 
@@ -184,7 +185,7 @@ Without the photos the page keeps your theme's background. The background is dra
 by a template on the first section heading, using Bubble Card's `styles` option, and
 is hidden when you switch to another dashboard.
 
-**HACS frontend dependencies required:** Bubble Card **v3.2.0 or later**. The pop-ups use
+**Required custom card:** Bubble Card **v3.2.0 or later**. The pop-ups use
 the standalone format introduced in v3.2.0. Everything else is a built-in card.
 
 ---
@@ -196,7 +197,7 @@ temperature, humidity, pressure, wind speed, wind gust, UV index, rain rate,
 rain probability, data quality score, AQI, fire risk score, WBGT, and
 (opt-in, v2.7) snow rate.
 
-Uses only the built-in `gauge` card — no HACS dependencies.
+Uses only the built-in `gauge` card.
 
 Paste individual card definitions into any existing dashboard.
 
@@ -212,11 +213,40 @@ Markdown card that lists every forecast with its maturity; paste it in.
 
 ---
 
+## Plain status instead of "Unknown"
+
+Home Assistant shows "Unknown" when a numeric sensor has no value.
+Derived sensors covered by Data Status carry a short `status_text` attribute when empty
+("No rain expected", "Learning (2 of 5 events)", "Starting up"), and the Enhanced and
+Bubble dashboards show it in place of "Unknown" for the nowcast and Pattern Forecast
+sensors. To do the same on your own dashboard, pair two conditional rows in an entities
+card:
+
+```yaml
+- type: conditional
+  conditions:
+    - entity: sensor.ws_pattern_frost_12h
+      state_not: unknown
+  row:
+    entity: sensor.ws_pattern_frost_12h
+    name: Frost, 12 h
+- type: conditional
+  conditions:
+    - entity: sensor.ws_pattern_frost_12h
+      state: unknown
+  row:
+    type: attribute
+    entity: sensor.ws_pattern_frost_12h
+    attribute: status_text
+    name: Frost, 12 h
+```
+
+---
+
 ## Keeping dashboards up to date
 
-Dashboards are not auto-updated by HACS. When a new version of ws_core adds entities
-referenced in a dashboard update, re-paste the updated YAML from the `dashboards/`
-directory.
+Integration updates leave pasted dashboard YAML as saved. To update a dashboard,
+paste the new YAML from the `dashboards/` directory.
 
 The CHANGELOG notes dashboard changes per version.
 

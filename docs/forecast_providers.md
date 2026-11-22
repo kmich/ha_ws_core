@@ -58,7 +58,7 @@ your coordinates are outside the continental United States.
 ## OpenWeatherMap
 
 Uses the One Call 3.0 API endpoint. A free tier is available but requires registration
-at openweathermap.org to obtain an API key. Enter the key in Configure → Forecast.
+at openweathermap.org to obtain an API key. Enter the key in Configure → Weather Forecast & Location.
 
 ---
 
@@ -84,7 +84,7 @@ external network call is made; forecast data comes from the existing HA integrat
 This is useful if you already have Met.no, OpenWeatherMap, or another HA weather
 integration set up and do not want ws_core to make its own API calls.
 
-To configure: in Configure → Forecast, select "Home Assistant weather entity" as
+To configure: in Configure → Weather Forecast & Location, select "Home Assistant weather entity" as
 the provider, then pick the entity from the dropdown.
 
 Uses the `weather.get_forecasts` service (HA 2024.2+) with fallback to the `forecast`
@@ -140,3 +140,18 @@ See [Contributing](contributing.md) for the provider contribution path.
 New providers require: a Python file in `custom_components/ws_core/providers/`, a
 one-line registry entry in `providers/__init__.py`, and translation strings for the
 provider name.
+
+---
+
+## Variable availability and Weather Windows {#provider-capabilities}
+
+Not every forecast provider supplies the same hourly fields (`capabilities.py`):
+
+- **Open-Meteo, OpenWeatherMap, Pirate Weather, Météo France:** Supply temperature, precipitation probability and amount, humidity, wind speed, gusts, and cloud cover.
+- **Met.no:** Supplies temperature, humidity, wind speed, cloud cover, and hourly precipitation amount (`precip_mm`), but omits `precip_prob` and `gust_kmh`. Weather Windows uses `precip_mm` for rain limits and lists `max_wind_gust_kmh` in `not_assessed_by_provider`.
+- **NWS / NOAA:** Supplies temperature, humidity, wind speed, and `precip_prob`, but omits `precip_mm`, `gust_kmh`, and `cloud_cover`. Weather Windows uses `precip_prob` for rain limits and lists unassessed limits (such as `max_wind_gust_kmh` and `max_cloud_cover_pct`) in `not_assessed_by_provider`.
+- **Home Assistant weather entity:** Available fields depend on what the wrapped `weather.*` integration returns at runtime; any variable absent across every forecast hour is listed under `not_assessed_by_provider`, while partial slot gaps report `unknown`. Hours that have already passed are skipped. If the entity's hourly list starts at the next hour (Home Assistant's Open-Meteo integration does this), the first row also stands in for the hour in progress, and Weather Windows reports `current_hour_estimated: true` in its data quality details; your station's live rain and gust checks still apply to that hour. If the entity's "hourly" rows are more than an hour apart (some integrations provide 3-hourly data), Weather Windows reports `unknown` with `forecast_too_coarse`.
+
+Live station gust and rain checks use your station sensors even when a provider omits
+forecast gusts. **Configure → Decision Engine & Weather Windows** displays a notice
+when the active provider omits fields used by the profiles.

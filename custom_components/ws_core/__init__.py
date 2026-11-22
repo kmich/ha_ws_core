@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import TYPE_CHECKING
+import math
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -20,10 +23,12 @@ from .const import (
     CONF_CAL_TEMP_C,
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_HEMISPHERE,
     CONF_INDOOR_ROOMS,
     CONFIG_VERSION,
     DEFAULT_CLIMATE_REGION,
+    DEFAULT_ENABLE_WEATHER_WINDOWS,
     DEFAULT_HEMISPHERE,
     DEPRECATED_CONF_KEYS_V030,
     DEPRECATED_KEYS_FORECASTER,
@@ -31,9 +36,13 @@ from .const import (
     DOMAIN,
     ENTRY_REPAIR_ISSUES,
     PLATFORMS,
+    PROFILE_CUSTOM,
+    PROFILE_GARDEN_WORK,
+    PROFILE_OUTDOOR_DRYING,
     issue_id_for_entry,
     normalize_indoor_rooms,
 )
+from .weather_windows import MAX_MIN_DURATION_H
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _LOGGER = logging.getLogger(__name__)
@@ -45,9 +54,79 @@ SERVICE_RESET_RAIN = "reset_rain_baseline"
 SERVICE_RESET_LEARNING = "reset_learning_state"
 SERVICE_EXPORT_LEARNING = "export_learning_state"
 SERVICE_APPLY_CALIBRATION = "apply_calibration"
+SERVICE_GET_WEATHER_WINDOWS = "get_weather_windows"
+SERVICE_GET_STATION_SUMMARY = "get_station_summary"
 ATTR_ENTRY_ID = "entry_id"
 
+
+def _positive_int(value: Any) -> int:
+    """Validate integer >= 1, rejecting booleans, fractions, and non-finite floats."""
+    if isinstance(value, bool):
+        raise vol.Invalid("Expected an integer >= 1, got boolean")
+    if isinstance(value, int):
+        out = value
+    elif isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise vol.Invalid("Expected a whole integer >= 1")
+        out = int(value)
+    elif isinstance(value, str):
+        try:
+            out = int(value.strip())
+        except ValueError as err:
+            raise vol.Invalid("Expected a whole integer >= 1") from err
+    else:
+        raise vol.Invalid("Expected a whole integer >= 1")
+    if out < 1:
+        raise vol.Invalid("Value must be at least 1")
+    return out
+
+
+def _optional_finite_float(value: Any) -> float | None:
+    """Validate an optional finite float, rejecting booleans and NaN/Infinity."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise vol.Invalid("Expected a finite number, got boolean")
+    try:
+        num = float(value)
+    except (TypeError, ValueError) as err:
+        raise vol.Invalid("Expected a finite number") from err
+    if not math.isfinite(num):
+        raise vol.Invalid("Number must be finite")
+    return num
+
+
 SERVICE_RESET_RAIN_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY_ID): cv.string,
+        vol.Optional("full", default=False): cv.boolean,
+    }
+)
+SERVICE_GET_STATION_SUMMARY_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
+SERVICE_GET_WEATHER_WINDOWS_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_ENTRY_ID): cv.string,
+        vol.Optional("profile_id"): cv.string,
+        vol.Optional("limits"): vol.Schema(
+            {
+                vol.Optional("name"): cv.string,
+                vol.Optional("min_duration_h"): vol.All(_positive_int, vol.Range(max=MAX_MIN_DURATION_H)),
+                vol.Optional("max_rain_prob_pct"): _optional_finite_float,
+                vol.Optional("max_rain_mm"): _optional_finite_float,
+                vol.Optional("min_temp_c"): _optional_finite_float,
+                vol.Optional("max_temp_c"): _optional_finite_float,
+                vol.Optional("min_humidity_pct"): _optional_finite_float,
+                vol.Optional("max_humidity_pct"): _optional_finite_float,
+                vol.Optional("min_wind_kmh"): _optional_finite_float,
+                vol.Optional("max_wind_kmh"): _optional_finite_float,
+                vol.Optional("max_wind_gust_kmh"): _optional_finite_float,
+                vol.Optional("max_cloud_cover_pct"): _optional_finite_float,
+                vol.Optional("require_daylight"): cv.boolean,
+            }
+        ),
+    }
+)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
@@ -197,6 +276,34 @@ def _async_remove_orphaned_forecaster_entities(hass: HomeAssistant, entry: Confi
             registry.async_remove(ent.entity_id)
 
 
+def _async_remove_disabled_window_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove Weather Window registry entities when the engine or specific profiles are disabled."""
+    from .weather_windows import resolve_profiles
+
+    merged = {**entry.data, **entry.options}
+    ww_enabled = bool(merged.get(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS))
+    profiles = resolve_profiles(merged)
+    active_pids = {pid for pid, prof in profiles.items() if ww_enabled and prof.enabled}
+    disabled_pids = [
+        pid for pid in (PROFILE_OUTDOOR_DRYING, PROFILE_GARDEN_WORK, PROFILE_CUSTOM) if pid not in active_pids
+    ]
+    if not disabled_pids:
+        return
+
+    disabled_uids = {
+        f"{entry.entry_id}_window_{pid}_{suffix}"
+        for pid in disabled_pids
+        for suffix in ("status", "next_start", "next_end")
+    }
+    registry = er.async_get(hass)
+    for ent in list(registry.entities.values()):
+        if ent.config_entry_id != entry.entry_id:
+            continue
+        if ent.unique_id in disabled_uids:
+            _LOGGER.info("Removing disabled Weather Window entity %s (unique_id=%s)", ent.entity_id, ent.unique_id)
+            registry.async_remove(ent.entity_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .coordinator import WSStationCoordinator
 
@@ -206,6 +313,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ir.async_delete_issue(hass, DOMAIN, name)
 
     _async_remove_orphaned_forecaster_entities(hass, entry)
+    _async_remove_disabled_window_entities(hass, entry)
 
     coordinator = WSStationCoordinator(
         hass, {**entry.data, "entry_id": entry.entry_id}, entry.options, config_entry=entry
@@ -213,32 +321,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.runtime_data = coordinator
 
     try:
-        await coordinator.async_start()
-    except Exception as err:
-        _LOGGER.warning(
-            "ws_core: async_start raised %s - entry will still be created, sensors populate on first tick", err
+        try:
+            await coordinator.async_start()
+        except Exception as err:
+            # A failed initial fetch can be retried by the coordinator tick.
+            _LOGGER.warning(
+                "ws_core: async_start raised %s - entry will still be created, sensors populate on first tick", err
+            )
+
+        dev_reg = dr.async_get(hass)
+        integration = await async_get_integration(hass, DOMAIN)
+        dev_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.title,
+            manufacturer="Weather Station Core",
+            model="Derived Weather Package",
+            sw_version=str(integration.version) if integration.version else "unknown",
         )
-        # Do NOT re-raise - a failed initial fetch must not block entry creation.
-        # The 60s tick scheduler will retry all fetches automatically.
 
-    # Create a device for the station.
-    dev_reg = dr.async_get(hass)
-    _integration = await async_get_integration(hass, DOMAIN)
-    dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title,
-        manufacturer="Weather Station Core",
-        model="Derived Weather Package",
-        sw_version=str(_integration.version) if _integration.version else "unknown",
-    )
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        entry.async_on_unload(entry.add_update_listener(async_update_options))
+        _async_register_services(hass)
+    except (Exception, asyncio.CancelledError):
+        await coordinator.async_stop()
+        _async_remove_unused_services(hass, entry)
+        raise
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(async_update_options))
+    return True
+
+
+def _async_register_services(hass: HomeAssistant) -> None:
+    def _get_targets(call: ServiceCall) -> list:
+        entry_id = call.data.get(ATTR_ENTRY_ID)
+        targets = _loaded_coordinators(hass, entry_id)
+        if not targets:
+            if entry_id is not None:
+                raise ServiceValidationError(f"Unknown or unloaded Weather Station Core config entry '{entry_id}'")
+            raise ServiceValidationError("No loaded Weather Station Core config entries found")
+        return targets
 
     # ── Service: reset_rain_baseline ──────────────────────────────────────
     async def _reset_rain(call: ServiceCall) -> None:
-        for coord in _loaded_coordinators(hass, call.data.get(ATTR_ENTRY_ID)):
+        for coord in _get_targets(call):
             coord.runtime.last_rain_total_mm = None
             coord.runtime.last_rain_ts = None
             coord.runtime.last_rain_rate_filt = 0.0
@@ -256,10 +381,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             vol.Optional("target", default="all"): vol.In(["all", "solar", "forecast", "streaks", "pattern_forecast"]),
         }
     )
-    SERVICE_EXPORT_LEARNING_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTRY_ID): cv.string})
-
-    def _get_targets(call: ServiceCall) -> list:
-        return _loaded_coordinators(hass, call.data.get(ATTR_ENTRY_ID))
 
     async def _reset_learning(call: ServiceCall) -> None:
         from .learning_state import async_save_learning
@@ -290,13 +411,63 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 await coord.async_reset_pattern_forecast()
             _LOGGER.info("ws_core: learning state reset (target=%s)", target)
 
-    async def _export_learning(call: ServiceCall) -> None:
+    async def _export_learning(call: ServiceCall) -> dict[str, Any] | None:
+        """Export learning state with response support (SupportsResponse.OPTIONAL)."""
+        is_full = bool(call.data.get("full", False))
+        wants_response = bool(getattr(call, "return_response", False))
+        out: dict[str, Any] = {}
         for coord in _get_targets(call):
-            payload = coord._learning_state.to_dict()
-            _LOGGER.info("ws_core learning state export: %s", payload)
+            eid = coord.entry_data.get("entry_id", "station")
+            ls = coord._learning_state
             pattern = getattr(coord, "_pattern", None)
-            if pattern is not None:
-                _LOGGER.info("ws_core pattern forecast export: %s", pattern.summary())
+            if not wants_response:
+                _LOGGER.info("ws_core learning state export (%s): %s", eid, ls.to_dict())
+                if pattern is not None:
+                    _LOGGER.info("ws_core pattern forecast export (%s): %s", eid, pattern.summary())
+                continue
+            if is_full:
+                payload = ls.to_dict()
+                if pattern is not None:
+                    payload["pattern_forecast"] = (
+                        pattern.engine.to_dict() if hasattr(pattern, "engine") else pattern.summary()
+                    )
+                out[eid] = payload
+            else:
+                out[eid] = {
+                    "solar_lux_factor": round(float(ls.solar_lux_factor), 2),
+                    "solar_factor_n": ls.solar_factor_n,
+                    "blend_local": round(float(ls.blend_local), 3),
+                    "blend_openmeteo": round(float(ls.blend_openmeteo), 3),
+                    "streaks": {
+                        "dry_streak_days": ls.dry_streak_days,
+                        "heat_streak_days": ls.heat_streak_days,
+                        "frost_streak_days": ls.frost_streak_days,
+                    },
+                    "pattern_forecast": pattern.summary() if pattern is not None else None,
+                }
+            _LOGGER.debug("ws_core learning state export (%s): %s", eid, out[eid])
+        return out if wants_response else None
+
+    async def _get_weather_windows(call: ServiceCall) -> dict[str, Any]:
+        """Evaluate weather windows (SupportsResponse.ONLY)."""
+        profile_id = call.data.get("profile_id")
+        limits = call.data.get("limits")
+        out: dict[str, Any] = {}
+        for coord in _get_targets(call):
+            eid = coord.entry_data.get("entry_id", "station")
+            try:
+                out[eid] = coord.get_weather_windows_evaluation(profile_id=profile_id, custom_limits=limits)
+            except ValueError as err:
+                raise ServiceValidationError(str(err)) from err
+        return out
+
+    async def _get_station_summary(call: ServiceCall) -> dict[str, Any]:
+        """Return station summary (SupportsResponse.ONLY)."""
+        out: dict[str, Any] = {}
+        for coord in _get_targets(call):
+            eid = coord.entry_data.get("entry_id", "station")
+            out[eid] = coord.get_station_summary()
+        return out
 
     if not hass.services.has_service(DOMAIN, SERVICE_RESET_LEARNING):
         hass.services.async_register(
@@ -304,7 +475,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     if not hass.services.has_service(DOMAIN, SERVICE_EXPORT_LEARNING):
         hass.services.async_register(
-            DOMAIN, SERVICE_EXPORT_LEARNING, _export_learning, schema=SERVICE_EXPORT_LEARNING_SCHEMA
+            DOMAIN,
+            SERVICE_EXPORT_LEARNING,
+            _export_learning,
+            schema=SERVICE_EXPORT_LEARNING_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_WEATHER_WINDOWS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_WEATHER_WINDOWS,
+            _get_weather_windows,
+            schema=SERVICE_GET_WEATHER_WINDOWS_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_GET_STATION_SUMMARY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_GET_STATION_SUMMARY,
+            _get_station_summary,
+            schema=SERVICE_GET_STATION_SUMMARY_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
         )
 
     # ── Apply calibration service ────────────────────────────────────────
@@ -334,10 +525,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if entry_id:
             entry = hass.config_entries.async_get_entry(entry_id)
-            if entry and entry.domain == DOMAIN:
-                targets = [entry]
+            if not entry or entry.domain != DOMAIN:
+                raise ServiceValidationError(f"Unknown Weather Station Core config entry '{entry_id}'")
+            targets = [entry]
         else:
             targets = [e for e in hass.config_entries.async_entries(DOMAIN)]
+            if not targets:
+                raise ServiceValidationError("No Weather Station Core config entries found")
 
         offsets = {
             k: call.data[k]
@@ -399,8 +593,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DOMAIN, SERVICE_APPLY_CALIBRATION, _apply_calibration, schema=SERVICE_APPLY_CALIBRATION_SCHEMA
         )
 
-    return True
-
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update."""
@@ -412,19 +604,48 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not unload_ok:
         return False
     await entry.runtime_data.async_stop()
-    if not hass.config_entries.async_loaded_entries(DOMAIN):
+    _async_remove_unused_services(hass, entry)
+    return True
+
+
+def _async_remove_unused_services(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    if not any(
+        other.entry_id != entry.entry_id and not getattr(getattr(other, "runtime_data", None), "_stopped", False)
+        for other in hass.config_entries.async_loaded_entries(DOMAIN)
+    ):
         for svc in (
             SERVICE_RESET_RAIN,
             SERVICE_RESET_LEARNING,
             SERVICE_EXPORT_LEARNING,
             SERVICE_APPLY_CALIBRATION,
+            SERVICE_GET_WEATHER_WINDOWS,
+            SERVICE_GET_STATION_SUMMARY,
         ):
             if hass.services.has_service(DOMAIN, svc):
                 hass.services.async_remove(DOMAIN, svc)
-    return True
+
+
+def entry_storage_keys(entry_id: str) -> tuple[str, ...]:
+    """Every .storage file this integration keeps for one config entry."""
+    return (
+        f"ws_core_{entry_id}_learning",
+        f"ws_core_{entry_id}_history",
+        f"ws_core_{entry_id}_climate_normals",
+        f"ws_core_{entry_id}_pattern_forecast",
+        f"ws_core_{entry_id}_pattern_forecast_pre_v3_backup",
+        f"ws_core_{entry_id}_solar_local",
+    )
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Clean up this entry's Repairs issues when it is deleted."""
+    """Clean up this entry's Repairs issues and stored data when it is deleted."""
+    from homeassistant.helpers.storage import Store
+
     for name in ENTRY_REPAIR_ISSUES:
         ir.async_delete_issue(hass, DOMAIN, issue_id_for_entry(name, entry.entry_id))
+    # Deleting the integration removes its learned and accumulated data; a missing file is fine.
+    for key in entry_storage_keys(entry.entry_id):
+        try:
+            await Store(hass, 1, key).async_remove()
+        except Exception as err:  # noqa: BLE001 - cleanup must never block entry removal
+            _LOGGER.debug("ws_core: could not remove stored data %s: %s", key, err)

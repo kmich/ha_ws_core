@@ -2,15 +2,69 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from . import const as c
+
+# Short, plain wording of each reason for dashboards ("status_text"). Home Assistant only
+# allows numbers in sensors with a unit, so it shows "Unknown"; dashboards show this text.
+_STATUS_TEXT: dict[str, str] = {
+    "waiting_for_data": "Waiting for data",
+    "outside_valid_range": "Does not apply now",
+    "missing_solar_radiation": "Needs a solar sensor",
+    "waiting_for_daylight_or_radiation": "Waiting for daylight",
+    "waiting_for_daily_radiation": "After a full day",
+    "missing_location": "Needs a location",
+    "fetch_failed": "Forecast fetch failed",
+    "waiting_for_forecast": "Waiting for forecast",
+    "feature_disabled": "Nowcast is off",
+    "no_transition_in_forecast": "No change expected",
+    "waiting_for_nowcast": "Waiting for nowcast",
+    "missing_lightning_source": "No lightning source",
+    "waiting_for_lightning_location": "No recent strike",
+    "lightning_source_unavailable": "Lightning source unavailable",
+    "no_strike_recorded": "No strike yet",
+    "calm": "Calm",
+    "no_event_recorded": "Nothing yet",
+    "collecting_training_data": "Learning",
+    "waiting_for_first_run": "Starting up",
+    "provider_missing_precip_prob": "No rain probability from provider",
+}
+
+_EVENTS_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s+(?:live\s+)?events")
+
+
+def lightning_source_reporting(hass: Any, entity_id: str | None) -> bool:
+    """True when a lightning source exists and is not unavailable.
+
+    Detectors and Blitzortung sit at ``unknown`` (or a stale number) between strikes, which
+    means no strike; ``unavailable`` or a missing entity means the source is offline.
+    """
+    if hass is None or not entity_id:
+        return False
+    state = hass.states.get(entity_id)
+    return state is not None and state.state != "unavailable"
+
+
+def status_text(reason: str | None, *, explanation: str | None = None) -> str:
+    """Short wording for a reason code, for dashboards that would otherwise show "Unknown"."""
+    if not reason:
+        return _STATUS_TEXT["waiting_for_data"]
+    if reason == "collecting_training_data" and explanation:
+        m = _EVENTS_RE.search(explanation)
+        if m:
+            return f"Learning ({m.group(1)} of {m.group(2)} events)"
+    if reason.startswith("waiting_for:"):
+        return "Waiting for history"
+    return _STATUS_TEXT.get(reason, _STATUS_TEXT["waiting_for_data"])
 
 
 def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
     """Return diagnostic attributes for an unknown value, using configured inputs."""
     reason = "waiting_for_data"
     explanation = "Waiting for a valid reading from the configured source sensors."
+    short: str | None = None
     temp = data.get(c.KEY_NORM_TEMP_C)
     humidity = data.get(c.KEY_NORM_HUMIDITY)
     if key in (c.KEY_HEAT_INDEX, c.KEY_THW_INDEX, c.KEY_THSW_INDEX):
@@ -25,6 +79,11 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         if temp is not None and speed is not None and (temp > 10 or speed <= 1.34):
             reason = "outside_valid_range"
             explanation = "Wind chill applies only at 10 °C or below with wind above 4.8 km/h."
+    elif key == c.KEY_WIND_GUST_FACTOR:
+        speed = data.get(c.KEY_NORM_WIND_SPEED_MS)
+        if speed is not None and speed < 0.5:
+            reason = "calm"
+            explanation = "The wind is calm (below 0.5 m/s), so gust divided by mean wind is not defined."
     elif key in (c.KEY_CLEARNESS_INDEX, c.KEY_CLOUD_COVER_PCT):
         if not coord.sources.get(c.SRC_SOLAR_RADIATION):
             reason = "missing_solar_radiation"
@@ -43,6 +102,17 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         elif key == c.KEY_ET0_PM_DAILY_MM and not getattr(coord, "_solar_energy_previous_whm2", 0.0):
             reason = "waiting_for_daily_radiation"
             explanation = "Waiting for a completed day's solar irradiation to calculate daily Penman–Monteith ET₀."
+    elif key in (c.KEY_SOLAR_LOCAL_TODAY_KWH, c.KEY_SOLAR_LOCAL_TOMORROW_KWH, c.KEY_SOLAR_LOCAL_REMAINING_KWH):
+        runtime = getattr(coord, "_solar_local", None)
+        if getattr(coord, "forecast_lat", None) is None or getattr(coord, "forecast_lon", None) is None:
+            reason = "missing_location"
+            explanation = "Set the forecast latitude and longitude to fetch the irradiance forecast."
+        elif runtime is not None and runtime.error:
+            reason = "fetch_failed"
+            explanation = f"The Open-Meteo irradiance forecast could not be fetched ({runtime.error}); retrying."
+        else:
+            reason = "waiting_for_forecast"
+            explanation = "Waiting for the first Open-Meteo irradiance forecast and PV meter history."
     elif key in (c.KEY_MINUTES_UNTIL_RAIN, c.KEY_MINUTES_UNTIL_DRY):
         cache = getattr(coord, "_nowcast_cache", None)
         if not getattr(coord, "nowcast_enabled", False):
@@ -51,6 +121,11 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         elif cache and data.get(c.KEY_NOWCAST_INTENSITY) is not None:
             reason = "no_transition_in_forecast"
             explanation = "No matching rain start or stop is predicted within the available nowcast window."
+            raining = (data.get(c.KEY_RAIN_RATE_FILT) or 0) > 0
+            if key == c.KEY_MINUTES_UNTIL_RAIN:
+                short = "Raining now" if raining else "No rain expected"
+            else:
+                short = "Rain continues" if raining else "Not raining"
         else:
             reason = "waiting_for_nowcast"
             explanation = "Waiting for precipitation nowcast data."
@@ -59,10 +134,40 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         if not (coord.sources.get(source) or getattr(coord, "_blitzortung_sources", {}).get(source)):
             reason = "missing_lightning_source"
             explanation = "Map the lightning distance/bearing source, or set up the Blitzortung integration."
+        elif not lightning_source_reporting(
+            getattr(coord, "hass", None),
+            coord.sources.get(source) or getattr(coord, "_blitzortung_sources", {}).get(source),
+        ):
+            reason = "lightning_source_unavailable"
+            explanation = "The lightning source is unavailable, so a nearby strike could not be reported."
         else:
             reason = "waiting_for_lightning_location"
             explanation = "The lightning source has not supplied a valid strike distance or bearing."
     elif key == c.KEY_LIGHTNING_CLEARANCE_MIN:
         reason = "no_strike_recorded"
-        explanation = "No strike has been observed since this station entry loaded; elapsed clearance is unknown."
-    return {"data_status": reason, "reason": reason, "explanation": explanation}
+        explanation = "No lightning strike has been recorded yet, so there is no time since the last one."
+    elif key == c.KEY_FORECAST_AGREEMENT:
+        if not getattr(coord, "forecast_enabled", True):
+            reason = "feature_disabled"
+            explanation = "Enable weather forecast to compare Zambretti with the forecast provider."
+            short = "Forecast is off"
+        elif data.get(c.KEY_ZAMBRETTI_NUMBER) is None:
+            reason = "waiting_for_data"
+            explanation = (
+                "Waiting for a local Zambretti barometric forecast before comparing with the forecast provider."
+            )
+        elif data.get("_forecast_agreement_reason") == "provider_missing_precip_prob":
+            reason = "provider_missing_precip_prob"
+            explanation = (
+                "The selected forecast provider does not supply precipitation probability, "
+                "which Forecast Agreement requires."
+            )
+        else:
+            reason = "waiting_for_forecast"
+            explanation = "Waiting for a fresh forecast to compare against the local Zambretti outlook."
+    return {
+        "data_status": reason,
+        "reason": reason,
+        "explanation": explanation,
+        "status_text": short or status_text(reason, explanation=explanation),
+    }

@@ -44,13 +44,70 @@ reset_learning_state:
 export_learning_state:
   name: Export learning state
   description: >-
-    Logs the current learning state to the HA log (for diagnostics), plus a
-    Pattern Forecast summary (maturity and skill per target, named weights).
+    Returns the persistent learning state and Pattern Forecast summary
+    (SupportsResponse.OPTIONAL). By default returns a compact summary suitable
+    for automations; set full to true to export complete models and raw weights.
   fields:
     entry_id:
       name: Config entry ID (optional)
       description: >-
         If provided, only exports that specific WS Station config entry.
+      example: "abcd1234efgh5678"
+      selector:
+        text:
+    full:
+      name: Export full raw model state (optional)
+      description: >-
+        If true, includes complete model weights, standardizer statistics, and
+        raw accumulators.
+      default: false
+      selector:
+        boolean:
+
+get_weather_windows:
+  name: Get weather windows
+  description: >-
+    Evaluates favorable activity time windows (such as outdoor drying or garden work)
+    over the next 24 hours (SupportsResponse.ONLY). Returns suitable intervals,
+    evaluated limits, and structured rejection reason codes.
+  fields:
+    entry_id:
+      name: Config entry ID (optional)
+      description: >-
+        If provided, only evaluates windows for that specific station entry.
+      example: "abcd1234efgh5678"
+      selector:
+        text:
+    profile_id:
+      name: Profile ID (optional)
+      description: >-
+        Activity profile to evaluate (outdoor_drying, garden_work, or custom).
+        If omitted, evaluates all enabled profiles.
+      example: "outdoor_drying"
+      selector:
+        select:
+          options:
+            - "outdoor_drying"
+            - "garden_work"
+            - "custom"
+    limits:
+      name: Custom limits (optional)
+      description: >-
+        Optional custom constraint thresholds overriding the profile defaults.
+      selector:
+        object:
+
+get_station_summary:
+  name: Get station summary
+  description: >-
+    Returns a deterministic, comprehensive summary of current station observations,
+    24h extremes, active alerts, forecast validity, and weather windows
+    (SupportsResponse.ONLY). Designed for voice assistants and Home Assistant Assist.
+  fields:
+    entry_id:
+      name: Config entry ID (optional)
+      description: >-
+        If provided, only returns summary for that specific station entry.
       example: "abcd1234efgh5678"
       selector:
         text:

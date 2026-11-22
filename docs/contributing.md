@@ -47,9 +47,10 @@ The forecast provider system is pluggable. To add a new provider:
 
 1. Create `custom_components/ws_core/providers/your_provider.py`
    - Subclass `ForecastProvider` from `base.py`
-   - Implement `async_fetch(session, lat, lon, api_key=None)` returning the
-     normalised 7-day daily + 24h hourly format documented in `base.py`
-2. Add one line to `providers/__init__.py`: `"your_id": YourProvider`
+   - Implement `async_fetch(session, lat, lon, api_key=None)` using the daily and
+     hourly row formats documented in `base.py`. Keep missing values as `None`.
+2. Import and register it in `providers/__init__.py`, and describe its forecast
+   fields in `providers/capabilities.py`.
 3. Add display names to `strings.json` and all `translations/*.json` under
    `forecast_provider` selector options
 
@@ -77,16 +78,17 @@ ruff check custom_components/ tests/ scripts/
 ruff format --check custom_components/ tests/ scripts/
 ```
 
-CI (`.github/workflows/validate.yml`) runs automatically on PRs to `main`. All seven
-jobs must pass: hassfest, HACS validation, lint, tests, no-bytecode, version
-consistency, and the dashboard entity validator.
+CI (`.github/workflows/validate.yml`) validates pull requests with the test suite,
+Home Assistant compatibility checks, hassfest, HACS validation, Ruff, version
+and bytecode checks, dashboard entity validation, and a strict MkDocs build.
 
 ---
 
 ## Code conventions
 
 - Follow the existing code style (ruff enforces it)
-- New sensors go in `sensor.py` with a `WSSensorDescription` entry
+- Declare new derived sensors in `entity_descriptions.py`. Entity ID overrides
+  live in `sensor.py`. Regenerate the entity map with `python scripts/generate_entity_map.py`.
 - New algorithm code goes in `algorithms.py`
 - New coordinator keys go in `const.py` as `KEY_*` constants
 - New feature toggles need: `const.py` `CONF_*` + `DEFAULT_*`, `switch.py` entry,

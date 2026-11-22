@@ -16,6 +16,7 @@ from custom_components.ws_core import pattern_runtime
 from custom_components.ws_core.const import (
     CONF_ENABLE_PATTERN_FORECAST,
     CONF_PATTERN_STORM_INTERNET_LIGHTNING,
+    PATTERN_HISTORY_FEATURES_METHOD,
     PATTERN_HISTORY_METHOD,
     PATTERN_HISTORY_RETRY_S,
     PATTERN_PRESSURE_SLOTS,
@@ -737,10 +738,17 @@ class TestPressureSeed:
         }
         coord, rt = make_runtime(stats=(meta, rows))
         rt.engine.history_learn = {
+            "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+            "features_reset_method": PATTERN_HISTORY_FEATURES_METHOD,
             "targets": {
-                tid: {"status": "ok", "method": PATTERN_HISTORY_METHOD, "attempted_at": NOW.timestamp()}
+                tid: {
+                    "status": "ok",
+                    "method": PATTERN_HISTORY_METHOD,
+                    "features_method": PATTERN_HISTORY_FEATURES_METHOD,
+                    "attempted_at": NOW.timestamp(),
+                }
                 for tid in rt.engine.active_target_ids()
-            }
+            },
         }
         return coord, rt
 
@@ -902,9 +910,10 @@ class TestPressureSeed:
     def test_replay_seeds_a_day_of_pressure(self, learned):
         coord, rt = learned
         eng = rt.engine
-        assert len(eng.pressure) == PATTERN_PRESSURE_SLOTS
+        # Kept by time (24.5 h), not by count: at least a full day of 15-min points
+        assert 97 <= len(eng.pressure) <= PATTERN_PRESSURE_SLOTS
         first, last = eng.pressure[0][0], eng.pressure[-1][0]
-        assert last <= NOW.timestamp() and last - first >= 23.5 * 3600
+        assert last <= NOW.timestamp() and last - first >= 24 * 3600
         assert all(p[0] % 900.0 == 0 for p in eng.pressure)
         # the next live issues all find their reading from 24 h before
         for k in range(4):

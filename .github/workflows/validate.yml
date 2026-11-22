@@ -91,9 +91,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # HA 2024.6's ACME stack imports ComparableX509, removed in josepy 2.
-      - run: pip install "homeassistant==2024.6.0" "josepy<2" "pytest>=8,<9" "pytest-socket>=0.7"
+      # Older HA 2024.x ACME dependency imports ComparableX509, removed in josepy 2.
+      - run: pip install "homeassistant==2024.12.0" "josepy<2" "pytest>=8,<9" "pytest-socket>=0.7"
       - run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/test_entity_contracts.py -q
+      # A real entry setup, options flow and unload on the minimum version. The contract
+      # tests above never construct the coordinator. 0.13.190 pins homeassistant==2024.12.0.
+      - run: pip install "pytest-homeassistant-custom-component==0.13.190" "josepy<2"
+      - run: python -c "from homeassistant.const import __version__; assert __version__ == '2024.12.0', __version__"
+      - run: pytest tests/test_setup_smoke.py -q
 
   no-bytecode:
     name: No bytecode in repo

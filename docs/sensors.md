@@ -2,8 +2,16 @@
 
 Complete list of entities created by Weather Station Core.
 
+Enabling a feature also enables its default sensors. This applies to existing
+entities that Weather Station Core disabled by default, such as Fog Probability.
+Entities you disabled yourself remain disabled.
+
 Entity IDs shown use the default prefix `ws`. If you chose a different prefix during
-setup, replace `ws` with your prefix.
+setup, replace `ws` with your prefix. Note: Home Assistant's entity registry preserves
+user-chosen or pre-existing entity IDs across upgrades, and renaming the Weather Station
+device in Home Assistant can offer to regenerate entity IDs using your UI language
+(for example `sensor.wetterstation_frostrisiko` in German); fresh setups assign the
+English `sensor.<prefix>_*` IDs directly and localize the display name.
 
 ---
 
@@ -20,7 +28,7 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_wind_speed` | m/s | measurement | Sustained wind speed |
 | `sensor.ws_wind_gust` | m/s | measurement | Wind gust speed |
 | `sensor.ws_wind_direction` | ° | measurement_angle | Wind direction |
-| `sensor.ws_rain_total` | mm | total_increasing | Cumulative rainfall |
+| `sensor.ws_rain_total` | mm | total_increasing | **Rainfall Counter.** Current amount from the mapped rain source, in your display units. The value follows that source's accumulation period, such as the current rain event or year. See [rainfall sources](hardware_mapping.md#rainfall-sources) |
 | `sensor.ws_rain_rate` | mm/h | measurement | Kalman-filtered rain rate |
 | `sensor.ws_dew_point` | °C | measurement | Dew point — Magnus formula (Alduchov & Eskridge 1996) |
 | `sensor.ws_illuminance` | lx | measurement | Solar illuminance (if mapped) |
@@ -33,17 +41,19 @@ Created for every installation, regardless of optional features.
 | `sensor.ws_feels_like` | °C | Apparent temperature (BOM/Steadman 1994) |
 | `sensor.ws_wet_bulb` | °C | Wet-bulb temperature (Stull 2011, ±0.3 °C) |
 | `sensor.ws_frost_point` | °C | Frost point with Buck (1981) ice constants below 0 °C; equals the dew point above 0 °C |
-| `sensor.ws_frost_risk` | — | Frost risk category: `high` / `probable` / `unlikely` / `no_risk` (state is localized) |
+| `sensor.ws_frost_risk` | — | Frost risk category (enum): `high` / `probable` / `unlikely` / `no_risk` (state is localized). Compares the lower of the current air temperature and the forecast low for the next 12 h against `thresh_freeze_c` +0 / +2 / +4 °C, with a `+0.5 °C` hysteresis and 2-tick on / 3-tick off debounce. Attributes: `min_temp_c`, `forecast_min_c`, `threshold_c`, `frost_point_c`. See [Frost risk](science.md#frost-risk) |
 | `sensor.ws_zambretti_forecast` | — | Zambretti text forecast (26 phrases) |
 | `sensor.ws_zambretti_number` | — | Z-number 1-26 |
-| `sensor.ws_wind_beaufort` | — | Beaufort scale classification |
-| `sensor.ws_wind_quadrant` | — | N / E / S / W compass quadrant |
-| `sensor.ws_current_condition` | — | 36-condition weather classifier from measured readings. A new condition is reported once it has held for 5 minutes; hurricane and severe storm are reported at once |
+| `sensor.ws_wind_beaufort` | — | Beaufort scale number (0–12); `description` attribute is localized in all 8 languages |
+| `sensor.ws_wind_beaufort_description` | — | Localized Beaufort scale label (`calm` .. `hurricane`, Home Assistant enum sensor translated per user language) |
+| `sensor.ws_wind_direction_smooth` | ° | Circular EMA-smoothed wind direction (`alpha = 0.3` per 60 s tick; see [Wind smoothing](science.md#wind-smoothing)) |
+| `sensor.ws_wind_quadrant` | — | N / E / S / W compass quadrant derived from the smoothed wind direction (`using_smoothed` attribute indicates whether smoothed or raw direction was used) |
+| `sensor.ws_current_condition` | — | 36-condition weather classifier from measured readings. A new condition is reported once it has held for 5 minutes, with immediate reporting for hurricane and severe storm. Clearing after rain requires at least 0.1 mm accumulated in the last 3 hours and a measured light reading |
 | `sensor.ws_rain_probability` | % | Local sensor-based rain index |
 | `sensor.ws_rain_probability_combined` | % | Brier-score blended local + NWP |
-| `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` |
+| `sensor.ws_forecast_agreement` | — | `aligned` / `diverging` / `conflict` comparing Zambretti's 6–12 h outlook against the forecast provider's peak `precipitation_probability` over the next 12 h (`comparison_window: hourly_12h`, falling back to `daily`). Reports `unknown` (`provider_missing_precip_prob`) if the provider omits rain probability |
 | `sensor.ws_pressure_trend` | — | WMO No. 306 classification + rate |
-| `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Localized to the HA language (English/French, English fallback). Useful for TTS and Assist. |
+| `sensor.ws_conditions_summary` | — | Human-readable conditions description (e.g. "Warm · 68% RH · Light rain · SE 12 km/h"). Localized in all 8 supported languages (`en`, `fr`, `de`, `es`, `it`, `nl`, `pl`, `pt`, English fallback). Useful for TTS and Assist. |
 | `sensor.ws_rain_last_1h` | mm | Rolling 1-hour rainfall |
 | `sensor.ws_rain_last_24h` | mm | Rolling 24-hour rainfall |
 | `sensor.ws_rain_today_mm` | mm | Today's accumulated rainfall |
@@ -83,8 +93,8 @@ covered completed day is available; missing history is not filled retrospectivel
 | `sensor.ws_cloud_base` | m | Cloud base height (lifted condensation level) |
 | `sensor.ws_freezing_level` | m | Freezing-level altitude (ISA lapse rate) |
 | `sensor.ws_wind_gust_factor` | — | Gust ÷ mean wind speed ratio |
-| `sensor.ws_dominant_wind_direction` | ° | Circular-mean wind direction (24h) |
-| `sensor.ws_wind_direction_variability` | ° | Circular standard deviation of wind direction |
+| `sensor.ws_dominant_wind_direction` | ° | Circular-mean wind direction over the rolling 24 h buffer; exposes `variability_deg` (24 h circular standard deviation, 0° steady to >100° shifting) |
+| `sensor.ws_wind_direction_variability` | ° | Circular standard deviation of wind direction over the rolling 24 h buffer |
 | `sensor.ws_rain_this_week` | mm | Rainfall since Monday |
 | `sensor.ws_rain_this_month` | mm | Rainfall since the 1st of the month |
 | `sensor.ws_rain_this_year` | mm | Station year-to-date total when mapped; otherwise rainfall since January 1 |
@@ -176,15 +186,25 @@ Services: `ws_core.reset_learning_state` accepts target `pattern_forecast`;
 
 ## Optional: Comfort Indices (`enable_comfort_indices`)
 
-All 23 sensors are created when the feature is enabled.
-THSW index, clearness index, cloud cover, solar energy, max solar radiation,
-peak sun hours, and net radiation also require a solar radiation sensor.
+All 23 sensors are created when the feature is enabled, except the solar-radiation
+ones below. Clearness index, cloud cover and the THSW index are only created when a
+solar radiation sensor (W/m²) is mapped. Solar energy, peak sun hours and net
+radiation (and Penman-Monteith ET₀) are created with a solar radiation sensor, or
+with the illuminance fallback and a lux sensor, as estimates. Entries for these
+sensors left by earlier versions on stations without such a sensor are removed
+automatically, and `sensor.ws_data_status` lists them under `not_on_this_station`.
+
+**Feels-like sensors outside their range.** Heat index, THW, THSW, wind chill and
+humidex only apply in certain weather. Outside it they show the air temperature,
+as Davis and NWS stations do, with `formula_applies: false` and an `explanation`
+attribute; inside it, `formula_applies` is `true`. Before 3.0.0 they showed
+`unknown`. MQTT and exports still send no value when the formula does not apply.
 
 | Entity ID | Unit | Formula / reference | Notes |
 |---|---|---|---|
-| `sensor.ws_heat_index` | °C | Rothfusz (1990) | Active when T ≥ 27 °C and RH ≥ 40% |
-| `sensor.ws_wind_chill` | °C | WMO/NWS (2001) | Active when T ≤ 10 °C and wind > 1.34 m/s |
-| `sensor.ws_humidex` | °C | Masterton & Richardson (1979) | Active when result exceeds ambient T |
+| `sensor.ws_heat_index` | °C | Rothfusz (1990) | Applies when T ≥ 27 °C and RH ≥ 40%; air temperature otherwise |
+| `sensor.ws_wind_chill` | °C | WMO/NWS (2001) | Applies when T ≤ 10 °C and wind > 1.34 m/s; air temperature otherwise |
+| `sensor.ws_humidex` | °C | Masterton & Richardson (1979) | Applies when it exceeds the air temperature; air temperature otherwise |
 | `sensor.ws_thw_index` | °C | Davis Instruments | THW — heat index with wind cooling |
 | `sensor.ws_thsw_index` | °C | Davis Instruments | THSW — THW plus solar heating; needs solar radiation |
 | `sensor.ws_vpd` | kPa | FAO-56 (Allen 1998) | Vapour Pressure Deficit |
@@ -237,8 +257,8 @@ FWI sub-components (`enable_fwi_components`) run the FWI calculation even when t
 | `sensor.ws_lightning_count_1h` | strikes | Strikes in the past hour |
 | `sensor.ws_lightning_distance` | km | Nearest detected strike |
 | `sensor.ws_lightning_rate` | /min | Average strike rate |
-| `sensor.ws_lightning_clearance` | min | Minutes since the last strike (safe at ≥30) |
-| `sensor.ws_lightning_proximity` | — | `near` / `clear` vs configurable threshold |
+| `sensor.ws_lightning_clearance` | min | Minutes since the last strike (safe at ≥30); keeps counting across restarts from the last strike the lightning event recorded |
+| `sensor.ws_lightning_proximity` | — | `near` / `clear` vs configurable threshold; `clear` when the distance source reports no strike, `unknown` while it is unavailable |
 
 Supports WH57, AS3935, and Blitzortung. Blitzortung is auto-discovered if installed.
 
@@ -292,7 +312,9 @@ Free via Open-Meteo. No API key required.
 
 | Entity ID | Unit | Description |
 |---|---|---|
-| `sensor.ws_air_quality_index` | AQI | US EPA AQI, higher of the PM2.5 and PM10 sub-indices (2024 PM2.5 breakpoints) |
+| `sensor.ws_air_quality_index` | AQI | Air Quality Index (`aqi_scale`: `auto` selects European EAQI 0–100+ in Europe and US EPA AQI 0–500 elsewhere). Exposes `scale`, `level`, `color`, `source`, `missing_pollutants` for the local estimate, and pollutant concentrations |
+| `sensor.ws_pm2_5` | µg/m³ | Fine particulate matter (PM2.5) |
+| `sensor.ws_pm10` | µg/m³ | Coarse particulate matter (PM10) |
 | `sensor.ws_no2` | µg/m³ | Nitrogen dioxide |
 | `sensor.ws_ozone` | µg/m³ | Ozone |
 
@@ -331,6 +353,44 @@ Via forecast.solar (free). Configure your panel peak kWp, azimuth, and tilt.
 | `sensor.ws_solar_forecast_today` | kWh | Estimated PV generation today |
 | `sensor.ws_solar_forecast_tomorrow` | kWh | Estimated PV generation tomorrow |
 
+### Local PV forecast (v3.0.0, optional)
+
+Pick the PV energy meters that count your solar production (the same kWh meters as in the Energy dashboard, one or several) under **Configure → Features & Diagnostics → Solar Forecast Settings**. ws_core learns a forecast for your installation:
+
+- It fetches Open-Meteo's hourly irradiance forecast on the plane of your panels (your tilt and azimuth; free, no key).
+- From your meters' long-term statistics it learns how many kWh your system really produces per kWh/m² of that irradiance (the **site factor**). Shading, inverter losses, soiling and a wrong kWp setting are all absorbed by it.
+- On the first start it reads up to 92 days of history from the recorder and Open-Meteo, so a system with existing statistics is calibrated right away. Without history it starts from your peak power (kWp × 0.80) and refits as days come in.
+
+| Entity ID | Unit | Description |
+|---|---|---|
+| `sensor.ws_solar_local_forecast_today` | kWh | Local PV forecast for today |
+| `sensor.ws_solar_local_forecast_tomorrow` | kWh | Local PV forecast for tomorrow |
+| `sensor.ws_solar_local_forecast_remaining_today` | kWh | Energy still expected today (rest of the current hour plus later hours) |
+
+Attributes of `sensor.ws_solar_local_forecast_today`:
+
+| Attribute | Meaning |
+|---|---|
+| `model_status` | `prior` (from your kWp only), `learning` (fewer than 7 usable days, blended with the prior) or `trained` |
+| `days_used` | Days in the last 60 that went into the fit |
+| `days_rejected` | Days with complete data whose yield fell outside the fitting band |
+| `site_factor` / `prior_site_factor` | Learned and kWp-based kWh per kWh/m² of plane irradiance |
+| `skill_local` / `skill_forecast_solar` | Day-ahead error over the last 30 days for this forecast and for forecast.solar: `days`, `mae_kwh`, `bias_kwh`, `correlation` (shown from 5 days) |
+| `hourly` | Hourly forecast for today and tomorrow (`start`, `kwh`). Home Assistant Recorder excludes this attribute |
+| `meter_problem` / `last_error` | Problems reading usable meter data or refreshing the irradiance forecast |
+
+Skill compares the last forecast made **before** each day with that day's measured yield. The model scores both forecasts on shared days when at least five are available. With fewer shared days each forecast is scored on its own qualifying dates, so the two scores can cover different days. The day-ahead history starts when the feature is turned on.
+
+Notes and limits:
+
+- The meters need long-term statistics (`state_class` `total` or `total_increasing`, unit Wh, kWh or MWh). Lifetime and daily-reset counters both work.
+- Each selected meter must cover every modeled hour with at least 25 Wh/m² of panel-plane irradiance. Meters that go offline at night can still qualify. Incomplete productive hours exclude that day. Data Status reports meter statistics problems. A failed history backfill is retried after six hours while short forecast refreshes continue.
+- The fit uses least squares on days near the typical yield of the highest-producing fifth of recent days, using at least seven days for that reference when available. This helps when a majority of days are curtailed or snow-covered if enough productive days remain. Consistently curtailed systems can learn a lower factor. With a mix of heavily curtailed and productive days, all days can fall outside the fitting band. In that case the model uses the kWp-based prior and reports the number of rejected days.
+- If the irradiance refresh fails, the forecast may keep its last values until local midnight. Check `updated_at` for the last successful refresh and `last_error` for the failure.
+- Clearing the PV meter list removes the three Local PV Forecast entities on reload.
+- One tilt and azimuth are used for the whole system. For arrays facing different ways, set the orientation of the largest array; the site factor absorbs the rest, but the hourly shape follows that one orientation.
+- Uses the forecast latitude and longitude. Removing the integration deletes the learned data (`.storage/ws_core_<entry>_solar_local`).
+
 ---
 
 ## Optional: Fog and Thunderstorm
@@ -362,6 +422,70 @@ Via Open-Meteo Marine API (free, no API key).
 
 ---
 
+## Always-on: Alerts {#alerts}
+
+Always created (`EntityCategory.DIAGNOSTIC`):
+
+| Entity ID | Description |
+|---|---|
+| `sensor.ws_alert_state` | Overall alert severity (`clear`, `advisory`, or `warning`). Exposes `message`, `detail_message`, `active_alerts`, `alert_count`, `icon`, `color` |
+| `sensor.ws_alert_message` | Stable localized alert title(s) (e.g. `"Freeze risk"`, or multiple active alerts joined with `" \| "`, or `"All clear"` when clear). Live measurements are exposed in `detail_message` and `active_alerts` attributes so state history does not flap on every reading |
+
+**Triggers, thresholds, hysteresis & debounce:**
+
+| Alert | Severity | Config option | Default | Hysteresis deadband to clear |
+|---|---|---|---|---|
+| Wind | `warning` | `thresh_wind_gust_ms` (`number.ws_thresh_wind_gust`) | `17.0 m/s` (61.2 km/h) | Drops below `threshold - 1.5 m/s` |
+| Rain | `warning` | `thresh_rain_rate_mmph` (`number.ws_thresh_rain_rate`) | `10.0 mm/h` | Drops below `threshold - 1.0 mm/h` |
+| Freeze | `advisory` | `thresh_freeze_c` (`number.ws_thresh_freeze`) | `0.0 °C` | Rises above `threshold + 0.5 °C` |
+| Lightning | `warning` | Nearby strike / `lightning_proximity_km` | Immediate, 30 min hold | Clears 30 min after last nearby strike |
+
+- **Debounce:** Wind, rain and freeze alerts advance on the fixed **60-second tick** and require **2 consecutive ticks** meeting the trigger condition to fire (`ALERT_DEBOUNCE_ON_TICKS = 2`) and **3 consecutive ticks** clear of the hysteresis deadband to turn off (`ALERT_DEBOUNCE_OFF_TICKS = 3`). Lightning triggers immediately with no onset delay.
+- **Combining:** `sensor.ws_alert_state` takes the highest active severity (`warning` beats `advisory`). Active alert titles are joined with `" | "` in `sensor.ws_alert_message`, and live formatted values are joined in `detail_message` and listed per alert in `active_alerts`.
+
+**Freeze alert vs `sensor.ws_frost_risk`:** the two answer different questions.
+
+- The **freeze alert** (`sensor.ws_alert_state` = `advisory`, `sensor.ws_alert_message` = "Freeze risk") fires only when the **measured** air temperature is at or below `thresh_freeze_c` (`number.ws_thresh_freeze`, default `0.0 °C`).
+- **`sensor.ws_frost_risk`** is an early-warning indicator for ground and grass frost. It uses the lower of the current air temperature and the forecast low over the next 12 hours, so it can rise before the air itself reaches the threshold:
+
+  | State | Lowest temperature considered |
+  |---|---|
+  | `high` | ≤ `thresh_freeze_c` |
+  | `probable` | ≤ `thresh_freeze_c` + 2 °C |
+  | `unlikely` | ≤ `thresh_freeze_c` + 4 °C |
+  | `no_risk` | above `thresh_freeze_c` + 4 °C |
+
+  It does **not** look at frost point, humidity, wind or cloud cover. The frost point is available separately (`sensor.ws_frost_point`, and the `frost_point_c` attribute). Like the alerts, it needs 2 ticks to step up and 3 ticks to step down, and only steps down once the temperature is more than 0.5 °C above the boundary. See [Frost risk](science.md#frost-risk).
+
+---
+
+## Always-on: Data Status {#data-status}
+
+`sensor.ws_data_status` answers "is an empty sensor a problem?" in one place. Its
+state is **OK** or **Needs attention**.
+
+- **Needs attention** reports station-source problems that last more than five minutes,
+  as well as problems reading usable PV meter history. Missing entities and stale
+  readings can also raise Repairs issues.
+- The `summary` attribute says what is going on in one sentence.
+- `needs_attention` lists the problems.
+- `waiting` lists every sensor that is empty for a normal reason, with that reason.
+  Examples: no rain expected, no lightning strike yet, Pattern Forecast still
+  collecting data, no frost event yet.
+- `not_on_this_station` lists features this station's sensors or settings cannot
+  provide, and what would make them work. Examples: clearness index without a W/m²
+  solar sensor, or lightning with no detector and no Blitzortung integration.
+
+Derived sensors covered by Data Status also carry `reason` and `explanation` attributes when empty, plus a
+short `status_text` such as "No rain expected", "No recent strike" or "Learning (2 of 5
+events)". Home Assistant only allows numbers in a sensor with a unit and shows
+"Unknown" when there is none, so the bundled dashboards show `status_text` there
+instead. To do the same on your own dashboard, use an entities-card row of
+`type: attribute` with `attribute: status_text` behind a conditional on
+`state: unknown`.
+
+---
+
 ## Optional: Station Diagnostics (`enable_diagnostics`)
 
 | Entity ID | Description |
@@ -374,7 +498,7 @@ Via Open-Meteo Marine API (free, no API key).
 | `sensor.ws_climatology_30d` | Rolling 30-day climatology summary |
 | `sensor.ws_temperature_anomaly_30d` | Today's mean temperature vs 30-day rolling mean |
 | `sensor.ws_rain_anomaly_30d` | Today's rain vs 30-day rolling daily average |
-| `sensor.ws_frost_risk` | Frost risk diagnostic (`no_risk`, `unlikely`, `probable`, `high`) |
+| `sensor.ws_frost_risk` | Frost risk (`no_risk`, `unlikely`, `probable`, `high`); see [Alerts](#alerts) |
 | `sensor.ws_forecast_brier_local` | Brier score for local sensor model (lower is better; requires ≥10 outcomes) |
 | `sensor.ws_forecast_brier_api` | Brier score for the forecast provider, scored on its highest hourly probability over each 6-hour window ([method](science.md#rain-blend)) |
 | `sensor.ws_forecast_blend_weight_local` | Current learned weight (%) of the local model in the blended probability |
@@ -391,7 +515,7 @@ Via Open-Meteo Marine API (free, no API key).
 
 ## Feature: Soil Sensors
 
-Requires: soil moisture or soil temperature source sensors mapped in Configure → Sources, and **Soil Sensors** enabled in Configure → Features.
+Requires: soil moisture or soil temperature source sensors mapped in Configure → Sensor Sources, and **Soil Sensors** enabled in Configure → Features & Diagnostics.
 
 | Entity ID | Unit | State Class | Description |
 |---|---|---|---|
@@ -469,14 +593,19 @@ MQTT integration to be set up.
 
 | Entity | Type | Description |
 |---|---|---|
-| `weather.ws` | weather | Standard HA weather entity with daily forecast |
+| `weather.ws` | weather | Standard HA weather entity with daily and hourly forecast |
 | `binary_sensor.ws_package_ok` | binary_sensor | On when all required sources are mapped and available |
-| `binary_sensor.ws_rain_expected_1h` | binary_sensor | On when rain is expected within 60 minutes (nowcast) |
+| `binary_sensor.ws_rain_expected_1h` | binary_sensor | On when nowcast predicts rain in the next 60 minutes (or when the local gauge currently measures ≥ 0.1 mm/h while nowcast is unavailable); `unknown` with `status_text` when nowcast is unavailable and the station is dry |
 | `event.ws_rain_event` | event | Fires on rain start and rain stop |
 | `event.ws_frost_event` | event | Fires on frost onset and thaw |
 | `event.ws_lightning_event` | event | Fires on lightning strike or proximity change |
 | `select.ws_graph_range` | select | Dashboard graph time range: 6h / 24h / 3d |
 | `sensor.ws_forecast_provider` | sensor | Active forecast provider name (`forecast_status` attribute shows `ok` / `degraded` / `local_only`) |
+
+**Forecast provider coverage (`weather.ws`):**
+
+- `ha_weather_entity` retains the source entity's full forecast horizon and forwards extra fields when supplied (`cloud_coverage`, `humidity`, `pressure`, `visibility`, `uv_index`, `wind_bearing`). Visibility uses the WS weather entity's selected units. The provider preserves HA condition strings and source attribution and derives missing hourly `apparent_temperature` when temperature, humidity and wind speed are available.
+- Fields a source entity or provider omits (for example, DWD does not publish `precipitation_probability`, Met.no omits `wind_gust_speed`, NWS omits `wind_gust_speed` and `cloud_coverage`) remain `null` in the forecast; `sensor.ws_forecast_agreement` reports `unknown` (`provider_missing_precip_prob`) when precipitation probability is absent.
 
 ---
 
@@ -517,3 +646,54 @@ a coordinator reload automatically.
 | `switch.ws_enable_comfort_indices` | All comfort and heat-stress indices |
 | `switch.ws_enable_neighbor_qc` | Hourly sensor sanity check against Open-Meteo (on by default; sends your coordinates) |
 | `switch.ws_enable_pattern_forecast` | Pattern Forecast: learned chance of rain, frost, heat, gusts and storms (off by default; local) |
+
+---
+
+## Optional: Weather Windows {#weather-windows}
+
+Off by default (`enable_weather_windows = false`). Configure under **Settings → Devices & Services → Weather Station Core → Configure → Decision Engine & Weather Windows**.
+
+Entities are created **only** when `enable_weather_windows` is turned on, and only for the selected profiles (`outdoor_drying`, `garden_work`, and/or `custom`). Disabling the feature or unchecking a profile removes its disabled entities from Home Assistant's entity registry on reload.
+
+### Profiles and Entities
+
+For each enabled profile `<pid>` (`outdoor_drying`, `garden_work`, `custom`):
+
+| Entity ID | Device Class | Description |
+|---|---|---|
+| `sensor.ws_window_<pid>_status` | `enum` | Current suitability state: `suitable_now`, `window_upcoming`, `unsuitable`, or `unknown` |
+| `sensor.ws_window_<pid>_next_start` | `timestamp` | Start time of the active or next suitable interval (`unknown` if none) |
+| `sensor.ws_window_<pid>_next_end` | `timestamp` | End time of the active or next suitable interval (`unknown` if none) |
+
+Default profile criteria (all numeric custom limits accept °C/°F, mm/in, and km/h/mph/m/s/kn matching station units):
+
+| Profile | Min Duration | Rain Limits | Temp (°C) | Humidity | Wind / Gust (km/h) | Daylight | Clouds |
+|---|---|---|---|---|---|---|---|
+| `outdoor_drying` | 2 h | prob ≤ 20%, mm = 0 | 10 to 38 | ≤ 75% | wind 3 to 35, gust ≤ 45 | Required | ≤ 80% |
+| `garden_work` | 2 h | prob ≤ 30%, mm ≤ 0.1 | 8 to 32 | ≤ 90% | wind ≤ 25, gust ≤ 40 | Required | not checked |
+| `custom` | 2 h | prob ≤ 25%, mm = 0 | 12 to 30 | ≤ 80% | wind ≤ 30, gust ≤ 50 | Not required | not checked |
+
+### Attributes, Live Station Checks & Provider Coverage
+
+- `sensor.ws_window_<pid>_status` exposes localized `reasons`, stable `reason_codes`, `not_assessed_by_provider`, `substituted_by`, `gust_unavailable`, `is_truncated`, and `horizon_hours`. The action `ws_core.get_weather_windows` also returns `duration_h` for the full window and `remaining_h` for the time still available.
+- **Live station checks:** Active station rainfall blocks the current hour. Gusts above the limit for three minutes block the window until five minutes of observed calm. An unavailable gust reading preserves an active hold for up to 30 minutes after the last valid reading.
+- **Interrupted windows:** When live rain or a sustained gust blocks a window that the forecast says is open now, the status becomes `unsuitable` with `window_interrupted` plus the live reason, and `next_start` / `next_end` keep the forecast window's original times. The rest of the window stays visible and the notification blueprint does not re-fire for it.
+- **Action calls:** `ws_core.get_weather_windows` reads the live gust hold but never starts, resets or advances it, so calling the action (even with custom limits) does not change the sensors.
+- **Horizon:** windows are evaluated up to 24 hours ahead, ending on the last full local hour, so a window that runs to the end of the horizon keeps a stable end time. For that reason the minimum duration is limited to 1 to 23 hours.
+- **What "suitable now" means:** a window must meet the minimum duration when it opens. Once open, it stays `suitable_now` until the end while conditions hold, even when less than the minimum duration remains. Use the action's `remaining_h` if an automation needs to decide whether there is enough time to start.
+- **`next_start` of an open window** is the time the window opened, and stays fixed while it remains open. After a Home Assistant restart it shows the start of the current hour until the window ends.
+- **Forecast availability and resolution:** an unavailable forecast reports `unknown` with `forecast_unavailable`. Coarse and sub-hourly data report `forecast_too_coarse` and `forecast_too_fine`, respectively.
+- **Provider capability handling:** Limits that depend on a missing forecast field appear in `not_assessed_by_provider`. If the provider supplies one rain signal, Weather Windows uses its configured limit. If only the missing signal has a limit, the available signal must be zero and the substitution appears in `substituted_by`. Gaps can report `unknown` with `missing_data`. A passing interval shorter than the minimum can report `unsuitable` with `short_window`. A forecast too short to tell reports `unknown` with `insufficient_horizon`.
+
+---
+
+## Actions (Services) {#actions}
+
+| Service | Response | Description |
+|---|---|---|
+| `ws_core.get_weather_windows` | `SupportsResponse.ONLY` | Evaluates enabled profiles (or a chosen `profile_id` with optional custom `limits` dict) across the next 24 hours; raises `ServiceValidationError` on unknown `entry_id`, unknown `profile_id`, or invalid limits |
+| `ws_core.get_station_summary` | `SupportsResponse.ONLY` | Deterministic JSON-serializable snapshot of live observations, 24h extremes, alerts, forecast validity (`hourly_horizon_h`, `capabilities`), Pattern Forecast maturity, and Weather Windows (`not_assessed_by_provider` when present) for Home Assistant Assist and scripts |
+| `ws_core.export_learning_state` | `SupportsResponse.OPTIONAL` | Returns a compact JSON summary (or complete raw model weights when `full: true` is passed), or writes to the INFO log when called without `return_response` |
+| `ws_core.apply_calibration` | None | Updates calibration offsets (`cal_temp_c`, `cal_humidity`, `cal_pressure_hpa`, `cal_wind_ms`) and triggers a reload |
+| `ws_core.reset_learning_state` | None | Resets `all`, `solar`, `forecast`, `streaks`, or `pattern_forecast` learning state |
+| `ws_core.reset_rain_baseline` | None | Resets the internal cumulative precipitation baseline used for rain rate filtering |

@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.helpers.entity import EntityCategory
 
+from .algorithms import BEAUFORT_KEYS
 from .const import (
     CONF_ENABLE_ADVANCED_SENSORS,
     CONF_ENABLE_AIR_QUALITY,
@@ -42,12 +43,14 @@ from .const import (
     CONF_ENABLE_WOW,
     CONF_ENABLE_WUNDERGROUND,
     CONF_ET0_ILLUMINANCE_FALLBACK,
+    CONF_SOLAR_PV_ENERGY_ENTITIES,
     KEY_ABSOLUTE_HUMIDITY,
     KEY_AIR_DENSITY,
     KEY_ALERT_MESSAGE,
     KEY_ALERT_STATE,
     KEY_AQI,
     KEY_AQI_LEVEL,
+    KEY_AQI_SCALE,
     KEY_AUTO_CAL_BIAS_HUMIDITY,
     KEY_AUTO_CAL_BIAS_PRESSURE_HPA,
     KEY_AUTO_CAL_BIAS_TEMP_C,
@@ -216,6 +219,10 @@ from .const import (
     KEY_SOLAR_FORECAST_STATUS,
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
+    KEY_SOLAR_LOCAL_INFO,
+    KEY_SOLAR_LOCAL_REMAINING_KWH,
+    KEY_SOLAR_LOCAL_TODAY_KWH,
+    KEY_SOLAR_LOCAL_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
     KEY_SPECIFIC_HUMIDITY,
     KEY_TEMP_ANOMALY_30D,
@@ -251,6 +258,7 @@ from .const import (
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
+    KEY_WIND_BEAUFORT_KEY,
     KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_DIR_VARIABILITY,
@@ -276,6 +284,9 @@ from .const import (
     UNIT_TEMP_C,
     UNIT_WIND_MS,
 )
+from .const import (
+    WIND_FACTORS as _WIND_FACTORS,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -300,15 +311,15 @@ class WSSensorDescription:
 
 
 # Conversion factors from canonical internal (metric) value to configured unit.
-# wind: from m/s; pressure: from hPa; distance: from km; altitude: from m.
+# wind: from m/s (_WIND_FACTORS is imported from const.py); pressure: from hPa;
+# distance: from km; altitude: from m.
 # Rain accumulation (mm->in) and rain rate (mm/h->in/h) share the 1/25.4 factor.
-_WIND_FACTORS: dict[str, float] = {"m/s": 1.0, "km/h": 3.6, "mph": 2.23694, "kn": 1.94384}
 _PRESSURE_FACTORS: dict[str, float] = {"hPa": 1.0, "inHg": 0.02953, "mmHg": 0.75006}
 _DISTANCE_FACTORS: dict[str, float] = {"km": 1.0, "mi": 0.621371}
 _ALTITUDE_FACTORS: dict[str, float] = {"m": 1.0, "ft": 3.28084}
 
 # SensorDeviceClass.WIND_DIRECTION and SensorStateClass.MEASUREMENT_ANGLE were
-# added after HA 2025.1 (2025.1.4 has neither). We support down to HA 2024.6.0 (see hacs.json), so resolve
+# added after HA 2025.1 (2025.1.4 has neither). We support down to HA 2024.12.0 (see hacs.json), so resolve
 # them defensively: on older cores the wind-direction sensors simply fall back to
 # a plain numeric "°" sensor (no device class / measurement state class) instead
 # of raising AttributeError at import and breaking the whole sensor platform.
@@ -400,7 +411,7 @@ SENSORS: list[WSSensorDescription] = [
     WSSensorDescription(
         key=KEY_NORM_RAIN_TOTAL_MM,
         translation_key="rain_total",
-        name="WS Rain Total",
+        name="WS Rainfall Counter",
         icon="mdi:water",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit=UNIT_RAIN_MM,
@@ -1170,6 +1181,20 @@ SENSORS: list[WSSensorDescription] = [
             "gust_kmh": round(float(d[KEY_NORM_WIND_GUST_MS]) * 3.6, 1)
             if d.get(KEY_NORM_WIND_GUST_MS) is not None
             else None,
+        },
+    ),
+    WSSensorDescription(
+        key=KEY_WIND_BEAUFORT_KEY,
+        translation_key="wind_beaufort_description",
+        name="WS Wind Beaufort Description",
+        icon="mdi:weather-windy",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(BEAUFORT_KEYS),
+        native_unit=None,
+        state_class=None,
+        attrs_fn=lambda d: {
+            "beaufort": d.get(KEY_WIND_BEAUFORT),
+            "speed_ms": d.get(KEY_NORM_WIND_SPEED_MS),
         },
     ),
     WSSensorDescription(
@@ -2084,10 +2109,15 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {
             "level": d.get(KEY_AQI_LEVEL),
+            "scale": d.get(KEY_AQI_SCALE),
+            "color": d.get("_aqi_color"),
+            "source": d.get("_aqi_source"),
+            "missing_pollutants": d.get("_aqi_missing_pollutants"),
             "pm2_5_ug_m3": d.get(KEY_PM2_5),
             "pm10_ug_m3": d.get(KEY_PM10),
             "no2_ug_m3": d.get(KEY_NO2),
             "ozone_ug_m3": d.get(KEY_OZONE),
+            "so2_ug_m3": d.get("_aqi_so2"),
         },
     ),
     WSSensorDescription(
@@ -2229,6 +2259,37 @@ SENSORS: list[WSSensorDescription] = [
         native_unit="kWh",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    # ---------------------------------------------------------------
+    # Local PV forecast (v3.0.0, Open-Meteo GTI scaled by measured PV energy)
+    # ---------------------------------------------------------------
+    WSSensorDescription(
+        key=KEY_SOLAR_LOCAL_TODAY_KWH,
+        translation_key="solar_local_forecast_today",
+        name="WS Local PV Forecast Today",
+        icon="mdi:solar-power",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        attrs_fn=lambda d: dict(d.get(KEY_SOLAR_LOCAL_INFO) or {}),
+    ),
+    WSSensorDescription(
+        key=KEY_SOLAR_LOCAL_TOMORROW_KWH,
+        translation_key="solar_local_forecast_tomorrow",
+        name="WS Local PV Forecast Tomorrow",
+        icon="mdi:solar-power-variant",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    WSSensorDescription(
+        key=KEY_SOLAR_LOCAL_REMAINING_KWH,
+        translation_key="solar_local_forecast_remaining_today",
+        name="WS Local PV Forecast Remaining Today",
+        icon="mdi:solar-power",
+        native_unit="kWh",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
     ),
     # Penman-Monteith ET₀ (v0.9.0, when solar radiation sensor available)
     WSSensorDescription(
@@ -2402,8 +2463,16 @@ SENSORS: list[WSSensorDescription] = [
         translation_key="frost_risk",
         name="WS Frost Risk",
         icon="mdi:snowflake-alert",
+        device_class=SensorDeviceClass.ENUM,
+        options=["no_risk", "unlikely", "probable", "high"],
         native_unit=None,
         state_class=None,
+        attrs_fn=lambda d: {
+            "min_temp_c": d.get("_frost_risk_min_temp_c"),
+            "forecast_min_c": d.get("_frost_risk_forecast_min_c"),
+            "threshold_c": d.get("_frost_risk_threshold_c"),
+            "frost_point_c": d.get(KEY_FROST_POINT_C),
+        },
     ),
     # =========================================================================
     # v1.2.0 - STATION INTELLIGENCE
@@ -2583,6 +2652,7 @@ SENSORS: list[WSSensorDescription] = [
             "zambretti_implied_rain_pct": d.get("_forecast_agreement_z_rain_pct"),
             "openmeteo_precip_prob": d.get("_forecast_agreement_api_precip_prob"),
             "delta_pp": d.get("_forecast_agreement_delta"),
+            "comparison_window": d.get("_forecast_agreement_basis"),
             "zambretti_forecast": d.get(KEY_ZAMBRETTI_FORECAST),
         },
     ),
@@ -2746,6 +2816,9 @@ _FEATURE_TOGGLE_MAP: dict[str, str] = {
     # Remote PV forecast only. Local ET₀ has its own configured radiation source.
     KEY_SOLAR_FORECAST_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
     KEY_SOLAR_FORECAST_TOMORROW_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_SOLAR_LOCAL_TODAY_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_SOLAR_LOCAL_TOMORROW_KWH: CONF_ENABLE_SOLAR_FORECAST,
+    KEY_SOLAR_LOCAL_REMAINING_KWH: CONF_ENABLE_SOLAR_FORECAST,
     # v1.2.0 - optional new sensors
     KEY_FOG_PROBABILITY: CONF_ENABLE_FOG,
     KEY_THUNDERSTORM_RISK: CONF_ENABLE_THUNDERSTORM,
@@ -2878,17 +2951,41 @@ _SOLAR_SOURCE_KEYS = frozenset(
     (KEY_ET0_PM_DAILY_MM, KEY_SOLAR_ENERGY_TODAY_WHM2, KEY_PEAK_SUN_HOURS, KEY_NET_RADIATION)
 )
 _MEASURED_SOLAR_KEYS = frozenset((KEY_CLEARNESS_INDEX, KEY_CLOUD_COVER_PCT))
+# Part of a feature group (its toggle still applies), but can only ever have a value
+# with a measured solar radiation sensor.
+_SOLAR_REQUIRED_TOGGLED_KEYS = frozenset((KEY_THSW_INDEX,))
+# Local PV forecast: part of the solar forecast feature (its toggle still applies), but
+# only possible with at least one PV energy meter mapped to learn from.
+_PV_METER_KEYS = frozenset((KEY_SOLAR_LOCAL_TODAY_KWH, KEY_SOLAR_LOCAL_TOMORROW_KWH, KEY_SOLAR_LOCAL_REMAINING_KWH))
+# Every sensor that this station's hardware decides, whatever the feature toggles say.
+STATION_DEPENDENT_KEYS = _SOLAR_SOURCE_KEYS | _MEASURED_SOLAR_KEYS | _SOLAR_REQUIRED_TOGGLED_KEYS | _PV_METER_KEYS
 
 
-def sensor_selected(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
-    """Whether a configured entity family should be instantiated."""
+def station_supports(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
+    """Whether this station's mapped hardware can ever give the sensor a value.
+
+    Kept separate from the feature toggles so that turning a feature off never
+    deletes entities; only sensors the station cannot provide are cleaned up.
+    """
     if key in _SOLAR_SOURCE_KEYS:
         return bool(
             sources.get(SRC_SOLAR_RADIATION)
             or (options.get(CONF_ET0_ILLUMINANCE_FALLBACK, False) and sources.get(SRC_LUX))
         )
-    if key in _MEASURED_SOLAR_KEYS:
+    if key in _MEASURED_SOLAR_KEYS or key in _SOLAR_REQUIRED_TOGGLED_KEYS:
         return bool(sources.get(SRC_SOLAR_RADIATION))
+    if key in _PV_METER_KEYS:
+        return bool(options.get(CONF_SOLAR_PV_ENERGY_ENTITIES))
+    return True
+
+
+def sensor_selected(key: str, options: dict[str, Any], sources: dict[str, str]) -> bool:
+    """Whether a configured entity family should be instantiated."""
+    if not station_supports(key, options, sources):
+        return False
+    if key in _SOLAR_SOURCE_KEYS or key in _MEASURED_SOLAR_KEYS:
+        # The local solar family follows its source, not a feature toggle.
+        return True
     toggle = _FEATURE_TOGGLE_MAP.get(key)
     return toggle is None or bool(options.get(toggle, False))
 
@@ -2897,7 +2994,9 @@ __all__ = [
     "SENSORS",
     "WSSensorDescription",
     "_FEATURE_TOGGLE_MAP",
+    "STATION_DEPENDENT_KEYS",
     "sensor_selected",
+    "station_supports",
     "_WIND_FACTORS",
     "_PRESSURE_FACTORS",
     "_DISTANCE_FACTORS",

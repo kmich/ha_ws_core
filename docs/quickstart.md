@@ -4,7 +4,7 @@ This page gets you from zero to a working installation in about 5 minutes.
 
 ## Requirements
 
-- Home Assistant 2024.6 or newer
+- Home Assistant 2024.12 or newer
 - A personal weather station already integrated into HA, providing at minimum:
 
 | Measurement | Example entity |
@@ -15,7 +15,7 @@ This page gets you from zero to a working installation in about 5 minutes.
 | Wind speed | `sensor.gw2000a_wind_speed` |
 | Wind gust | `sensor.gw2000a_wind_gust` |
 | Wind direction (degrees) | `sensor.gw2000a_wind_direction` |
-| Cumulative rainfall | `sensor.gw2000a_rain_total` |
+| Rainfall counter | `sensor.gw2000a_yearly_rain` |
 
 Any HA-integrated weather station brand works (Ecowitt, Davis, WeatherFlow, Shelly,
 Froggit, and others). The integration does not care which integration produced the
@@ -26,18 +26,21 @@ UV index, dew point, battery level, solar radiation (W/m²).
 
 ---
 
-## Step 1: Install via HACS
+## Step 1: Install Weather Station Core
 
 [![Open Weather Station Core in HACS on your Home Assistant.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
-Weather Station Core is in the default HACS list, so there's no repository to add.
+Weather Station Core is in the default catalog. The button opens its Marketplace
+or HACS listing, depending on your Home Assistant version.
 
-1. Open HACS in your Home Assistant sidebar
-2. Search for "Weather Station Core" and open it
-3. Click **Download**
-4. Restart Home Assistant
+**Home Assistant 2026.11 and newer:** Open **Settings → Marketplace**, search for
+**Weather Station Core**, and select **Install**. Continue to the setup wizard
+when it opens. [Home Assistant Marketplace](https://www.home-assistant.io/integrations/marketplace/)
 
-The button above opens it in HACS directly.
+**Home Assistant 2024.12 through 2026.10:** Open HACS, search for **Weather Station
+Core**, select **Download**, then restart Home Assistant. Continue to Step 2.
+
+Restart Home Assistant after updating an existing installation.
 
 ### Manual installation (alternative)
 
@@ -48,11 +51,14 @@ Copy the `custom_components/ws_core/` directory from the repository into your HA
 
 ## Step 2: Add the integration
 
+Go directly to Step 3 if the Marketplace has already opened the setup wizard.
+
 1. Go to **Settings → Devices & Services**
 2. Click **+ Add Integration**
 3. Search for "Weather Station Core" and select it
 
-The setup wizard opens and guides you through 8 steps.
+The setup wizard opens. It adds screens for the optional features and forecast
+provider you select.
 
 ---
 
@@ -70,6 +76,11 @@ Map the 7 mandatory sensor entities from your weather station.
 Use the entity picker to find each one. You can type the entity ID directly or browse
 the picker. The integration accepts any sensor regardless of brand or integration source.
 
+For **Rainfall Counter**, prefer a lifetime or yearly amount counter in `mm` or `in`.
+An event counter also works if it increases during each rain event and resets between
+events. The WS Core Rainfall Counter displays the mapped counter's current amount.
+[Rainfall source mapping](hardware_mapping.md#rainfall-sources)
+
 ### Step 3 — Optional sensors
 
 Map illuminance, UV index, dew point, battery level, and solar radiation sensors
@@ -77,6 +88,9 @@ if your station provides them. Leave any field blank to skip it.
 
 - **Solar radiation (W/m²):** enables Penman-Monteith ET₀ and THSW index
 - **Illuminance (lx):** enables cloud cover estimation and the 36-condition classifier
+- **Year-to-date rainfall:** supplies the station's **Rain This Year** value, including
+  rain measured before you installed WS Core. You can select the same yearly entity
+  in both rain fields. [Rainfall source mapping](hardware_mapping.md#rainfall-sources)
 
 ### Step 4 — Location and climate
 
@@ -153,7 +167,7 @@ click the device to see all created entities.
 If it shows `Off`, go to Configure and remap any missing source sensors.
 
 If you want the rain countdown shown in the README, make sure **Precipitation
-Nowcast** is enabled under **Configure → Features**. The
+Nowcast** is enabled under **Configure → Features & Diagnostics**. The
 `sensor.ws_minutes_until_rain` entity is optional and is only created when that
 feature is enabled.
 
@@ -176,7 +190,9 @@ Every setting from the wizard is changeable after installation without reinstall
 
 Go to **Settings → Devices & Services → Weather Station Core → Configure**.
 
-The options flow mirrors the full setup wizard. Changes take effect after saving.
+The options flow uses a menu hub (**Sensor Sources**, **Weather Forecast & Location**, **Decision Engine & Weather Windows**, **Indoor Rooms**, **Thresholds, Units & Calibration**, **Weather Services & Uploads**, **Features & Diagnostics**). Changes take effect after saving.
+
+To enable activity planning windows (`outdoor_drying`, `garden_work`, or a custom profile), open **Configure → Decision Engine & Weather Windows**.
 
 To remap a required or optional sensor (e.g. after replacing your weather station
-hardware), use **Configure → Required sensors** or **Configure → Optional sensors**.
+hardware), use **Configure → Sensor Sources**.

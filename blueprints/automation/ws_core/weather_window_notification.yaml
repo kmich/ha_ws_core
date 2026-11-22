@@ -1,0 +1,79 @@
+blueprint:
+  name: "WS Core: Weather Window Notification"
+  description: >
+    Notifies you ahead of an upcoming suitable weather window (for outdoor laundry
+    drying, garden work, or custom activity). Triggers accurately using Home Assistant's
+    native time trigger at the timestamp sensor with a configurable lead-time offset.
+  domain: automation
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    next_start_sensor:
+      name: Weather Window Next Start Sensor
+      description: The timestamp sensor for the window (e.g. sensor.ws_window_outdoor_drying_next_start)
+      selector:
+        entity:
+          domain: sensor
+          device_class: timestamp
+    lead_time_offset:
+      name: Lead Time Offset
+      description: How early to trigger before the window start time (e.g. -00:15:00 for 15 minutes before)
+      default: "-00:15:00"
+      selector:
+        select:
+          custom_value: true
+          options:
+            - label: At window start (0 min)
+              value: "00:00:00"
+            - label: 5 minutes before
+              value: "-00:05:00"
+            - label: 15 minutes before
+              value: "-00:15:00"
+            - label: 30 minutes before
+              value: "-00:30:00"
+            - label: 1 hour before
+              value: "-01:00:00"
+    notify_service:
+      name: Notification Service
+      description: Home Assistant notify action to invoke (e.g. notify.persistent_notification or notify.mobile_app_phone)
+      default: "notify.persistent_notification"
+      selector:
+        text:
+    custom_message:
+      name: Custom Message (Optional)
+      description: Optional extra text to include in the notification
+      default: ""
+      selector:
+        text:
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  next_start_sensor: !input next_start_sensor
+  custom_message: !input custom_message
+
+trigger:
+  - platform: time
+    at:
+      entity_id: !input next_start_sensor
+      offset: !input lead_time_offset
+
+condition:
+  - condition: template
+    value_template: >-
+      {% set start = states(next_start_sensor) %}
+      {% if start in ['unknown', 'unavailable', 'none', ''] %}
+        false
+      {% else %}
+        {{ as_timestamp(start, 0) >= (as_timestamp(now()) - 60) }}
+      {% endif %}
+
+action:
+  - service: !input notify_service
+    data:
+      title: "Weather Window Starting Soon"
+      message: >-
+        A suitable weather window for {{ state_attr(next_start_sensor, 'friendly_name') | default('your activity') }}
+        is scheduled to begin at {{ as_timestamp(states(next_start_sensor)) | timestamp_custom('%H:%M', true) }}.
+        {% if custom_message %}{{ custom_message }}{% endif %}

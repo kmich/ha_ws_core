@@ -457,20 +457,62 @@ views:
                       card_type: separator
                       name: Nowcast (Open-Meteo)
                       icon: mdi:radar
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_minutes_until_rain
-                      name: Minutes until rain
-                      icon: mdi:timer-sand
-                      show_state: true
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_minutes_until_dry
-                      name: Minutes until dry
-                      icon: mdi:timer-sand-complete
-                      show_state: true
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_minutes_until_rain
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_minutes_until_rain
+                        name: Minutes until rain
+                        icon: mdi:timer-sand
+                        show_state: true
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_minutes_until_rain
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_minutes_until_rain
+                        name: Minutes until rain
+                        icon: mdi:timer-sand
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_minutes_until_dry
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_minutes_until_dry
+                        name: Minutes until dry
+                        icon: mdi:timer-sand-complete
+                        show_state: true
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_minutes_until_dry
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_minutes_until_dry
+                        name: Minutes until dry
+                        icon: mdi:timer-sand-complete
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
                     - type: custom:bubble-card
                       card_type: button
                       button_type: state
@@ -490,33 +532,96 @@ views:
                       card_type: separator
                       name: Pattern Forecast (local)
                       icon: mdi:chart-bell-curve-cumulative
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_pattern_rain_1h
-                      name: Chance of rain, 1 h
-                      icon: mdi:umbrella-outline
-                      show_state: true
-                      show_attribute: true
-                      attribute: maturity
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_pattern_rain_3h
-                      name: Chance of rain, 3 h
-                      icon: mdi:umbrella
-                      show_state: true
-                      show_attribute: true
-                      attribute: maturity
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_pattern_rain_6h
-                      name: Chance of rain, 6 h
-                      icon: mdi:umbrella-closed
-                      show_state: true
-                      show_attribute: true
-                      attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_rain_1h
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_rain_1h
+                        name: Chance of rain, 1 h
+                        icon: mdi:umbrella-outline
+                        show_state: true
+                        show_attribute: true
+                        attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_rain_1h
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_rain_1h
+                        name: Chance of rain, 1 h
+                        icon: mdi:umbrella-outline
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_rain_3h
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_rain_3h
+                        name: Chance of rain, 3 h
+                        icon: mdi:umbrella
+                        show_state: true
+                        show_attribute: true
+                        attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_rain_3h
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_rain_3h
+                        name: Chance of rain, 3 h
+                        icon: mdi:umbrella
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_rain_6h
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_rain_6h
+                        name: Chance of rain, 6 h
+                        icon: mdi:umbrella-closed
+                        show_state: true
+                        show_attribute: true
+                        attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_rain_6h
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_rain_6h
+                        name: Chance of rain, 6 h
+                        icon: mdi:umbrella-closed
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
 
           # -------------------------------------------------------------------
           # Pop-up: Wind
@@ -718,33 +823,96 @@ views:
                         name: Skill vs the usual rate
                         icon: mdi:chart-line
                         show_state: true
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_pattern_frost_12h
-                      name: Chance of frost, 12 h
-                      icon: mdi:snowflake
-                      show_state: true
-                      show_attribute: true
-                      attribute: maturity
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_pattern_heat_24h
-                      name: Chance of a hot day, 24 h
-                      icon: mdi:sun-thermometer
-                      show_state: true
-                      show_attribute: true
-                      attribute: maturity
-                    - type: custom:bubble-card
-                      card_type: button
-                      button_type: state
-                      entity: sensor.ws_pattern_gust_3h
-                      name: Chance of a strong gust, 3 h
-                      icon: mdi:weather-windy
-                      show_state: true
-                      show_attribute: true
-                      attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_frost_12h
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_frost_12h
+                        name: Chance of frost, 12 h
+                        icon: mdi:snowflake
+                        show_state: true
+                        show_attribute: true
+                        attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_frost_12h
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_frost_12h
+                        name: Chance of frost, 12 h
+                        icon: mdi:snowflake
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_heat_24h
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_heat_24h
+                        name: Chance of a hot day, 24 h
+                        icon: mdi:sun-thermometer
+                        show_state: true
+                        show_attribute: true
+                        attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_heat_24h
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_heat_24h
+                        name: Chance of a hot day, 24 h
+                        icon: mdi:sun-thermometer
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_gust_3h
+                          state_not: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_gust_3h
+                        name: Chance of a strong gust, 3 h
+                        icon: mdi:weather-windy
+                        show_state: true
+                        show_attribute: true
+                        attribute: maturity
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: sensor.ws_pattern_gust_3h
+                          state: unknown
+                      card:
+                        type: custom:bubble-card
+                        card_type: button
+                        button_type: state
+                        entity: sensor.ws_pattern_gust_3h
+                        name: Chance of a strong gust, 3 h
+                        icon: mdi:weather-windy
+                        show_state: false
+                        show_attribute: true
+                        attribute: status_text
                     # The storm forecast only exists with a lightning source, so
                     # hide it until the entity reports a value.
                     - type: conditional

@@ -135,7 +135,7 @@ action:
 
 **The Problem:** Weather apps tell you it's 24°C, but is that typical or an extreme anomaly for today?
 
-**The Solution:** Enable **Climate Normals** under **Configure → Features**. `ws_core` queries the Open-Meteo ERA5 10-year archive for your specific coordinates, populating:
+**The Solution:** Enable **Climate Normals** under **Configure → Features & Diagnostics**. `ws_core` queries the Open-Meteo ERA5 10-year archive for your specific coordinates, populating:
 * `sensor.ws_temp_anomaly_normal`: Tells you: *"Today is +3.8°C warmer than the 10-year historical average for this date."*
 * `sensor.ws_precip_anomaly_normal`: Compares rainfall against your location's historical seasonal benchmarks.
 

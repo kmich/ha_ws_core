@@ -9,7 +9,7 @@ from typing import Any
 import aiohttp
 
 from ..const import _INTEGRATION_VERSION
-from .base import ForecastProvider, local_datetime_str
+from .base import ForecastProvider, local_datetime_str, utc_datetime_str
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -167,7 +167,7 @@ class NwsNoaaProvider(ForecastProvider):
         hourly_periods = hourly_raw.get("properties", {}).get("periods", [])
         hourly_out: list[dict[str, Any]] = []
         for period in hourly_periods:
-            if len(hourly_out) >= 24:
+            if len(hourly_out) >= 25:
                 break
             start = period.get("startTime", "")
             try:
@@ -175,7 +175,7 @@ class NwsNoaaProvider(ForecastProvider):
             except ValueError:
                 continue
             delta_h = (dt.astimezone(UTC) - now).total_seconds() / 3600
-            if not (0 <= delta_h < 24):
+            if not (-1.0 < delta_h < 24.0):
                 continue
             temp_f = period.get("temperature")
             temp_c = _f_to_c(temp_f) if isinstance(temp_f, (int, float)) else None
@@ -187,6 +187,7 @@ class NwsNoaaProvider(ForecastProvider):
             hourly_out.append(
                 {
                     "datetime": local_datetime_str(dt),
+                    "utc_datetime": utc_datetime_str(dt),
                     "temp_c": temp_c,
                     "apparent_temp_c": None,
                     "dewpoint_c": None,

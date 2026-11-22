@@ -69,7 +69,9 @@ from .const import (
     KEY_THUNDERSTORM_RISK,
     LUX_TO_WM2_FACTOR,
     PATTERN_BIN_COUNT,
+    PATTERN_CORRUPTED_FEATURES,
     PATTERN_HISTORY_DAYS,
+    PATTERN_HISTORY_FEATURES_METHOD,
     PATTERN_HISTORY_UNITS_METHOD,
     PATTERN_ISSUE_INTERVAL_MIN,
     PATTERN_MIN_DAYS_COLLECTING,
@@ -78,6 +80,7 @@ from .const import (
     PATTERN_SKILLED_BSS_MIN,
     PATTERN_SOURCE_INTERNET,
     PATTERN_SOURCE_LOCAL,
+    PATTERN_STD_MIN_N,
     PATTERN_STORE_VERSION,
     PATTERN_STRIKE_JUMP_CAP,
     PATTERN_TARGET_KEYS,
@@ -94,6 +97,7 @@ from .const import (
 )
 from .pattern_forecast import (
     POOL,
+    POOL_INDEX,
     TARGETS,
     HourlyHistory,
     Instant,
@@ -197,6 +201,8 @@ def _iso(ts: float | None) -> str | None:
 class PatternRuntime:
     """One per coordinator when ``enable_pattern_forecast`` is on."""
 
+    _reset_seq: int = 0
+
     def __init__(self, coord: WSStationCoordinator) -> None:
         self.coord = coord
         opts = coord.entry_options
@@ -215,6 +221,8 @@ class PatternRuntime:
         self._published: dict[str, Any] = {}
         self._error_logged = False
         self._history_running = False
+        self._history_queued = False
+        self._reset_seq = 0
         self._warm_start: dict[str, Any] = {}
         self._recent_failed = False
         self._retry_count = 0
@@ -244,6 +252,48 @@ class PatternRuntime:
 
         return Store(self.coord.hass, PATTERN_STORE_VERSION, f"ws_core_{entry_id}_pattern_forecast")
 
+    def make_backup_store(self) -> Any | None:
+        """Return a backup Store alongside the pattern Store when backed by a real HA instance."""
+        hass = getattr(getattr(self, "coord", None), "hass", None)
+        if hass is None or not isinstance(getattr(hass, "data", None), dict):
+            return None
+        store = getattr(self, "store", None)
+        store_key = getattr(store, "key", None)
+        if not isinstance(store_key, str) or not store_key:
+            return None
+        from homeassistant.helpers.storage import Store
+
+        version = getattr(store, "version", PATTERN_STORE_VERSION)
+        if not isinstance(version, int) or isinstance(version, bool):
+            version = PATTERN_STORE_VERSION
+        return Store(hass, version, f"{store_key}_pre_v3_backup")
+
+    async def _async_backup_pre_migration_state(self) -> bool:
+        """Persist pre-reset pattern storage before one-way v3.0 feature migration.
+
+        Returns False only when a real backup Store exists and writing fails so
+        one-way migration waits for the next retry before mutating state.
+        """
+        backup_store = getattr(self, "backup_store", None)
+        if backup_store is None:
+            backup_store = self.make_backup_store()
+        if backup_store is None:
+            return True
+
+        store = getattr(self, "store", None)
+        try:
+            if await backup_store.async_load() is not None:
+                return True
+            raw: Any = None
+            if store is not None and hasattr(store, "async_load"):
+                raw = await store.async_load()
+            payload = raw if isinstance(raw, dict) else self.engine.to_dict()
+            await backup_store.async_save(payload)
+            return True
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("ws_core pattern forecast: pre-migration backup failed, deferring reset: %s", err)
+            return False
+
     async def async_load(self, store: Any) -> None:
         """Load the engine; a missing, corrupt or mismatched store starts fresh."""
         self.store = store
@@ -255,6 +305,9 @@ class PatternRuntime:
 
     async def async_reset(self) -> None:
         """Delete the store and return every target to ``collecting``."""
+        self._reset_seq += 1
+        if self._history_running:
+            self._history_queued = True
         self.engine.reset_all()
         self._published = {}
         self._last_bucket = None
@@ -849,11 +902,19 @@ class PatternRuntime:
         """Seed the 15-min history bins from the recorder (every startup, before any replay)."""
         ts = now.timestamp()
         plan = {name: self.recent_entity(name, ts) for name in _RECENT_INPUTS}
+        reset_seq = self._reset_seq
+        eng = self.engine
         try:
             bins = await _recorder_instance(self.coord.hass).async_add_executor_job(partial(self._recent_job, plan, ts))
         except Exception as err:  # noqa: BLE001 - recorder missing or busy: warm up live instead
             _LOGGER.debug("ws_core pattern forecast: no short-term statistics to seed from: %s", err)
-            self._recent_failed = True
+            if self._reset_seq == reset_seq and self.engine is eng:
+                self._recent_failed = True
+            return 0
+        if self._reset_seq != reset_seq or self.engine is not eng or getattr(self.coord, "_stopped", False) is True:
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset or stopped during recent bin seed; discarding"
+            )
             return 0
         self._recent_failed = False
         wet = [b["ts"] for b in bins if (b.get("r") or 0.0) > 0.0]
@@ -1087,11 +1148,26 @@ class PatternRuntime:
         names = {x for t in old for x in _HISTORY_NEEDS[eng.models[t].spec.kind]}
         plan = {name: self.history_entity(name, ts) for name in names}
         ids = {eid for eid in plan.values() if eid}
+        reset_seq = self._reset_seq
         try:
             meta = await _recorder_instance(self.coord.hass).async_add_executor_job(self._read_statistic_meta, ids)
         except Exception as err:  # noqa: BLE001 - a short recorder outage is retried
             _LOGGER.debug("ws_core pattern forecast: could not read the units of the statistics: %s", err)
             return True
+
+        # Discard recorder results if learning was reset or stopped while the job was in flight
+        if (
+            self._reset_seq != reset_seq
+            or self.engine is not eng
+            or not self.engine.history_learn
+            or not self.engine.history_learn.get("targets")
+            or getattr(self.coord, "_stopped", False) is True
+        ):
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset during legacy units check; discarding results"
+            )
+            return False
+
         misread = self._misread_inputs(plan, meta)
         if misread:
             _LOGGER.warning(
@@ -1104,6 +1180,218 @@ class PatternRuntime:
         else:
             eng.mark_replay_current(old)
             await self.async_save()
+        return False
+
+    async def _async_migrate_feature_replay(self, now: datetime) -> bool:
+        """Migrate targets replayed under older methods (< PATTERN_HISTORY_FEATURES_METHOD).
+
+        Performs the one-time scoped reset of corrupted solar features and dp_3h once
+        per upgrade (persisted under ``features_reset_method``) so transient recorder
+        outages, retries, or restarts preserve any live learning accumulated after the
+        reset, then replays ``dp_3h`` from recorder history once available.
+        """
+        eng = self.engine
+        hl = dict(eng.history_learn or {})
+        targets = dict(hl.get("targets") or {})
+        if eng.features_migration_pending is False:
+            return False
+
+        def _method_int(val: Any) -> int:
+            try:
+                return int(val) if val is not None and not isinstance(val, bool) else 1
+            except (TypeError, ValueError):
+                return 1
+
+        fm_val = _method_int(hl.get("features_method"))
+        if fm_val >= PATTERN_HISTORY_FEATURES_METHOD:
+            return False
+        reset_val = _method_int(hl.get("features_reset_method", hl.get("features_method")))
+        ok_targets = [
+            t
+            for t, e in targets.items()
+            if isinstance(e, dict)
+            and e.get("status") == "ok"
+            and _method_int(e.get("features_method")) < PATTERN_HISTORY_FEATURES_METHOD
+        ]
+        if not ok_targets and eng.features_migration_pending is not True:
+            return False
+        eng.features_migration_pending = True
+
+        did_reset = reset_val < PATTERN_HISTORY_FEATURES_METHOD
+        if did_reset:
+            reset_seq = self._reset_seq
+            if not await self._async_backup_pre_migration_state():
+                return True
+            # A learning reset (or unload) while the backup was written wins: ``hl`` and
+            # ``targets`` are copies from before it and must not be written back.
+            if self._reset_seq != reset_seq or self.engine is not eng or getattr(self.coord, "_stopped", False) is True:
+                _LOGGER.debug(
+                    "ws_core pattern forecast: learning state was reset during the v3 backup; skipping migration"
+                )
+                return False
+            _LOGGER.info(
+                "ws_core pattern forecast: migrating pattern state for v3.0 feature alignment (dp_3h and solar replay masking)"
+            )
+            eng.scoped_reset_features(PATTERN_CORRUPTED_FEATURES)
+            hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            hl["targets"] = targets
+            eng.history_learn = hl
+            self._published = {}
+
+        pressure_targets = [t for t in ok_targets if t in eng.models and "dp_3h" in eng.models[t].spec.features]
+        if not pressure_targets:
+            for tid in ok_targets:
+                if isinstance(targets.get(tid), dict):
+                    targets[tid]["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            hl["targets"] = targets
+            hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            eng.history_learn = hl
+            eng.features_migration_pending = False
+            self._published = {}
+            await self.async_save()
+            return False
+
+        end_ts = math.floor(now.timestamp() / 3600.0) * 3600.0
+        n = PATTERN_HISTORY_DAYS * 24
+        start_ts = end_ts - n * 3600.0
+        needed_names = sorted(
+            {x for t in ok_targets if t in eng.models for x in _HISTORY_NEEDS[eng.models[t].spec.kind]}
+        )
+        plan = {name: self.history_entity(name, end_ts) for name in needed_names}
+        ids = {e for e in plan.values() if e}
+        if not ids:
+            await self.async_save()
+            return True
+
+        snapshot = eng.to_dict()
+        need_night = any(eng.models[t].spec.kind == "frost" for t in ok_targets if t in eng.models)
+        dp_slot = POOL_INDEX["dp_3h"]
+        # Preserve the dp_3h standardizer (and any post-reset live weights on that scale)
+        # once live learning has warmed up the scaler, even if every pressure target is pending.
+        has_warm_scale = eng.std.n[dp_slot] >= PATTERN_STD_MIN_N
+
+        def _dp3h_job() -> tuple[PatternEngine, dict[str, int]] | None:
+            trainer, _ = PatternEngine.from_dict(snapshot, eng.thresholds, eng.storm_source, self.fingerprint)
+            if not has_warm_scale:
+                # Cold scaler (< PATTERN_STD_MIN_N): reset dp_3h cleanly and build scale from history.
+                trainer.scoped_reset_features(("dp_3h",))
+            meta, rows = self._fetch_statistics(
+                ids,
+                datetime.fromtimestamp(start_ts, UTC),
+                datetime.fromtimestamp(end_ts, UTC),
+            )
+            if not meta:
+                return None
+            hist = self.build_history(plan, meta, rows, start_ts, n, need_night)
+            counts = trainer.replay_scoped_features(hist, ok_targets, {"dp_3h"}, update_std=not has_warm_scale)
+            return trainer, counts
+
+        live_logs: dict[str, list[Any]] = {}
+        pre_cp_at: dict[str, float | None] = {}
+        for tid in ok_targets:
+            m = eng.models.get(tid)
+            if m is not None and "dp_3h" in m.spec.features:
+                log: list[Any] = []
+                live_logs[tid] = log
+                pre_cp_at[tid] = m.cp_at
+                m._migration_sample_log = log
+
+        reset_seq = self._reset_seq
+        try:
+            job_res = await _recorder_instance(self.coord.hass).async_add_executor_job(_dp3h_job)
+        except Exception as err:  # noqa: BLE001 - transient recorder failure should retry
+            _LOGGER.debug("ws_core pattern forecast: dp_3h migration replay failed, will retry: %s", err)
+            await self.async_save()
+            return True
+        finally:
+            for tid in live_logs:
+                m = eng.models.get(tid)
+                if m is not None and m._migration_sample_log is live_logs[tid]:
+                    m._migration_sample_log = None
+
+        # Discard recorder results if learning was reset or stopped while the job was in flight
+        if (
+            self._reset_seq != reset_seq
+            or self.engine is not eng
+            or not self.engine.history_learn
+            or not self.engine.history_learn.get("targets")
+            or getattr(self.coord, "_stopped", False) is True
+        ):
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset during dp_3h migration replay; discarding results"
+            )
+            return False
+
+        if job_res is None:
+            _LOGGER.debug("ws_core pattern forecast: no statistics metadata for dp_3h migration, will retry")
+            await self.async_save()
+            return True
+
+        trained, counts = job_res
+        n_h = trained.std.n[dp_slot]
+        pressure_targets = [t for t in ok_targets if t in eng.models and "dp_3h" in eng.models[t].spec.features]
+        non_pressure_ok = [t for t in ok_targets if t not in eng.models or "dp_3h" not in eng.models[t].spec.features]
+        scaler_ready = n_h >= PATTERN_STD_MIN_N
+        recoverable_pressure = [t for t in pressure_targets if scaler_ready and counts.get(t, 0) > 0]
+        missing_pressure = [t for t in pressure_targets if not (scaler_ready and counts.get(t, 0) > 0)]
+        migrated_targets = [*non_pressure_ok, *recoverable_pressure]
+
+        if recoverable_pressure and not has_warm_scale and eng.std.n[dp_slot] >= PATTERN_STD_MIN_N:
+            # Live observations warmed the dp_3h scaler while the migration job was
+            # in flight; re-run so recoverable targets train against that live scale.
+            await self.async_save()
+            return True
+
+        if not migrated_targets:
+            _LOGGER.debug(
+                "ws_core pattern forecast: dp_3h migration replay lacked usable samples (%s, n=%d), will retry",
+                {t: counts.get(t, 0) for t in pressure_targets},
+                n_h,
+            )
+            await self.async_save()
+            return True
+
+        if recoverable_pressure and not has_warm_scale:
+            eng.std.mean[dp_slot] = trained.std.mean[dp_slot]
+            eng.std.var[dp_slot] = trained.std.var[dp_slot]
+            eng.std.n[dp_slot] = trained.std.n[dp_slot]
+
+        for tid in migrated_targets:
+            live = eng.models.get(tid)
+            src = trained.models.get(tid)
+            if live is not None and src is not None and "dp_3h" in live.spec.features:
+                idx = live.spec.features.index("dp_3h") + 1
+                live.w[idx] = src.w[idx]
+                live.g2[idx] = src.g2[idx]
+                live.cp_w[idx] = src.cp_w[idx]
+                live.cp_g2[idx] = src.cp_g2[idx]
+                samples = live_logs.get(tid)
+                if samples:
+                    live.apply_feature_samples(eng.std, idx, samples, pre_cp_at.get(tid))
+            if isinstance(targets.get(tid), dict):
+                targets[tid]["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+
+        hl["targets"] = targets
+        hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
+        all_done = not missing_pressure and all(
+            _method_int(e.get("features_method")) >= PATTERN_HISTORY_FEATURES_METHOD
+            for e in targets.values()
+            if isinstance(e, dict) and e.get("status") == "ok"
+        )
+        if all_done:
+            hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            eng.features_migration_pending = False
+        eng.history_learn = hl
+        self._published = {}
+        await self.async_save()
+        if missing_pressure:
+            _LOGGER.debug(
+                "ws_core pattern forecast: dp_3h migration completed for %s; lacking samples for %s, will retry",
+                recoverable_pressure,
+                {t: counts.get(t, 0) for t in missing_pressure},
+            )
+            return True
         return False
 
     async def _async_seed_pressure(self, now: datetime) -> tuple[int, bool]:
@@ -1123,13 +1411,21 @@ class PatternRuntime:
             hist = self.build_history(plan, meta, rows, start_ts, n, need_night=False)
             return PatternEngine.pressure_seed_from_history(hist)
 
+        reset_seq = self._reset_seq
+        eng = self.engine
         try:
             points = await _recorder_instance(self.coord.hass).async_add_executor_job(pressure_job)
         except Exception as err:  # noqa: BLE001 - a short recorder outage is retried
             _LOGGER.debug("ws_core pattern forecast: no pressure statistics to seed from: %s", err)
-            self._warm_start["pressure_status"] = "recorder_error"
+            if self._reset_seq == reset_seq and self.engine is eng:
+                self._warm_start["pressure_status"] = "recorder_error"
             return 0, True
-        seeded = self.engine.seed_pressure(points)
+        if self._reset_seq != reset_seq or self.engine is not eng or getattr(self.coord, "_stopped", False) is True:
+            _LOGGER.debug(
+                "ws_core pattern forecast: learning state was reset or stopped during pressure seed; discarding"
+            )
+            return 0, False
+        seeded = eng.seed_pressure(points)
         self._warm_start["pressure_status"] = "available" if points else "unavailable"
         self._warm_start["pressure_points_added"] = seeded
         if seeded:
@@ -1138,6 +1434,8 @@ class PatternRuntime:
 
     def _schedule_recovery_retry(self) -> None:
         """Retry recorder warm start at most three times; unload cancels the task."""
+        if getattr(self.coord, "_stopped", False) is True:
+            return
         if self._retry_scheduled or self._retry_count >= len(_RECOVERY_RETRY_S):
             if self._retry_count >= len(_RECOVERY_RETRY_S):
                 self._warm_start["retry_exhausted"] = True
@@ -1165,20 +1463,44 @@ class PatternRuntime:
         against a copy of the engine, and the result is swapped in here on the event
         loop. Replayed samples never count toward ``skilled``.
         """
+        if getattr(self.coord, "_stopped", False) is True:
+            self._history_queued = False
+            return
         if self._history_running:
+            self._history_queued = True
             return
         self._history_running = True
         retry_needed = False
         cancelled = False
+        reset_seq = self._reset_seq
+        eng_initial = self.engine
         try:
             now = dt_util.utcnow()
+
+            def _aborted() -> bool:
+                return (
+                    self._reset_seq != reset_seq
+                    or self.engine is not eng_initial
+                    or getattr(self.coord, "_stopped", False) is True
+                )
+
             retry_needed = await self._async_forget_misread_replay(now)
+            if _aborted():
+                return
+            features_migrated = await self._async_migrate_feature_replay(now)
+            if _aborted():
+                return
+            retry_needed = retry_needed or features_migrated
             bins = await self._async_seed_recent(now)
+            if _aborted():
+                return
             retry_needed = retry_needed or self._recent_failed
             if bins:
                 _LOGGER.info("ws_core pattern forecast: seeded %d recent 15-min history bins from the recorder", bins)
             eng = self.engine
             seeded, pressure_failed = await self._async_seed_pressure(now)
+            if _aborted():
+                return
             retry_needed = retry_needed or pressure_failed
             targets = eng.targets_needing_replay(now.timestamp())
             if not targets:
@@ -1209,6 +1531,11 @@ class PatternRuntime:
                         for t in targets
                     },
                 }
+            if _aborted():
+                _LOGGER.debug(
+                    "ws_core pattern forecast: learning state was reset or stopped during history replay; discarding results"
+                )
+                return
             eng.adopt_replay(result["trained"], result["report"], result["statuses"], update_std, now.timestamp())
             # The 24 h pressure change needs a reading from a day ago; seed it from the
             # replayed hours so forecasts do not wait a day after being switched on.
@@ -1229,11 +1556,19 @@ class PatternRuntime:
             raise
         finally:
             self._history_running = False
-            if not cancelled:
-                if retry_needed:
-                    self._schedule_recovery_retry()
-                else:
-                    self._retry_count = 0
+            stopped = getattr(self.coord, "_stopped", False) is True
+            if cancelled or stopped:
+                self._history_queued = False
+            elif self._history_queued:
+                self._history_queued = False
+                if hasattr(self.coord, "_start_once"):
+                    self.coord._start_once(self.async_learn_history, 0, "ws_core_pattern_history")
+                elif hasattr(self.coord, "_spawn"):
+                    self.coord._spawn(self.async_learn_history(), "ws_core_pattern_history")
+            elif retry_needed:
+                self._schedule_recovery_retry()
+            else:
+                self._retry_count = 0
 
     # ------------------------------------------------------------------
     # services / diagnostics

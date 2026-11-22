@@ -6,6 +6,12 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 [![Open Weather Station Core in HACS on your Home Assistant.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kmich&repository=ha_ws_core&category=integration)
 
+!!! tip "New in 3.0"
+    - **[Weather Windows](guides/weather_windows.md):** when in the next 24 hours the weather suits drying laundry, garden work or your own activity, with a notification blueprint.
+    - **[Data Status](sensors.md#data-status):** see whether a source or PV meter needs attention and why other readings are waiting.
+    - **Local PV forecast** learned from your own PV meters, and feels-like sensors that show the air temperature when their formula does not apply.
+    - Upgrading from 2.x? Read **[Upgrading to 3.0](upgrading.md)** first: it needs Home Assistant 2024.12 and has a few breaking changes.
+
 ---
 
 ## ⚡ What do you want to automate?
@@ -35,6 +41,14 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
     Pattern Forecast learns from your own station and scores itself. It gives the chance of rain, frost, a hot day, strong gusts and storms over the next hours, 100% local (the storm forecast can optionally use internet lightning data if you have no detector). It needs time to learn and shows `unknown` until it has earned trust.
 
     [:octicons-arrow-right-24: Read the Pattern Forecast Guide](guides/pattern_forecast.md)
+
+-   :material-calendar-clock:{ .lg .middle } __Weather Windows: Plan Around the Weather__
+
+    ---
+
+    Know when the next dry, calm, mild spell starts and how long it lasts, for laundry, garden work or your own limits. Your station's live rain and gusts override the forecast when it matters.
+
+    [:octicons-arrow-right-24: Read the Weather Windows Guide](guides/weather_windows.md)
 
 -   :material-weather-windy:{ .lg .middle } __Home & Property Protection__
 
@@ -86,7 +100,7 @@ If your weather station is connected to Home Assistant, `ws_core` can use it. Su
 
 ## 🛠️ Ready-Made Resources
 
-* **[3-Minute Quickstart](quickstart.md):** Step-by-step installation via HACS with auto-discovery.
+* **[Quickstart](quickstart.md):** Install from Marketplace or HACS and map your station's sensors.
 * **[Blueprints](blueprints.md):** 1-click importable automations for rain alerts, wind protection, and irrigation skips.
 * **[Dashboards](dashboards.md):** Drop-in Lovelace dashboards: native cards only, Mushroom, an animated Enhanced dashboard and a mobile-first Bubble Card dashboard.
 * **[Sensor Reference](sensors.md):** Complete catalog of all 170+ available derived sensors and feature groups.

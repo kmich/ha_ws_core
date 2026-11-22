@@ -3,7 +3,7 @@
 from typing import Any
 
 DOMAIN = "ws_core"
-_INTEGRATION_VERSION = "2.14.3"
+_INTEGRATION_VERSION = "3.0.0"
 
 PLATFORMS = ["sensor", "binary_sensor", "weather", "select", "switch", "number", "event"]
 
@@ -200,6 +200,7 @@ KEY_ZAMBRETTI_FORECAST = "zambretti_forecast"
 KEY_ZAMBRETTI_NUMBER = "zambretti_number"
 KEY_WIND_BEAUFORT = "wind_beaufort"
 KEY_WIND_BEAUFORT_DESC = "wind_beaufort_desc"
+KEY_WIND_BEAUFORT_KEY = "wind_beaufort_key"
 KEY_WIND_QUADRANT = "wind_quadrant"
 KEY_WIND_DIR_SMOOTH_DEG = "wind_dir_smooth_deg"
 KEY_CURRENT_CONDITION = "current_condition"
@@ -373,6 +374,10 @@ RAIN_RATE_PHYSICAL_CAP_MMPH: float = 500.0
 # increments; averaging over a short window instead smooths that out while
 # still reacting quickly to real changes in intensity.
 RAIN_RATE_WINDOW_H: float = 10.0 / 60.0
+# "Clearing after rain" needs measured rain this recently (issue #207); the
+# minimum amount ignores counter noise below one typical bucket tip.
+CLEARING_AFTER_RAIN_WINDOW_H: float = 3.0
+CLEARING_AFTER_RAIN_MIN_MM: float = 0.1
 WIND_SMOOTH_ALPHA: float = 0.3
 
 ZAMBRETTI_UPPER_PRESSURE: float = 1050.0
@@ -406,6 +411,9 @@ CONFIG_VERSION = 4
 # Alert hysteresis: ticks above/below threshold before state changes
 ALERT_DEBOUNCE_ON_TICKS: int = 2  # consecutive ticks above threshold → fire
 ALERT_DEBOUNCE_OFF_TICKS: int = 3  # consecutive ticks below threshold → clear
+ALERT_HYSTERESIS_FREEZE_C: float = 0.5
+ALERT_HYSTERESIS_WIND_MS: float = 1.5
+ALERT_HYSTERESIS_RAIN_MMPH: float = 1.0
 
 # Source entities can register a few minutes after startup (Ecowitt creates them on
 # the first packet), so the missing-sources repair waits this long before it is raised
@@ -416,8 +424,14 @@ MISSING_SOURCE_GRACE_S: int = 300
 # ---------------------------------------------------------------------------
 CONF_ENABLE_AIR_QUALITY = "enable_air_quality"
 CONF_AQI_INTERVAL_MIN = "aqi_interval_min"
+CONF_AQI_SCALE = "aqi_scale"
+AQI_SCALE_AUTO = "auto"
+AQI_SCALE_EUROPEAN = "european"
+AQI_SCALE_US = "us"
+AQI_SCALE_OPTIONS = [AQI_SCALE_AUTO, AQI_SCALE_EUROPEAN, AQI_SCALE_US]
 DEFAULT_ENABLE_AIR_QUALITY = False
 DEFAULT_AQI_INTERVAL_MIN = 60
+DEFAULT_AQI_SCALE = AQI_SCALE_AUTO
 
 # v0.7.0 - Pollen (Tomorrow.io, free API key required)
 CONF_ENABLE_POLLEN = "enable_pollen"
@@ -440,6 +454,8 @@ CONF_SOLAR_PEAK_KW = "solar_peak_kw"
 CONF_SOLAR_PANEL_AZIMUTH = "solar_panel_azimuth"
 CONF_SOLAR_PANEL_TILT = "solar_panel_tilt"
 CONF_SOLAR_INTERVAL_MIN = "solar_interval_min"
+# v3.0.0 - Local PV forecast: PV energy meters whose statistics train the site factor
+CONF_SOLAR_PV_ENERGY_ENTITIES = "solar_pv_energy_entities"
 DEFAULT_ENABLE_SOLAR_FORECAST = False
 DEFAULT_SOLAR_PEAK_KW = 5.0
 DEFAULT_SOLAR_PANEL_AZIMUTH = 180  # south-facing
@@ -463,6 +479,7 @@ ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE = "illuminance_estimate"
 # ---------------------------------------------------------------------------
 KEY_AQI = "air_quality_index"
 KEY_AQI_LEVEL = "air_quality_level"
+KEY_AQI_SCALE = "aqi_scale"
 KEY_PM2_5 = "pm2_5_ug_m3"
 KEY_PM10 = "pm10_ug_m3"
 KEY_NO2 = "no2_ug_m3"
@@ -487,6 +504,11 @@ KEY_MOON_NEXT_NEW = "moon_next_new_days"
 KEY_SOLAR_FORECAST_TODAY_KWH = "solar_forecast_today_kwh"
 KEY_SOLAR_FORECAST_TOMORROW_KWH = "solar_forecast_tomorrow_kwh"
 KEY_SOLAR_FORECAST_STATUS = "solar_forecast_status"
+# Data keys - v3.0.0 Local PV forecast (Open-Meteo GTI scaled by measured PV energy)
+KEY_SOLAR_LOCAL_TODAY_KWH = "solar_local_forecast_today_kwh"
+KEY_SOLAR_LOCAL_TOMORROW_KWH = "solar_local_forecast_tomorrow_kwh"
+KEY_SOLAR_LOCAL_REMAINING_KWH = "solar_local_forecast_remaining_kwh"
+KEY_SOLAR_LOCAL_INFO = "solar_local_forecast_info"
 KEY_ET0_PM_DAILY_MM = "et0_pm_daily_mm"  # Penman-Monteith (when solar available)
 KEY_ET0_PM_RADIATION_SOURCE = "et0_pm_radiation_source"  # "sensor" or "illuminance_estimate"
 KEY_ET0_PM_PERIOD = "et0_pm_period"  # completed local calendar date
@@ -619,6 +641,11 @@ DEFAULT_CHILL_SEASON_RESET_DAY = 1
 KEY_HEAT_INDEX = "heat_index_c"
 KEY_WIND_CHILL = "wind_chill_c"
 KEY_HUMIDEX = "humidex"
+# v3.0: feels-like formulas that ran but are outside their range (sensors show air temp)
+KEY_FEELS_LIKE_AIR_TEMP = "_feels_like_air_temp"
+# v3.0: Data Status sensor and the lasting source problems it reports
+KEY_DATA_STATUS = "data_status"
+KEY_SOURCE_PROBLEMS = "_source_problems"
 
 # Data keys - humidity / vapour
 KEY_VPD = "vpd_kpa"
@@ -723,7 +750,10 @@ PATTERN_RAIN_JUMP_CAP_MM = 60.0  # per-tick rain jump that invalidates a window
 PATTERN_STRIKE_JUMP_CAP = 2000.0  # per-tick lightning jump that invalidates a window
 PATTERN_PENDING_MAX = 48  # pending-buffer cap
 PATTERN_BIN_COUNT = 13  # 15-min history bins kept (3 h plus the current one)
-PATTERN_PRESSURE_SLOTS = 97  # 24 h of 15-min pressure samples
+# Pressure history for the 24 h change is kept by time, not by count: every restart
+# adds one off-grid point, and a 97-point cap pushed the reading from 24 h ago out early.
+PATTERN_PRESSURE_WINDOW_S = 86400.0 + 1800.0  # 24.5 h of pressure points
+PATTERN_PRESSURE_SLOTS = 400  # safety cap only: 24.5 h of 15-min points plus restart points
 PATTERN_DRY_HOURS_CAP = 48.0
 
 # Online logistic regression
@@ -764,10 +794,21 @@ PATTERN_HISTORY_RETRY_S = 7 * 86400.0  # a target that could not replay is retri
 # out PATTERN_HISTORY_RETRY_S. v2 (2.11.1): cumulative counters recorded as
 # measurement statistics (hourly mean/min/max only) are read from the hourly max.
 # v3 (2.13.17): the unit of each statistic is read, not taken for metric.
-PATTERN_HISTORY_METHOD = 3
+# v4 (3.0.0): dp_3h scale aligned to 3h change; cloud_deficit and solar features masked in replay.
+PATTERN_HISTORY_METHOD = 4
 # Replays older than this took every statistic for metric: a station whose
 # statistics are not metric has to learn again.
 PATTERN_HISTORY_UNITS_METHOD = 3
+# Replays older than this used unmasked solar features and 1h dp_3h: affected
+# features are reset and re-replayed under method 4.
+PATTERN_HISTORY_FEATURES_METHOD = 4
+PATTERN_CORRUPTED_FEATURES: tuple[str, ...] = (
+    "cloud_deficit",
+    "solar_ok",
+    "last_day_clearness",
+    "last_day_clearness_ok",
+    "dp_3h",
+)
 PATTERN_HISTORY_STD_WEIGHT = 4.0  # an hourly replay sample weighs like four 15-min samples in the EMA
 PATTERN_HISTORY_DELAY_S = 120.0  # wait after startup before reading the recorder
 
@@ -820,8 +861,9 @@ KEY_NOWCAST_CONFIDENCE = "nowcast_confidence"  # "high", "medium", "low"
 KEY_RAIN_EXPECTED_1H = "rain_expected_1h"
 KEY_NOWCAST_FETCHED_AT = "_nowcast_fetched_at"
 KEY_NOWCAST_STALE = "nowcast_stale"
-KEY_RAIN_EXPECTED_SOURCE = "rain_expected_source"  # "nowcast" or "local_fallback"
+KEY_RAIN_EXPECTED_SOURCE = "rain_expected_source"  # "nowcast" or "local_rain"
 RAIN_EXPECTED_SOURCE_NOWCAST = "nowcast"
+RAIN_EXPECTED_SOURCE_LOCAL_RAIN = "local_rain"
 RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK = "local_fallback"
 # Z-number implied rain probability (%) at/above which the Zambretti-derived
 # local fallback reports rain expected. Coarser than the 15-min NWP nowcast.
@@ -1296,3 +1338,45 @@ ENTRY_REPAIR_ISSUES = (
 def issue_id_for_entry(name: str, entry_id: str) -> str:
     """Repairs issue ID for ``name`` scoped to one config entry."""
     return f"{name}_{entry_id}"
+
+
+# ---------------------------------------------------------------------------
+# v3.0.0 Architecture & Weather Decision Engine
+# ---------------------------------------------------------------------------
+
+# Update coalescing (Scope D)
+COALESCE_BURST_DELAY_S = 0.15  # 150 ms debounce to collapse multi-sensor packet bursts
+
+# Weather Windows Decision Engine (Scope C)
+CONF_ENABLE_WEATHER_WINDOWS = "enable_weather_windows"
+DEFAULT_ENABLE_WEATHER_WINDOWS = False
+CONF_WEATHER_WINDOW_PROFILES = "weather_window_profiles"
+
+KEY_WEATHER_WINDOWS = "weather_windows"
+
+SERVICE_GET_WEATHER_WINDOWS = "get_weather_windows"
+SERVICE_GET_STATION_SUMMARY = "get_station_summary"
+
+PROFILE_OUTDOOR_DRYING = "outdoor_drying"
+PROFILE_GARDEN_WORK = "garden_work"
+PROFILE_CUSTOM = "custom"
+
+DEFAULT_WEATHER_WINDOW_PROFILES = [PROFILE_OUTDOOR_DRYING, PROFILE_GARDEN_WORK]
+
+# Automated Custom Weather Window profile options
+CONF_CUSTOM_WINDOW_NAME = "custom_window_name"
+CONF_CUSTOM_MIN_DURATION_H = "custom_min_duration_h"
+CONF_CUSTOM_MAX_RAIN_PROB_PCT = "custom_max_rain_prob_pct"
+CONF_CUSTOM_MAX_RAIN_MM = "custom_max_rain_mm"
+CONF_CUSTOM_MIN_TEMP_C = "custom_min_temp_c"
+CONF_CUSTOM_MAX_TEMP_C = "custom_max_temp_c"
+CONF_CUSTOM_MIN_HUMIDITY_PCT = "custom_min_humidity_pct"
+CONF_CUSTOM_MAX_HUMIDITY_PCT = "custom_max_humidity_pct"
+CONF_CUSTOM_MIN_WIND_KMH = "custom_min_wind_kmh"
+CONF_CUSTOM_MAX_WIND_KMH = "custom_max_wind_kmh"
+CONF_CUSTOM_MAX_WIND_GUST_KMH = "custom_max_wind_gust_kmh"
+CONF_CUSTOM_MAX_CLOUD_COVER_PCT = "custom_max_cloud_cover_pct"
+CONF_CUSTOM_REQUIRE_DAYLIGHT = "custom_require_daylight"
+
+# Conversion factors from canonical internal (m/s) wind speed to configured unit
+WIND_FACTORS: dict[str, float] = {"m/s": 1.0, "km/h": 3.6, "mph": 2.23694, "kn": 1.94384}

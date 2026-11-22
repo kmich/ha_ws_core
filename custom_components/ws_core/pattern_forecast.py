@@ -30,6 +30,7 @@ from .const import (
     PATTERN_BASE_RATE_HALF_LIFE_DAYS,
     PATTERN_BIN_COUNT,
     PATTERN_CHECKPOINT_INTERVAL_S,
+    PATTERN_CORRUPTED_FEATURES,
     PATTERN_COVERAGE_MIN,
     PATTERN_DEGRADED_MIN_EVENTS,
     PATTERN_DEGRADED_WEEKS,
@@ -37,6 +38,7 @@ from .const import (
     PATTERN_DRY_HOURS_CAP,
     PATTERN_EVENT_GAP_H,
     PATTERN_GRAD_CLIP,
+    PATTERN_HISTORY_FEATURES_METHOD,
     PATTERN_HISTORY_METHOD,
     PATTERN_HISTORY_RETRY_S,
     PATTERN_HISTORY_STD_WEIGHT,
@@ -50,6 +52,7 @@ from .const import (
     PATTERN_PENDING_MAX,
     PATTERN_POOL_ID,
     PATTERN_PRESSURE_SLOTS,
+    PATTERN_PRESSURE_WINDOW_S,
     PATTERN_PRIOR_RATE,
     PATTERN_RAIN_JUMP_CAP_MM,
     PATTERN_RAIN_THRESHOLD_MM,
@@ -181,8 +184,18 @@ _FEATURE_MASKS: dict[str, tuple[str, ...]] = {
 }
 
 # Features the replay of recorder statistics cannot supply (wind direction is
-# not averageable, the storm distance filter is lost); they train as masked.
-REPLAY_MASKED_FEATURES: frozenset[str] = frozenset({"wind_u", "wind_v"})
+# not averageable, the storm distance filter is lost, solar features are unrecorded);
+# they train as masked.
+REPLAY_MASKED_FEATURES: frozenset[str] = frozenset(
+    {
+        "wind_u",
+        "wind_v",
+        "cloud_deficit",
+        "solar_ok",
+        "last_day_clearness",
+        "last_day_clearness_ok",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Target registry: adding a target is a declaration, not new machinery
@@ -420,6 +433,19 @@ class Standardizer:
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class _InFlightSample:
+    """Per-sample optimizer and standardizer context captured during live training."""
+
+    feat: list[float | None]
+    y: float
+    ts: float
+    masked: frozenset[int]
+    pre_w: list[float]
+    z: list[float]
+    warm_slots: tuple[bool, ...]
+
+
 class ModelState:
     """Weights, accumulators, checkpoint and bookkeeping of one target/horizon."""
 
@@ -444,6 +470,7 @@ class ModelState:
         self.ev_live = 0
         self.ev_hist = 0
         self.discarded = 0
+        self._migration_sample_log: list[_InFlightSample] | None = None
 
     # -- prediction ---------------------------------------------------------
 
@@ -468,6 +495,7 @@ class ModelState:
         """One SGD step. Returns False when the numeric guard restored the checkpoint."""
         z = self.zvec(std, feat, masked)
         active = [i not in masked for i in self.idx]
+        pre_w = list(self.w) if self._migration_sample_log is not None else None
         s = self.w[0] + sum(w * v for w, v in zip(self.w[1:], z, strict=True))
         err = _sigmoid(s) - y
         clip = PATTERN_GRAD_CLIP
@@ -496,7 +524,49 @@ class ModelState:
             self.cp_w = list(self.w)
             self.cp_g2 = list(self.g2)
             self.cp_at = ts
+        if self._migration_sample_log is not None and pre_w is not None:
+            self._migration_sample_log.append(
+                _InFlightSample(
+                    feat=list(feat),
+                    y=float(y),
+                    ts=float(ts),
+                    masked=masked,
+                    pre_w=pre_w,
+                    z=z,
+                    warm_slots=tuple(std.n[i] >= PATTERN_STD_MIN_N for i in self.idx),
+                )
+            )
         return True
+
+    def apply_feature_samples(
+        self,
+        std: Standardizer,
+        idx: int,
+        samples: list[_InFlightSample],
+        initial_cp_at: float | None,
+    ) -> None:
+        """Apply buffered live samples to one feature slot using each sample's training context."""
+        pool_slot = self.idx[idx - 1]
+        cp_at = initial_cp_at
+        for sample in samples:
+            if pool_slot in sample.masked:
+                continue
+            z_feat = sample.z[idx - 1] if sample.warm_slots[idx - 1] else std.z(pool_slot, sample.feat[pool_slot])
+            base_s = sample.pre_w[0] + sum(
+                w * v for j, (w, v) in enumerate(zip(sample.pre_w[1:], sample.z, strict=True), start=1) if j != idx
+            )
+            s = base_s + self.w[idx] * z_feat
+            err = _sigmoid(s) - sample.y
+            g = max(-PATTERN_GRAD_CLIP, min(PATTERN_GRAD_CLIP, err * z_feat + PATTERN_L2 * self.w[idx]))
+            self._step(idx, g)
+            if not (math.isfinite(self.w[idx]) and math.isfinite(self.g2[idx])):
+                self.w[idx] = self.cp_w[idx]
+                self.g2[idx] = self.cp_g2[idx]
+                continue
+            if cp_at is None or sample.ts - cp_at >= PATTERN_CHECKPOINT_INTERVAL_S:
+                self.cp_w[idx] = self.w[idx]
+                self.cp_g2[idx] = self.g2[idx]
+                cp_at = sample.ts
 
     def _step(self, j: int, g: float) -> None:
         self.g2[j] += g * g
@@ -743,6 +813,7 @@ class PatternEngine:
         self.base_rate: dict[str, list[float]] = {}
         self.cond: dict[str, list[list[float]]] = {}
         self.history_learn: dict[str, Any] = {}
+        self.features_migration_pending: bool | None = None
         self.last_trained_at: float | None = None
         self.first_obs_ts: float | None = None
         self.last_rain_ts: float | None = None
@@ -834,6 +905,144 @@ class PatternEngine:
         """Back to a fresh engine (same configuration)."""
         fresh = PatternEngine(self.thresholds, self.storm_source, self.source_fingerprint, self.tick_cap_s)
         self.__dict__.update(fresh.__dict__)
+
+    def scoped_reset_features(
+        self, feature_names: tuple[str, ...] | set[str] | frozenset[str] = PATTERN_CORRUPTED_FEATURES
+    ) -> set[str]:
+        """Reset standardizer slots and model weights for specific corrupted features only (v3.0).
+
+        Keeps bias (w[0]), all other feature weights, base rates, conditional rates,
+        scoring, reliability, history entries, and all other standardizer slots untouched.
+        """
+        for feat in feature_names:
+            if feat in POOL_INDEX:
+                slot = POOL_INDEX[feat]
+                self.std.mean[slot] = 0.0
+                self.std.var[slot] = 1.0
+                self.std.n[slot] = 0
+
+        reset_targets: set[str] = set()
+        for tid, model in self.models.items():
+            touched = False
+            for feat in feature_names:
+                if feat in model.spec.features:
+                    idx = model.spec.features.index(feat) + 1  # 0 is bias
+                    model.w[idx] = 0.0
+                    model.g2[idx] = 0.0
+                    model.cp_w[idx] = 0.0
+                    model.cp_g2[idx] = 0.0
+                    touched = True
+            if touched:
+                reset_targets.add(tid)
+        return reset_targets
+
+    @staticmethod
+    def _iter_replay_vectors(hist: HourlyHistory):
+        """Yield ``(k, j, ts, vec, highs, lows)`` feature vectors across replayable hourly history."""
+
+        def diff(a: list[float | None], i: int, b: int) -> float | None:
+            return None if a[i] is None or a[b] is None else a[i] - a[b]
+
+        n = hist.n
+        last_wet: int | None = None
+        for k in range(1, n + 1):
+            j = k - 1
+            if hist.rain[j] is not None and hist.rain[j] >= 0.1:
+                last_wet = j
+            if k < 25:
+                continue
+            ts = hist.start_ts + k * 3600.0
+            vec: list[float | None] = [None] * N_POOL
+            vec[POOL_INDEX["mslp"]] = hist.mslp[j]
+            dp3 = diff(hist.mslp, j, j - 3)
+            vec[POOL_INDEX["dp_3h"]] = dp3
+            vec[POOL_INDEX["dp_24h"]] = diff(hist.mslp, j, j - 24)
+            vec[POOL_INDEX["temp"]] = hist.temp[j]
+            vec[POOL_INDEX["dpd"]] = hist.dpd[j]
+            vec[POOL_INDEX["dpd_1h"]] = diff(hist.dpd, j, j - 1)
+            vec[POOL_INDEX["t_1h"]] = diff(hist.temp, j, j - 1)
+            vec[POOL_INDEX["t_3h"]] = diff(hist.temp, j, j - 3)
+            highs = [v for v in hist.temp_max[j - 23 : j + 1] if v is not None]
+            lows = [v for v in hist.temp_min[j - 23 : j + 1] if v is not None]
+            vec[POOL_INDEX["t_max_24h"]] = max(highs) if len(highs) >= 20 else None
+            vec[POOL_INDEX["wind_speed"]] = hist.wind[j]
+            vec[POOL_INDEX["gust_1h"]] = hist.gust[j]
+            vec[POOL_INDEX["rain_1h"]] = None if hist.rain[j] is None else math.log1p(max(0.0, hist.rain[j]))
+            dry = (j - last_wet) if last_wet is not None else min(PATTERN_DRY_HOURS_CAP, float(j + 1))
+            vec[POOL_INDEX["dry_hours"]] = math.log1p(min(PATTERN_DRY_HOURS_CAP, float(dry)))
+            vec[POOL_INDEX["cloud_deficit"]] = 0.0
+            vec[POOL_INDEX["solar_ok"]] = 0.0
+            vec[POOL_INDEX["last_day_clearness"]] = 0.0
+            vec[POOL_INDEX["last_day_clearness_ok"]] = 0.0
+            vec[POOL_INDEX["night_frac_12h"]] = hist.night_frac[j]
+            local_hour = ((ts + hist.tz_offset[j]) / 3600.0) % 24.0
+            vec[POOL_INDEX["hour_sin"]] = math.sin(2.0 * math.pi * local_hour / 24.0)
+            vec[POOL_INDEX["hour_cos"]] = math.cos(2.0 * math.pi * local_hour / 24.0)
+            vec[POOL_INDEX["lightning_1h"]] = None if hist.strikes[j] is None else math.log1p(max(0.0, hist.strikes[j]))
+            yield k, j, ts, vec, highs, lows
+
+    def replay_scoped_features(
+        self,
+        hist: HourlyHistory,
+        targets: list[str],
+        feature_names: set[str] | frozenset[str] = frozenset({"dp_3h"}),
+        update_std: bool = True,
+    ) -> dict[str, int]:
+        """Re-standardize and re-train only ``feature_names`` from hourly history.
+
+        Preserves all other feature weights, bias (w[0]), base/conditional rates,
+        sample counts, events, scoring, reliability, and history_learn metadata.
+        """
+        masked = frozenset(POOL_INDEX[f] for f in REPLAY_MASKED_FEATURES)
+        active_feats = [f for f in feature_names if f in POOL_INDEX and POOL_INDEX[f] not in masked]
+        active_slots = [POOL_INDEX[f] for f in active_feats]
+        specs = [TARGET_BY_ID[t] for t in targets if t in self.models]
+        counts: dict[str, int] = {s.target_id: 0 for s in specs}
+        if not active_slots or not specs:
+            return counts
+
+        target_feat_indices: dict[str, list[int]] = {}
+        for spec in specs:
+            indices = [spec.features.index(f) + 1 for f in active_feats if f in spec.features]
+            if indices:
+                target_feat_indices[spec.target_id] = indices
+        if not target_feat_indices:
+            return counts
+
+        for k, _j, _ts, vec, _highs, _lows in self._iter_replay_vectors(hist):
+            if update_std:
+                for slot in active_slots:
+                    val = vec[slot]
+                    if val is not None:
+                        self.std.update(slot, float(val), PATTERN_HISTORY_STD_WEIGHT)
+            if any(self.std.n[s] < PATTERN_STD_MIN_N for s in active_slots):
+                continue
+            for spec in specs:
+                feat_indices = target_feat_indices.get(spec.target_id)
+                if not feat_indices:
+                    continue
+                m = self.models[spec.target_id]
+                if any(vec[i] is None and i not in masked for i in m.idx):
+                    continue
+                label = self._replay_label(hist, spec, k)
+                if label is None:
+                    continue
+                y = 1.0 if label else 0.0
+                z = m.zvec(self.std, vec, masked)
+                s = m.w[0] + sum(w * v for w, v in zip(m.w[1:], z, strict=True))
+                err = _sigmoid(s) - y
+                for idx in feat_indices:
+                    zj = z[idx - 1]
+                    g = max(-PATTERN_GRAD_CLIP, min(PATTERN_GRAD_CLIP, err * zj + PATTERN_L2 * m.w[idx]))
+                    m._step(idx, g)
+                    if not (math.isfinite(m.w[idx]) and math.isfinite(m.g2[idx])):
+                        m.w[idx] = m.cp_w[idx]
+                        m.g2[idx] = m.cp_g2[idx]
+                    else:
+                        m.cp_w[idx] = m.w[idx]
+                        m.cp_g2[idx] = m.g2[idx]
+                counts[spec.target_id] += 1
+        return counts
 
     # -- 60 s tick: tallies, events, label resolution -----------------------
 
@@ -1166,8 +1375,22 @@ class PatternEngine:
         ]
         merged = sorted(live + seeds, key=lambda p: p[0])[-PATTERN_PRESSURE_SLOTS:]
         self.pressure = deque(merged, maxlen=PATTERN_PRESSURE_SLOTS)
-        kept = {p[0] for p in merged}
+        self._trim_pressure()
+        kept = {p[0] for p in self.pressure}
         return sum(1 for s in seeds if s[0] in kept)
+
+    def _trim_pressure(self) -> None:
+        """Keep the last 24.5 h of pressure points, by time rather than by count.
+
+        Each restart or reload issues one extra, off-grid forecast that adds a point.
+        With a 97-point cap a few restarts pushed the reading from 24 h ago out early,
+        so ``dp_24h`` went missing and every target paused for up to a day.
+        """
+        if not self.pressure:
+            return
+        newest = self.pressure[-1][0]
+        while self.pressure and self.pressure[0][0] < newest - PATTERN_PRESSURE_WINDOW_S:
+            self.pressure.popleft()
 
     _BIN_KEYS = ("t", "d", "u", "v", "s", "g", "r", "k")
 
@@ -1296,6 +1519,7 @@ class PatternEngine:
         feats, now_flags = self._features(ts, inst)
         if inst.mslp is not None:
             self.pressure.append([ts, float(inst.mslp)])
+            self._trim_pressure()
         vec: list[float | None] = [feats[name] for name in POOL]
         for i, x in enumerate(vec):
             if x is not None and math.isfinite(x):
@@ -1495,45 +1719,8 @@ class PatternEngine:
                     ids["heat"] = ident
                     events["heat"] += 1
 
-        def diff(a: list[float | None], i: int, b: int) -> float | None:
-            return None if a[i] is None or a[b] is None else a[i] - a[b]
-
         # ---- samples: one per hour boundary, features from the hours before it
-        last_wet: int | None = None
-        for k in range(1, n + 1):
-            j = k - 1
-            if hist.rain[j] is not None and hist.rain[j] >= 0.1:
-                last_wet = j
-            if k < 25:
-                continue
-            ts = hist.start_ts + k * 3600.0
-            vec: list[float | None] = [None] * N_POOL
-            vec[POOL_INDEX["mslp"]] = hist.mslp[j]
-            dp3 = diff(hist.mslp, j, j - 3)
-            vec[POOL_INDEX["dp_3h"]] = None if dp3 is None else dp3 / 3.0
-            vec[POOL_INDEX["dp_24h"]] = diff(hist.mslp, j, j - 24)
-            vec[POOL_INDEX["temp"]] = hist.temp[j]
-            vec[POOL_INDEX["dpd"]] = hist.dpd[j]
-            vec[POOL_INDEX["dpd_1h"]] = diff(hist.dpd, j, j - 1)
-            vec[POOL_INDEX["t_1h"]] = diff(hist.temp, j, j - 1)
-            vec[POOL_INDEX["t_3h"]] = diff(hist.temp, j, j - 3)
-            highs = [v for v in hist.temp_max[j - 23 : j + 1] if v is not None]
-            lows = [v for v in hist.temp_min[j - 23 : j + 1] if v is not None]
-            vec[POOL_INDEX["t_max_24h"]] = max(highs) if len(highs) >= 20 else None
-            vec[POOL_INDEX["wind_speed"]] = hist.wind[j]
-            vec[POOL_INDEX["gust_1h"]] = hist.gust[j]
-            vec[POOL_INDEX["rain_1h"]] = None if hist.rain[j] is None else math.log1p(max(0.0, hist.rain[j]))
-            dry = (j - last_wet) if last_wet is not None else min(PATTERN_DRY_HOURS_CAP, float(j + 1))
-            vec[POOL_INDEX["dry_hours"]] = math.log1p(min(PATTERN_DRY_HOURS_CAP, float(dry)))
-            vec[POOL_INDEX["cloud_deficit"]] = 0.0
-            vec[POOL_INDEX["solar_ok"]] = 0.0
-            vec[POOL_INDEX["last_day_clearness"]] = 0.0
-            vec[POOL_INDEX["last_day_clearness_ok"]] = 0.0
-            vec[POOL_INDEX["night_frac_12h"]] = hist.night_frac[j]
-            local_hour = ((ts + hist.tz_offset[j]) / 3600.0) % 24.0
-            vec[POOL_INDEX["hour_sin"]] = math.sin(2.0 * math.pi * local_hour / 24.0)
-            vec[POOL_INDEX["hour_cos"]] = math.cos(2.0 * math.pi * local_hour / 24.0)
-            vec[POOL_INDEX["lightning_1h"]] = None if hist.strikes[j] is None else math.log1p(max(0.0, hist.strikes[j]))
+        for k, j, ts, vec, highs, lows in self._iter_replay_vectors(hist):
             if update_std:
                 for i, x in enumerate(vec):
                     if x is not None and i not in masked:
@@ -1621,20 +1808,63 @@ class PatternEngine:
             self.cond[tid] = [list(c) for c in trained.cond[tid]]
         if update_std:
             self.std = trained.std
-        targets = dict((self.history_learn or {}).get("targets") or {})
+        prev_hl = self.history_learn or {}
+        prev_fm = prev_hl.get("features_method")
+        prev_reset_fm = prev_hl.get("features_reset_method")
+        prev_fm_val = int(prev_fm) if _finite(prev_fm) else 1
+        dp_warm = (
+            self.std.n[POOL_INDEX["dp_3h"]] >= PATTERN_STD_MIN_N
+            and trained.std.n[POOL_INDEX["dp_3h"]] >= PATTERN_STD_MIN_N
+        )
+        fresh_alignment = self.features_migration_pending is not True and (
+            prev_fm is None or prev_fm_val >= PATTERN_HISTORY_FEATURES_METHOD
+        )
+        targets = dict(prev_hl.get("targets") or {})
         for tid, st in statuses.items():
             if tid in self.models:
-                targets[tid] = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
+                entry = {**st, "attempted_at": now_ts, "method": PATTERN_HISTORY_METHOD}
+                needs_dp = "dp_3h" in self.models[tid].spec.features
+                if (
+                    st.get("status") == "ok"
+                    and report.get(tid, {}).get("samples", 0) > 0
+                    and (not needs_dp or dp_warm or fresh_alignment)
+                ):
+                    entry["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+                elif tid in targets and "features_method" in targets[tid]:
+                    entry["features_method"] = targets[tid]["features_method"]
+                targets[tid] = entry
         oks = [t for t in targets.values() if t.get("status") == "ok"]
+        # Only mark the v3 feature-alignment migration complete when every
+        # already-learned target was either migrated earlier or replayed in this run
+        # against a warm dp_3h standardizer.
+        all_ok_migrated = prev_fm_val >= PATTERN_HISTORY_FEATURES_METHOD or (
+            bool(oks)
+            and all(
+                isinstance(t, dict)
+                and _finite(t.get("features_method"))
+                and int(t["features_method"]) >= PATTERN_HISTORY_FEATURES_METHOD
+                for t in targets.values()
+                if isinstance(t, dict) and t.get("status") == "ok"
+            )
+        )
         spans = [r["last"] - r["first"] for r in report.values() if r["first"] is not None]
         failed = [f"{t}: {v.get('reason')}" for t, v in targets.items() if v.get("status") != "ok"]
-        self.history_learn = {
+        new_hl: dict[str, Any] = {
             "done_at": now_ts,
             "span_days": round(max(spans) / 86400.0, 1) if spans else 0.0,
             "status": "ok" if not failed else ("partial" if oks else "unavailable"),
             "reason": "; ".join(failed) if failed else None,
             "targets": targets,
         }
+        if all_ok_migrated:
+            new_hl["features_method"] = PATTERN_HISTORY_FEATURES_METHOD
+            new_hl["features_reset_method"] = PATTERN_HISTORY_FEATURES_METHOD
+        else:
+            if prev_fm is not None:
+                new_hl["features_method"] = prev_fm
+            if prev_reset_fm is not None:
+                new_hl["features_reset_method"] = prev_reset_fm
+        self.history_learn = new_hl
         for m in self.models.values():
             self._update_maturity(m, now_ts)
 
@@ -1763,6 +1993,7 @@ class PatternEngine:
             "last_day_clear": list(self.last_day_clear) if self.last_day_clear else None,
             "last_trained_at": self.last_trained_at,
             "history_learn": self.history_learn,
+            "features_migration_pending": bool(self.features_migration_pending),
         }
 
     @staticmethod
@@ -1869,6 +2100,7 @@ class PatternEngine:
         for t, v in data.get("pressure_24h", []):
             if _finite(t) and _finite(v):
                 eng.pressure.append([float(t), float(v)])
+        eng._trim_pressure()
         for b in data.get("recent_bins", []):
             if isinstance(b, dict) and _finite(b.get("ts")) and _finite(b.get("n")):
                 eng.bins.append(dict(b))
@@ -1881,6 +2113,26 @@ class PatternEngine:
         ldc = data.get("last_day_clear")
         eng.last_day_clear = [float(ldc[0]), float(ldc[1])] if _floats_ok(ldc, 2) else None
         eng.history_learn = cls._clean_history(data.get("history_learn"), loaded)
+        pending = data.get("features_migration_pending")
+        if isinstance(pending, bool):
+            eng.features_migration_pending = pending
+        else:
+            history = eng.history_learn
+            targets = history.get("targets") or {}
+            feature_method = history.get("features_method", 0)
+            # v3 previews wrote the new replay method even on a short replay
+            # that never warmed the pressure scaler. Their weights are current.
+            legacy_history = any(
+                not _finite(target.get("method")) or target["method"] < PATTERN_HISTORY_METHOD
+                for target in targets.values()
+            )
+            untagged_weights = not targets and any(std.n[POOL_INDEX[name]] for name in PATTERN_CORRUPTED_FEATURES)
+            eng.features_migration_pending = feature_method < PATTERN_HISTORY_FEATURES_METHOD and (
+                legacy_history
+                or untagged_weights
+                or history.get("features_reset_method", 0) >= PATTERN_HISTORY_FEATURES_METHOD
+                or "features_method" in history
+            )
         return eng
 
     @staticmethod
@@ -1902,11 +2154,18 @@ class PatternEngine:
                     and _finite(e.get("attempted_at"))
                     and isinstance(e.get("reason"), (str, type(None)))
                 ):
-                    clean[tid] = dict(e)
+                    clean_entry = dict(e)
+                    if _finite(e.get("features_method")):
+                        clean_entry["features_method"] = int(e["features_method"])
+                    clean[tid] = clean_entry
         out: dict[str, Any] = {}
         for key in ("done_at", "span_days"):
             if _opt_ok(hl.get(key)):
                 out[key] = hl.get(key)
+        for key in ("features_method", "features_reset_method"):
+            fm = hl.get(key)
+            if _finite(fm):
+                out[key] = int(fm)
         for key in ("status", "reason"):
             if isinstance(hl.get(key), (str, type(None))):
                 out[key] = hl.get(key)

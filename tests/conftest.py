@@ -9,6 +9,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Disable pytest-socket entirely on Windows because it breaks ProactorEventLoop
 import pytest_socket
 
+# On Windows, os.fchmod does not exist, but HA's write_utf8_file calls it
+if not hasattr(os, "fchmod"):
+    os.fchmod = lambda *args, **kwargs: None
+
 pytest_socket.disable_socket = lambda *args, **kwargs: None
 pytest_socket.SocketBlockedError = Exception
 

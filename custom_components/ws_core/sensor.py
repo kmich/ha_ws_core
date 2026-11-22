@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import logging
+from collections.abc import Mapping
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
@@ -16,8 +18,11 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_ENABLE_COMFORT_INDICES,
     CONF_ENABLE_INDOOR,
+    CONF_ENABLE_SOLAR_FORECAST,
     CONF_ENABLE_VIGICRUES,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_INDOOR_ROOMS,
     CONF_PREFIX,
     CONF_VIGICRUES_RIVER_NAME,
@@ -48,6 +53,7 @@ from .const import (
     KEY_CWOP_STATUS_V2,
     KEY_DATA_QUALITY,
     KEY_DATA_QUALITY_SCORE,
+    KEY_DATA_STATUS,
     KEY_DELTA_T,
     KEY_DEW_POINT_C,
     KEY_DOMINANT_WIND_DIR,
@@ -55,6 +61,7 @@ from .const import (
     KEY_ET0_DAILY_MM,
     KEY_ET0_HOURLY_MM,
     KEY_ET0_PM_DAILY_MM,
+    KEY_FEELS_LIKE_AIR_TEMP,
     KEY_FEELS_LIKE_C,
     KEY_FFDI,
     KEY_FFWI,
@@ -171,7 +178,12 @@ from .const import (
     KEY_SOLAR_ENERGY_TODAY_WHM2,
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
+    KEY_SOLAR_LOCAL_INFO,
+    KEY_SOLAR_LOCAL_REMAINING_KWH,
+    KEY_SOLAR_LOCAL_TODAY_KWH,
+    KEY_SOLAR_LOCAL_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
+    KEY_SOURCE_PROBLEMS,
     KEY_SPECIFIC_HUMIDITY,
     KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_ANOMALY_90D,
@@ -200,8 +212,10 @@ from .const import (
     KEY_VPD,
     KEY_WBGT,
     KEY_WC_STATUS,
+    KEY_WEATHER_WINDOWS,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
+    KEY_WIND_BEAUFORT_KEY,
     KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_DIR_VARIABILITY,
@@ -219,6 +233,10 @@ from .const import (
     KEY_ZAMBRETTI_FORECAST,
     KEY_ZAMBRETTI_NUMBER,
     PATTERN_SOURCE_INTERNET,
+    PROFILE_CUSTOM,
+    SRC_LIGHTNING_COUNT,
+    SRC_LIGHTNING_DISTANCE,
+    SRC_LUX,
     UNIT_TEMP_C,
     normalize_indoor_rooms,
 )
@@ -231,10 +249,42 @@ from .entity_descriptions import (
     _WIND_DIRECTION_DEVICE_CLASS,
     _WIND_FACTORS,
     SENSORS,
+    STATION_DEPENDENT_KEYS,
     WSSensorDescription,
     sensor_selected,
+    station_supports,
 )
-from .sensor_status import unknown_status
+from .sensor_status import status_text, unknown_status
+
+_LOGGER = logging.getLogger(__name__)
+
+_HEAT_NOTE = "Below 27 °C or 40% humidity this formula does not apply, so this shows the air temperature."
+# Feels-like sensors that show the air temperature when their formula does not apply.
+_FEELS_LIKE_NOTES: dict[str, str] = {
+    KEY_HEAT_INDEX: _HEAT_NOTE,
+    KEY_THW_INDEX: _HEAT_NOTE,
+    KEY_THSW_INDEX: _HEAT_NOTE,
+    KEY_WIND_CHILL: (
+        "Wind chill applies only at 10 °C or below with wind above 4.8 km/h, so this shows the air temperature."
+    ),
+    KEY_HUMIDEX: "The air is dry enough that humidity adds no discomfort, so this shows the air temperature.",
+}
+# Reasons meaning "this station or its settings cannot provide the value", as opposed
+# to "nothing to report right now".
+_NOT_ON_STATION_REASONS = frozenset(
+    ("missing_solar_radiation", "missing_lightning_source", "feature_disabled", "provider_missing_precip_prob")
+)
+# A Pattern Forecast target whose learning details are known but that has not published
+# a forecast since the last restart (it does on its next run, within 15 minutes).
+_PATTERN_FIRST_RUN = {
+    "reason": "waiting_for_first_run",
+    "explanation": "Pattern Forecast has not run since Home Assistant started; it publishes within 15 minutes.",
+}
+_EVENT_NOTES = (
+    ("rain_event", "No rain has started or stopped since this station was set up."),
+    ("frost_event", "No frost has started or ended since this station was set up."),
+    ("lightning_event", "No lightning strike has been detected since this station was set up."),
+)
 
 __all__ = [
     "SENSORS",
@@ -247,10 +297,43 @@ __all__ = [
     "_WIND_DIRECTION_DEVICE_CLASS",
     "_MEASUREMENT_ANGLE_STATE_CLASS",
     "WSSensor",
+    "WSDataStatusSensor",
     "WSRiverSensor",
     "WSRiverFlowSensor",
     "async_setup_entry",
 ]
+
+
+def _async_remove_unsupported_solar_entities(
+    hass: HomeAssistant, entry: ConfigEntry, opts: Mapping[str, Any], sources: Mapping[str, str]
+) -> None:
+    """Remove registry entries for solar sensors this station can no longer provide.
+
+    Since 2.13.0 the solar-radiation sensors are only created when a W/m² source is
+    mapped (or, for the estimated ones, the illuminance fallback is on); since 3.0.0 the
+    THSW index too. Entries created by earlier versions stayed behind as unavailable
+    "restored" entities forever. Unlike a feature toggle, this depends on the station's
+    hardware, so they are removed; they come back if a solar radiation source is mapped
+    later. Matching is by unique_id, so renamed entity ids are covered too.
+    """
+    stale_uids = {
+        f"{entry.entry_id}_{key}"
+        for key in STATION_DEPENDENT_KEYS
+        if not station_supports(key, dict(opts), dict(sources))
+    }
+    if not stale_uids:
+        return
+    registry = er.async_get(hass)
+    for ent in list(registry.entities.values()):
+        if ent.config_entry_id != entry.entry_id or ent.domain != "sensor":
+            continue
+        if ent.unique_id in stale_uids:
+            _LOGGER.info(
+                "Removing solar sensor %s (unique_id=%s): its solar radiation source or PV meter is not mapped",
+                ent.entity_id,
+                ent.unique_id,
+            )
+            registry.async_remove(ent.entity_id)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
@@ -258,6 +341,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     prefix = (entry.options.get(CONF_PREFIX) or entry.data.get(CONF_PREFIX) or DEFAULT_PREFIX).strip().lower()
 
     opts = {**entry.data, **entry.options}
+    _async_remove_unsupported_solar_entities(hass, entry, opts, coordinator.sources)
 
     pattern = getattr(coordinator, "_pattern", None)
     filtered: list[WSSensorDescription] = []
@@ -273,9 +357,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 continue
             if source == PATTERN_SOURCE_INTERNET:
                 desc = dataclasses.replace(desc, translation_key="pattern_storm_3h_internet")
+        feature = _FEATURE_TOGGLE_MAP.get(desc.key)
+        if not desc.entity_registry_enabled_default and feature is not None and opts.get(feature):
+            # A selected feature is an explicit opt-in. Repair old integration
+            # defaults while preserving entities disabled by the user or entry.
+            desc = dataclasses.replace(desc, entity_registry_enabled_default=True)
+            registry = er.async_get(hass)
+            entity_id = registry.async_get_entity_id("sensor", DOMAIN, f"{entry.entry_id}_{desc.key}")
+            if entity_id is not None:
+                registry_entry = registry.async_get(entity_id)
+                if registry_entry is not None and registry_entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION:
+                    registry.async_update_entity(entity_id, disabled_by=None)
         filtered.append(desc)
 
     entities: list[SensorEntity] = [WSSensor(coordinator, entry, desc, prefix) for desc in filtered]
+    entities.append(WSDataStatusSensor(coordinator, entry, prefix, filtered))
 
     # Named indoor rooms: per-room temp-delta, relative/absolute humidity, CO2
     # and comfort sensors. Only metrics with the required sources are created.
@@ -429,6 +525,112 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         for st in stations:
             entities.append(WSRiverSensor(coordinator, entry, prefix, st))
             entities.append(WSRiverFlowSensor(coordinator, entry, prefix, st))
+
+    # v3.0.0: Weather Windows Decision Engine entities (created only when enabled)
+    ww_enabled = getattr(coordinator, "weather_windows_enabled", None)
+    if not isinstance(ww_enabled, bool):
+        ww_enabled = bool(opts.get(CONF_ENABLE_WEATHER_WINDOWS, entry.data.get(CONF_ENABLE_WEATHER_WINDOWS, False)))
+    if ww_enabled:
+        from homeassistant.util import dt as dt_util
+
+        from .weather_windows import WINDOW_STATUSES, resolve_profiles
+
+        def _parse_ts(val: Any):
+            if not val:
+                return None
+            parsed = dt_util.parse_datetime(str(val))
+            if parsed is not None and parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=dt_util.get_default_time_zone())
+            return parsed
+
+        profiles = getattr(coordinator, "weather_window_profiles", None)
+        if not isinstance(profiles, Mapping):
+            profiles = resolve_profiles(opts)
+
+        for pid, prof in profiles.items():
+            if not prof.enabled:
+                continue
+            placeholders = {"profile_name": prof.name} if pid == PROFILE_CUSTOM else None
+
+            # 1. Profile Status sensor
+            entities.append(
+                WSSensor(
+                    coordinator,
+                    entry,
+                    WSSensorDescription(
+                        key=f"window_{pid}_status",
+                        name=f"{prof.name} Status",
+                        translation_key=f"window_{pid}_status",
+                        translation_placeholders=placeholders,
+                        icon="mdi:calendar-clock",
+                        # Fixed states, so automations and the UI can offer them as choices
+                        device_class=SensorDeviceClass.ENUM,
+                        options=list(WINDOW_STATUSES),
+                        value_fn=lambda d, _pid=pid: (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("status"),
+                        attrs_fn=lambda d, _pid=pid: {
+                            "reasons": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("reasons_text", []),
+                            "reason_codes": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("reason_codes", []),
+                            "not_assessed_by_provider": (d.get(KEY_WEATHER_WINDOWS) or {})
+                            .get(_pid, {})
+                            .get("not_assessed_by_provider", []),
+                            "substituted_by": (d.get(KEY_WEATHER_WINDOWS) or {})
+                            .get(_pid, {})
+                            .get("data_quality", {})
+                            .get("substituted_by", {}),
+                            "gust_unavailable": (d.get(KEY_WEATHER_WINDOWS) or {})
+                            .get(_pid, {})
+                            .get("data_quality", {})
+                            .get("gust_unavailable", False),
+                            # No remaining-duration attribute: it would change every minute while a
+                            # window is open. next_start/next_end carry the window; the action
+                            # response still returns duration_h.
+                            "is_truncated": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("is_truncated", False),
+                            "horizon_hours": (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("horizon_hours", 0),
+                        },
+                    ),
+                    prefix,
+                )
+            )
+
+            # 2. Next window start (TIMESTAMP)
+            entities.append(
+                WSSensor(
+                    coordinator,
+                    entry,
+                    WSSensorDescription(
+                        key=f"window_{pid}_next_start",
+                        name=f"{prof.name} Next Start",
+                        translation_key=f"window_{pid}_next_start",
+                        translation_placeholders=placeholders,
+                        icon="mdi:play-circle-outline",
+                        device_class=SensorDeviceClass.TIMESTAMP,
+                        value_fn=lambda d, _pid=pid: _parse_ts(
+                            (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_start")
+                        ),
+                    ),
+                    prefix,
+                )
+            )
+
+            # 3. Next window end (TIMESTAMP)
+            entities.append(
+                WSSensor(
+                    coordinator,
+                    entry,
+                    WSSensorDescription(
+                        key=f"window_{pid}_next_end",
+                        name=f"{prof.name} Next End",
+                        translation_key=f"window_{pid}_next_end",
+                        translation_placeholders=placeholders,
+                        icon="mdi:stop-circle-outline",
+                        device_class=SensorDeviceClass.TIMESTAMP,
+                        value_fn=lambda d, _pid=pid: _parse_ts(
+                            (d.get(KEY_WEATHER_WINDOWS) or {}).get(_pid, {}).get("next_end")
+                        ),
+                    ),
+                    prefix,
+                )
+            )
 
     async_add_entities(entities)
 
@@ -630,6 +832,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_ZAMBRETTI_FORECAST: "zambretti_forecast",
             KEY_ZAMBRETTI_NUMBER: "zambretti_number",
             KEY_WIND_BEAUFORT: "wind_beaufort",
+            KEY_WIND_BEAUFORT_KEY: "wind_beaufort_description",
             KEY_WIND_QUADRANT: "wind_quadrant",
             KEY_WIND_DIR_SMOOTH_DEG: "wind_direction_smooth",
             KEY_CURRENT_CONDITION: "current_condition",
@@ -689,6 +892,9 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             # v0.9.0
             KEY_SOLAR_FORECAST_TODAY_KWH: "solar_forecast_today",
             KEY_SOLAR_FORECAST_TOMORROW_KWH: "solar_forecast_tomorrow",
+            KEY_SOLAR_LOCAL_TODAY_KWH: "solar_local_forecast_today",
+            KEY_SOLAR_LOCAL_TOMORROW_KWH: "solar_local_forecast_tomorrow",
+            KEY_SOLAR_LOCAL_REMAINING_KWH: "solar_local_forecast_remaining_today",
             KEY_ET0_PM_DAILY_MM: "et0_penman_monteith",
             # v1.2.0
             KEY_FOG_PROBABILITY: "fog_probability",
@@ -823,6 +1029,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             KEY_PATTERN_STORM_3H: "pattern_storm_3h",
             KEY_PATTERN_FORECAST_STATUS: "pattern_forecast_status",
             KEY_PATTERN_FORECAST_SKILL: "pattern_forecast_skill",
+            # v3.0
+            KEY_DATA_STATUS: "data_status",
         }
         if key in overrides:
             return overrides[key]
@@ -869,6 +1077,10 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         else:
             val = d.get(self._desc.key)
 
+        # Feels-like formula outside its range: show the air temperature instead of unknown
+        if val is None and self._desc.key in (d.get(KEY_FEELS_LIKE_AIR_TEMP) or ()):
+            val = d.get(KEY_NORM_TEMP_C)
+
         # Fall back to last-restored value for slow-warm-up sensors during startup
         if val is None and self._restored_value is not None and self._desc.key in self._RESTORE_KEYS:
             return self._restored_value
@@ -886,9 +1098,19 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         attrs = self._value_attributes
-        if self.native_value is None and "maturity" not in attrs:
+        native = self.native_value
+        if native is None and "maturity" not in attrs:
             for key, value in unknown_status(self._desc.key, self.coordinator, self.coordinator.data or {}).items():
                 attrs.setdefault(key, value)
+        elif self._desc.key in _FEELS_LIKE_NOTES:
+            out_of_range = self._desc.key in ((self.coordinator.data or {}).get(KEY_FEELS_LIKE_AIR_TEMP) or ())
+            attrs["formula_applies"] = not out_of_range
+            if out_of_range:
+                attrs["explanation"] = _FEELS_LIKE_NOTES[self._desc.key]
+        if native is None and "maturity" in attrs:
+            if not attrs.get("explanation"):
+                attrs.update(_PATTERN_FIRST_RUN)
+            attrs.setdefault("status_text", status_text(attrs.get("reason"), explanation=attrs.get("explanation")))
         return attrs
 
     @property
@@ -903,6 +1125,7 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
             alerts = d.get("_active_alerts", [])
             return {
                 "message": d.get(KEY_ALERT_MESSAGE, "All clear"),
+                "detail_message": d.get("_alert_detail_message"),
                 "icon": d.get("_alert_icon", "mdi:check-circle-outline"),
                 "color": d.get("_alert_color", "rgba(74,222,128,0.8)"),
                 "active_alerts": alerts,
@@ -911,6 +1134,8 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
         if self._desc.key == KEY_ALERT_MESSAGE:
             return {
                 "alert_state": d.get(KEY_ALERT_STATE, "clear"),
+                "detail_message": d.get("_alert_detail_message"),
+                "active_alerts": d.get("_active_alerts", []),
                 "icon": d.get("_alert_icon", "mdi:check-circle-outline"),
                 "color": d.get("_alert_color", "rgba(74,222,128,0.8)"),
             }
@@ -921,6 +1146,171 @@ class WSSensor(RestoreEntity, CoordinatorEntity, SensorEntity):
                 "alert_state": d.get(KEY_ALERT_STATE),
             }
         return {}
+
+
+# ---------------------------------------------------------------------------
+# v3.0.0 - Data Status: one place that says which sensors are empty and why
+# ---------------------------------------------------------------------------
+
+
+class WSDataStatusSensor(WSSensor):
+    """Say whether anything needs attention, and why other sensors are empty.
+
+    State is ``ok`` or ``attention``. Source problems and PV meter history problems
+    count as ``attention``; empty values with a normal reason are
+    listed under ``waiting``, and sensors this station's hardware or settings cannot
+    provide under ``not_on_this_station``.
+    """
+
+    _unrecorded_attributes = WSSensor._unrecorded_attributes | frozenset(
+        {"summary", "needs_attention", "waiting", "not_on_this_station"}
+    )
+    _PV_METER_PROBLEMS = {
+        "recorder_unavailable": "Local PV forecast needs the Recorder integration",
+        "statistics_unavailable": "Local PV forecast could not read energy meter statistics",
+        "no_statistics": "Local PV forecast has no statistics for the selected energy meters",
+        "not_an_energy_meter": "A selected PV meter does not report energy units",
+        "no_complete_days": "Local PV forecast has no day with sufficient coverage from all selected meters",
+    }
+
+    def __init__(self, coordinator, entry: ConfigEntry, prefix: str, watched: list[WSSensorDescription]):
+        super().__init__(
+            coordinator,
+            entry,
+            WSSensorDescription(
+                key=KEY_DATA_STATUS,
+                translation_key="data_status",
+                name="WS Data Status",
+                icon="mdi:list-status",
+                device_class=SensorDeviceClass.ENUM,
+                options=["ok", "attention"],
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            prefix,
+        )
+        self._watched = [desc for desc in watched if desc.key != KEY_DATA_STATUS]
+
+    @property
+    def native_value(self) -> str:
+        return "attention" if self._problems(self.coordinator.data or {}) else "ok"
+
+    def _problems(self, data: Mapping[str, Any]) -> list[str]:
+        problems = list(data.get(KEY_SOURCE_PROBLEMS) or [])
+        meter_problem = (data.get(KEY_SOLAR_LOCAL_INFO) or {}).get("meter_problem")
+        if explanation := self._PV_METER_PROBLEMS.get(meter_problem):
+            problems.append(explanation)
+        return problems
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        d = self.coordinator.data or {}
+        problems = self._problems(d)
+        waiting: dict[str, str] = {}
+        not_here = self._station_notes()
+        registry = er.async_get(self.hass) if self.hass is not None else None
+
+        for desc in self._watched:
+            entity_id = self._live_entity_id(registry, "sensor", desc.key)
+            if entity_id is None or self._value_of(desc, d) is not None:
+                continue
+            state = self.hass.states.get(entity_id) if self.hass is not None else None
+            if state is not None and state.state not in ("unknown", "unavailable"):
+                continue  # still showing a restored value
+            info = self._safe_attrs(desc, d)
+            if not info.get("explanation"):
+                info = dict(_PATTERN_FIRST_RUN) if "maturity" in info else unknown_status(desc.key, self.coordinator, d)
+            if info.get("reason") in _NOT_ON_STATION_REASONS:
+                if info.get("reason") == "missing_lightning_source" and "Lightning" in not_here:
+                    continue  # already covered by the family note
+                not_here[entity_id] = info["explanation"]
+            else:
+                waiting[entity_id] = info.get("explanation") or "Waiting for data."
+
+        for suffix, note in _EVENT_NOTES:
+            entity_id = self._live_entity_id(registry, "event", suffix)
+            state = self.hass.states.get(entity_id) if entity_id and self.hass is not None else None
+            if state is not None and state.state == "unknown":
+                waiting[entity_id] = note
+
+        if problems:
+            summary = "Needs attention: " + "; ".join(problems) + "."
+        else:
+            summary = "Everything is working."
+            if waiting:
+                summary += f" {len(waiting)} sensors are empty for a normal reason (see waiting)."
+            if not_here:
+                summary += f" {len(not_here)} are not available with this station's sensors (see not_on_this_station)."
+        return {
+            "summary": summary,
+            "needs_attention": problems,
+            "waiting": waiting,
+            "not_on_this_station": not_here,
+        }
+
+    def _live_entity_id(self, registry: Any, domain: str, key: str) -> str | None:
+        """Entity id of an enabled entity of this entry, or None."""
+        if registry is None:
+            return None
+        entity_id = registry.async_get_entity_id(domain, DOMAIN, f"{self._entry.entry_id}_{key}")
+        if entity_id is None:
+            return None
+        reg_entry = registry.async_get(entity_id)
+        if reg_entry is None or reg_entry.disabled_by is not None:
+            return None
+        return entity_id
+
+    @staticmethod
+    def _value_of(desc: WSSensorDescription, d: dict) -> Any:
+        if desc.value_fn is not None:
+            try:
+                val = desc.value_fn(d)
+            except Exception:
+                val = None
+        else:
+            val = d.get(desc.key)
+        if val is None and desc.key in (d.get(KEY_FEELS_LIKE_AIR_TEMP) or ()):
+            val = d.get(KEY_NORM_TEMP_C)
+        return val
+
+    @staticmethod
+    def _safe_attrs(desc: WSSensorDescription, d: dict) -> dict[str, Any]:
+        if desc.attrs_fn is None:
+            return {}
+        try:
+            return dict(desc.attrs_fn(d) or {})
+        except Exception:
+            return {}
+
+    def _station_notes(self) -> dict[str, str]:
+        """Feature families this station's hardware cannot provide, with what would."""
+        opts = {**self._entry.data, **self._entry.options}
+        sources = dict(getattr(self.coordinator, "sources", None) or {})
+        notes: dict[str, str] = {}
+        if not station_supports(KEY_CLEARNESS_INDEX, opts, sources):
+            notes["Clearness index and cloud cover"] = (
+                "Needs a solar radiation sensor (W/m²); illuminance (lux) is not accurate enough for these."
+            )
+        if opts.get(CONF_ENABLE_COMFORT_INDICES) and not station_supports(KEY_THSW_INDEX, opts, sources):
+            notes["THSW index"] = "Needs a solar radiation sensor (W/m²)."
+        if not station_supports(KEY_SOLAR_ENERGY_TODAY_WHM2, opts, sources):
+            note = "Needs a solar radiation sensor (W/m²)"
+            if sources.get(SRC_LUX):
+                note += ", or turn on the illuminance fallback to estimate them from your lux sensor"
+            notes["Solar energy, peak sun hours, net radiation and Penman-Monteith ET₀"] = note + "."
+        if opts.get(CONF_ENABLE_SOLAR_FORECAST) and not station_supports(KEY_SOLAR_LOCAL_TODAY_KWH, opts, sources):
+            notes["Local PV forecast"] = (
+                "Pick your PV energy meters (kWh) in the Solar Forecast settings to learn a forecast from your real yield."
+            )
+        if getattr(self.coordinator, "lightning_enabled", False) is True and not (
+            sources.get(SRC_LIGHTNING_COUNT)
+            or sources.get(SRC_LIGHTNING_DISTANCE)
+            or getattr(self.coordinator, "_blitzortung_sources", None)
+        ):
+            notes["Lightning"] = (
+                "No lightning detector is mapped and no Blitzortung integration was found, "
+                "so the lightning sensors stay empty."
+            )
+        return notes
 
 
 # ---------------------------------------------------------------------------

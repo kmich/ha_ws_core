@@ -30,6 +30,7 @@ import math
 import pathlib as _pathlib
 import time
 from collections import deque
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -39,7 +40,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_FINAL_WRITE, UnitOfTemperature
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -52,8 +53,9 @@ from .algorithms import (
     ZAMBRETTI_RAIN_PCT,
     ConditionHold,
     KalmanFilter,
+    aqi_color,
     aqi_level,
-    beaufort_description,
+    beaufort_key,
     calculate_absolute_humidity,
     calculate_air_density,
     calculate_apparent_temperature,
@@ -63,6 +65,7 @@ from .algorithms import (
     calculate_delta_t,
     calculate_dew_point,
     calculate_dominant_wind_direction,
+    calculate_european_aqi,
     calculate_ffdi,
     calculate_ffwi,
     calculate_freezing_level_m,
@@ -101,6 +104,8 @@ from .algorithms import (
     et0_hargreaves,
     et0_hourly_estimate,
     et0_penman_monteith,
+    european_aqi_color,
+    european_aqi_level,
     ffdi_danger_level,
     fog_probability,
     format_rain_display,
@@ -116,6 +121,7 @@ from .algorithms import (
     moon_phase_from_age,
     pressure_trend_arrow,
     pressure_trend_display,
+    resolve_aqi_scale,
     smooth_wind_direction,
     solar_elevation_deg,
     thunderstorm_risk_index,
@@ -128,8 +134,15 @@ from .algorithms import (
 from .const import (
     ALERT_DEBOUNCE_OFF_TICKS,
     ALERT_DEBOUNCE_ON_TICKS,
+    ALERT_HYSTERESIS_FREEZE_C,
+    ALERT_HYSTERESIS_RAIN_MMPH,
+    ALERT_HYSTERESIS_WIND_MS,
+    CLEARING_AFTER_RAIN_MIN_MM,
+    CLEARING_AFTER_RAIN_WINDOW_H,
+    COALESCE_BURST_DELAY_S,
     CONF_ALTITUDE_UNIT,
     CONF_AQI_INTERVAL_MIN,
+    CONF_AQI_SCALE,
     CONF_AWEKAS_INTERVAL_MIN,
     CONF_AWEKAS_PASSWORD,
     CONF_AWEKAS_USERNAME,
@@ -174,6 +187,7 @@ from .const import (
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_ENABLE_WEATHERCLOUD,
     CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
@@ -214,6 +228,7 @@ from .const import (
     CONF_SOLAR_PANEL_AZIMUTH,
     CONF_SOLAR_PANEL_TILT,
     CONF_SOLAR_PEAK_KW,
+    CONF_SOLAR_PV_ENERGY_ENTITIES,
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_SUPPRESS_NOTIFICATIONS,
@@ -242,6 +257,7 @@ from .const import (
     CONF_WU_STATION_ID,
     DEFAULT_ALTITUDE_UNIT,
     DEFAULT_AQI_INTERVAL_MIN,
+    DEFAULT_AQI_SCALE,
     DEFAULT_AWEKAS_INTERVAL_MIN,
     DEFAULT_CDD_BASE_C,
     DEFAULT_CHILL_HOUR_BASE_C,
@@ -277,6 +293,7 @@ from .const import (
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_WEATHER_WINDOWS,
     DEFAULT_ENABLE_WEATHERCLOUD,
     DEFAULT_ENABLE_WINDY,
     DEFAULT_ENABLE_WOW,
@@ -316,6 +333,7 @@ from .const import (
     DEFAULT_WINDY_INTERVAL_MIN,
     DEFAULT_WOW_INTERVAL_MIN,
     DEFAULT_WU_INTERVAL_MIN,
+    DOMAIN,
     DRIFT_MIN_SAMPLES,
     DRIFT_R_SQ_THRESH,
     DRIFT_SLOPE_HUMIDITY_PCT_H,
@@ -325,6 +343,7 @@ from .const import (
     DRIFT_STUCK_BUCKET_SAMPLES,
     DRIFT_STUCK_RATE_RANGE_MAX,
     DRIFT_WINDOW_SAMPLES,
+    ENTRY_REPAIR_ISSUES,
     ET0_RADIATION_SOURCE_ILLUMINANCE_ESTIMATE,
     ET0_RADIATION_SOURCE_SENSOR,
     FORECAST_AGREEMENT_ALIGNED_PP,
@@ -345,6 +364,7 @@ from .const import (
     # v0.7.0
     KEY_AQI,
     KEY_AQI_LEVEL,
+    KEY_AQI_SCALE,
     KEY_AUTO_CAL_BIAS_HUMIDITY,
     KEY_AUTO_CAL_BIAS_PRESSURE_HPA,
     KEY_AUTO_CAL_BIAS_TEMP_C,
@@ -383,6 +403,7 @@ from .const import (
     KEY_ET0_PM_PERIOD,
     KEY_ET0_PM_RADIATION_SOURCE,
     KEY_ET0_PM_REASON,
+    KEY_FEELS_LIKE_AIR_TEMP,
     KEY_FEELS_LIKE_C,
     KEY_FFDI,
     KEY_FFWI,
@@ -516,6 +537,7 @@ from .const import (
     KEY_SOLAR_FORECAST_TODAY_KWH,
     KEY_SOLAR_FORECAST_TOMORROW_KWH,
     KEY_SOLAR_LUX_FACTOR,
+    KEY_SOURCE_PROBLEMS,
     KEY_SPECIFIC_HUMIDITY,
     KEY_TEMP_ANOMALY_30D,
     KEY_TEMP_ANOMALY_90D,
@@ -547,9 +569,11 @@ from .const import (
     KEY_VPD,
     KEY_WBGT,
     KEY_WC_STATUS,
+    KEY_WEATHER_WINDOWS,
     KEY_WET_BULB_C,
     KEY_WIND_BEAUFORT,
     KEY_WIND_BEAUFORT_DESC,
+    KEY_WIND_BEAUFORT_KEY,
     KEY_WIND_CHILL,
     KEY_WIND_DIR_SMOOTH_DEG,
     KEY_WIND_DIR_VARIABILITY,
@@ -575,7 +599,8 @@ from .const import (
     PATTERN_HISTORY_DELAY_S,
     PRESSURE_HISTORY_INTERVAL_MIN,
     PRESSURE_HISTORY_SAMPLES,
-    RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK,
+    PROFILE_CUSTOM,
+    RAIN_EXPECTED_SOURCE_LOCAL_RAIN,
     RAIN_EXPECTED_SOURCE_NOWCAST,
     RAIN_RATE_PHYSICAL_CAP_MMPH,
     RAIN_RATE_WINDOW_H,
@@ -614,14 +639,15 @@ from .const import (
     VALID_PRESSURE_MIN_HPA,
     VALID_TEMP_MAX_C,
     VALID_TEMP_MIN_C,
+    WIND_FACTORS,
     WIND_SMOOTH_ALPHA,
-    ZAMBRETTI_FALLBACK_RAIN_THRESHOLD_PCT,
     issue_id_for_entry,
     normalize_indoor_rooms,
 )
 from .models import WsData
 from .pattern_runtime import PatternRuntime
-from .providers import get_provider
+from .providers import get_provider, get_provider_capabilities
+from .sensor_status import lightning_source_reporting
 from .uploaders import (
     _redact_secrets,
     async_upload_awekas,
@@ -632,6 +658,13 @@ from .uploaders import (
     async_upload_windy,
     async_upload_wow,
     async_upload_wunderground,
+)
+from .weather_windows import (
+    DEFAULT_PROFILES,
+    WeatherWindowsEngine,
+    apply_profile_overrides,
+    count_usable_hourly_horizon_h,
+    resolve_profiles,
 )
 
 try:
@@ -674,7 +707,6 @@ class WSStationRuntime:
     last_rain_total_mm: float | None = None
     last_rain_ts: Any | None = None
     last_rain_rate_filt: float = 0.0
-    last_rain_event_ts: Any | None = None
 
     # Pressure tracking
     pressure_history: deque = field(default_factory=lambda: deque(maxlen=PRESSURE_HISTORY_SAMPLES))
@@ -723,6 +755,12 @@ class WSStationRuntime:
 
 class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Keeps all derived values up to date."""
+
+    _debounce_handle: Any = None
+    _burst_debounce_delay_s: float = COALESCE_BURST_DELAY_S
+    weather_windows_enabled: bool = False
+    _weather_windows_engine: Any = None
+    _weather_windows_eval: dict[str, Any] = {}
 
     def __init__(
         self,
@@ -1013,6 +1051,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Air Quality + Pollen (Open-Meteo Air Quality API, single fetch)
         self.aqi_enabled = bool(_get(CONF_ENABLE_AIR_QUALITY, DEFAULT_ENABLE_AIR_QUALITY))
         self.aqi_interval_min = int(_get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
+        self.aqi_scale = str(_get(CONF_AQI_SCALE, DEFAULT_AQI_SCALE))
         self._aqi_cache: dict[str, Any] | None = None
 
         # Pollen (v0.3.0: now via Open-Meteo Air Quality API; piggybacks on AQI fetch)
@@ -1036,6 +1075,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.solar_panel_tilt = int(_get(CONF_SOLAR_PANEL_TILT, DEFAULT_SOLAR_PANEL_TILT))
         self.solar_interval_min = int(_get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN))
         self._solar_cache: dict[str, Any] | None = None
+        # v3.0.0 - Local PV forecast: Open-Meteo GTI scaled by this site's measured PV energy
+        self._solar_local: Any = None
+        _pv_meters = _get(CONF_SOLAR_PV_ENERGY_ENTITIES, []) or []
+        if isinstance(_pv_meters, str):
+            _pv_meters = [_pv_meters]
+        if self.solar_forecast_enabled and _pv_meters:
+            from .solar_local_runtime import SolarLocalRuntime
+
+            self._solar_local = SolarLocalRuntime(self, list(_pv_meters))
         self.et0_illuminance_fallback = bool(_get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK))
         self._solar_radiation_source: str | None = None
 
@@ -1092,15 +1140,29 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.pattern_enabled = bool(_get(CONF_ENABLE_PATTERN_FORECAST, DEFAULT_ENABLE_PATTERN_FORECAST))
         self._pattern: PatternRuntime | None = PatternRuntime(self) if self.pattern_enabled else None
 
+        # v3.0 Update coalescing and Weather Windows Decision Engine
+        self._debounce_handle: Any = None
+        self._burst_debounce_delay_s: float = COALESCE_BURST_DELAY_S
+        self.weather_windows_enabled = bool(_get(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS))
+        self.weather_window_profiles = resolve_profiles(self.entry_options)
+        self._weather_windows_engine: Any = None
+        self._weather_windows_eval: dict[str, Any] = {}
+
         # v1.8.4 Suppress HA Repairs notifications (issue #20)
         self.suppress_notifications = bool(_get(CONF_SUPPRESS_NOTIFICATIONS, DEFAULT_SUPPRESS_NOTIFICATIONS))
         # When source entities were first found missing (None while all exist)
         self._missing_sources_since: datetime | None = None
+        self._source_problem_since: datetime | None = None
 
         # Alert hysteresis: count consecutive ticks above/below threshold
         self._alert_debounce_raw: dict[str, int] = {}  # ticks above threshold
         self._alert_debounce_clear: dict[str, int] = {}  # ticks below threshold
         self._alert_active: dict[str, bool] = {}  # hysteresis state
+        self._alert_last_info: dict[str, dict[str, Any]] = {}
+        # Frost risk hysteresis & debounce state (issue #209)
+        self._frost_risk_state: str | None = None
+        self._frost_risk_pending_tier: str | None = None
+        self._frost_risk_pending_ticks: int = 0
 
         # Wind run accumulator - resets at local midnight (like rain_today)
         self._wind_run_km: float = 0.0
@@ -1271,10 +1333,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _fmt_wind(self, ms: float, digits: int = 1, with_unit: bool = True) -> str:
         """Format an m/s value in the configured wind unit."""
-        from .entity_descriptions import _WIND_FACTORS
-
         unit = self.wind_unit
-        text = f"{float(ms) * _WIND_FACTORS.get(unit, 1.0):.{digits}f}"
+        text = f"{float(ms) * WIND_FACTORS.get(unit, 1.0):.{digits}f}"
         return f"{text} {unit}" if with_unit else text
 
     def _fmt_rain_rate(self, mmph: float) -> str:
@@ -1371,6 +1431,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # (targets that already learned, or are waiting for a retry, are skipped).
             self._start_once(self._pattern.async_learn_history, PATTERN_HISTORY_DELAY_S, "ws_core_pattern_history")
 
+        if self._solar_local is not None:
+            await self._solar_local.async_load(entry_id)
+
         # Once per start, fill rain totals from the station's recorder statistics.
         from .history_backfill import async_backfill_from_statistics
 
@@ -1430,6 +1493,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._start_periodic(
                 self._async_fetch_solar_forecast, self.solar_interval_min * 60, "ws_core_solar_fetch", 30
             )
+        if self._solar_local is not None and has_location:
+            # After the forecast.solar fetch, so the first day-ahead snapshot can include it.
+            self._start_periodic(
+                self._solar_local.async_update, self.solar_interval_min * 60, "ws_core_solar_local_fetch", 40
+            )
         # Météo Vigilance: alerts rarely change faster than 30 min
         if self.vigilance_meteo_enabled and has_location:
             self._start_periodic(self._async_fetch_vigilance, 30 * 60, "ws_core_vigilance_fetch", 45)
@@ -1473,6 +1541,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _spawn(self, coro: Any, name: str) -> None:
         """Start a background task that is cancelled when the entry unloads."""
         task = self.hass.async_create_background_task(coro, name)
+        if not isinstance(task, asyncio.Future) and hasattr(coro, "close"):
+            coro.close()
         self._unsubs.append(task.cancel)
 
     def _create_bg_task(self, coro: Any) -> asyncio.Task[Any] | None:
@@ -1486,6 +1556,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             tasks = set()
             self._bg_tasks = tasks
         task = self.hass.async_create_task(coro)
+        if not isinstance(task, asyncio.Future) and hasattr(coro, "close"):
+            coro.close()
         if hasattr(task, "add_done_callback"):
             tasks.add(task)
             task.add_done_callback(tasks.discard)
@@ -1524,26 +1596,29 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_stop(self) -> None:
         self._stopped = True
+        self._cancel_debounce()
         for task in list(getattr(self, "_bg_tasks", ())):
             with contextlib.suppress(Exception):
                 task.cancel()
         if getattr(self, "_bg_tasks", None) is not None:
             self._bg_tasks.clear()
-        for u in self._unsubs:
+        for u in getattr(self, "_unsubs", ()):
             with contextlib.suppress(Exception):
                 u()
-        self._unsubs.clear()
+        if hasattr(self, "_unsubs"):
+            self._unsubs.clear()
         # Persist learning state one last time on clean shutdown
-        if self._learning_store is not None:
+        if getattr(self, "_learning_store", None) is not None:
             from .learning_state import async_save_learning
 
             await async_save_learning(self._learning_store, self._learning_state)
         # Preserve history and accumulators across an entry reload.
-        await self._async_save_history()
-        if self._pattern is not None:
+        if hasattr(self, "_async_save_history"):
+            await self._async_save_history()
+        if getattr(self, "_pattern", None) is not None:
             await self._pattern.async_save()
         # v2.0: remove MQTT Discovery entries on clean shutdown
-        if self.mqtt_enabled and self._mqtt_discovery_published:
+        if getattr(self, "mqtt_enabled", False) and getattr(self, "_mqtt_discovery_published", False):
             from .mqtt_publisher import async_unpublish_discovery
 
             with contextlib.suppress(Exception):
@@ -1553,6 +1628,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self.entry_options.get("prefix", "ws"),
                 )
 
+    def _cancel_debounce(self) -> None:
+        """Cancel any pending coalesced recompute timer."""
+        if self._debounce_handle is not None:
+            with contextlib.suppress(Exception):
+                self._debounce_handle()
+            self._debounce_handle = None
+
     async def async_reset_pattern_forecast(self) -> None:
         """Service hook (reset_learning_state, target pattern_forecast)."""
         if self._pattern is not None:
@@ -1560,11 +1642,39 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._start_once(self._pattern.async_learn_history, 5, "ws_core_pattern_history")
 
     @callback
-    def _handle_source_change(self, event) -> None:
-        self.async_set_updated_data(self._compute(sample=False))
+    def _handle_source_change(self, event=None) -> None:
+        """Handle sensor entity state change with burst coalescing."""
+        if event is None or getattr(self.hass, "loop", None) is None:
+            self._cancel_debounce()
+            self.async_set_updated_data(self._compute(sample=False))
+            return
+
+        # Prompt hazard handling: lightning events bypass debounce
+        eid = getattr(event, "data", {}).get("entity_id") if hasattr(event, "data") else None
+        is_hazard = bool(
+            eid and (eid == self.sources.get(SRC_LIGHTNING_COUNT) or eid == self.sources.get(SRC_LIGHTNING_DISTANCE))
+        )
+        if is_hazard:
+            self._cancel_debounce()
+            self.async_set_updated_data(self._compute(sample=False))
+            return
+
+        if self._debounce_handle is not None:
+            return  # Already scheduled to flush this burst
+
+        @callback
+        def _flush_coalesced(_now=None) -> None:
+            self._debounce_handle = None
+            if not self._stopped:
+                self.async_set_updated_data(self._compute(sample=False))
+
+        delay = float(getattr(self, "_burst_debounce_delay_s", COALESCE_BURST_DELAY_S))
+        self._debounce_handle = async_call_later(self.hass, delay, _flush_coalesced)
 
     @callback
     def _handle_tick(self, _now) -> None:
+        """Sample tick (advances stored accumulators). Cancels any pending burst flush."""
+        self._cancel_debounce()
         self.async_set_updated_data(self._compute(sample=True))
 
     async def _async_update_data(self) -> dict[str, Any]:
@@ -1986,6 +2096,14 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 solar_rad = self._get_solar_radiation()
                 if solar_rad is not None:
                     data[KEY_THSW_INDEX] = calculate_thsw_index(float(tc), float(rh), float(wind_ms), float(solar_rad))
+            # Formulas that ran but are outside their valid range. Their sensors show the
+            # air temperature (as Davis and NWS stations do); the data keys stay None so
+            # MQTT and exports still tell "not applicable" apart from a real index value.
+            data[KEY_FEELS_LIKE_AIR_TEMP] = [
+                key
+                for key in (KEY_HEAT_INDEX, KEY_WIND_CHILL, KEY_THW_INDEX, KEY_THSW_INDEX, KEY_HUMIDEX)
+                if key in data and data[key] is None
+            ]
             wet_bulb = data.get(KEY_WET_BULB_C)
             if wet_bulb is not None:
                 data[KEY_DELTA_T] = calculate_delta_t(float(tc), float(wet_bulb))
@@ -2023,6 +2141,24 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if getattr(self, "_temp_low_all_time", None) is not None:
             data[KEY_TEMP_LOW_ALL_TIME] = round(self._temp_low_all_time, 1)
 
+    def _local_period_keys(self) -> tuple[str, str, str, str]:
+        """Return cached (date_str, iso_week, month_key, year_key) for the current local calendar day."""
+        now_local = dt_util.now()
+        ymd = (now_local.year, now_local.month, now_local.day)
+        cached = getattr(self, "_cached_period_keys", None)
+        if cached is not None and cached[0] == ymd:
+            return cached[1]
+        y, m, d = ymd
+        iso_year, iso_week_num, _ = now_local.isocalendar()
+        keys = (
+            f"{y:04d}-{m:02d}-{d:02d}",
+            f"{iso_year:04d}-W{iso_week_num:02d}",
+            f"{y:04d}-{m:02d}",
+            f"{y:04d}",
+        )
+        self._cached_period_keys = (ymd, keys)
+        return keys
+
     def _update_temp_year_all_time(self, data: dict, tc: float | None) -> None:
         """Update yearly and all-time temperature high/low extremes (issue #124).
 
@@ -2031,7 +2167,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ``year_ref`` attribute on the yearly sensors). All-time extremes never
         reset automatically - they persist for the life of the config entry.
         """
-        year_key = dt_util.now().strftime("%Y")
+        year_key = self._local_period_keys()[3]
         if tc is None:
             self._publish_temp_year_all_time(data, year_key)
             return
@@ -2074,9 +2210,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         the ``week_ref`` attribute. Monthly extremes reset on the 1st,
         exposed as ``month_ref``.
         """
-        now_local = dt_util.now()
-        iso_week = now_local.strftime("%G-W%V")
-        month_key = now_local.strftime("%Y-%m")
+        _, iso_week, month_key, _ = self._local_period_keys()
         if tc is None:
             self._publish_temp_week_month(data, iso_week, month_key)
             return
@@ -2209,7 +2343,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if wind_ms is not None:
             bft = wind_speed_to_beaufort(float(wind_ms))
             data[KEY_WIND_BEAUFORT] = bft
-            data[KEY_WIND_BEAUFORT_DESC] = beaufort_description(bft)
+            data[KEY_WIND_BEAUFORT_DESC] = localize.beaufort(self.hass.config.language, bft)
+            data[KEY_WIND_BEAUFORT_KEY] = beaufort_key(bft)
 
         gust_hist = self._history_view(rt.gust_history_24h, now, gust_ms, sample)
         if gust_hist:
@@ -2255,9 +2390,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         automatically. A gust far above the wind of the same reading is a
         sensor glitch: the records keep their values and it sets none.
         """
-        now_local = dt_util.now()
-        month_key = now_local.strftime("%Y-%m")
-        year_key = now_local.strftime("%Y")
+        _, _, month_key, year_key = self._local_period_keys()
         if gust_ms is None:
             self._publish_gust_month_year_all_time(data, month_key, year_key)
             return
@@ -2313,10 +2446,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if rain_hist:
             data[KEY_RAIN_ACCUM_1H] = round(self._rain_accum_window_from_totals(rain_hist, now, 1.0), 1)
             data[KEY_RAIN_ACCUM_24H] = round(self._rain_accum_24h_from_totals(rain_hist), 1)
+            # Recent rain for the "clearing after rain" condition; the 24h history is
+            # persisted, so this survives a restart (issue #207).
+            data["_rain_recent_mm"] = self._rain_accum_window_from_totals(rain_hist, now, CLEARING_AFTER_RAIN_WINDOW_H)
 
         # Rain today - resets at local midnight (use local time, not UTC)
         rain_total_mm: float | None = data.get(KEY_NORM_RAIN_TOTAL_MM)
-        date_str = dt_util.now().strftime("%Y-%m-%d")
+        date_str, iso_week, month_key, year_key = self._local_period_keys()
         if date_str != self._rain_today_date:
             # Day rolled over - snapshot the day that just ended (with its final
             # rain total) so streak counters can evaluate the completed day
@@ -2337,16 +2473,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_rain_today_mm"] = round(self._rain_today_mm, 1)
         data[KEY_RAIN_TODAY_MM] = self._rain_today_mm
 
-        # Track last rain event timestamp (used by streak counters)
-        if float(rain_rate) > 0.0:
-            rt.last_rain_event_ts = now
-
         # v2.0 — Weekly / monthly / yearly rain accumulators
-        now_local = dt_util.now()
-        iso_week = now_local.strftime("%G-W%V")  # ISO 8601 week (Mon start)
-        month_key = now_local.strftime("%Y-%m")
-        year_key = now_local.strftime("%Y")
-
         # Weekly
         if iso_week != self._rain_this_week_isoweek:
             self._rain_this_week_mm = 0.0
@@ -2432,6 +2559,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if tc is None or rh is None:
             return "sunny" if is_day else "clear-night"
 
+        # Use measured accumulation so the filtered rate cannot turn counter noise
+        # into evidence of rain. Allow for roundoff when subtracting gauge totals.
+        recent_mm = data.get("_rain_recent_mm", 0.0)
+        rained_recently = recent_mm >= CLEARING_AFTER_RAIN_MIN_MM or math.isclose(
+            recent_mm, CLEARING_AFTER_RAIN_MIN_MM, abs_tol=1e-9
+        )
+
         condition = determine_current_condition(
             temp_c=float(tc),
             humidity=float(rh),
@@ -2448,6 +2582,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             sun_azimuth=sun_azimuth,
             is_day=is_day,
             current_hour=dt_util.now().hour,
+            rained_recently=bool(rained_recently),
+            illuminance_known=lux is not None,
         )
         condition = self.runtime.condition_hold.update(condition, time.monotonic())
         data[KEY_CURRENT_CONDITION] = condition
@@ -2513,8 +2649,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for row in daily
             if isinstance(row, dict) and (not row.get("date") or str(row["date"])[:10] >= today_str)
         ]
-        if daily and not valid_daily:
-            return {**fc, "daily": [], "hourly": []}
         return {**fc, "daily": valid_daily}
 
     def _compute_rain_probability(
@@ -2554,21 +2688,34 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             data[KEY_RAIN_PROBABILITY_COMBINED] = combined
 
+    @staticmethod
+    def _forecast_slot_utc(item: Mapping[str, Any], local_tz: Any) -> datetime | None:
+        utc_s = item.get("utc_datetime")
+        dt_s = item.get("datetime")
+        slot = dt_util.parse_datetime(str(utc_s)) if utc_s else None
+        if slot is None and dt_s:
+            slot = dt_util.parse_datetime(str(dt_s))
+        if slot is None:
+            return None
+        if slot.tzinfo is None:
+            slot = slot.replace(tzinfo=local_tz)
+        return slot.astimezone(UTC)
+
     def _compute_forecast_agreement(self, data: dict, now: Any = None) -> None:
-        """Compare Zambretti local outlook vs Open-Meteo precip probability.
+        """Compare Zambretti 6-12h local outlook vs forecast provider precip probability.
 
         Derives an implied rain likelihood from the Z-number (using the
-        ZAMBRETTI_RAIN_PCT lookup table) and compares it to Open-Meteo's
-        daily precipitation_probability for today.  The difference drives a
-        three-state agreement sensor:
+        ZAMBRETTI_RAIN_PCT lookup table) and compares it to the forecast
+        provider's peak hourly precipitation_probability over the next 12 hours
+        when available, falling back to today's daily precipitation_probability.
+        The difference drives a three-state agreement sensor:
           • aligned   - difference < 20 pp  (both sources agree)
           • diverging - difference 20-40 pp (moderate disagreement)
-          • conflict  - difference > 40 pp  (sources fundamentally disagree)
-
-        When sources conflict, forecasts should be treated with lower
-        confidence; the discrepancy itself is often meaningful (e.g. a
-        rapidly-falling barometer that the NWP model hasn't captured yet).
+          • conflict  - difference >= 40 pp (sources fundamentally disagree)
         """
+        data.pop("_forecast_agreement_reason", None)
+        data.pop("_forecast_agreement_basis", None)
+
         z_number = data.get(KEY_ZAMBRETTI_NUMBER)
         if z_number is None:
             return
@@ -2581,15 +2728,53 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (TypeError, ValueError):
             return
 
-        now = now or dt_util.utcnow()
-        today_row, _ = self._forecast_validity(now)
-        if not today_row:
+        if not getattr(self, "forecast_enabled", True):
             return
-        api_precip_prob = today_row.get("precip_prob")
+        now = now or dt_util.utcnow()
+        published_fc = self._published_forecast(getattr(self, "_forecast_cache", None), now)
+        if published_fc is None:
+            return
+
+        local_tz = dt_util.as_local(now).tzinfo or dt_util.get_default_time_zone()
+        now_utc = (
+            dt_util.as_utc(now)
+            if getattr(now, "tzinfo", None) is not None
+            else now.replace(tzinfo=local_tz).astimezone(UTC)
+        )
+        horizon_end = now_utc + timedelta(hours=12)
+
+        hourly_probs: list[float] = []
+        has_future_hourly = False
+        for item in published_fc.get("hourly") or []:
+            if not isinstance(item, Mapping):
+                continue
+            slot_utc = self._forecast_slot_utc(item, local_tz)
+            if slot_utc is None or slot_utc + timedelta(hours=1) <= now_utc or slot_utc >= horizon_end:
+                continue
+            has_future_hourly = True
+            pp = item.get("precip_prob")
+            if pp is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    hourly_probs.append(float(pp))
+
+        today_row, _ = self._forecast_validity(now)
+        api_precip_prob: float | None = None
+        basis: str | None = None
+        if hourly_probs:
+            api_precip_prob = max(hourly_probs)
+            basis = "hourly_12h"
+        elif today_row is not None and today_row.get("precip_prob") is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                api_precip_prob = float(today_row["precip_prob"])
+                basis = "daily"
+        else:
+            if today_row is not None or has_future_hourly:
+                data["_forecast_agreement_reason"] = "provider_missing_precip_prob"
+            return
+
         if api_precip_prob is None:
             return
 
-        api_precip_prob = float(api_precip_prob)
         delta = abs(z_rain_pct - api_precip_prob)
 
         if delta < FORECAST_AGREEMENT_ALIGNED_PP:
@@ -2603,6 +2788,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data["_forecast_agreement_z_rain_pct"] = z_rain_pct
         data["_forecast_agreement_api_precip_prob"] = round(api_precip_prob)
         data["_forecast_agreement_delta"] = round(delta)
+        data["_forecast_agreement_basis"] = basis
 
     def _compute_nowcast(self, data: dict) -> None:
         """Precipitation nowcast (Open-Meteo minutely_15), with staleness handling.
@@ -2610,9 +2796,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The cache is considered stale once older than NOWCAST_STALE_MULTIPLIER x
         the configured fetch interval. When fresh, blends the NWP buckets with
         the local rain-gauge rate for the first 30 minutes. When stale or never
-        fetched, falls back to a coarser rain-expected signal derived from the
-        local pressure-trend/Zambretti forecast (KEY_ZAMBRETTI_NUMBER) instead of
-        silently reusing an old NWP value or leaving the entity unavailable.
+        fetched, the rain-expected flag confirms rain detected by the local
+        gauge. With a dry gauge the flag stays unknown until the forecast is fresh.
         KEY_RAIN_EXPECTED_SOURCE tags which path produced the current value.
         """
         nc = self._nowcast_cache
@@ -2683,9 +2868,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             # Open-Meteo nowcast has failed or gone stale (never fetched, or
             # older than NOWCAST_STALE_MULTIPLIER x the fetch interval).
-            # Fall back to the coarser local pressure-trend/Zambretti path
-            # instead of silently reusing a stale NWP value or going
-            # unavailable outright.
+            # Zambretti is a 6-12h barometric outlook and does not reflect
+            # 60-minute rain; only report True when the local rain gauge is
+            # already detecting rain, otherwise leave unknown.
             data[KEY_RAIN_NEXT_60MIN] = None
             data[KEY_MINUTES_UNTIL_RAIN] = None
             data[KEY_MINUTES_UNTIL_DRY] = None
@@ -2693,23 +2878,15 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["_nowcast_peak_rate_mmph"] = None
             data["_nowcast_raining_now"] = None
 
-            z_idx = None
-            z_number = data.get(KEY_ZAMBRETTI_NUMBER)
-            if z_number is not None:
-                with contextlib.suppress(TypeError, ValueError):
-                    candidate = int(z_number) - 1
-                    if 0 <= candidate < len(ZAMBRETTI_RAIN_PCT):
-                        z_idx = candidate
-
-            if z_idx is not None:
-                z_rain_pct = ZAMBRETTI_RAIN_PCT[z_idx]
-                data[KEY_RAIN_EXPECTED_1H] = z_rain_pct >= ZAMBRETTI_FALLBACK_RAIN_THRESHOLD_PCT
+            local_rate = float(data.get(KEY_RAIN_RATE_FILT) or 0.0)
+            if local_rate >= 0.1:
+                data[KEY_RAIN_EXPECTED_1H] = True
+                data[KEY_RAIN_EXPECTED_SOURCE] = RAIN_EXPECTED_SOURCE_LOCAL_RAIN
                 data[KEY_NOWCAST_CONFIDENCE] = "low"
-                data[KEY_RAIN_EXPECTED_SOURCE] = RAIN_EXPECTED_SOURCE_LOCAL_FALLBACK
             else:
-                # Neither a fresh nowcast nor a Zambretti reading is available.
                 data[KEY_RAIN_EXPECTED_1H] = None
                 data[KEY_RAIN_EXPECTED_SOURCE] = None
+                data[KEY_NOWCAST_CONFIDENCE] = None
 
     def _compute_degree_days(
         self, data: dict, now: Any, tc: float | None, dew_c: float | None, rh: float | None, sample: bool = True
@@ -3655,6 +3832,34 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._blitzortung_sources[SRC_LIGHTNING_AZIMUTH] = eid
                 _LOGGER.debug("Blitzortung lightning azimuth auto-detected: %s", eid)
 
+    def _restore_last_strike_ts(self, now: Any) -> Any:
+        """Time of the last strike from the lightning event entity's restored state, or None.
+
+        Sets ``_lightning_strike_restored`` once the event entity has a state (a time or
+        "unknown"), so the lookup stops; while it is still loading it is retried.
+        """
+        from homeassistant.helpers import entity_registry as er  # local import to avoid circular
+
+        entry_id = self.entry_data.get("entry_id") if isinstance(getattr(self, "entry_data", None), dict) else None
+        if not entry_id or self.hass is None:
+            self._lightning_strike_restored = True
+            return None
+        entity_id = er.async_get(self.hass).async_get_entity_id("event", DOMAIN, f"{entry_id}_lightning_event")
+        state = self.hass.states.get(entity_id) if entity_id else None
+        if entity_id is None:
+            self._lightning_strike_restored = True
+            return None
+        if state is None or state.state == "unavailable":
+            return None  # not loaded yet: try again on the next update
+        self._lightning_strike_restored = True
+        when = dt_util.parse_datetime(state.state) if isinstance(state.state, str) else None
+        if when is None or when.tzinfo is None:
+            return None
+        try:
+            return when if when <= now else None
+        except TypeError:
+            return None
+
     def _compute_lightning(self, data: dict, now: Any) -> None:
         """Derive lightning sensors from optional strike count + distance inputs.  (v2.0)"""
         if not self.lightning_enabled:
@@ -3676,10 +3881,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass,
             self.sources.get(SRC_LIGHTNING_COUNT) or self._blitzortung_sources.get(SRC_LIGHTNING_COUNT),
         )
-        dist_raw = self._num(
-            self.hass,
-            self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE),
-        )
+        dist_eid = self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE)
+        dist_raw = self._num(self.hass, dist_eid)
         azimuth_raw = self._num(
             self.hass,
             self.sources.get(SRC_LIGHTNING_AZIMUTH) or self._blitzortung_sources.get(SRC_LIGHTNING_AZIMUTH),
@@ -3693,6 +3896,17 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if dist_raw is not None:
             prox_km = self._lightning_proximity_km
             data[KEY_LIGHTNING_PROXIMITY] = "near" if float(dist_raw) <= prox_km else "clear"
+        elif dist_eid and lightning_source_reporting(self.hass, dist_eid):
+            # A working distance source that reports no strike means nothing nearby: "clear".
+            # A missing or unavailable one (detector offline, integration not loaded) stays
+            # unknown, since it could not report a strike either.
+            data[KEY_LIGHTNING_PROXIMITY] = "clear"
+
+        # The last strike time is in memory only; after a restart pick it up from the
+        # lightning event entity (which Home Assistant restores) so the clearance timer
+        # keeps counting instead of going unknown until the next strike.
+        if self._lightning_last_strike_ts is None and not getattr(self, "_lightning_strike_restored", False):
+            self._lightning_last_strike_ts = self._restore_last_strike_ts(now)
 
         # 1h rolling strike count (accumulates increases in cumulative counter)
         new_strikes = 0
@@ -3757,6 +3971,26 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return False
         return True
 
+    @staticmethod
+    def _fallback_alert_info(alert_type: str, lang: str) -> dict[str, Any]:
+        meta = {
+            "wind": ("warning", "mdi:weather-windy", "rgba(239,68,68,0.9)"),
+            "rain": ("warning", "mdi:weather-pouring", "rgba(59,130,246,0.9)"),
+            "freeze": ("advisory", "mdi:snowflake-alert", "rgba(147,197,253,0.9)"),
+            "lightning": ("warning", "mdi:weather-lightning", "rgba(220,38,38,0.95)"),
+        }
+        severity, icon, color = meta[alert_type]
+        title = localize.alert_title(lang, alert_type)
+        return {
+            "type": alert_type,
+            "severity": severity,
+            "message": title,
+            "detail": title,
+            "value": None,
+            "icon": icon,
+            "color": color,
+        }
+
     def _compute_health(self, data: dict, now: Any, missing: list, missing_entities: list, sample: bool = True) -> None:
         """Staleness, package status, data quality, configurable alerts."""
         stale = []
@@ -3798,6 +4032,28 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         model_inputs = (KEY_NORM_TEMP_C, KEY_NORM_HUMIDITY, KEY_NORM_PRESSURE_HPA, KEY_NORM_WIND_SPEED_MS)
         data["model_ready"] = data["source_healthy"] and all(data.get(key) is not None for key in model_inputs)
         data["model_readiness_reason"] = "ok" if data["model_ready"] else "source readings missing or stale"
+
+        # Real source problems for the Data Status sensor, reported only once they have
+        # lasted past the grace period so a restart does not raise a false alarm.
+        problems: list[str] = []
+        if missing:
+            problems.append("Required source not mapped: " + ", ".join(missing))
+        if missing_entities:
+            problems.append("Mapped source entity not found: " + ", ".join(missing_entities))
+        if unavailable:
+            problems.append("No valid reading from: " + ", ".join(unavailable))
+        if stale:
+            problems.append("No recent update from: " + ", ".join(stale))
+        if problems:
+            if getattr(self, "_source_problem_since", None) is None:
+                self._source_problem_since = now
+        else:
+            self._source_problem_since = None
+        lasting = (
+            self._source_problem_since is not None
+            and (now - self._source_problem_since).total_seconds() >= MISSING_SOURCE_GRACE_S
+        )
+        data[KEY_SOURCE_PROBLEMS] = problems if lasting else []
         ok = data["source_healthy"]
         parts: list[str] = []
         if missing:
@@ -3846,30 +4102,56 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         tc = data.get(KEY_NORM_TEMP_C)
 
         lang = self.hass.config.language
+        alert_last_info = getattr(self, "_alert_last_info", None)
+        if alert_last_info is None:
+            alert_last_info = {}
+            self._alert_last_info = alert_last_info
 
-        # Raw trigger flags \u2014 one per alert type (before hysteresis)
-        raw_triggers: dict[str, dict] = {}
-        if gust_ms is not None and float(gust_ms) >= gust_thr:
+        # Apply hysteresis deadband when already active to avoid threshold chatter.
+        wind_limit = (
+            max(0.1, gust_thr - ALERT_HYSTERESIS_WIND_MS)
+            if (self._alert_active.get("wind") and gust_thr > 0)
+            else gust_thr
+        )
+        rain_limit = (
+            max(0.1, rain_thr - ALERT_HYSTERESIS_RAIN_MMPH)
+            if (self._alert_active.get("rain") and rain_thr > 0)
+            else rain_thr
+        )
+        freeze_limit = (freeze_thr + ALERT_HYSTERESIS_FREEZE_C) if self._alert_active.get("freeze") else freeze_thr
+
+        # Raw trigger flags — one per alert type (before debounce)
+        raw_triggers: dict[str, dict[str, Any]] = {}
+        if gust_ms is not None and float(gust_ms) >= wind_limit:
+            val_str = self._fmt_wind(gust_ms)
             raw_triggers["wind"] = {
                 "type": "wind",
                 "severity": "warning",
-                "message": localize.alert(lang, "wind", v=self._fmt_wind(gust_ms)),
+                "message": localize.alert_title(lang, "wind"),
+                "detail": localize.alert(lang, "wind", v=val_str),
+                "value": val_str,
                 "icon": "mdi:weather-windy",
                 "color": "rgba(239,68,68,0.9)",
             }
-        if float(rain_rate) >= rain_thr:
+        if float(rain_rate) >= rain_limit:
+            val_str = self._fmt_rain_rate(rain_rate)
             raw_triggers["rain"] = {
                 "type": "rain",
                 "severity": "warning",
-                "message": localize.alert(lang, "rain", v=self._fmt_rain_rate(rain_rate)),
+                "message": localize.alert_title(lang, "rain"),
+                "detail": localize.alert(lang, "rain", v=val_str),
+                "value": val_str,
                 "icon": "mdi:weather-pouring",
                 "color": "rgba(59,130,246,0.9)",
             }
-        if tc is not None and float(tc) <= freeze_thr:
+        if tc is not None and float(tc) <= freeze_limit:
+            val_str = self._fmt_temp(tc)
             raw_triggers["freeze"] = {
                 "type": "freeze",
                 "severity": "advisory",
-                "message": localize.alert(lang, "freeze", v=self._fmt_temp(tc)),
+                "message": localize.alert_title(lang, "freeze"),
+                "detail": localize.alert(lang, "freeze", v=val_str),
+                "value": val_str,
                 "icon": "mdi:snowflake-alert",
                 "color": "rgba(147,197,253,0.9)",
             }
@@ -3890,7 +4172,9 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_triggers["lightning"] = {
                 "type": "lightning",
                 "severity": "warning",
-                "message": localize.alert(lang, "lightning"),
+                "message": localize.alert_title(lang, "lightning"),
+                "detail": localize.alert(lang, "lightning"),
+                "value": None,
                 "icon": "mdi:weather-lightning",
                 "color": "rgba(220,38,38,0.95)",
             }
@@ -3909,31 +4193,57 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._alert_debounce_raw[alert_type] = 0
                 if self._alert_debounce_clear[alert_type] >= ALERT_DEBOUNCE_OFF_TICKS:
                     self._alert_active[alert_type] = False
+                    alert_last_info.pop(alert_type, None)
 
         # Never delay a lightning warning behind the wind/rain debounce.
         self._alert_active["lightning"] = "lightning" in raw_triggers
+        if not self._alert_active["lightning"]:
+            alert_last_info.pop("lightning", None)
 
-        active_alerts: list[dict] = [
-            info for alert_type, info in raw_triggers.items() if self._alert_active.get(alert_type, False)
-        ]
+        for alert_type, info in raw_triggers.items():
+            alert_last_info[alert_type] = dict(info)
+
+        active_alerts: list[dict[str, Any]] = []
+        for alert_type in ("wind", "rain", "freeze", "lightning"):
+            if not self._alert_active.get(alert_type, False):
+                continue
+            if alert_type in raw_triggers:
+                active_alerts.append(dict(raw_triggers[alert_type]))
+            else:
+                entry = dict(alert_last_info.get(alert_type) or self._fallback_alert_info(alert_type, lang))
+                entry["message"] = localize.alert_title(lang, alert_type)
+                live_val: str | None = None
+                if alert_type == "wind" and gust_ms is not None:
+                    live_val = self._fmt_wind(gust_ms)
+                elif alert_type == "rain":
+                    live_val = self._fmt_rain_rate(rain_rate)
+                elif alert_type == "freeze" and tc is not None:
+                    live_val = self._fmt_temp(tc)
+                if live_val is not None:
+                    entry["value"] = live_val
+                    entry["detail"] = localize.alert(lang, alert_type, v=live_val)
+                active_alerts.append(entry)
 
         if active_alerts:
             # Highest severity wins for state; warnings > advisories
             has_warning = any(a["severity"] == "warning" for a in active_alerts)
             alert_state = "warning" if has_warning else "advisory"
             alert_msg = " | ".join(a["message"] for a in active_alerts)
+            alert_detail_msg = " | ".join(a["detail"] for a in active_alerts)
             # Use the highest-severity alert for icon/color
             primary = next((a for a in active_alerts if a["severity"] == "warning"), active_alerts[0])
             data["_alert_icon"] = primary["icon"]
             data["_alert_color"] = primary["color"]
         else:
             alert_state = "clear"
-            alert_msg = localize.alert(lang, "clear")
+            alert_msg = localize.alert_title(lang, "clear")
+            alert_detail_msg = localize.alert(lang, "clear")
             data["_alert_icon"] = "mdi:check-circle-outline"
             data["_alert_color"] = "rgba(74,222,128,0.8)"
 
         data[KEY_ALERT_STATE] = alert_state
         data[KEY_ALERT_MESSAGE] = alert_msg
+        data["_alert_detail_message"] = alert_detail_msg
         data["_active_alerts"] = active_alerts
 
         # Only report missing sources once they have stayed missing past the grace period
@@ -3949,8 +4259,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # HA Repairs integration: create/clear issues for missing sources
         if HAS_REPAIRS:
-            from .const import DOMAIN, ENTRY_REPAIR_ISSUES
-
             if self.suppress_notifications:
                 # User has disabled notifications - clear any existing issues immediately
                 for issue_key in ENTRY_REPAIR_ISSUES:
@@ -4168,31 +4476,118 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # v1.2.0 - GDD accumulation, streak counters
     # ------------------------------------------------------------------
 
-    def _compute_frost_risk(self, data: dict, tc: float | None) -> None:
+    _FROST_RISK_ORDER = ("no_risk", "unlikely", "probable", "high")
+
+    @staticmethod
+    def _frost_tier(min_temp: float, freeze_thr: float, offset: float = 0.0) -> str:
+        """Classify frost risk against thresh_freeze_c + 0 / +2 / +4 °C (plus offset)."""
+        if min_temp <= freeze_thr + offset:
+            return "high"
+        if min_temp <= freeze_thr + 2.0 + offset:
+            return "probable"
+        if min_temp <= freeze_thr + 4.0 + offset:
+            return "unlikely"
+        return "no_risk"
+
+    def _frost_forecast_min(self, data: dict, now: Any) -> float | None:
+        """Lowest forecast temperature over the next 12 h (hourly), else today's daily low."""
+        forecast = data.get(KEY_FORECAST)
+        if not isinstance(forecast, dict):
+            return None
+
+        hourly = forecast.get("hourly") or []
+        if hourly and now is not None:
+            local_tz = dt_util.as_local(now).tzinfo or dt_util.get_default_time_zone()
+            now_utc = (
+                dt_util.as_utc(now)
+                if getattr(now, "tzinfo", None) is not None
+                else now.replace(tzinfo=local_tz).astimezone(UTC)
+            )
+            horizon_end = now_utc + timedelta(hours=12)
+            temps: list[float] = []
+            for item in hourly:
+                if not isinstance(item, Mapping) or item.get("temp_c") is None:
+                    continue
+                slot_utc = self._forecast_slot_utc(item, local_tz)
+                if slot_utc is None or slot_utc + timedelta(hours=1) <= now_utc or slot_utc >= horizon_end:
+                    continue
+                with contextlib.suppress(TypeError, ValueError):
+                    temps.append(float(item["temp_c"]))
+            if temps:
+                return min(temps)
+
+        daily = forecast.get("daily") or []
+        if daily and isinstance(daily[0], Mapping):
+            # Normalized providers store the daily low as tmin_c; never fall back to a daily high.
+            raw_low = daily[0].get("tmin_c")
+            if raw_low is None:
+                raw_low = daily[0].get("templow")
+            if raw_low is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    return float(raw_low)
+        return None
+
+    def _compute_frost_risk(self, data: dict, tc: float | None, sample: bool = True, now: Any = None) -> None:
+        """Four-tier frost risk with hysteresis and tick debounce (issues #209 / #211).
+
+        Uses min(current air temperature, forecast low over the next 12 h) against
+        thresh_freeze_c + 0 / +2 / +4 °C. Leaving a tier needs the value to rise
+        ALERT_HYSTERESIS_FREEZE_C above its boundary; a change is adopted after
+        ALERT_DEBOUNCE_ON_TICKS (escalating) or ALERT_DEBOUNCE_OFF_TICKS
+        (de-escalating) consecutive 60 s sample ticks.
+        """
         if tc is None:
+            if sample:
+                self._frost_risk_pending_tier = None
+                self._frost_risk_pending_ticks = 0
             return
 
-        forecast = data.get(KEY_FORECAST)
-        forecast_min = None
-        if forecast and isinstance(forecast, dict) and forecast.get("daily"):
-            daily = forecast["daily"]
-            if len(daily) > 0:
-                forecast_min = daily[0].get("templow")
-                if forecast_min is None:
-                    forecast_min = daily[0].get("temperature")
+        freeze_thr = float(getattr(self, "entry_options", {}).get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
+        forecast_min = self._frost_forecast_min(data, now)
+        min_temp = float(tc) if forecast_min is None else min(float(tc), float(forecast_min))
 
-        min_temp = float(tc)
-        if forecast_min is not None:
-            min_temp = min(min_temp, float(forecast_min))
+        order = self._FROST_RISK_ORDER
+        cur_state = getattr(self, "_frost_risk_state", None)
+        candidate = self._frost_tier(min_temp, freeze_thr)
+        if cur_state in order and order.index(candidate) < order.index(cur_state):
+            hyst_tier = self._frost_tier(min_temp, freeze_thr, ALERT_HYSTERESIS_FREEZE_C)
+            candidate = order[min(order.index(cur_state), order.index(hyst_tier))]
 
-        if min_temp < 0:
-            data[KEY_FROST_RISK] = "high"
-        elif min_temp < 2:
-            data[KEY_FROST_RISK] = "probable"
-        elif min_temp < 4:
-            data[KEY_FROST_RISK] = "unlikely"
-        else:
-            data[KEY_FROST_RISK] = "no_risk"
+        if cur_state not in order:
+            cur_state = candidate
+            self._frost_risk_state = candidate
+            self._frost_risk_pending_tier = None
+            self._frost_risk_pending_ticks = 0
+        elif sample:
+            cur_idx = order.index(cur_state)
+            cand_idx = order.index(candidate)
+            if cand_idx == cur_idx:
+                self._frost_risk_pending_tier = None
+                self._frost_risk_pending_ticks = 0
+            else:
+                pending = self._frost_risk_pending_tier
+                pending_idx = order.index(pending) if pending is not None else cur_idx
+                # Only adopt a tier that every tick in the run supported.
+                if cand_idx > cur_idx:
+                    needed = ALERT_DEBOUNCE_ON_TICKS
+                    continuing = pending_idx > cur_idx
+                    target_idx = min(pending_idx, cand_idx) if continuing else cand_idx
+                else:
+                    needed = ALERT_DEBOUNCE_OFF_TICKS
+                    continuing = pending_idx < cur_idx
+                    target_idx = max(pending_idx, cand_idx) if continuing else cand_idx
+                self._frost_risk_pending_tier = order[target_idx]
+                self._frost_risk_pending_ticks = self._frost_risk_pending_ticks + 1 if continuing else 1
+                if self._frost_risk_pending_ticks >= needed:
+                    cur_state = order[target_idx]
+                    self._frost_risk_state = cur_state
+                    self._frost_risk_pending_tier = None
+                    self._frost_risk_pending_ticks = 0
+
+        data[KEY_FROST_RISK] = cur_state
+        data["_frost_risk_min_temp_c"] = round(min_temp, 1)
+        data["_frost_risk_forecast_min_c"] = round(float(forecast_min), 1) if forecast_min is not None else None
+        data["_frost_risk_threshold_c"] = round(freeze_thr, 1)
 
     def _compute_streaks(self, data: dict, now: Any) -> None:
         """Update dry/heat/frost streak counters (RestoreEntity-backed in v0.3.0).
@@ -4952,8 +5347,6 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         and leave that state untouched, so its cadence never depends on how
         often sensors report.
         """
-        import time
-
         t0 = time.monotonic()
         data: WsData = WsData()
         now = dt_util.utcnow()
@@ -5068,7 +5461,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_FORECAST_TILES] = self._build_forecast_tiles(published_fc["daily"])
 
         # Frost risk
-        self._compute_frost_risk(data, tc)
+        self._compute_frost_risk(data, tc, sample=sample, now=now)
 
         # Sea surface temperature
         if self.sea_temp_enabled and self._sea_temp_cache:
@@ -5113,6 +5506,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             aq = self._aqi_cache
             data[KEY_AQI] = aq.get("aqi")
             data[KEY_AQI_LEVEL] = aq.get("aqi_level")
+            data[KEY_AQI_SCALE] = aq.get("aqi_scale")
+            data["_aqi_color"] = aq.get("aqi_color")
+            data["_aqi_source"] = aq.get("aqi_source")
+            data["_aqi_missing_pollutants"] = aq.get("missing_pollutants")
+            data["_aqi_so2"] = aq.get("so2")
             data[KEY_PM2_5] = aq.get("pm2_5")
             data[KEY_PM10] = aq.get("pm10")
             data[KEY_NO2] = aq.get("no2")
@@ -5183,6 +5581,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_SOLAR_FORECAST_TODAY_KWH] = sol.get("today_kwh")
             data[KEY_SOLAR_FORECAST_TOMORROW_KWH] = sol.get("tomorrow_kwh")
             data[KEY_SOLAR_FORECAST_STATUS] = sol.get("status", "OK")
+        if self._solar_local is not None:
+            self._solar_local.apply(data, now)
 
         # --- v1.5.0 wind run, chill hours, clearness index ---
         if self.comfort_indices_enabled:
@@ -5190,12 +5590,300 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._compute_chill_hours(data, now)
             self._compute_clearness_and_cloud(data)
 
-        self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
-
         # v2.0: fire HA Event entities for weather transitions
         self._fire_ws_events(data)
 
+        # v3.0: Weather Windows Decision Engine evaluation
+        self._compute_weather_windows(data, now)
+
+        self.runtime.last_compute_ms = round((time.monotonic() - t0) * 1000, 1)
+
         return data
+
+    def _effective_forecast_coords(self) -> tuple[float | None, float | None]:
+        """Return (lat, lon) using configured forecast coordinates or HA config fallback."""
+        lat = getattr(self, "forecast_lat", None)
+        lon = getattr(self, "forecast_lon", None)
+        hass_cfg = getattr(getattr(self, "hass", None), "config", None)
+        if lat is None and hass_cfg is not None:
+            raw_lat = getattr(hass_cfg, "latitude", None)
+            if isinstance(raw_lat, (int, float)) and not isinstance(raw_lat, bool):
+                lat = float(raw_lat)
+        if lon is None and hass_cfg is not None:
+            raw_lon = getattr(hass_cfg, "longitude", None)
+            if isinstance(raw_lon, (int, float)) and not isinstance(raw_lon, bool):
+                lon = float(raw_lon)
+        if (
+            not isinstance(lat, (int, float))
+            or isinstance(lat, bool)
+            or not isinstance(lon, (int, float))
+            or isinstance(lon, bool)
+        ):
+            return None, None
+        return float(lat), float(lon)
+
+    def _weather_windows_display_prefs(self) -> dict[str, str]:
+        """Resolve validated language and display units for weather-window text."""
+        hass = getattr(self, "hass", None)
+        raw_lang = getattr(getattr(hass, "config", None), "language", None)
+        lang = raw_lang if isinstance(raw_lang, str) and raw_lang else "en"
+        t_unit = getattr(self, "temp_unit", None)
+        temp_u = t_unit if isinstance(t_unit, str) and t_unit in ("°C", "°F") else "°C"
+        r_unit = getattr(self, "rain_unit", None)
+        rain_u = r_unit if isinstance(r_unit, str) and r_unit in ("mm", "in") else "mm"
+        w_conf = getattr(self, "_wind_unit_conf", "auto")
+        if w_conf == "auto":
+            wind_u = "mph" if self._is_imperial() else "km/h"
+        else:
+            w_val = getattr(self, "wind_unit", None)
+            wind_u = w_val if isinstance(w_val, str) and w_val in ("km/h", "m/s", "mph", "kn") else "km/h"
+        return {"language": lang, "temp_unit": temp_u, "wind_unit": wind_u, "rain_unit": rain_u}
+
+    def _live_weather_windows_inputs(self, data: Mapping[str, Any], now: datetime) -> dict[str, Any]:
+        """Return shallow current-observation view with stale or unavailable gust/rain suppressed."""
+        stale_list = list(data.get("_stale_sources") or ())
+        hass = getattr(self, "hass", None)
+        sources = getattr(self, "sources", None) or {}
+        if hass is not None and isinstance(sources, Mapping):
+            gust_eid = sources.get(SRC_GUST)
+            if gust_eid:
+                gust_state = hass.states.get(gust_eid)
+                if gust_state is not None and (
+                    self._num(hass, gust_eid) is None or self._source_is_stale(SRC_GUST, now)
+                ):
+                    stale_list.append(SRC_GUST)
+            rain_eid = sources.get(SRC_RAIN_TOTAL)
+            if rain_eid:
+                rain_state = hass.states.get(rain_eid)
+                rain_rate_val = data.get(KEY_RAIN_RATE_FILT)
+                is_stale_raining = (
+                    isinstance(rain_rate_val, (int, float))
+                    and float(rain_rate_val) > 0.05
+                    and self._source_is_stale(SRC_RAIN_TOTAL, now)
+                )
+                if rain_state is not None and (self._num(hass, rain_eid) is None or is_stale_raining):
+                    stale_list.append(SRC_RAIN_TOTAL)
+        if not stale_list:
+            return data if isinstance(data, dict) else dict(data)
+        out = dict(data)
+        out["_stale_sources"] = stale_list
+        return out
+
+    def _get_weather_windows_engine(self, coords: tuple[float | None, float | None] | None = None):
+        """Return or initialize the WeatherWindowsEngine using resolved station profiles."""
+        profiles = getattr(self, "weather_window_profiles", None)
+        if not isinstance(profiles, Mapping):
+            profiles = resolve_profiles(getattr(self, "entry_options", None))
+        eff_lat, eff_lon = self._effective_forecast_coords() if coords is None else coords
+        lat = float(eff_lat if eff_lat is not None else 0.0)
+        lon = float(eff_lon if eff_lon is not None else 0.0)
+        elev = float(getattr(self, "elevation_m", 0.0) or 0.0)
+        prefs = self._weather_windows_display_prefs()
+        engine = self._weather_windows_engine
+        if engine is None:
+            engine = WeatherWindowsEngine(
+                lat=lat,
+                lon=lon,
+                elevation_m=elev,
+                profiles=profiles,
+                **prefs,
+            )
+            self._weather_windows_engine = engine
+        else:
+            engine.lat = lat
+            engine.lon = lon
+            engine.elevation_m = elev
+            engine.profiles = profiles if type(profiles) is dict else dict(profiles)
+            engine.language = prefs["language"]
+            engine.temp_unit = prefs["temp_unit"]
+            engine.wind_unit = prefs["wind_unit"]
+            engine.rain_unit = prefs["rain_unit"]
+        return engine
+
+    def _compute_weather_windows(self, data: dict, now: Any) -> None:
+        """Evaluate enabled activity profiles for the next 24 hours (v3.0)."""
+        if not getattr(self, "weather_windows_enabled", DEFAULT_ENABLE_WEATHER_WINDOWS):
+            return
+
+        eff_lat, eff_lon = self._effective_forecast_coords()
+        if eff_lat is None or eff_lon is None:
+            return
+
+        fc = data.get(KEY_FORECAST)
+        hourly = fc.get("hourly") if fc else None
+        engine = self._get_weather_windows_engine((eff_lat, eff_lon))
+        local_now = dt_util.as_local(now)
+        live_current = self._live_weather_windows_inputs(data, now)
+        eval_dict = engine.evaluate_profiles(
+            [prof for prof in engine.profiles.values() if prof.enabled],
+            hourly,
+            current_data=live_current,
+            now=local_now,
+        )
+
+        self._weather_windows_eval = eval_dict
+        data[KEY_WEATHER_WINDOWS] = eval_dict
+
+    def get_weather_windows_evaluation(
+        self, profile_id: str | None = None, custom_limits: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Return structured weather windows response for actions (SupportsResponse.ONLY)."""
+        engine = self._get_weather_windows_engine()
+        data = self.data or {}
+        now = dt_util.now()
+        now_utc = now.astimezone(UTC) if now.tzinfo is not None else dt_util.as_utc(now)
+        eff_lat, eff_lon = self._effective_forecast_coords()
+        if eff_lat is None or eff_lon is None:
+            hourly: list[dict[str, Any]] = []
+        else:
+            raw_fc = data.get(KEY_FORECAST)
+            fc = (
+                (self._published_forecast(raw_fc, now_utc) or {})
+                if hasattr(self, "_published_forecast")
+                else (raw_fc or {})
+            )
+            hourly = fc.get("hourly") or []
+
+        # Reject unknown profile_id before applying custom overrides
+        if profile_id is not None and profile_id not in engine.profiles:
+            raise ValueError(f"Unknown profile '{profile_id}'. Available profiles: {', '.join(engine.profiles)}")
+
+        live_current = self._live_weather_windows_inputs(data, now_utc)
+
+        # If custom limits provided, apply partial overrides onto the selected base profile
+        if custom_limits:
+            base_profile = (
+                engine.profiles[profile_id]
+                if profile_id
+                else (engine.profiles.get(PROFILE_CUSTOM) or DEFAULT_PROFILES[PROFILE_CUSTOM])
+            )
+            target_profile = apply_profile_overrides(
+                base_profile,
+                custom_limits,
+                profile_id=base_profile.profile_id,
+            )
+            res = engine.evaluate_profile(
+                target_profile, hourly, current_data=live_current, now=now, update_live_hold=False
+            )
+            return res.to_dict()
+
+        if profile_id:
+            prof = engine.profiles[profile_id]
+            res = engine.evaluate_profile(prof, hourly, current_data=live_current, now=now, update_live_hold=False)
+            return res.to_dict()
+
+        # Return all enabled profiles
+        return engine.evaluate_profiles(
+            [prof for prof in engine.profiles.values() if prof.enabled],
+            hourly,
+            current_data=live_current,
+            now=now,
+            update_live_hold=False,
+        )
+
+    def get_station_summary(self) -> dict[str, Any]:
+        """Return concise, deterministic summary for voice/Assist actions (SupportsResponse.ONLY)."""
+        data = self.data or {}
+        now = dt_util.now()
+        now_utc = now.astimezone(UTC) if now.tzinfo is not None else dt_util.as_utc(now)
+        pattern = getattr(self, "_pattern", None)
+        active_alerts = list(data.get("_active_alerts") or [])
+
+        fc_enabled = bool(getattr(self, "forecast_enabled", True))
+        provider_id = self.forecast_provider if fc_enabled else None
+        fc_expired = False
+        if provider_id:
+            rt = getattr(self, "runtime", None)
+            last_fetch = getattr(rt, "last_forecast_fetch", None) if rt is not None else None
+            if last_fetch is None:
+                fc_expired = True
+            else:
+                last_fetch_utc = (
+                    last_fetch.astimezone(UTC)
+                    if getattr(last_fetch, "tzinfo", None) is not None
+                    else dt_util.as_utc(last_fetch)
+                )
+                max_age_s = max(FORECAST_CACHE_MAX_AGE_S, int(getattr(self, "forecast_interval_min", 30)) * 60 * 6)
+                fc_expired = (now_utc - last_fetch_utc).total_seconds() > max_age_s
+
+        raw_fc = data.get(KEY_FORECAST)
+        published_fc = (
+            self._published_forecast(raw_fc, now_utc)
+            if (not fc_expired and hasattr(self, "_published_forecast"))
+            else (None if fc_expired else raw_fc)
+        )
+
+        windows_summary: dict[str, dict[str, Any]] = {}
+        if not fc_expired:
+            for pid, win in (data.get(KEY_WEATHER_WINDOWS) or {}).items():
+                if not isinstance(win, Mapping):
+                    continue
+                end_dt = dt_util.parse_datetime(str(win["next_end"])) if win.get("next_end") else None
+                if end_dt is None and win.get("next_start") and win.get("duration_h") is not None:
+                    start_dt = dt_util.parse_datetime(str(win["next_start"]))
+                    if start_dt is not None:
+                        try:
+                            end_dt = start_dt + timedelta(hours=float(win["duration_h"]))
+                        except (TypeError, ValueError):
+                            end_dt = None
+                if end_dt is not None:
+                    end_dt_utc = end_dt.astimezone(UTC) if end_dt.tzinfo is not None else dt_util.as_utc(end_dt)
+                    if end_dt_utc <= now_utc:
+                        continue
+                win_summary: dict[str, Any] = {
+                    "status": win.get("status"),
+                    "next_start": win.get("next_start"),
+                    "duration_h": win.get("duration_h"),
+                    "remaining_h": win.get("remaining_h"),
+                    "reasons": win.get("reasons_text", [])[:1],
+                }
+                if win.get("not_assessed_by_provider"):
+                    win_summary["not_assessed_by_provider"] = list(win["not_assessed_by_provider"])
+                windows_summary[pid] = win_summary
+
+        return {
+            "entry_id": self.entry_data.get("entry_id", "station"),
+            "prefix": self.entry_options.get("prefix", "ws"),
+            "evaluated_at": now.astimezone(UTC).isoformat(),
+            "elevation_m": getattr(self, "elevation_m", 0.0),
+            "current_conditions": {
+                "temperature_c": data.get(KEY_NORM_TEMP_C),
+                "humidity_pct": data.get(KEY_NORM_HUMIDITY),
+                "dew_point_c": data.get(KEY_DEW_POINT_C),
+                "feels_like_c": data.get(KEY_FEELS_LIKE_C),
+                "pressure_hpa": data.get(KEY_NORM_PRESSURE_HPA),
+                "pressure_trend_3h_hpa": data.get(KEY_PRESSURE_TREND_HPAH),
+                "pressure_trend_display": data.get(KEY_PRESSURE_TREND_DISPLAY),
+                "wind_speed_ms": data.get(KEY_NORM_WIND_SPEED_MS),
+                "wind_gust_ms": data.get(KEY_NORM_WIND_GUST_MS),
+                "wind_direction_deg": data.get(KEY_NORM_WIND_DIR_DEG),
+                "rain_rate_mmph": data.get(KEY_RAIN_RATE_FILT),
+                "rain_today_mm": data.get(KEY_RAIN_TODAY_MM),
+                "condition": data.get(KEY_CURRENT_CONDITION),
+                "uv_index": data.get(KEY_UV),
+                "solar_radiation_wm2": (
+                    self._get_solar_radiation()
+                    if hasattr(self, "_get_solar_radiation") and getattr(self, "hass", None) is not None
+                    else None
+                ),
+            },
+            "daily_extremes": {
+                "temp_high_24h_c": data.get(KEY_TEMP_HIGH_24H),
+                "temp_low_24h_c": data.get(KEY_TEMP_LOW_24H),
+                "gust_max_24h_ms": data.get(KEY_WIND_GUST_MAX_24H),
+            },
+            "active_alerts": active_alerts,
+            "forecast_validity": {
+                "provider": provider_id,
+                "is_expired": fc_expired,
+                "hourly_horizon_h": (
+                    0 if fc_expired else count_usable_hourly_horizon_h((published_fc or {}).get("hourly"), now)
+                ),
+                "capabilities": get_provider_capabilities(provider_id).to_dict() if provider_id else None,
+            },
+            "pattern_forecast_maturity": pattern.summary() if pattern is not None else None,
+            "weather_windows": windows_summary,
+        }
 
     def _compute_daily_pm(self, data: dict, now: Any) -> None:
         """Publish FAO-56 PM only for one covered local calendar day."""
@@ -5349,8 +6037,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if not self.forecast_enabled or getattr(self, "_stopped", False):
                 return
             rt.last_forecast_attempt = dt_util.utcnow()
-            lat = self.forecast_lat or float(self.hass.config.latitude)
-            lon = self.forecast_lon or float(self.hass.config.longitude)
+            eff_lat, eff_lon = self._effective_forecast_coords()
+            if eff_lat is None or eff_lon is None:
+                return
+            lat, lon = eff_lat, eff_lon
 
             session = async_get_clientsession(self.hass)
             is_ha_entity = self.forecast_provider == FORECAST_PROVIDER_HA_ENTITY
@@ -5823,7 +6513,18 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Build params depending on what's enabled
         current_params = []
         if self.aqi_enabled:
-            current_params.extend(["pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide", "ozone"])
+            current_params.extend(
+                [
+                    "pm10",
+                    "pm2_5",
+                    "carbon_monoxide",
+                    "nitrogen_dioxide",
+                    "ozone",
+                    "sulphur_dioxide",
+                    "european_aqi",
+                    "us_aqi",
+                ]
+            )
         if self.pollen_enabled:
             current_params.extend(
                 ["alder_pollen", "birch_pollen", "grass_pollen", "mugwort_pollen", "olive_pollen", "ragweed_pollen"]
@@ -5845,24 +6546,57 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # AQI side
             if self.aqi_enabled:
-                pm25 = cur.get("pm2_5")
-                pm10 = cur.get("pm10")
-                no2 = cur.get("nitrogen_dioxide")
-                ozone = cur.get("ozone")
-                co = cur.get("carbon_monoxide")
-                aqi_val = calculate_us_aqi(pm25, pm10)
+
+                def reading(key: str) -> float | None:
+                    try:
+                        value = float(cur.get(key))
+                    except (TypeError, ValueError, OverflowError):
+                        return None
+                    return value if math.isfinite(value) and value >= 0 else None
+
+                concentrations = {
+                    "pm2_5": reading("pm2_5"),
+                    "pm10": reading("pm10"),
+                    "no2": reading("nitrogen_dioxide"),
+                    "ozone": reading("ozone"),
+                    "so2": reading("sulphur_dioxide"),
+                    "co": reading("carbon_monoxide"),
+                }
+                scale = resolve_aqi_scale(
+                    getattr(self, "aqi_scale", DEFAULT_AQI_SCALE),
+                    lat,
+                    lon,
+                    getattr(self, "climate_region", None),
+                )
+                european = scale == "european"
+                raw_aqi = reading(f"{scale}_aqi")
+                missing_pollutants = []
+                if raw_aqi is not None:
+                    aqi_val = math.floor(raw_aqi + 0.5) if european else round(raw_aqi)
+                    source = "open_meteo"
+                else:
+                    pollutant_keys = ("pm2_5", "pm10", "no2", "ozone", "so2") if european else ("pm2_5", "pm10")
+                    inputs = {key: concentrations[key] for key in pollutant_keys}
+                    calculate = calculate_european_aqi if european else calculate_us_aqi
+                    aqi_val = calculate(**inputs)
+                    missing_pollutants = [key for key, value in inputs.items() if value is None]
+                    source = "local_estimate" if aqi_val is not None else None
+                level = color = None
+                if aqi_val is not None:
+                    level = (european_aqi_level if european else aqi_level)(aqi_val)
+                    color = (european_aqi_color if european else aqi_color)(aqi_val)
                 self._aqi_cache = {
-                    "pm2_5": pm25,
-                    "pm10": pm10,
-                    "no2": no2,
-                    "ozone": ozone,
-                    "co": co,
+                    **concentrations,
                     "aqi": aqi_val,
-                    "aqi_level": aqi_level(aqi_val) if aqi_val is not None else None,
+                    "aqi_level": level,
+                    "aqi_scale": scale,
+                    "aqi_color": color,
+                    "aqi_source": source,
+                    "missing_pollutants": missing_pollutants,
                     "fetched_at": dt_util.utcnow().isoformat(),
                 }
                 self.runtime.last_aqi_fetch = dt_util.utcnow()
-                _LOGGER.debug("ws_core AQI fetched: AQI=%s (%s)", aqi_val, self._aqi_cache.get("aqi_level"))
+                _LOGGER.debug("ws_core AQI fetched (%s): AQI=%s (%s)", scale, aqi_val, level)
 
             # Pollen side: Open-Meteo grains/m³ -> 0-5 index per WHO/EAN bands
             if self.pollen_enabled:

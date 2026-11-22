@@ -64,12 +64,16 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
+  - Hardware Mapping: hardware_mapping.md
+  - Upgrading to 3.0: upgrading.md
   - Use Cases: use_cases.md
   - Sensors Reference: sensors.md
   - Forecast Providers: forecast_providers.md
+  - Science: science.md
   - Dashboards: dashboards.md
   - Blueprints: blueprints.md
   - Guides:
+    - Weather Windows: guides/weather_windows.md
     - Fire Danger: guides/fire_danger.md
     - Irrigation / ET₀: guides/irrigation.md
     - Smart Irrigation bridge: guides/smart_irrigation.md

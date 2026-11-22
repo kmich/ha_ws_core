@@ -15,6 +15,7 @@ The Options flow (Configure button) exposes all settings for post-install change
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 import aiohttp
@@ -26,14 +27,29 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     ALTITUDE_UNIT_OPTIONS,
+    AQI_SCALE_OPTIONS,
     CLIMATE_REGION_OPTIONS,
     CONF_ALTITUDE_UNIT,
     CONF_AQI_INTERVAL_MIN,
+    CONF_AQI_SCALE,
     CONF_CAL_HUMIDITY,
     CONF_CAL_PRESSURE_HPA,
     CONF_CAL_TEMP_C,
     CONF_CAL_WIND_MS,
     CONF_CLIMATE_REGION,
+    CONF_CUSTOM_MAX_CLOUD_COVER_PCT,
+    CONF_CUSTOM_MAX_HUMIDITY_PCT,
+    CONF_CUSTOM_MAX_RAIN_MM,
+    CONF_CUSTOM_MAX_RAIN_PROB_PCT,
+    CONF_CUSTOM_MAX_TEMP_C,
+    CONF_CUSTOM_MAX_WIND_GUST_KMH,
+    CONF_CUSTOM_MAX_WIND_KMH,
+    CONF_CUSTOM_MIN_DURATION_H,
+    CONF_CUSTOM_MIN_HUMIDITY_PCT,
+    CONF_CUSTOM_MIN_TEMP_C,
+    CONF_CUSTOM_MIN_WIND_KMH,
+    CONF_CUSTOM_REQUIRE_DAYLIGHT,
+    CONF_CUSTOM_WINDOW_NAME,
     CONF_DISTANCE_UNIT,
     CONF_ELEVATION_M,
     CONF_ENABLE_ADVANCED_SENSORS,
@@ -67,6 +83,7 @@ from .const import (
     CONF_ENABLE_THUNDERSTORM,
     CONF_ENABLE_VIGICRUES,
     CONF_ENABLE_VIGILANCE_METEO,
+    CONF_ENABLE_WEATHER_WINDOWS,
     CONF_ENABLE_WEATHERCLOUD,
     CONF_ENABLE_WINDY,
     CONF_ENABLE_WOW,
@@ -97,6 +114,7 @@ from .const import (
     CONF_SOLAR_PANEL_AZIMUTH,
     CONF_SOLAR_PANEL_TILT,
     CONF_SOLAR_PEAK_KW,
+    CONF_SOLAR_PV_ENERGY_ENTITIES,
     CONF_SOURCES,
     CONF_STALENESS_S,
     CONF_TEMP_UNIT,
@@ -106,6 +124,7 @@ from .const import (
     CONF_UNITS_MODE,
     CONF_VIGICRUES_STATION_CODE,
     CONF_VIGICRUES_STATIONS,
+    CONF_WEATHER_WINDOW_PROFILES,
     CONF_WIND_UNIT,
     CONF_WU_API_KEY,
     CONF_WU_INTERVAL_MIN,
@@ -113,6 +132,7 @@ from .const import (
     CONFIG_VERSION,
     DEFAULT_ALTITUDE_UNIT,
     DEFAULT_AQI_INTERVAL_MIN,
+    DEFAULT_AQI_SCALE,
     DEFAULT_CAL_HUMIDITY,
     DEFAULT_CAL_PRESSURE_HPA,
     DEFAULT_CAL_TEMP_C,
@@ -150,6 +170,7 @@ from .const import (
     DEFAULT_ENABLE_THUNDERSTORM,
     DEFAULT_ENABLE_VIGICRUES,
     DEFAULT_ENABLE_VIGILANCE_METEO,
+    DEFAULT_ENABLE_WEATHER_WINDOWS,
     DEFAULT_ENABLE_WEATHERCLOUD,
     DEFAULT_ENABLE_WINDY,
     DEFAULT_ENABLE_WOW,
@@ -179,6 +200,7 @@ from .const import (
     DEFAULT_THRESH_RAIN_RATE_MMPH,
     DEFAULT_THRESH_WIND_GUST_MS,
     DEFAULT_UNITS_MODE,
+    DEFAULT_WEATHER_WINDOW_PROFILES,
     DEFAULT_WIND_UNIT,
     DEFAULT_WU_INTERVAL_MIN,
     DISTANCE_UNIT_OPTIONS,
@@ -193,6 +215,9 @@ from .const import (
     HEMISPHERE_OPTIONS,
     OPTIONAL_SOURCES,
     PRESSURE_UNIT_OPTIONS,
+    PROFILE_CUSTOM,
+    PROFILE_GARDEN_WORK,
+    PROFILE_OUTDOOR_DRYING,
     PROVIDERS_REQUIRING_API_KEY,
     PROVIDERS_REQUIRING_ENTITY,
     RAIN_UNIT_OPTIONS,
@@ -494,8 +519,9 @@ def _guess_climate_region(hass: HomeAssistant) -> str:
     # North America
     if -170 <= lon <= -50:
         return "north_america_east" if lon > -100 else "north_america_west"
-    # Continental Europe (east of 15°E)
-    if lon > 15:
+    # Continental Europe (Central & Eastern Europe: east of 9°E north of the Alps,
+    # or anywhere east of 15°E)
+    if lon > 15 or (47 <= lat <= 55 and lon > 9):
         return "continental_europe"
     # Default Atlantic Europe
     return "atlantic_europe"
@@ -508,12 +534,14 @@ def _is_imperial(units_mode: str, hass: HomeAssistant) -> bool:
     if m == "metric":
         return False
     try:
-        return hass.config.units.temperature_unit != "°C"
+        temp_unit = hass.config.units.temperature_unit
+        return isinstance(temp_unit, str) and temp_unit != "°C"
     except Exception:
         return False
 
 
 _GUST_UNIT_FACTORS: dict[str, float] = {"m/s": 1.0, "km/h": 3.6, "mph": 2.23694, "kn": 1.94384}
+_WIND_KMH_DISPLAY_FACTORS: dict[str, float] = {"km/h": 1.0, "m/s": 1.0 / 3.6, "mph": 0.62137119, "kn": 0.5399568}
 
 
 def _convert_gust_to_display(ms: float, wind_unit: str) -> float:
@@ -522,6 +550,14 @@ def _convert_gust_to_display(ms: float, wind_unit: str) -> float:
 
 def _convert_gust_to_ms(val: float, wind_unit: str) -> float:
     return val / _GUST_UNIT_FACTORS.get(wind_unit, 1.0)
+
+
+def _convert_wind_kmh_to_display(kmh: float, wind_unit: str) -> float:
+    return kmh * _WIND_KMH_DISPLAY_FACTORS.get(wind_unit, 1.0)
+
+
+def _convert_wind_display_to_kmh(val: float, wind_unit: str) -> float:
+    return val / _WIND_KMH_DISPLAY_FACTORS.get(wind_unit, 1.0)
 
 
 def _convert_rain_to_display(mmph: float, rain_unit: str) -> float:
@@ -568,6 +604,19 @@ def _build_optional_sources_fields(defaults: dict[str, str], soil_unit: str) -> 
 
 # Plain sensor selector — no device_class filter (fixes issue #41: sensors mis-routed into wrong slots)
 _ENTITY_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+# v3.0.0 - PV energy meters for the local PV forecast (the Energy dashboard's solar meters)
+_PV_METER_SELECTOR = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)
+)
+
+
+def _pv_meter_list(value: Any) -> list[str]:
+    """Selected PV meters as a sorted list without blanks or duplicates."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        return []
+    return sorted({str(v).strip() for v in value if isinstance(v, str) and v.strip()})
 
 
 # ---------------------------------------------------------------------------
@@ -1390,6 +1439,7 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             if back:
                 return back
             self._data[CONF_AQI_INTERVAL_MIN] = int(user_input.get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
+            self._data[CONF_AQI_SCALE] = str(user_input.get(CONF_AQI_SCALE, DEFAULT_AQI_SCALE))
             if self._data.get(CONF_ENABLE_POLLEN):
                 return await self.async_step_pollen()
             if self._data.get(CONF_ENABLE_SOLAR_FORECAST):
@@ -1404,6 +1454,13 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             step_id="air_quality",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_AQI_SCALE, default=DEFAULT_AQI_SCALE): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=AQI_SCALE_OPTIONS,
+                            mode="dropdown",
+                            translation_key="aqi_scale",
+                        )
+                    ),
                     vol.Optional(CONF_AQI_INTERVAL_MIN, default=DEFAULT_AQI_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=15, max=360, step=15, mode="box", unit_of_measurement="min")
                     ),
@@ -1455,6 +1512,7 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             self._data[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
+            self._data[CONF_SOLAR_PV_ENERGY_ENTITIES] = _pv_meter_list(user_input.get(CONF_SOLAR_PV_ENERGY_ENTITIES))
             self._data[CONF_ET0_ILLUMINANCE_FALLBACK] = bool(
                 user_input.get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK)
             )
@@ -1488,6 +1546,8 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
                     vol.Optional(CONF_SOLAR_INTERVAL_MIN, default=DEFAULT_SOLAR_INTERVAL_MIN): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
+                    # No default: a default makes the picker impossible to clear (issue #135).
+                    vol.Optional(CONF_SOLAR_PV_ENERGY_ENTITIES): _PV_METER_SELECTOR,
                     vol.Optional(
                         CONF_ET0_ILLUMINANCE_FALLBACK, default=DEFAULT_ET0_ILLUMINANCE_FALLBACK
                     ): selector.BooleanSelector(),
@@ -1495,6 +1555,8 @@ class WSStationConfigFlow(SharedFlowSteps, config_entries.ConfigFlow, domain=DOM
             ),
             description_placeholders={
                 "info": "Free solar PV generation forecast from forecast.solar. Uses forecast lat/lon. Azimuth: 0=N, 90=E, 180=S, 270=W. "
+                "Optionally pick the PV energy meters (kWh) that count your solar production: ws_core then also "
+                "learns a local PV forecast from Open-Meteo irradiance and your real yield. "
                 "The illuminance fallback derives an approximate solar radiation from a lux sensor for the ET₀ "
                 "Penman-Monteith sensor when no solar_radiation source is mapped - lower confidence than a real "
                 "pyranometer reading, and only used if an illuminance sensor is also mapped in Sources."
@@ -1697,10 +1759,425 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
     def _get(self, key: str, default: Any) -> Any:
         return self.config_entry.options.get(key, self.config_entry.data.get(key, default))
 
+    def _ensure_opt(self) -> dict[str, Any]:
+        if not hasattr(self, "_opt") or self._opt is None:
+            if hasattr(self, "config_entry") and self.config_entry is not None:
+                self._opt = dict(getattr(self.config_entry, "options", {}))
+            else:
+                self._opt = {}
+        return self._opt
+
     # ------------------------------------------------------------------
-    # Step 1: Core - identity, location, units, forecast, calibration, alerts
+    # Main Menu Hub (v3.0.0 Scope D)
     # ------------------------------------------------------------------
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
+        """Main options hub menu."""
+        self._ensure_opt()
+        if user_input is not None and not isinstance(user_input, str):
+            # Backward-compat: if called with core schema dict directly (legacy callers/tests)
+            return await self.async_step_thresholds(user_input)
+
+        self._in_menu_sources = False
+        self._in_menu_uploads = False
+        self._in_menu_diagnostics = False
+        self._in_menu_rooms = False
+        menu_options = [
+            "sources",
+            "forecast",
+            "decision_profiles",
+            "rooms",
+            "thresholds",
+            "uploads",
+            "diagnostics",
+        ]
+        return self.async_show_menu(step_id="init", menu_options=menu_options)
+
+    async def async_step_sources(self, user_input: dict[str, Any] | None = None):
+        """Navigate to required sources, then optional sources."""
+        self._ensure_opt()
+        self._in_menu_sources = True
+        return await self.async_step_required_sources_opt(user_input)
+
+    async def async_step_forecast(self, user_input: dict[str, Any] | None = None):
+        """Configure forecast provider and coordinates."""
+        self._ensure_opt()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            provider = user_input.get(
+                CONF_FORECAST_PROVIDER, self._get(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
+            )
+            enabled = user_input.get(CONF_FORECAST_ENABLED, self._get(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED))
+            forecast_entity = str(user_input.get(CONF_FORECAST_ENTITY) or "").strip()
+            if enabled and provider == FORECAST_PROVIDER_HA_ENTITY and not forecast_entity:
+                errors[CONF_FORECAST_ENTITY] = "required"
+            else:
+                self._opt.update(user_input)
+                # Persist explicit "" when EntitySelector is cleared so entry.data does not bleed through
+                self._opt[CONF_FORECAST_ENTITY] = forecast_entity
+                if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
+                    return await self.async_step_forecast_api_key_opt()
+                return self.async_create_entry(title="", data=self._opt)
+
+        return self.async_show_form(
+            step_id="forecast",
+            data_schema=self._build_forecast_schema(),
+            errors=errors,
+        )
+
+    def _build_forecast_schema(self) -> vol.Schema:
+        """Schema for external forecast provider settings."""
+        g = self._get
+        default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
+        default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)
+                ): selector.BooleanSelector(),
+                vol.Optional(
+                    CONF_FORECAST_INTERVAL_MIN, default=g(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN)
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
+                ),
+                vol.Optional(
+                    CONF_FORECAST_LAT, default=g(CONF_FORECAST_LAT, round(default_lat, 4))
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")),
+                vol.Optional(
+                    CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))
+                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
+                vol.Optional(
+                    CONF_FORECAST_PROVIDER, default=g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            FORECAST_PROVIDER_OPEN_METEO,
+                            FORECAST_PROVIDER_MET_NO,
+                            FORECAST_PROVIDER_NWS,
+                            FORECAST_PROVIDER_OWM,
+                            FORECAST_PROVIDER_PIRATE,
+                            FORECAST_PROVIDER_METEO_FRANCE,
+                            FORECAST_PROVIDER_HA_ENTITY,
+                        ],
+                        mode=selector.SelectSelectorMode.LIST,
+                        translation_key="forecast_provider",
+                    )
+                ),
+                vol.Optional(
+                    CONF_FORECAST_ENTITY,
+                    description={"suggested_value": g(CONF_FORECAST_ENTITY, "") or None},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="weather")),
+            }
+        )
+
+    def _decision_provider_warning(self, g: Any) -> str:
+        """Build a concise, localized provider capability notice for the decision profiles form."""
+        from . import localize
+        from .providers.capabilities import get_provider_capabilities
+
+        lang = getattr(getattr(self.hass, "config", None), "language", None)
+        if not bool(g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)):
+            return "\n\n" + localize.window_text(lang, "pn_forecast_disabled")
+        provider_id = str(g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER))
+        caps = get_provider_capabilities(provider_id)
+        if provider_id == FORECAST_PROVIDER_HA_ENTITY:
+            return "\n\n" + localize.window_text(lang, "pn_ha_entity", provider=caps.display_name)
+        missing: list[str] = []
+        if not caps.has_wind_gust:
+            missing.append("max_wind_gust_kmh")
+        if not caps.has_cloud_cover:
+            missing.append("max_cloud_cover_pct")
+        if not caps.has_humidity:
+            missing.extend(("min_humidity_pct", "max_humidity_pct"))
+        if not caps.has_wind_speed:
+            missing.extend(("min_wind_kmh", "max_wind_kmh"))
+        rain_note = ""
+        if not caps.has_precip_probability and caps.has_precip_amount:
+            rain_note = localize.window_text(lang, "pn_rain_mm")
+        elif not caps.has_precip_amount and caps.has_precip_probability:
+            rain_note = localize.window_text(lang, "pn_rain_prob")
+        elif not caps.has_precip_probability and not caps.has_precip_amount:
+            missing.extend(("max_rain_prob_pct", "max_rain_mm"))
+        if not missing and not rain_note:
+            return ""
+        parts = [localize.window_text(lang, "pn_prefix", provider=caps.display_name)]
+        if missing:
+            parts.append(localize.window_text(lang, "pn_missing", fields=localize.window_field_labels(lang, missing)))
+        if rain_note:
+            parts.append(rain_note)
+        return "\n\n" + " ".join(parts)
+
+    async def async_step_decision_profiles(self, user_input: dict[str, Any] | None = None):
+        """Configure Decision Profiles, active Weather Windows, and Custom Profile limits."""
+        from .weather_windows import DEFAULT_PROFILES, MAX_MIN_DURATION_H, resolve_profiles
+        from .weather_windows import PROFILE_CUSTOM as _PROFILE_CUSTOM
+
+        self._ensure_opt()
+        g = self._get
+        units_mode = str(g(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
+        imperial = _is_imperial(units_mode, self.hass)
+        wind_unit_conf = str(g(CONF_WIND_UNIT, DEFAULT_WIND_UNIT))
+        rain_unit_conf = str(g(CONF_RAIN_UNIT, DEFAULT_RAIN_UNIT))
+        temp_unit_conf = str(g(CONF_TEMP_UNIT, DEFAULT_TEMP_UNIT))
+        temp_u = _effective_temp_unit(temp_unit_conf, imperial)
+        rain_u = rain_unit_conf if rain_unit_conf != "auto" else ("in" if imperial else "mm")
+        wind_u = wind_unit_conf if wind_unit_conf != "auto" else ("mph" if imperial else "km/h")
+
+        def _to_disp(val: float, kind: str) -> float:
+            if kind == "temp":
+                return _convert_temp_to_display(val, temp_u == "°F")
+            if kind == "rain":
+                return _convert_rain_to_display(val, rain_u)
+            if kind == "wind":
+                return _convert_wind_kmh_to_display(val, wind_u)
+            return val
+
+        def _to_canonical(val: float, kind: str) -> float:
+            if kind == "temp":
+                return _convert_temp_to_c(val, temp_u == "°F")
+            if kind == "rain":
+                return _convert_rain_to_mmph(val, rain_u)
+            if kind == "wind":
+                return _convert_wind_display_to_kmh(val, wind_u)
+            return val
+
+        # (conf_key, profile_attr, kind, c_lo, c_hi, c_step, precision)
+        raw_specs: tuple[tuple[str, str, str, float, float, float, int], ...] = (
+            (CONF_CUSTOM_MAX_RAIN_PROB_PCT, "max_rain_prob_pct", "pct", 0.0, 100.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_RAIN_MM, "max_rain_mm", "rain", 0.0, 200.0, 0.1, 2 if rain_u == "in" else 1),
+            (CONF_CUSTOM_MIN_TEMP_C, "min_temp_c", "temp", -40.0, 50.0, 0.5, 1),
+            (CONF_CUSTOM_MAX_TEMP_C, "max_temp_c", "temp", -40.0, 60.0, 0.5, 1),
+            (CONF_CUSTOM_MIN_HUMIDITY_PCT, "min_humidity_pct", "pct", 0.0, 100.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_HUMIDITY_PCT, "max_humidity_pct", "pct", 0.0, 100.0, 1.0, 1),
+            (CONF_CUSTOM_MIN_WIND_KMH, "min_wind_kmh", "wind", 0.0, 150.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_WIND_KMH, "max_wind_kmh", "wind", 0.0, 150.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_WIND_GUST_KMH, "max_wind_gust_kmh", "wind", 0.0, 250.0, 1.0, 1),
+            (CONF_CUSTOM_MAX_CLOUD_COVER_PCT, "max_cloud_cover_pct", "pct", 0.0, 100.0, 1.0, 1),
+        )
+        limit_specs: list[tuple[str, str, str, float, float, float, str, int]] = []
+        for conf_key, attr_name, kind, c_lo, c_hi, c_step, prec in raw_specs:
+            unit = {"pct": "%", "rain": rain_u, "temp": temp_u, "wind": wind_u}[kind]
+            lo = round(_to_disp(c_lo, kind), prec) if kind != "pct" else c_lo
+            hi = round(_to_disp(c_hi, kind), prec) if kind != "pct" else c_hi
+            step = (
+                (0.01 if rain_u == "in" else c_step)
+                if kind == "rain"
+                else ((0.5 if wind_u == "m/s" else c_step) if kind == "wind" else c_step)
+            )
+            limit_specs.append((conf_key, attr_name, kind, lo, hi, step, unit, prec))
+
+        errors: dict[str, str] = {}
+        sentinel = object()
+        cfg: dict[str, Any] = {}
+        try:
+            entry = self.config_entry
+            if entry is not None:
+                cfg.update(getattr(entry, "data", {}) or {})
+                cfg.update(getattr(entry, "options", {}) or {})
+        except (ValueError, AttributeError):
+            pass
+        for key in (
+            CONF_WEATHER_WINDOW_PROFILES,
+            CONF_CUSTOM_WINDOW_NAME,
+            CONF_CUSTOM_MIN_DURATION_H,
+            CONF_CUSTOM_REQUIRE_DAYLIGHT,
+            *(spec[0] for spec in limit_specs),
+        ):
+            val = self._flow_default(key, sentinel)
+            if val is not sentinel:
+                cfg[key] = val
+
+        custom_prof = resolve_profiles(cfg)[_PROFILE_CUSTOM]
+
+        if user_input is not None:
+            raw_profiles = user_input.get(CONF_WEATHER_WINDOW_PROFILES)
+            if raw_profiles is not None and (
+                isinstance(raw_profiles, str)
+                or not isinstance(raw_profiles, (list, tuple, set))
+                or any(p not in DEFAULT_PROFILES for p in raw_profiles)
+            ):
+                errors[CONF_WEATHER_WINDOW_PROFILES] = "invalid_profiles"
+
+            raw_dur = user_input.get(CONF_CUSTOM_MIN_DURATION_H)
+            validated_dur: int | None = None
+            if raw_dur is not None:
+                if isinstance(raw_dur, bool):
+                    errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+                else:
+                    try:
+                        dur_f = float(raw_dur)
+                        if not math.isfinite(dur_f) or not dur_f.is_integer():
+                            errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+                        else:
+                            dur_val = int(dur_f)
+                            if dur_val < 1 or dur_val > MAX_MIN_DURATION_H:
+                                errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+                            else:
+                                validated_dur = dur_val
+                    except (TypeError, ValueError):
+                        errors[CONF_CUSTOM_MIN_DURATION_H] = "invalid_duration"
+
+            validated_limits: dict[str, float] = {}
+            spec_by_key = {spec[0]: spec for spec in limit_specs}
+            for conf_key, attr_name, kind, lo, hi, _step, _unit, prec in limit_specs:
+                raw_val = user_input.get(conf_key)
+                if raw_val is None:
+                    continue
+                if isinstance(raw_val, bool):
+                    errors[conf_key] = "out_of_range"
+                    continue
+                try:
+                    fval = float(raw_val)
+                except (TypeError, ValueError):
+                    errors[conf_key] = "out_of_range"
+                    continue
+                if not math.isfinite(fval) or fval < lo or fval > hi:
+                    errors[conf_key] = "out_of_range"
+                    continue
+                existing_canonical = getattr(custom_prof, attr_name)
+                if (
+                    existing_canonical is not None
+                    and kind != "pct"
+                    and abs(fval - round(_to_disp(float(existing_canonical), kind), prec)) <= 1e-6
+                ):
+                    validated_limits[conf_key] = float(existing_canonical)
+                else:
+                    is_identity = (
+                        kind == "pct"
+                        or (kind == "temp" and temp_u == "°C")
+                        or (kind == "rain" and rain_u == "mm")
+                        or (kind == "wind" and wind_u == "km/h")
+                    )
+                    validated_limits[conf_key] = fval if is_identity else round(_to_canonical(fval, kind), 4)
+
+            is_full_form = any(
+                k in user_input
+                for k in (CONF_CUSTOM_MIN_DURATION_H, CONF_CUSTOM_WINDOW_NAME, CONF_CUSTOM_REQUIRE_DAYLIGHT)
+            )
+
+            def _effective_limit(conf_k: str) -> float | None:
+                if conf_k in errors:
+                    return None
+                if conf_k in user_input:
+                    return validated_limits.get(conf_k)
+                if is_full_form:
+                    return None
+                val = getattr(custom_prof, spec_by_key[conf_k][1], None)
+                return float(val) if isinstance(val, (int, float)) and not isinstance(val, bool) else None
+
+            for min_k, max_k in (
+                (CONF_CUSTOM_MIN_TEMP_C, CONF_CUSTOM_MAX_TEMP_C),
+                (CONF_CUSTOM_MIN_HUMIDITY_PCT, CONF_CUSTOM_MAX_HUMIDITY_PCT),
+                (CONF_CUSTOM_MIN_WIND_KMH, CONF_CUSTOM_MAX_WIND_KMH),
+                (CONF_CUSTOM_MIN_WIND_KMH, CONF_CUSTOM_MAX_WIND_GUST_KMH),
+            ):
+                if min_k not in user_input and max_k not in user_input:
+                    continue
+                eff_min = _effective_limit(min_k)
+                eff_max = _effective_limit(max_k)
+                if eff_min is not None and eff_max is not None and eff_min > eff_max:
+                    err_key = min_k if min_k not in errors else max_k
+                    errors[err_key] = "min_exceeds_max"
+
+            if not errors:
+                self._opt.update(user_input)
+                if validated_dur is not None:
+                    self._opt[CONF_CUSTOM_MIN_DURATION_H] = validated_dur
+                if CONF_WEATHER_WINDOW_PROFILES in self._opt and self._opt[CONF_WEATHER_WINDOW_PROFILES] is not None:
+                    self._opt[CONF_WEATHER_WINDOW_PROFILES] = list(
+                        dict.fromkeys(self._opt[CONF_WEATHER_WINDOW_PROFILES])
+                    )
+                if CONF_CUSTOM_WINDOW_NAME in user_input:
+                    name_val = str(user_input.get(CONF_CUSTOM_WINDOW_NAME) or "").strip()
+                    self._opt[CONF_CUSTOM_WINDOW_NAME] = name_val or DEFAULT_PROFILES[_PROFILE_CUSTOM].name
+                for conf_key, fval in validated_limits.items():
+                    self._opt[conf_key] = fval
+                if is_full_form:
+                    for conf_key, *_rest in limit_specs:
+                        if user_input.get(conf_key) is None:
+                            self._opt[conf_key] = None
+                return self.async_create_entry(title="", data=self._opt)
+
+        current_profiles = g(CONF_WEATHER_WINDOW_PROFILES, DEFAULT_WEATHER_WINDOW_PROFILES)
+        if isinstance(current_profiles, str):
+            current_profiles = [current_profiles]
+
+        # After a validation error, re-show what the user submitted rather than the stored values,
+        # so fixing one field does not silently discard their other edits (issue #149 class).
+        submitted: dict[str, Any] = dict(user_input) if (user_input is not None and errors) else {}
+        submitted_full = bool(submitted) and any(
+            k in submitted for k in (CONF_CUSTOM_MIN_DURATION_H, CONF_CUSTOM_WINDOW_NAME, CONF_CUSTOM_REQUIRE_DAYLIGHT)
+        )
+        if submitted.get(CONF_WEATHER_WINDOW_PROFILES) is not None and CONF_WEATHER_WINDOW_PROFILES not in errors:
+            current_profiles = list(submitted[CONF_WEATHER_WINDOW_PROFILES])
+
+        fields: dict[Any, Any] = {
+            vol.Optional(
+                CONF_ENABLE_WEATHER_WINDOWS,
+                default=bool(
+                    submitted.get(
+                        CONF_ENABLE_WEATHER_WINDOWS, g(CONF_ENABLE_WEATHER_WINDOWS, DEFAULT_ENABLE_WEATHER_WINDOWS)
+                    )
+                ),
+            ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_WEATHER_WINDOW_PROFILES,
+                default=list(current_profiles),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[PROFILE_OUTDOOR_DRYING, PROFILE_GARDEN_WORK, PROFILE_CUSTOM],
+                    multiple=True,
+                    mode=selector.SelectSelectorMode.LIST,
+                    translation_key="weather_window_profiles",
+                )
+            ),
+            vol.Optional(
+                CONF_CUSTOM_WINDOW_NAME, default=str(submitted.get(CONF_CUSTOM_WINDOW_NAME, custom_prof.name))
+            ): selector.TextSelector(),
+            vol.Optional(
+                CONF_CUSTOM_MIN_DURATION_H,
+                default=submitted.get(CONF_CUSTOM_MIN_DURATION_H, custom_prof.min_duration_h),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=MAX_MIN_DURATION_H, step=1, mode="box", unit_of_measurement="h"
+                )
+            ),
+        }
+        for conf_key, attr_name, kind, lo, hi, step, unit, prec in limit_specs:
+            if submitted_full:
+                # Already in display units; a field the user cleared stays cleared.
+                suggested = submitted.get(conf_key)
+            else:
+                stored_val = getattr(custom_prof, attr_name)
+                suggested = (
+                    (round(_to_disp(float(stored_val), kind), prec) if kind != "pct" else float(stored_val))
+                    if stored_val is not None
+                    else None
+                )
+            fields[vol.Optional(conf_key, description={"suggested_value": suggested})] = selector.NumberSelector(
+                selector.NumberSelectorConfig(min=lo, max=hi, step=step, mode="box", unit_of_measurement=unit)
+            )
+        fields[
+            vol.Optional(
+                CONF_CUSTOM_REQUIRE_DAYLIGHT,
+                default=bool(submitted.get(CONF_CUSTOM_REQUIRE_DAYLIGHT, custom_prof.require_daylight)),
+            )
+        ] = selector.BooleanSelector()
+        return self.async_show_form(
+            step_id="decision_profiles",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"provider_warning": self._decision_provider_warning(g)},
+        )
+
+    async def async_step_rooms(self, user_input: dict[str, Any] | None = None):
+        """Hub menu for managing named indoor rooms."""
+        self._ensure_opt()
+        self._in_menu_rooms = True
+        return await self._rooms_menu()
+
+    async def async_step_thresholds(self, user_input: dict[str, Any] | None = None):
+        """Configure Station identity, units, alerts, and calibration thresholds."""
+        self._ensure_opt()
         units_mode = str(self._get(CONF_UNITS_MODE, DEFAULT_UNITS_MODE))
         imperial = _is_imperial(units_mode, self.hass)
         wind_unit_conf = str(self._get(CONF_WIND_UNIT, DEFAULT_WIND_UNIT))
@@ -1719,14 +2196,19 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                 elev = float(out.get(CONF_ELEVATION_M, 0))
                 if not (VALID_ELEVATION_MIN_M <= elev <= VALID_ELEVATION_MAX_M):
                     return self.async_show_form(
-                        step_id="init",
-                        data_schema=self._build_core_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
+                        step_id="thresholds",
+                        data_schema=self._build_thresholds_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
                         errors={CONF_ELEVATION_M: "elevation_out_of_range"},
-                        last_step=False,
                     )
             except (TypeError, ValueError):
                 pass
-            # Convert thresholds to canonical metric
+            alert_errors = WSStationConfigFlow._validate_alert_inputs(out, gust_u, temp_u)
+            if alert_errors:
+                return self.async_show_form(
+                    step_id="thresholds",
+                    data_schema=self._build_thresholds_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
+                    errors=alert_errors,
+                )
             out[CONF_THRESH_WIND_GUST_MS] = _convert_gust_to_ms(
                 float(out.get(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS)), gust_u
             )
@@ -1736,118 +2218,26 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             out[CONF_THRESH_FREEZE_C] = _convert_temp_to_c(
                 float(out.get(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C)), temp_u == "°F"
             )
-            out[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
-                float(out.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)), rain_meas
-            )
-            out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
-                float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), rain_meas
-            )
-            # Merge into options - source mapping step comes next.
-            self._opt: dict[str, Any] = out
-            return await self.async_step_required_sources_opt()
+            if CONF_RAIN_PENALTY_LIGHT_MMPH in out:
+                out[CONF_RAIN_PENALTY_LIGHT_MMPH] = _convert_rain_to_mmph(
+                    float(out.get(CONF_RAIN_PENALTY_LIGHT_MMPH, DEFAULT_RAIN_PENALTY_LIGHT_MMPH)), rain_meas
+                )
+            if CONF_RAIN_PENALTY_HEAVY_MMPH in out:
+                out[CONF_RAIN_PENALTY_HEAVY_MMPH] = _convert_rain_to_mmph(
+                    float(out.get(CONF_RAIN_PENALTY_HEAVY_MMPH, DEFAULT_RAIN_PENALTY_HEAVY_MMPH)), rain_meas
+                )
+            self._opt.update(out)
+            return self.async_create_entry(title="", data=self._opt)
 
         return self.async_show_form(
-            step_id="init",
-            data_schema=self._build_core_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
-            last_step=False,
+            step_id="thresholds",
+            data_schema=self._build_thresholds_schema(imperial, gust_u, rain_u, temp_u, rain_meas),
         )
 
-    def _current_sources_for_options(self) -> dict[str, str]:
-        if CONF_SOURCES in self.config_entry.options:
-            current = dict(self.config_entry.options[CONF_SOURCES] or {})
-        else:
-            current = dict(self.config_entry.data.get(CONF_SOURCES, {}))
-
-        guessed = _guess_defaults(self.hass)
-        defaults: dict[str, str] = {}
-        for k in REQUIRED_SOURCES:
-            val = current.get(k) or guessed.get(k)
-            if val:
-                defaults[k] = val
-
-        # For optional sources, only use what is currently configured.
-        # Do not auto-guess unconfigured or cleared optional sources in the Options flow (issue #149).
-        for k in OPTIONAL_SOURCES:
-            val = current.get(k)
-            if val:
-                defaults[k] = val
-
-        return defaults
-
-    async def async_step_required_sources_opt(self, user_input: dict[str, Any] | None = None):
-        defaults = self._current_sources_for_options()
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            sources = dict(self._get(CONF_SOURCES, {}))
-            for k in REQUIRED_SOURCES:
-                eid = user_input.get(k)
-                if not eid:
-                    errors[k] = "required"
-                else:
-                    err = _validate_numeric_sensor(self.hass, eid, allow_unknown=k in _ALLOW_UNKNOWN_SOURCE_KEYS)
-                    if err:
-                        errors[k] = err
-                    else:
-                        sources[k] = eid
-            if not errors:
-                self._opt[CONF_SOURCES] = {k: v.strip() for k, v in sources.items()}
-                return await self.async_step_optional_sources_opt()
-            defaults = _merge_submitted_sources(defaults, user_input, REQUIRED_SOURCES)
-
-        fields = {vol.Required(k, default=defaults.get(k)): _ENTITY_SELECTOR for k in REQUIRED_SOURCES}
-        return self.async_show_form(
-            step_id="required_sources_opt",
-            data_schema=vol.Schema(fields),
-            errors=errors,
-            last_step=False,
-        )
-
-    async def async_step_optional_sources_opt(self, user_input: dict[str, Any] | None = None):
-        defaults = self._current_sources_for_options()
-        errors: dict[str, str] = {}
-        soil_unit = str(
-            self._opt.get(CONF_SOIL_MOISTURE_UNIT, self._get(CONF_SOIL_MOISTURE_UNIT, DEFAULT_SOIL_MOISTURE_UNIT))
-            or DEFAULT_SOIL_MOISTURE_UNIT
-        )
-
-        if user_input is not None:
-            soil_unit = str(user_input.get(CONF_SOIL_MOISTURE_UNIT, soil_unit) or DEFAULT_SOIL_MOISTURE_UNIT)
-            sources = dict(self._opt.get(CONF_SOURCES) or self._get(CONF_SOURCES, {}))
-            for k in OPTIONAL_SOURCES:
-                sources.pop(k, None)
-                eid = user_input.get(k)
-                if not eid:
-                    continue
-                err = _validate_numeric_sensor(self.hass, eid, allow_unknown=k in _ALLOW_UNKNOWN_SOURCE_KEYS)
-                if err:
-                    errors[k] = err
-                else:
-                    sources[k] = eid.strip()
-            if not errors:
-                self._opt[CONF_SOURCES] = sources
-                self._opt[CONF_SOIL_MOISTURE_UNIT] = soil_unit
-                if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
-                    return await self.async_step_forecast_api_key_opt()
-                return await self.async_step_features_opt()
-            defaults = _merge_submitted_sources(defaults, user_input, OPTIONAL_SOURCES)
-
-        # See async_step_optional_sources for why suggested_value is used
-        # instead of default (issue #135: unclearable, unsaveable fields).
-        fields = _build_optional_sources_fields(defaults, soil_unit)
-        return self.async_show_form(
-            step_id="optional_sources_opt",
-            data_schema=vol.Schema(fields),
-            errors=errors,
-            last_step=False,
-        )
-
-    def _build_core_schema(
+    def _build_thresholds_schema(
         self, imperial: bool, gust_u: str, rain_u: str, temp_u: str, rain_meas: str = "mm"
     ) -> vol.Schema:
         g = self._get
-        default_lat = getattr(self.hass.config, "latitude", 0.0) or 0.0
-        default_lon = getattr(self.hass.config, "longitude", 0.0) or 0.0
         cur_gust_ms = float(g(CONF_THRESH_WIND_GUST_MS, DEFAULT_THRESH_WIND_GUST_MS))
         cur_rain_mmph = float(g(CONF_THRESH_RAIN_RATE_MMPH, DEFAULT_THRESH_RAIN_RATE_MMPH))
         cur_freeze_c = float(g(CONF_THRESH_FREEZE_C, DEFAULT_THRESH_FREEZE_C))
@@ -1922,46 +2312,6 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     )
                 ),
                 vol.Optional(
-                    CONF_FORECAST_ENABLED, default=g(CONF_FORECAST_ENABLED, DEFAULT_FORECAST_ENABLED)
-                ): selector.BooleanSelector(),
-                vol.Optional(
-                    CONF_FORECAST_INTERVAL_MIN, default=g(CONF_FORECAST_INTERVAL_MIN, DEFAULT_FORECAST_INTERVAL_MIN)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode="box", unit_of_measurement="min")
-                ),
-                vol.Optional(
-                    CONF_FORECAST_LAT, default=g(CONF_FORECAST_LAT, round(default_lat, 4))
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-90, max=90, step=0.001, mode="box")),
-                vol.Optional(
-                    CONF_FORECAST_LON, default=g(CONF_FORECAST_LON, round(default_lon, 4))
-                ): selector.NumberSelector(selector.NumberSelectorConfig(min=-180, max=180, step=0.001, mode="box")),
-                vol.Optional(
-                    CONF_FORECAST_PROVIDER, default=g(CONF_FORECAST_PROVIDER, DEFAULT_FORECAST_PROVIDER)
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            FORECAST_PROVIDER_OPEN_METEO,
-                            FORECAST_PROVIDER_MET_NO,
-                            FORECAST_PROVIDER_NWS,
-                            FORECAST_PROVIDER_OWM,
-                            FORECAST_PROVIDER_PIRATE,
-                            FORECAST_PROVIDER_METEO_FRANCE,
-                            FORECAST_PROVIDER_HA_ENTITY,
-                        ],
-                        mode=selector.SelectSelectorMode.LIST,
-                        translation_key="forecast_provider",
-                    )
-                ),
-                # Optional weather entity used only by the HA-entity forecast provider.
-                # Must NOT carry a default of "" — an empty string fails the weather
-                # EntitySelector ("Entity is neither a valid entity ID nor a valid UUID")
-                # and blocked the whole options dialog (issue #71). Use a suggested value
-                # so it pre-fills when set but is simply omitted (no validation) when blank.
-                vol.Optional(
-                    CONF_FORECAST_ENTITY,
-                    description={"suggested_value": g(CONF_FORECAST_ENTITY, "") or None},
-                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="weather")),
-                vol.Optional(
                     CONF_THRESH_WIND_GUST_MS, default=round(_convert_gust_to_display(cur_gust_ms, gust_u), 1)
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=0, max=120, step=0.1, mode="box", unit_of_measurement=gust_u)
@@ -2015,6 +2365,118 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     selector.NumberSelectorConfig(min=-5, max=5, step=0.1, mode="box", unit_of_measurement="m/s")
                 ),
             }
+        )
+
+    async def async_step_uploads(self, user_input: dict[str, Any] | None = None):
+        """Configure upload services."""
+        self._ensure_opt()
+        self._in_menu_uploads = True
+        return await self.async_step_upload_services_opt(user_input)
+
+    async def async_step_diagnostics(self, user_input: dict[str, Any] | None = None):
+        """Configure feature toggles & diagnostics."""
+        self._ensure_opt()
+        self._in_menu_diagnostics = True
+        return await self.async_step_features_opt(user_input)
+
+    def _current_sources_for_options(self) -> dict[str, str]:
+        current: dict[str, str] = {}
+        try:
+            entry = self.config_entry
+            if entry is not None:
+                if CONF_SOURCES in entry.options:
+                    current = dict(entry.options[CONF_SOURCES] or {})
+                else:
+                    current = dict(entry.data.get(CONF_SOURCES, {}))
+        except (ValueError, AttributeError):
+            pass
+        if not current and hasattr(self, "_opt") and self._opt:
+            current = dict(self._opt.get(CONF_SOURCES, {}))
+
+        guessed = _guess_defaults(self.hass)
+        defaults: dict[str, str] = {}
+        for k in REQUIRED_SOURCES:
+            val = current.get(k) or guessed.get(k)
+            if val:
+                defaults[k] = val
+
+        # For optional sources, only use what is currently configured.
+        # Do not auto-guess unconfigured or cleared optional sources in the Options flow (issue #149).
+        for k in OPTIONAL_SOURCES:
+            val = current.get(k)
+            if val:
+                defaults[k] = val
+
+        return defaults
+
+    async def async_step_required_sources_opt(self, user_input: dict[str, Any] | None = None):
+        defaults = self._current_sources_for_options()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            sources = dict(self._get(CONF_SOURCES, {}))
+            for k in REQUIRED_SOURCES:
+                eid = user_input.get(k)
+                if not eid:
+                    errors[k] = "required"
+                else:
+                    err = _validate_numeric_sensor(self.hass, eid, allow_unknown=k in _ALLOW_UNKNOWN_SOURCE_KEYS)
+                    if err:
+                        errors[k] = err
+                    else:
+                        sources[k] = eid
+            if not errors:
+                self._opt[CONF_SOURCES] = {k: v.strip() for k, v in sources.items()}
+                return await self.async_step_optional_sources_opt()
+            defaults = _merge_submitted_sources(defaults, user_input, REQUIRED_SOURCES)
+
+        fields = {vol.Required(k, default=defaults.get(k)): _ENTITY_SELECTOR for k in REQUIRED_SOURCES}
+        return self.async_show_form(
+            step_id="required_sources_opt",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            last_step=False,
+        )
+
+    async def async_step_optional_sources_opt(self, user_input: dict[str, Any] | None = None):
+        defaults = self._current_sources_for_options()
+        errors: dict[str, str] = {}
+        soil_unit = str(
+            self._opt.get(CONF_SOIL_MOISTURE_UNIT, self._get(CONF_SOIL_MOISTURE_UNIT, DEFAULT_SOIL_MOISTURE_UNIT))
+            or DEFAULT_SOIL_MOISTURE_UNIT
+        )
+
+        if user_input is not None:
+            soil_unit = str(user_input.get(CONF_SOIL_MOISTURE_UNIT, soil_unit) or DEFAULT_SOIL_MOISTURE_UNIT)
+            sources = dict(self._opt.get(CONF_SOURCES) or self._get(CONF_SOURCES, {}))
+            for k in OPTIONAL_SOURCES:
+                sources.pop(k, None)
+                eid = user_input.get(k)
+                if not eid:
+                    continue
+                err = _validate_numeric_sensor(self.hass, eid, allow_unknown=k in _ALLOW_UNKNOWN_SOURCE_KEYS)
+                if err:
+                    errors[k] = err
+                else:
+                    sources[k] = eid.strip()
+            if not errors:
+                self._opt[CONF_SOURCES] = sources
+                self._opt[CONF_SOIL_MOISTURE_UNIT] = soil_unit
+                if getattr(self, "_in_menu_sources", False):
+                    return self.async_create_entry(title="", data=self._opt)
+                if self._opt.get(CONF_FORECAST_PROVIDER) in PROVIDERS_REQUIRING_API_KEY:
+                    return await self.async_step_forecast_api_key_opt()
+                return await self.async_step_features_opt()
+            defaults = _merge_submitted_sources(defaults, user_input, OPTIONAL_SOURCES)
+
+        # See async_step_optional_sources for why suggested_value is used
+        # instead of default (issue #135: unclearable, unsaveable fields).
+        fields = _build_optional_sources_fields(defaults, soil_unit)
+        return self.async_show_form(
+            step_id="optional_sources_opt",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            last_step=False,
         )
 
     # ------------------------------------------------------------------
@@ -2143,6 +2605,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             return await self.async_step_vigicrues_station_opt()
         if user_input.get(CONF_ENABLE_INDOOR):
             return await self.async_step_indoor_rooms_opt()
+        if getattr(self, "_in_menu_diagnostics", False):
+            return self.async_create_entry(title="", data=self._opt)
         return await self.async_step_upload_services_opt()
 
     async def async_step_pattern_forecast_opt(self, user_input: dict[str, Any] | None = None):
@@ -2264,12 +2728,16 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         return self.async_create_entry(title="", data=self._opt)
 
     async def _rooms_done(self):
+        if getattr(self, "_in_menu_rooms", False):
+            return self.async_create_entry(title="", data=self._opt)
         return await self._finish_or_next("indoor_rooms_opt")
 
     async def async_step_forecast_api_key_opt(self, user_input: dict[str, Any] | None = None):
         """Options step: API key for providers that require one."""
         if user_input is not None:
             self._opt.update(user_input)
+            if not getattr(self, "_in_legacy_flow", False):
+                return self.async_create_entry(title="", data=self._opt)
             return await self.async_step_features_opt()
 
         provider = self._opt.get(CONF_FORECAST_PROVIDER, "")
@@ -2325,6 +2793,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
         nxt = self._opt_next_after(after)
         if nxt is not None:
             return await nxt
+        if getattr(self, "_in_menu_diagnostics", False):
+            return self.async_create_entry(title="", data=self._opt)
         return await self.async_step_upload_services_opt()
 
     async def async_step_sea_temp_opt(self, user_input: dict[str, Any] | None = None):
@@ -2398,12 +2868,20 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
     async def async_step_air_quality_opt(self, user_input: dict[str, Any] | None = None):
         g = self._get
         if user_input is not None:
+            self._opt[CONF_AQI_SCALE] = str(user_input.get(CONF_AQI_SCALE, DEFAULT_AQI_SCALE))
             self._opt[CONF_AQI_INTERVAL_MIN] = int(user_input.get(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN))
             return await self._finish_or_next("air_quality_opt")
         return self.async_show_form(
             step_id="air_quality_opt",
             data_schema=vol.Schema(
                 {
+                    vol.Optional(CONF_AQI_SCALE, default=g(CONF_AQI_SCALE, DEFAULT_AQI_SCALE)): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=AQI_SCALE_OPTIONS,
+                            mode="dropdown",
+                            translation_key="aqi_scale",
+                        )
+                    ),
                     vol.Optional(
                         CONF_AQI_INTERVAL_MIN, default=g(CONF_AQI_INTERVAL_MIN, DEFAULT_AQI_INTERVAL_MIN)
                     ): selector.NumberSelector(
@@ -2435,6 +2913,7 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             self._opt[CONF_SOLAR_INTERVAL_MIN] = int(
                 user_input.get(CONF_SOLAR_INTERVAL_MIN, DEFAULT_SOLAR_INTERVAL_MIN)
             )
+            self._opt[CONF_SOLAR_PV_ENERGY_ENTITIES] = _pv_meter_list(user_input.get(CONF_SOLAR_PV_ENERGY_ENTITIES))
             self._opt[CONF_ET0_ILLUMINANCE_FALLBACK] = bool(
                 user_input.get(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK)
             )
@@ -2469,6 +2948,11 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(min=30, max=360, step=30, mode="box", unit_of_measurement="min")
                     ),
+                    # suggested_value, not default: the meters must stay clearable (issue #135).
+                    vol.Optional(
+                        CONF_SOLAR_PV_ENERGY_ENTITIES,
+                        description={"suggested_value": _pv_meter_list(g(CONF_SOLAR_PV_ENERGY_ENTITIES, [])) or None},
+                    ): _PV_METER_SELECTOR,
                     vol.Optional(
                         CONF_ET0_ILLUMINANCE_FALLBACK,
                         default=g(CONF_ET0_ILLUMINANCE_FALLBACK, DEFAULT_ET0_ILLUMINANCE_FALLBACK),
@@ -2477,6 +2961,8 @@ class WSStationOptionsFlowHandler(SharedFlowSteps, config_entries.OptionsFlow):
             ),
             description_placeholders={
                 "info": "Azimuth: 0=N, 90=E, 180=S, 270=W. Tilt: degrees from horizontal. "
+                "PV energy meters (optional): the kWh meters that count your solar production, as in the Energy "
+                "dashboard. With them, ws_core learns a local PV forecast from Open-Meteo irradiance and your real yield. "
                 "The illuminance fallback derives an approximate solar radiation from a lux sensor for the ET₀ "
                 "Penman-Monteith sensor when no solar_radiation source is mapped - lower confidence than a real "
                 "pyranometer reading, and only used if an illuminance sensor is also mapped in Sources."

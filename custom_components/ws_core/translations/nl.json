@@ -19,8 +19,11 @@
           "wind_speed": "Windsnelheidssensor",
           "wind_gust": "Windvlaagsensor",
           "wind_direction": "Windrichtingssensor (graden)",
-          "rain_total": "Cumulatieve neerslagsensor",
+          "rain_total": "Neerslagteller",
           "_go_back": "← Terug naar vorige stap"
+        },
+        "data_description": {
+          "rain_total": "Kies een teller in mm of in. Gebruik bij voorkeur een totaal- of jaarteller. Een teller per regenperiode is ook geschikt als de waarde tijdens elke regenperiode stijgt en tussen perioden op nul wordt gezet. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "optional_sources": {
@@ -43,6 +46,9 @@
           "soil_moisture_unit": "Eenheid van de bodemvochtsensor",
           "soil_temperature": "Bodemtemperatuursensor",
           "_go_back": "← Terug naar vorige stap"
+        },
+        "data_description": {
+          "rain_year": "Kies de neerslag van het station sinds 1 januari in mm of in. Je kunt in beide velden dezelfde jaarteller kiezen. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "location": {
@@ -159,12 +165,31 @@
           "enable_climate_normals": "Historical climate normals (compares today against ~10 years of local history, Open-Meteo archive, no API key)"
         },
         "data_description": {
+          "enable_display_sensors": "Weergavesensoren (niveaus, trends, gezondheid)",
+          "enable_fire_risk_score": "Brandrisicoscore",
+          "enable_sea_temp": "Zeewateroppervlaktetemperatuur",
+          "enable_air_quality": "Luchtkwaliteitsindex (Open-Meteo)",
+          "enable_pollen": "Pollenniveaus (Open-Meteo)",
+          "enable_moon": "Maanfase & verlichting",
+          "enable_solar_forecast": "Zonne-PV-voorspelling (forecast.solar)",
+          "enable_fog": "Schakelt mistkans-sensor in (dauwpunt-depressiemodel)",
+          "enable_thunderstorm_risk": "Schakelt onweersrisico-sensor in (oppervlakte-heuristiek)",
+          "enable_comfort_indices": "Schakelt comfortindexen en agrometeorologische sensoren in",
+          "enable_vigilance_meteo": "Schakelt departementale weerwaarschuwingen van Météo-France in (Vigilance Météo)",
+          "enable_vigicrues": "Schakelt het dichtstbijzijnde rivierpeil van Vigicrues in (Hub'Eau v2)",
+          "enable_diagnostics": "Sensordrift, cross-sensorconsistentie, kwaliteitsvlaggen, voorspellingsvaardigheid/-overeenkomst, zonne-luxfactor, 30-daagse klimatologie",
+          "enable_fwi_components": "FWI-tussencodes (FFMC/DMC/DC/ISI/BUI). Vereist Brandrisico ingeschakeld om gegevens te produceren",
+          "enable_advanced_sensors": "Zambretti-nummer (numerieke vorm), uurlijkse ET₀, afgevlakte windrichting",
+          "enable_nowcast": "Open-Meteo 15-minuten neerslag-nowcast: minuten tot regen begint/stopt, totaal volgend uur, intensiteit. Geen API-sleutel",
           "enable_degree_days": "Berekening van groei-, verwarmings- en koelgraaddagen plus een schatting van de bladnatheid, nuttig voor landbouw en energiebeheer.",
+          "enable_lightning": "Aantal blikseminslagen, dichtstbijzijnde afstand en onweersnabijheid van een bliksemsensor (of Blitzortung als er geen sensor is gekoppeld).",
+          "enable_indoor": "Binnentemperatuur, luchtvochtigheid en CO₂, het verschil met buiten en het comfort per benoemde ruimte.",
+          "enable_soil": "Bodemvocht- en bodemtemperatuursensoren, plus een geschatte beregeningsbehoefte op basis van verdamping en regen.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "weathercloud": {
@@ -272,7 +297,8 @@
         "description": "Luchtkwaliteitsgegevens (PM2,5, PM10, NO₂, ozon) van Open-Meteo. Gratis, geen API-sleutel vereist. Gebruikt de breedtegraad/lengtegraad van de verwachting.",
         "data": {
           "aqi_interval_min": "Verversingsinterval",
-          "_go_back": "← Terug naar vorige stap"
+          "_go_back": "← Terug naar vorige stap",
+          "aqi_scale": "AQI-schaal"
         }
       },
       "pollen": {
@@ -290,6 +316,7 @@
           "solar_panel_azimuth": "Azimut zonnepanelen",
           "solar_panel_tilt": "Hellingshoek zonnepanelen",
           "solar_interval_min": "Verversingsinterval",
+          "solar_pv_energy_entities": "PV-energiemeters (optioneel)",
           "_go_back": "← Terug naar vorige stap"
         }
       },
@@ -374,8 +401,58 @@
   "options": {
     "step": {
       "init": {
-        "title": "Kerninstellingen",
-        "description": "Identiteit, eenheden, verwachting, waarschuwingen en kalibratie.",
+        "title": "Configuratiemenu",
+        "description": "Kies een sectie om te configureren.",
+        "menu_options": {
+          "sources": "Sensorbronnen (hardware-koppelingen)",
+          "forecast": "Weersverwachting & locatie",
+          "decision_profiles": "Beslissingsengine & weervensters",
+          "rooms": "Binnenkamers",
+          "thresholds": "Drempels, eenheden & kalibratie",
+          "uploads": "Weerdiensten & uploads",
+          "diagnostics": "Functies & diagnostiek"
+        }
+      },
+      "sources": {
+        "title": "Sensorbronnen",
+        "description": "Configureer fysieke sensorentiteit-koppelingen."
+      },
+      "forecast": {
+        "title": "Weersverwachting",
+        "description": "Configureer externe weersverwachting-leverancier, verversingsinterval en coördinaten.",
+        "data": {
+          "forecast_enabled": "Verwachting inschakelen",
+          "forecast_interval_min": "Verversingsinterval verwachting",
+          "forecast_lat": "Breedtegraad verwachting",
+          "forecast_lon": "Lengtegraad verwachting",
+          "forecast_provider": "Weergegevensleverancier",
+          "forecast_entity": "HA weereentiteit (voor Home Assistant-leverancier)"
+        }
+      },
+      "decision_profiles": {
+        "title": "Beslissingsprofielen & weervensters",
+        "description": "Configureer de weerbeslissingsengine en selecteer automatische activiteitenvensters.{provider_warning}",
+        "data": {
+          "enable_weather_windows": "Weervensters beslissingsengine inschakelen",
+          "weather_window_profiles": "Actieve beslissingsprofielen",
+          "custom_window_name": "Naam aangepast profiel",
+          "custom_min_duration_h": "Aangepaste minimale duur (uren)",
+          "custom_max_rain_prob_pct": "Aangepaste max. regenkans (%)",
+          "custom_max_rain_mm": "Aangepaste max. neerslag",
+          "custom_min_temp_c": "Aangepaste min. temperatuur",
+          "custom_max_temp_c": "Aangepaste max. temperatuur",
+          "custom_min_humidity_pct": "Aangepaste min. luchtvochtigheid (%)",
+          "custom_max_humidity_pct": "Aangepaste max. luchtvochtigheid (%)",
+          "custom_min_wind_kmh": "Aangepaste min. windsnelheid",
+          "custom_max_wind_kmh": "Aangepaste max. windsnelheid",
+          "custom_max_wind_gust_kmh": "Aangepaste max. windstoot",
+          "custom_max_cloud_cover_pct": "Aangepaste max. bewolking (%)",
+          "custom_require_daylight": "Aangepast profiel vereist daglicht"
+        }
+      },
+      "thresholds": {
+        "title": "Drempels, eenheden & kalibratie",
+        "description": "Stationsidentiteit, eenheden, waarschuwingsdrempels en sensorkalibratie-offsets.",
         "data": {
           "prefix": "Entiteit-voorvoegsel",
           "hemisphere": "Halfrond",
@@ -388,52 +465,6 @@
           "rain_unit": "Neerslagseenheid",
           "distance_unit": "Afstandseenheid",
           "altitude_unit": "Hoogte-eenheid",
-          "forecast_enabled": "Verwachting inschakelen",
-          "forecast_interval_min": "Verversingsinterval verwachting",
-          "forecast_lat": "Breedtegraad verwachting",
-          "forecast_lon": "Lengtegraad verwachting",
-          "forecast_provider": "Weergegevensleverancier",
-          "forecast_api_key": "API-sleutel verwachting",
-          "forecast_entity": "HA weereentiteit (voor Home Assistant-leverancier)",
-          "thresh_wind_gust_ms": "Drempelwaarde windvlaagwaarschuwing",
-          "thresh_rain_rate_mmph": "Drempelwaarde regenwaarschuwing",
-          "thresh_freeze_c": "Drempelwaarde vorswaarschuwing",
-          "staleness_s": "Time-out sensorverouderd",
-          "rain_filter_alpha": "Filterafvlakking regenintensiteit",
-          "pressure_trend_window_h": "Venster luchtdruktrend",
-          "cal_temp_c": "Kalibratie-offset temperatuur",
-          "cal_humidity": "Kalibratie-offset luchtvochtigheid",
-          "cal_pressure_hpa": "Kalibratie-offset luchtdruk",
-          "cal_wind_ms": "Kalibratie-offset windsnelheid",
-          "enable_display_sensors": "Weergavesensoren (niveaus, trends, gezondheid)",
-          "enable_fire_risk_score": "Brandrisicoscore",
-          "enable_sea_temp": "Zeewateroppervlaktetemperatuur",
-          "sea_temp_lat": "Breedtegraad zeewatertemperatuur",
-          "sea_temp_lon": "Lengtegraad zeewatertemperatuur",
-          "enable_wunderground": "Weather Underground upload",
-          "wu_station_id": "WU station-ID",
-          "wu_api_key": "WU stationcijfercode (wachtwoord)",
-          "wu_interval_min": "WU uploadinterval"
-        },
-        "data_description": {
-          "prefix": "Entiteit-voorvoegsel",
-          "hemisphere": "Halfrond",
-          "climate_region": "Klimaatregio",
-          "elevation_m": "Stationshoogte",
-          "units_mode": "Stelt een basiseenheidssysteem in. Afzonderlijke eenheidsoverschrijvingen hieronder hebben voorrang.",
-          "temp_unit": "Temperatuurweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "wind_unit": "Windsnelheidsweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "pressure_unit": "Drukweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "rain_unit": "Neerslagweergave overschrijven. 'Automatisch' volgt je HA-eenheidssysteem.",
-          "distance_unit": "Afstandsweergave overschrijven (bijv. bliksemafstand). 'Automatisch' volgt je HA-eenheidssysteem.",
-          "altitude_unit": "Hoogteweergave overschrijven (bijv. wolkenbasis, vriesniveau). 'Automatisch' volgt je HA-eenheidssysteem.",
-          "forecast_enabled": "Verwachting inschakelen",
-          "forecast_interval_min": "Verversingsinterval verwachting",
-          "forecast_lat": "Breedtegraad verwachting",
-          "forecast_lon": "Lengtegraad verwachting",
-          "forecast_provider": "Weergegevensbron. Open-Meteo en Met.no zijn gratis zonder API-sleutel. NWS/NOAA is gratis maar alleen voor de VS. OpenWeatherMap, Pirate Weather en Météo France vereisen een gratis API-sleutel. 'Home Assistant weereentiteit' gebruikt een bestaande weather.*-entiteit - geen extra API-aanroepen.",
-          "forecast_api_key": "API-sleutel voor de geselecteerde weergegevensleverancier (vereist voor OpenWeatherMap, Pirate Weather en Météo France).",
-          "forecast_entity": "Vereist wanneer 'Home Assistant weereentiteit' is geselecteerd. Kies een willekeurige weather.*-entiteit die al is ingesteld in Home Assistant.",
           "thresh_wind_gust_ms": "Drempelwaarde windvlaagwaarschuwing",
           "thresh_rain_rate_mmph": "Drempelwaarde regenwaarschuwing",
           "thresh_freeze_c": "Drempelwaarde vorswaarschuwing",
@@ -466,7 +497,10 @@
           "wind_speed": "Windsnelheidssensor",
           "wind_gust": "Windvlaagsensor",
           "wind_direction": "Windrichtingssensor (graden)",
-          "rain_total": "Cumulatieve neerslagsensor"
+          "rain_total": "Neerslagteller"
+        },
+        "data_description": {
+          "rain_total": "Kies een teller in mm of in. Gebruik bij voorkeur een totaal- of jaarteller. Een teller per regenperiode is ook geschikt als de waarde tijdens elke regenperiode stijgt en tussen perioden op nul wordt gezet. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "optional_sources_opt": {
@@ -488,6 +522,9 @@
           "soil_moisture": "Bodemvochtigheidssensor (0-100% of 0-1 volumetrisch)",
           "soil_moisture_unit": "Eenheid van de bodemvochtsensor",
           "soil_temperature": "Bodemtemperatuursensor"
+        },
+        "data_description": {
+          "rain_year": "Kies de neerslag van het station sinds 1 januari in mm of in. Je kunt in beide velden dezelfde jaarteller kiezen. Kies voor langetermijnstatistieken bij voorkeur statusklasse total_increasing."
         }
       },
       "features_opt": {
@@ -537,11 +574,15 @@
           "enable_fwi_components": "FWI-tussencodes (FFMC/DMC/DC/ISI/BUI). Vereist Brandrisico ingeschakeld om gegevens te produceren",
           "enable_advanced_sensors": "Zambretti-nummer (numerieke vorm), uurlijkse ET₀, afgevlakte windrichting",
           "enable_nowcast": "Open-Meteo 15-minuten neerslag-nowcast: minuten tot regen begint/stopt, totaal volgend uur, intensiteit. Geen API-sleutel",
+          "enable_degree_days": "Berekening van groei-, verwarmings- en koelgraaddagen plus een schatting van de bladnatheid, nuttig voor landbouw en energiebeheer.",
+          "enable_lightning": "Aantal blikseminslagen, dichtstbijzijnde afstand en onweersnabijheid van een bliksemsensor (of Blitzortung als er geen sensor is gekoppeld).",
+          "enable_indoor": "Binnentemperatuur, luchtvochtigheid en CO₂, het verschil met buiten en het comfort per benoemde ruimte.",
+          "enable_soil": "Bodemvocht- en bodemtemperatuursensoren, plus een geschatte beregeningsbehoefte op basis van verdamping en regen.",
+          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio.",
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average.",
-          "enable_snow": "Heuristic, not a measurement: no station-agnostic snow gauge exists. Estimates precipitation phase from wet-bulb temperature and snow accumulation from your existing rain rate via a temperature-dependent snow-to-liquid ratio."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "indoor_rooms_opt": {
@@ -626,7 +667,8 @@
         "title": "Luchtkwaliteitsinstellingen",
         "description": "Open-Meteo Air Quality API. Gratis, geen sleutel vereist.",
         "data": {
-          "aqi_interval_min": "Verversingsinterval"
+          "aqi_interval_min": "Verversingsinterval",
+          "aqi_scale": "AQI-schaal"
         }
       },
       "pollen_opt": {
@@ -641,7 +683,8 @@
           "solar_peak_kw": "Piekzonnestroom (kWp)",
           "solar_panel_azimuth": "Azimut zonnepanelen",
           "solar_panel_tilt": "Hellingshoek zonnepanelen",
-          "solar_interval_min": "Verversingsinterval"
+          "solar_interval_min": "Verversingsinterval",
+          "solar_pv_energy_entities": "PV-energiemeters (optioneel)"
         }
       },
       "vigicrues_station_opt": {
@@ -732,7 +775,11 @@
       "invalid_api_key": "Ongeldige API-sleutel of inloggegevens geweigerd",
       "cannot_connect": "Kan geen verbinding maken met API - controleer het netwerk en probeer opnieuw",
       "station_not_found": "Weather Underground station-ID niet gevonden",
-      "room_name_required": "Voer een naam in voor de ruimte."
+      "room_name_required": "Voer een naam in voor de ruimte.",
+      "invalid_duration": "De minimale duur moet een heel aantal uren tussen 1 en 23 zijn.",
+      "min_exceeds_max": "De minimumlimiet mag niet hoger zijn dan de maximumlimiet.",
+      "out_of_range": "De waarde ligt buiten het geldige bereik.",
+      "invalid_profiles": "Een of meer geselecteerde profielen zijn ongeldig."
     }
   },
   "issues": {
@@ -796,7 +843,7 @@
         "name": "Windrichting"
       },
       "rain_total": {
-        "name": "Neerslag totaal"
+        "name": "Neerslagteller"
       },
       "rain_rate": {
         "name": "Neerslagintensiteit"
@@ -882,6 +929,9 @@
           },
           "alert_count": {
             "name": "Aantal waarschuwingen"
+          },
+          "detail_message": {
+            "name": "Detailbericht"
           }
         }
       },
@@ -896,6 +946,12 @@
           },
           "color": {
             "name": "Kleur"
+          },
+          "detail_message": {
+            "name": "Detailbericht"
+          },
+          "active_alerts": {
+            "name": "Actieve waarschuwingen"
           }
         }
       },
@@ -1415,7 +1471,11 @@
               "unhealthy_sensitive": "Ongezond voor gevoelige groepen",
               "unhealthy": "Ongezond",
               "very_unhealthy": "Zeer ongezond",
-              "hazardous": "Gevaarlijk"
+              "hazardous": "Gevaarlijk",
+              "fair": "Redelijk",
+              "poor": "Slecht",
+              "very_poor": "Zeer slecht",
+              "extremely_poor": "Extreem slecht"
             }
           },
           "pm2_5_ug_m3": {
@@ -1429,6 +1489,13 @@
           },
           "ozone_ug_m3": {
             "name": "Ozon (µg/m³)"
+          },
+          "scale": {
+            "name": "AQI-schaal",
+            "state": {
+              "european": "Europees (EAQI)",
+              "us": "VS (EPA)"
+            }
           }
         }
       },
@@ -1542,6 +1609,37 @@
       "solar_forecast_tomorrow": {
         "name": "Zonvoorspelling morgen"
       },
+      "solar_local_forecast_today": {
+        "name": "Lokale PV-voorspelling vandaag",
+        "state_attributes": {
+          "model_status": {
+            "name": "Modelstatus",
+            "state": {
+              "prior": "Uit paneelinstellingen",
+              "learning": "Leert",
+              "trained": "Getraind"
+            }
+          },
+          "days_used": {
+            "name": "Gebruikte dagen"
+          },
+          "site_factor": {
+            "name": "Locatiefactor"
+          },
+          "skill_local": {
+            "name": "Nauwkeurigheid dag vooraf (lokaal)"
+          },
+          "skill_forecast_solar": {
+            "name": "Nauwkeurigheid dag vooraf (forecast.solar)"
+          }
+        }
+      },
+      "solar_local_forecast_tomorrow": {
+        "name": "Lokale PV-voorspelling morgen"
+      },
+      "solar_local_forecast_remaining_today": {
+        "name": "Lokale PV-voorspelling resterend vandaag"
+      },
       "fog_probability": {
         "name": "Mistkans",
         "state_attributes": {
@@ -1611,6 +1709,20 @@
           "probable": "Waarschijnlijk",
           "unlikely": "Onwaarschijnlijk",
           "no_risk": "Geen risico"
+        },
+        "state_attributes": {
+          "min_temp_c": {
+            "name": "Laagste meegenomen temperatuur (°C)"
+          },
+          "forecast_min_c": {
+            "name": "Verwacht minimum (°C)"
+          },
+          "threshold_c": {
+            "name": "Vorstdrempel (°C)"
+          },
+          "frost_point_c": {
+            "name": "Rijppunt (°C)"
+          }
         }
       },
       "sensor_drift": {
@@ -1728,6 +1840,13 @@
           },
           "zambretti_forecast": {
             "name": "Zambretti-voorspelling"
+          },
+          "comparison_window": {
+            "name": "Vergelijkingsvenster",
+            "state": {
+              "hourly_12h": "Komende 12 uur (uurlijks)",
+              "daily": "Vandaag (dagelijks)"
+            }
           }
         }
       },
@@ -1957,6 +2076,13 @@
               "internet": "Internet"
             }
           }
+        }
+      },
+      "data_status": {
+        "name": "Gegevensstatus",
+        "state": {
+          "ok": "OK",
+          "attention": "Aandacht nodig"
         }
       },
       "pattern_forecast_status": {
@@ -2531,43 +2657,43 @@
         "name": "{river} - Rivierdebiete"
       },
       "temperature_high_year": {
-        "name": "Temperature High (Year)"
+        "name": "Temperatuur max (Jaar)"
       },
       "temperature_low_year": {
-        "name": "Temperature Low (Year)"
+        "name": "Temperatuur min (Jaar)"
       },
       "temperature_high_all_time": {
-        "name": "Temperature High (All-Time)"
+        "name": "Temperatuur max (Record)"
       },
       "temperature_low_all_time": {
-        "name": "Temperature Low (All-Time)"
+        "name": "Temperatuur min (Record)"
       },
       "temperature_high_week": {
-        "name": "Temperature High (Week)"
+        "name": "Temperatuur max (Week)"
       },
       "temperature_low_week": {
-        "name": "Temperature Low (Week)"
+        "name": "Temperatuur min (Week)"
       },
       "temperature_high_month": {
-        "name": "Temperature High (Month)"
+        "name": "Temperatuur max (Maand)"
       },
       "temperature_low_month": {
-        "name": "Temperature Low (Month)"
+        "name": "Temperatuur min (Maand)"
       },
       "wind_gust_max_month": {
-        "name": "Wind Gust Max (Month)"
+        "name": "Max. windvlaag (Maand)"
       },
       "wind_gust_max_year": {
-        "name": "Wind Gust Max (Year)"
+        "name": "Max. windvlaag (Jaar)"
       },
       "wind_gust_max_all_time": {
-        "name": "Wind Gust Max (All-Time)"
+        "name": "Max. windvlaag (Record)"
       },
       "dry_streak_record": {
-        "name": "Dry Streak Record"
+        "name": "Record droogteperiode"
       },
       "heat_streak_record": {
-        "name": "Heat Streak Record",
+        "name": "Record hitteperiode",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2575,7 +2701,7 @@
         }
       },
       "frost_streak_record": {
-        "name": "Frost Streak Record",
+        "name": "Record vorstperiode",
         "state_attributes": {
           "threshold_c": {
             "name": "Threshold (°C)"
@@ -2583,7 +2709,7 @@
         }
       },
       "temp_high_normal": {
-        "name": "Temperature High (Normal)",
+        "name": "Temperatuur max (Normaal)",
         "state_attributes": {
           "sample_years": {
             "name": "Sample years"
@@ -2594,19 +2720,19 @@
         }
       },
       "temp_low_normal": {
-        "name": "Temperature Low (Normal)"
+        "name": "Temperatuur min (Normaal)"
       },
       "rain_normal": {
-        "name": "Rain (Normal)"
+        "name": "Neerslag (Normaal)"
       },
       "temp_anomaly_normal": {
-        "name": "Temperature Anomaly (Normal)"
+        "name": "Temperatuuranomalie (Normaal)"
       },
       "rain_anomaly_normal": {
-        "name": "Rain Anomaly (Normal)"
+        "name": "Neerslaganomalie (Normaal)"
       },
       "auto_calibration": {
-        "name": "Auto Calibration",
+        "name": "Automatische kalibratie",
         "state": {
           "learning": "Learning",
           "stable": "Stable",
@@ -2631,7 +2757,7 @@
         }
       },
       "snow_phase": {
-        "name": "Precipitation Phase",
+        "name": "Neerslagfase",
         "state": {
           "snow": "Snow",
           "sleet": "Sleet",
@@ -2640,19 +2766,19 @@
         }
       },
       "snow_rate": {
-        "name": "Snow Rate"
+        "name": "Sneeuwintensiteit"
       },
       "snow_today": {
-        "name": "Snow Today"
+        "name": "Sneeuw vandaag"
       },
       "snow_this_month": {
-        "name": "Snow This Month"
+        "name": "Sneeuw deze maand"
       },
       "snow_this_year": {
-        "name": "Snow This Year"
+        "name": "Sneeuw dit jaar"
       },
       "snow_record_day": {
-        "name": "Snowiest Day",
+        "name": "Sneeuwrijkste dag",
         "state_attributes": {
           "date": {
             "name": "Date"
@@ -2660,10 +2786,10 @@
         }
       },
       "indoor_room_delta": {
-        "name": "Temp Delta - {room_name}"
+        "name": "Temp. verschil - {room_name}"
       },
       "indoor_room_humidity": {
-        "name": "Humidity - {room_name}"
+        "name": "Luchtvochtigheid - {room_name}"
       },
       "indoor_room_absolute_humidity": {
         "name": "Absolute luchtvochtigheid - {room_name}"
@@ -2673,6 +2799,77 @@
       },
       "indoor_room_comfort": {
         "name": "Comfort - {room_name}"
+      },
+      "window_outdoor_drying_status": {
+        "name": "Buiten Drogen Status",
+        "state": {
+          "suitable_now": "Nu geschikt",
+          "window_upcoming": "Venster op komst",
+          "unsuitable": "Ongeschikt",
+          "unknown": "Onbekend"
+        }
+      },
+      "window_outdoor_drying_next_start": {
+        "name": "Buiten Drogen Volgende Start"
+      },
+      "window_outdoor_drying_next_end": {
+        "name": "Buiten Drogen Volgend Einde"
+      },
+      "window_garden_work_status": {
+        "name": "Tuinwerk Status",
+        "state": {
+          "suitable_now": "Nu geschikt",
+          "window_upcoming": "Venster op komst",
+          "unsuitable": "Ongeschikt",
+          "unknown": "Onbekend"
+        }
+      },
+      "window_garden_work_next_start": {
+        "name": "Tuinwerk Volgende Start"
+      },
+      "window_garden_work_next_end": {
+        "name": "Tuinwerk Volgend Einde"
+      },
+      "window_custom_status": {
+        "name": "Status {profile_name}",
+        "state": {
+          "suitable_now": "Nu geschikt",
+          "window_upcoming": "Venster op komst",
+          "unsuitable": "Ongeschikt",
+          "unknown": "Onbekend"
+        }
+      },
+      "window_custom_next_start": {
+        "name": "{profile_name} Volgende Start"
+      },
+      "window_custom_next_end": {
+        "name": "{profile_name} Volgend Einde"
+      },
+      "wind_beaufort_description": {
+        "name": "Beaufort-windbeschrijving",
+        "state": {
+          "calm": "Windstil",
+          "light_air": "Flauw en stil",
+          "light_breeze": "Zwakke wind",
+          "gentle_breeze": "Lichte wind",
+          "moderate_breeze": "Matige wind",
+          "fresh_breeze": "Vrij krachtige wind",
+          "strong_breeze": "Krachtige wind",
+          "near_gale": "Harde wind",
+          "gale": "Stormachtige wind",
+          "strong_gale": "Storm",
+          "storm": "Zware storm",
+          "violent_storm": "Zeer zware storm",
+          "hurricane": "Orkaan"
+        },
+        "state_attributes": {
+          "beaufort": {
+            "name": "Beaufort"
+          },
+          "speed_ms": {
+            "name": "Windsnelheid (m/s)"
+          }
+        }
       }
     },
     "select": {
@@ -2827,7 +3024,7 @@
         "name": "Functie: Windy upload"
       },
       "ws_enable_auto_calibration": {
-        "name": "Feature: Adaptive Sensor Calibration"
+        "name": "Functie: Adaptieve sensorkalibratie"
       },
       "ws_enable_neighbor_qc": {
         "name": "Functie: Sensorcontrole"
@@ -2836,10 +3033,10 @@
         "name": "Functie: Patroonvoorspelling"
       },
       "ws_enable_climate_normals": {
-        "name": "Feature: Historical Climate Normals"
+        "name": "Functie: Historische klimaatnormalen"
       },
       "ws_enable_snow": {
-        "name": "Feature: Snow"
+        "name": "Functie: Sneeuw"
       }
     },
     "binary_sensor": {
@@ -2874,7 +3071,7 @@
         "name": "Dauwpunt overschrijdt temperatuur"
       },
       "ws_snow_falling": {
-        "name": "Snow Falling"
+        "name": "Sneeuwval"
       }
     },
     "event": {
@@ -3013,6 +3210,20 @@
         "auto": "Automatisch (detecteren via sensoreenheid)",
         "percent": "Procent (0-100%)",
         "fraction": "Volumetrische fractie (0-1 / m³/m³)"
+      }
+    },
+    "weather_window_profiles": {
+      "options": {
+        "outdoor_drying": "Was buiten drogen",
+        "garden_work": "Tuin- en erfwerk",
+        "custom": "Aangepast vensterprofiel"
+      }
+    },
+    "aqi_scale": {
+      "options": {
+        "auto": "Auto (Europese EAQI in Europa, US EPA elders)",
+        "european": "Europese luchtkwaliteitsindex (EAQI)",
+        "us": "US EPA-luchtkwaliteitsindex"
       }
     }
   }

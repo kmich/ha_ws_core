@@ -121,4 +121,10 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             if coord is not None and getattr(coord, "_pattern", None) is not None
             else {"enabled": False}
         ),
+        # Local PV forecast: model status, site factor and day-ahead skill. No location data.
+        "solar_local_forecast": (
+            coord._solar_local.summary()
+            if coord is not None and getattr(coord, "_solar_local", None) is not None
+            else {"enabled": False}
+        ),
     }

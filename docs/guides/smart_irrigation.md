@@ -11,7 +11,7 @@ rainfall. ws_core provides the ET₀ value; Smart Irrigation decides the waterin
 ## Prerequisites
 
 - Weather Station Core installed and configured
-- [Smart Irrigation](https://github.com/jeroenterheerdt/HAsmartirrigation) installed via HACS
+- [Smart Irrigation](https://github.com/jeroenterheerdt/HAsmartirrigation) installed from Marketplace or HACS
 - A solar radiation sensor mapped in ws_core (for Penman-Monteith ET₀)
   OR acceptance of the Hargreaves-Samani approximation
 
