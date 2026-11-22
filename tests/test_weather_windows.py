@@ -1125,6 +1125,24 @@ class TestReleaseReviewFixes:
         assert after.status == STATUS_UNSUITABLE
         assert REASON_CURRENT_GUST_HIGH in after.reason_codes
 
+    def test_action_with_a_tighter_gust_limit_keeps_the_sustained_hold(self):
+        eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
+        t0 = datetime(2026, 6, 21, 9, 30, tzinfo=UTC)
+        hourly = _make_hourly_forecast(t0.replace(minute=0), hours=8)
+        profile = DEFAULT_PROFILES[PROFILE_OUTDOOR_DRYING]
+        assert self._sustain_gust(eng, profile, hourly, t0).status == STATUS_UNSUITABLE
+
+        gust = {KEY_NORM_WIND_GUST_MS: 14.0}  # 50.4 km/h, above the 45 km/h profile limit
+        t_svc = t0 + timedelta(minutes=5)
+        tighter = apply_profile_overrides(profile, {"max_wind_gust_kmh": 30}, profile_id=profile.profile_id)
+        svc = eng.evaluate_profile(tighter, hourly, current_data=gust, now=t_svc, update_live_hold=False)
+        assert svc.status == STATUS_UNSUITABLE
+        assert REASON_CURRENT_GUST_HIGH in svc.reason_codes
+        # A looser limit than the tracked one has no sustained evidence and is not held
+        looser = apply_profile_overrides(profile, {"max_wind_gust_kmh": 50}, profile_id=profile.profile_id)
+        svc = eng.evaluate_profile(looser, hourly, current_data=gust, now=t_svc, update_live_hold=False)
+        assert REASON_CURRENT_GUST_HIGH not in svc.reason_codes
+
     def test_upcoming_window_text_uses_local_clock_and_tomorrow(self):
         eng = WeatherWindowsEngine(lat=38.0, lon=23.7)
         now = datetime(2026, 6, 21, 20, 0, tzinfo=UTC)

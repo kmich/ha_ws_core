@@ -66,7 +66,9 @@ def build_url(lat: float, lon: float, tilt: float, compass_azimuth: float, past_
         f"?latitude={lat}&longitude={lon}"
         "&hourly=global_tilted_irradiance"
         f"&tilt={float(tilt):g}&azimuth={open_meteo_azimuth(compass_azimuth):g}"
-        f"&past_days={max(0, min(BACKFILL_DAYS, int(past_days)))}&forecast_days=2"
+        # Three GMT days: local tomorrow runs into the third UTC day for sites far from UTC
+        # (west of about UTC-4 in the afternoon, or east of UTC+2 before local midnight).
+        f"&past_days={max(0, min(BACKFILL_DAYS, int(past_days)))}&forecast_days=3"
         "&timeformat=unixtime&timezone=GMT"
     )
 

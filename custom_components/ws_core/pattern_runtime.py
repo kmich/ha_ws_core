@@ -1223,8 +1223,16 @@ class PatternRuntime:
 
         did_reset = reset_val < PATTERN_HISTORY_FEATURES_METHOD
         if did_reset:
+            reset_seq = self._reset_seq
             if not await self._async_backup_pre_migration_state():
                 return True
+            # A learning reset (or unload) while the backup was written wins: ``hl`` and
+            # ``targets`` are copies from before it and must not be written back.
+            if self._reset_seq != reset_seq or self.engine is not eng or getattr(self.coord, "_stopped", False) is True:
+                _LOGGER.debug(
+                    "ws_core pattern forecast: learning state was reset during the v3 backup; skipping migration"
+                )
+                return False
             _LOGGER.info(
                 "ws_core pattern forecast: migrating pattern state for v3.0 feature alignment (dp_3h and solar replay masking)"
             )

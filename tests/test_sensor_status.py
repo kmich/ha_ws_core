@@ -69,7 +69,11 @@ def test_missing_lightning_and_idle_lightning_are_distinct():
     co = coord()
     assert unknown_status(c.KEY_LIGHTNING_DISTANCE_KM, co, {})["reason"] == "missing_lightning_source"
     co._blitzortung_sources = {c.SRC_LIGHTNING_DISTANCE: "sensor.distance"}
+    states = {"sensor.distance": SimpleNamespace(state="unknown")}
+    co.hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
     assert unknown_status(c.KEY_LIGHTNING_DISTANCE_KM, co, {})["reason"] == "waiting_for_lightning_location"
+    states["sensor.distance"] = SimpleNamespace(state="unavailable")
+    assert unknown_status(c.KEY_LIGHTNING_DISTANCE_KM, co, {})["reason"] == "lightning_source_unavailable"
     assert unknown_status(c.KEY_LIGHTNING_CLEARANCE_MIN, co, {})["reason"] == "no_strike_recorded"
 
 

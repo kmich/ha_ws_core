@@ -26,9 +26,9 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 ### Breaking changes when upgrading from 2.x
 
-1. **Home Assistant 2024.10 or newer is required.**
+1. **Home Assistant 2024.12 or newer is required.**
 2. **Feels-like sensors** (heat index, THW, THSW, wind chill, humidex) show the air temperature outside their range instead of `unknown`. Automations should check the `formula_applies` attribute.
-3. **Lightning:** `sensor.ws_lightning_proximity` reads `clear` without a strike, and `sensor.ws_lightning_clearance` keeps counting across restarts. **Re-import the Lightning Safety blueprint** so a restart cannot send a false all-clear.
+3. **Lightning:** `sensor.ws_lightning_proximity` reads `clear` without a strike (unknown while the detector is unavailable), and `sensor.ws_lightning_clearance` keeps counting across restarts. **Re-import the Lightning Safety blueprint** so a restart cannot send a false all-clear.
 4. **Actions raise errors:** every ws_core action fails with a clear error for an unknown station, an unknown profile or invalid limits, instead of returning `{}` or an `error` key.
 5. **Leftover solar sensors are removed** on stations without a solar radiation sensor (W/m²), including THSW. They could never have a value.
 6. **Turning Weather Windows or a profile off removes its entities.**
@@ -82,7 +82,7 @@ The [hardware mapping guide](docs/hardware_mapping.md) covers each brand in deta
 2. If setup did not open automatically, go to **Settings → Devices & Services → Add Integration** and search for **Weather Station Core**. Updates to an already installed integration still require a restart.
 3. Check the entities it suggests for your station and submit.
 
-Requires Home Assistant 2024.10 or newer. More than 50 sensors are created straight away. Optional features are under **Configure → Features & Diagnostics**, and Weather Windows under **Configure → Decision Engine & Weather Windows**. The [quickstart](docs/quickstart.md) walks through each step.
+Requires Home Assistant 2024.12 or newer. More than 50 sensors are created straight away. Optional features are under **Configure → Features & Diagnostics**, and Weather Windows under **Configure → Decision Engine & Weather Windows**. The [quickstart](docs/quickstart.md) walks through each step.
 
 ## Blueprints
 

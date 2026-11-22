@@ -4,26 +4,26 @@ All notable changes to Weather Station Core are documented here.
 
 ## [3.0.0] - 2026-11-22
 
-This major release builds directly on the v2.14.0–2.14.3 correctness fixes (all v2.14.x fixes are included). Minimum supported Home Assistant version is raised from **2024.6.0** to **2024.10.0**.
+This major release builds directly on the v2.14.0–2.14.3 correctness fixes (all v2.14.x fixes are included). Minimum supported Home Assistant version is raised from **2024.6.0** to **2024.12.0**.
 
 **Highlights**
 
 - **Weather Windows:** when in the next 24 hours the weather suits drying laundry, garden work or your own activity, with start and end sensors, plain-language reasons, a notification blueprint, dashboard views and the `ws_core.get_weather_windows` action. [Guide](https://kmich.github.io/ha_ws_core/guides/weather_windows/)
 - **Data Status and plain status text:** `sensor.ws_data_status` says whether anything needs attention, and every empty sensor carries a short `status_text` that the bundled dashboards show instead of "Unknown".
 - **Local PV forecast** learned from your own PV meters and Open-Meteo irradiance for your panel angle.
-- **Feels-like sensors show the air temperature** outside their formula's range, lightning proximity reads `clear` without a strike, and the clearance timer survives restarts.
+- **Feels-like sensors show the air temperature** outside their formula's range, lightning proximity reads `clear` without a strike (unknown while the detector is unavailable), and the clearance timer survives restarts.
 - **A menu-based Configure flow**, setup help in all eight languages, and Pattern Forecast that no longer pauses after frequent restarts.
 
-**Before you upgrade:** read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) and the Breaking Changes right below. Home Assistant 2024.10 is required, and if you use the Lightning Safety blueprint, re-import it.
+**Before you upgrade:** read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) and the Breaking Changes right below. Home Assistant 2024.12 is required, and if you use the Lightning Safety blueprint, re-import it.
 
 ### Breaking Changes
 
 - **Service validation errors:** `ws_core.get_weather_windows`, `ws_core.get_station_summary`, `ws_core.export_learning_state`, `ws_core.reset_rain_baseline`, `ws_core.reset_learning_state`, and `ws_core.apply_calibration` now raise `ServiceValidationError` when called with an unknown/unloaded `entry_id`, unknown `profile_id`, or invalid profile limit range instead of returning `{}` or an `{"error": ...}` payload.
-- **Minimum Home Assistant 2024.10.0:** Installs running Home Assistant 2024.6–2024.9 must upgrade Home Assistant before updating to v3.0.0.
+- **Minimum Home Assistant 2024.12.0:** Installs running Home Assistant 2024.6 to 2024.11 must upgrade Home Assistant before updating to v3.0.0. Setup uses the coordinator and options-flow APIs of Home Assistant 2024.12, and the minimum-version CI job now sets up a real entry on 2024.12.0.
 - **Automatic cleanup of disabled Weather Window entities:** Disabling `enable_weather_windows` or unchecking a profile automatically removes its stale `window_<profile>_*` entity registry entries on reload.
 - **Cleanup of leftover solar sensors:** Since 2.13.0 the solar-radiation sensors are only created when the station can provide them, but entries made by earlier versions stayed behind as unavailable entities. On stations without a solar radiation sensor (W/m²), the clearness index, cloud cover, THSW index, solar energy today, peak sun hours, net radiation and Penman-Monteith ET₀ entries are now removed on startup; with the illuminance fallback and a lux sensor, only clearness index, cloud cover and THSW index are removed. The THSW index is no longer created without a solar radiation sensor, since it can never have a value without one. Matching is by unique ID, so renamed entities are covered. Custom names or areas on those entries are lost; recorded history stays. Mapping a solar radiation sensor later creates them again. The bundled dashboards show these sensors only when they exist.
 - **Feels-like sensors show the air temperature outside their range:** Heat index, THW, THSW, wind chill and humidex used to show `unknown` whenever their formula did not apply (for example heat index below 27 °C). They now show the air temperature, as Davis and NWS stations do, with a `formula_applies` attribute (`false` plus an `explanation` when it does not apply). Automations that checked for `unknown` should check `formula_applies` instead. MQTT and exports are unchanged and still send no value when the formula does not apply.
-- **Lightning proximity and clearance have values without a recent strike:** With a lightning distance source (a detector or Blitzortung) and no strike reported, `sensor.ws_lightning_proximity` is now `clear` instead of unknown. `sensor.ws_lightning_clearance` now resumes after a restart from the last strike the lightning event recorded instead of staying unknown until the next strike. The bundled lightning safety blueprint now ignores a jump from unknown or unavailable, so a restart cannot send a false "all clear"; re-import the blueprint if you use it.
+- **Lightning proximity and clearance have values without a recent strike:** With a lightning distance source (a detector or Blitzortung) and no strike reported, `sensor.ws_lightning_proximity` is now `clear` instead of unknown. While the distance source is unavailable or missing (a detector offline, Blitzortung disconnected) it stays unknown, with the status text "Lightning source unavailable", since it could not report a strike either. `sensor.ws_lightning_clearance` now resumes after a restart from the last strike the lightning event recorded instead of staying unknown until the next strike. The bundled lightning safety blueprint now ignores a jump from unknown or unavailable, so a restart cannot send a false "all clear"; re-import the blueprint if you use it.
 - **Removing the integration deletes its stored data:** Deleting a Weather Station Core entry now also deletes its files in `.storage` (learning state, history, climate normals, Pattern Forecast state and the pre-v3 backup). Re-adding the station starts fresh. Back up first if you may want that data back.
 
 ### Added
@@ -61,7 +61,7 @@ This major release builds directly on the v2.14.0–2.14.3 correctness fixes (al
 
 ### Changed
 
-- **Minimum Home Assistant Version Raised (`2024.10.0`):** `hacs.json` now requires Home Assistant `2024.10.0` or newer (required by the native timestamp-offset automation blueprint trigger and aligned with tested CI environments).
+- **Minimum Home Assistant Version Raised (`2024.12.0`):** `hacs.json` now requires Home Assistant `2024.12.0` or newer, the first release with both the `config_entry` argument of `DataUpdateCoordinator` and the automatic `OptionsFlow.config_entry` the integration uses. The Weather Window Notification blueprint itself needs 2024.10.0 (timestamp-offset time trigger).
 - **Coalesced Sensor Burst Updates:** Implemented a 150 ms debounce delay (`COALESCE_BURST_DELAY_S`) in `WSStationCoordinator` for sensor bursts from multi-sensor weather stations (e.g. a Shelly WS90). Immediate state flushing is preserved for lightning hazard events, the 60 s sample tick cancels pending debounce refreshes, and coordinator teardown cancels pending debounce handles cleanly without post-unload writes.
 - **Timestamp-Aware Lead-Time Blending:** Forecast lead-time blending in `weather.py` now uses aware datetime comparisons, ensuring robustness against repeated and skipped DST hours.
 
@@ -72,6 +72,11 @@ This major release builds directly on the v2.14.0–2.14.3 correctness fixes (al
 - **`ws_core.get_weather_windows` validation:** `min_duration_h` above 23 is rejected with a validation error, since the 24-hour horizon can never fit a longer window.
 - **"Clearing after rain" without rain ([#207](https://github.com/kmich/ha_ws_core/issues/207)):** The current condition no longer reports `clearing-after-rain` on any humid, bright day. It now requires measured rain in the last 3 hours (from the persisted rain history, so it survives a restart) and a real illuminance reading; stations without a light sensor no longer get this label from the default brightness value.
 - **Pattern Forecast paused for up to a day after several restarts:** Every Pattern Forecast target needs the pressure change over 24 hours. Its pressure history was capped at 97 points (24 h of 15-minute points), but each restart or reload adds one extra point, so a few restarts in a day pushed the reading from 24 hours ago out early. All targets then showed `waiting_for:dp_24h` until the extra points aged out (also in 2.x). The history is now kept by time (the last 24.5 hours), so restarts no longer cause this, and the recorder refill at startup restores a missing 24-hour reference straight away.
+- **Found in pre-release review:**
+  - Lightning proximity no longer reads `clear` while its distance source is unavailable or missing.
+  - `ws_core.get_weather_windows` with a tighter gust limit than the profile's keeps an active sustained-gust hold, since gusts held above the looser limit were also above the tighter one.
+  - The local PV forecast fetches three days of irradiance, so local tomorrow is complete for sites far from UTC, and its today and tomorrow totals roll over at local midnight (with one refresh) instead of showing yesterday's numbers until the next fetch.
+  - A learning reset made while Pattern Forecast writes its pre-v3 backup is no longer undone by the migration.
 - **Pattern Forecast Learning Migration & Replay Alignment:**
   - Masked solar features (`cloud_deficit`, `solar_ok`, `last_day_clearness`, `last_day_clearness_ok`) in replay vector generation to prevent historical replays from corrupting standardizer slots with zeros.
   - Aligned `dp_3h` replay units: removed `/ 3.0` factor in `replay()` so historical replays and live station updates both evaluate 3-hour pressure change in hPa consistently.

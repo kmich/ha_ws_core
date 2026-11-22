@@ -50,7 +50,7 @@ def test_open_meteo_azimuth(compass, om):
 def test_build_url_clamps_past_days_and_uses_panel_geometry():
     url = sl.build_url(37.9, 23.7, 30, 90, 500)
     assert "tilt=30" in url and "azimuth=-90" in url
-    assert "past_days=92" in url and "forecast_days=2" in url
+    assert "past_days=92" in url and "forecast_days=3" in url
     assert "global_tilted_irradiance" in url
 
 
@@ -360,6 +360,40 @@ async def test_runtime_backfills_learns_and_snapshots_day_ahead():
     # The next refresh only asks for the last day
     fetch = await _run_update(rt, js, rows, {"sensor.pv": "kWh"}, now)
     fetch.assert_awaited_once_with(1)
+
+
+async def test_totals_roll_over_at_local_midnight_and_refresh_once():
+    now = datetime(2026, 11, 20, 20, 0, tzinfo=ATHENS)
+    past = [TODAY - timedelta(days=i) for i in range(10, 0, -1)]
+    days = {d: _bell(450) for d in past}
+    days[TODAY] = _bell(400)
+    days[TODAY + timedelta(days=1)] = _bell(500)
+    gti_day = sum(_bell(450))
+    rows = {"sensor.pv": [r for d in past for r in _rows(d, 6.0 * gti_day / 1000 / 24)]}
+    coord = _coord()
+    coord._create_bg_task = MagicMock(side_effect=lambda coro: coro.close())
+    rt = SolarLocalRuntime(coord, ["sensor.pv"])
+    await _run_update(rt, _om_response(days), rows, {"sensor.pv": "kWh"}, now)
+    old_tomorrow = rt.tomorrow_kwh
+    assert rt.totals_date == TODAY and old_tomorrow is not None
+
+    local = patch(
+        "custom_components.ws_core.solar_local_runtime.dt_util.as_local", side_effect=lambda d: d.astimezone(ATHENS)
+    )
+    with local:
+        data: dict = {}
+        rt.apply(data, now.astimezone(UTC))
+        coord._create_bg_task.assert_not_called()
+
+        after_midnight = datetime(2026, 11, 21, 0, 5, tzinfo=ATHENS)
+        data = {}
+        rt.apply(data, after_midnight.astimezone(UTC))
+        assert data[c.KEY_SOLAR_LOCAL_TODAY_KWH] == old_tomorrow
+        assert data[c.KEY_SOLAR_LOCAL_TOMORROW_KWH] is None
+        assert data[c.KEY_SOLAR_LOCAL_REMAINING_KWH] == pytest.approx(old_tomorrow, abs=0.05)
+        coord._create_bg_task.assert_called_once()
+        rt.apply({}, (after_midnight + timedelta(minutes=1)).astimezone(UTC))
+        coord._create_bg_task.assert_called_once()  # one refresh per rollover
 
 
 async def test_runtime_ignores_stale_forecast_solar_and_non_energy_meters():

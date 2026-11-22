@@ -880,8 +880,10 @@ class WeatherWindowsEngine:
     ) -> bool:
         """Apply onset/clear hold hysteresis to instantaneous station gusts.
 
-        With ``update=False`` the tracked hold is only read: it applies when it was tracked for
-        the same threshold and is still fresh, and it is never created, reset or advanced.
+        With ``update=False`` the tracked hold is only read and never created, reset or
+        advanced. It applies while fresh when it was tracked for the same threshold, and an
+        active hold also applies to a tighter (lower) threshold: gusts sustained above the
+        tracked limit were sustained above the lower one too.
         """
         threshold = profile.max_wind_gust_kmh
         if not update:
@@ -890,12 +892,13 @@ class WeatherWindowsEngine:
                 live_gust_ms is None
                 or threshold is None
                 or state is None
-                or state["threshold"] != threshold
                 or now_ts < state["last_ts"]
                 or (now_ts - state["last_ts"]) > _LIVE_HOLD_STALE_GAP_S
             ):
                 return False
-            return bool(state["active"])
+            if state["threshold"] == threshold:
+                return bool(state["active"])
+            return bool(state["active"]) and threshold < state["threshold"]
         if live_gust_ms is None or threshold is None:
             self._gust_hold_state.pop(profile.profile_id, None)
             return False

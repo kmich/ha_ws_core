@@ -24,7 +24,7 @@ valid value returns. Home Assistant only allows numbers in a sensor with a unit 
 | Solar Energy, Peak Sun Hours, Net Radiation | No valid solar radiation input | Map a W/m² sensor, or enable the optional illuminance fallback with a mapped lux source for an estimate |
 | Clearness Index, Cloud Cover | Requires measured solar radiation and sun elevation of at least 5° | Map radiation; wait for daylight. These do not use the lux fallback |
 | Lightning distance, bearing | No mapped/discovered location source, or no strike since the source last reported one ("No recent strike") | Check the source entity; Blitzortung can report zero strikes with an unknown distance |
-| Lightning proximity | Since 3.0.0 it reads `clear` whenever a distance source exists; `unknown` means there is no distance source | Map a lightning detector or set up Blitzortung |
+| Lightning proximity | Since 3.0.0 it reads `clear` whenever a working distance source reports no strike; `unknown` means there is no distance source, or it is unavailable (see `status_text`) | Map a lightning detector or set up Blitzortung, or check that the detector is online |
 | Lightning clearance | No strike has ever been recorded. Since 3.0.0 it resumes from the last recorded strike after a restart | Expected until the first strike; unknown does not establish safety |
 | Rain/frost/lightning events | No corresponding event recorded yet ("No frost yet") | Expected; the state is the last event time |
 | Minutes Until Rain / Dry | No matching transition within the nowcast window ("No rain expected", "Not raining"), or nowcast data not ready | Read `reason`; check Rain Expected and Rain Next 60 min |

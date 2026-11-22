@@ -248,7 +248,7 @@ FWI sub-components (`enable_fwi_components`) run the FWI calculation even when t
 | `sensor.ws_lightning_distance` | km | Nearest detected strike |
 | `sensor.ws_lightning_rate` | /min | Average strike rate |
 | `sensor.ws_lightning_clearance` | min | Minutes since the last strike (safe at ≥30); keeps counting across restarts from the last strike the lightning event recorded |
-| `sensor.ws_lightning_proximity` | — | `near` / `clear` vs configurable threshold; `clear` when the distance source reports no strike |
+| `sensor.ws_lightning_proximity` | — | `near` / `clear` vs configurable threshold; `clear` when the distance source reports no strike, `unknown` while it is unavailable |
 
 Supports WH57, AS3935, and Blitzortung. Blitzortung is auto-discovered if installed.
 

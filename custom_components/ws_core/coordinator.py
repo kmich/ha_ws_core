@@ -636,6 +636,7 @@ from .const import (
 from .models import WsData
 from .pattern_runtime import PatternRuntime
 from .providers import get_provider, get_provider_capabilities
+from .sensor_status import lightning_source_reporting
 from .uploaders import (
     _redact_secrets,
     async_upload_awekas,
@@ -3831,10 +3832,8 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass,
             self.sources.get(SRC_LIGHTNING_COUNT) or self._blitzortung_sources.get(SRC_LIGHTNING_COUNT),
         )
-        dist_raw = self._num(
-            self.hass,
-            self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE),
-        )
+        dist_eid = self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE)
+        dist_raw = self._num(self.hass, dist_eid)
         azimuth_raw = self._num(
             self.hass,
             self.sources.get(SRC_LIGHTNING_AZIMUTH) or self._blitzortung_sources.get(SRC_LIGHTNING_AZIMUTH),
@@ -3848,8 +3847,10 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if dist_raw is not None:
             prox_km = self._lightning_proximity_km
             data[KEY_LIGHTNING_PROXIMITY] = "near" if float(dist_raw) <= prox_km else "clear"
-        elif self.sources.get(SRC_LIGHTNING_DISTANCE) or self._blitzortung_sources.get(SRC_LIGHTNING_DISTANCE):
-            # A distance source that reports no strike means nothing nearby: "clear", not unknown.
+        elif dist_eid and lightning_source_reporting(self.hass, dist_eid):
+            # A working distance source that reports no strike means nothing nearby: "clear".
+            # A missing or unavailable one (detector offline, integration not loaded) stays
+            # unknown, since it could not report a strike either.
             data[KEY_LIGHTNING_PROXIMITY] = "clear"
 
         # The last strike time is in memory only; after a restart pick it up from the

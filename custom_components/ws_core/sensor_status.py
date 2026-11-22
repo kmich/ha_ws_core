@@ -23,6 +23,7 @@ _STATUS_TEXT: dict[str, str] = {
     "waiting_for_nowcast": "Waiting for nowcast",
     "missing_lightning_source": "No lightning source",
     "waiting_for_lightning_location": "No recent strike",
+    "lightning_source_unavailable": "Lightning source unavailable",
     "no_strike_recorded": "No strike yet",
     "calm": "Calm",
     "no_event_recorded": "Nothing yet",
@@ -31,6 +32,18 @@ _STATUS_TEXT: dict[str, str] = {
 }
 
 _EVENTS_RE = re.compile(r"(\d+)\s*/\s*(\d+)\s+(?:live\s+)?events")
+
+
+def lightning_source_reporting(hass: Any, entity_id: str | None) -> bool:
+    """True when a lightning source exists and is not unavailable.
+
+    Detectors and Blitzortung sit at ``unknown`` (or a stale number) between strikes, which
+    means no strike; ``unavailable`` or a missing entity means the source is offline.
+    """
+    if hass is None or not entity_id:
+        return False
+    state = hass.states.get(entity_id)
+    return state is not None and state.state != "unavailable"
 
 
 def status_text(reason: str | None, *, explanation: str | None = None) -> str:
@@ -120,6 +133,12 @@ def unknown_status(key: str, coord: Any, data: dict) -> dict[str, str]:
         if not (coord.sources.get(source) or getattr(coord, "_blitzortung_sources", {}).get(source)):
             reason = "missing_lightning_source"
             explanation = "Map the lightning distance/bearing source, or set up the Blitzortung integration."
+        elif not lightning_source_reporting(
+            getattr(coord, "hass", None),
+            coord.sources.get(source) or getattr(coord, "_blitzortung_sources", {}).get(source),
+        ):
+            reason = "lightning_source_unavailable"
+            explanation = "The lightning source is unavailable, so a nearby strike could not be reported."
         else:
             reason = "waiting_for_lightning_location"
             explanation = "The lightning source has not supplied a valid strike distance or bearing."

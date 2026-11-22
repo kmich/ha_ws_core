@@ -43,7 +43,9 @@ Features → Lightning Detection.
 | `event.ws_lightning_event` | — | Fires on strike detection and proximity changes |
 
 Since 3.0.0, **proximity reads `clear`** whenever your distance source (a detector or
-Blitzortung) reports no strike, instead of `unknown`, and the **clearance timer keeps
+Blitzortung) reports no strike, instead of `unknown`. While that source is unavailable (a
+detector offline, Blitzortung disconnected) proximity stays `unknown` with the status text
+"Lightning source unavailable", since it could not report a strike. The **clearance timer keeps
 counting across restarts** from the last strike the lightning event recorded. Distance
 and bearing stay empty until there is a strike; their `status_text` attribute then says
 "No recent strike".

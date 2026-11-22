@@ -6,7 +6,7 @@ run an older Home Assistant.
 
 ## Before you update
 
-- **Home Assistant 2024.10 or newer is required.** On 2024.6 to 2024.9, update Home
+- **Home Assistant 2024.12 or newer is required.** On 2024.6 to 2024.11, update Home
   Assistant first. HACS will not install 3.0.0 on an older version.
 - **Take a backup** (Settings → System → Backups). Downgrading to 2.14.x works, but see
   [Pattern Forecast](#pattern-forecast-relearns-a-few-inputs) below.
@@ -16,7 +16,7 @@ run an older Home Assistant.
 | Change | What it means | What to do |
 |---|---|---|
 | **Feels-like sensors show the air temperature** when their formula does not apply | Heat index, THW, THSW, wind chill and humidex used to be `unknown` outside their range (for example heat index below 27 °C). They now show the air temperature, as Davis and NWS stations do, with `formula_applies: false` | Automations that tested for `unknown` should test `formula_applies` instead. MQTT and exports still send no value when the formula does not apply |
-| **Lightning proximity and clearance always have a value** | With a lightning detector or Blitzortung, `sensor.ws_lightning_proximity` reads `clear` when no strike is reported, and `sensor.ws_lightning_clearance` keeps counting from the last strike across restarts | If you use the **Lightning Safety** blueprint, re-import it so a restart cannot send a false "all clear" |
+| **Lightning proximity and clearance always have a value** | With a lightning detector or Blitzortung, `sensor.ws_lightning_proximity` reads `clear` when no strike is reported (`unknown` while the detector is unavailable), and `sensor.ws_lightning_clearance` keeps counting from the last strike across restarts | If you use the **Lightning Safety** blueprint, re-import it so a restart cannot send a false "all clear" |
 | **Actions raise clear errors** | All ws_core actions now fail with an error message for an unknown station, an unknown profile or invalid limits, instead of returning `{}` or an `error` key | Scripts that checked the response for an error should handle the action error instead (for example `continue_on_error`) |
 | **Leftover solar sensors are removed** | On stations without a solar radiation sensor (W/m²), the clearness index, cloud cover, THSW, solar energy, peak sun hours, net radiation and Penman-Monteith ET₀ entries left over from earlier versions are removed. They could never have a value. With the illuminance fallback and a lux sensor, only clearness index, cloud cover and THSW are removed | Remove dashboard cards that pointed at them. Mapping a solar radiation sensor later creates them again |
 | **Turning a feature off removes its entities** | Unticking Weather Windows or one of its profiles removes those entities on reload | Nothing |

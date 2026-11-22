@@ -388,6 +388,42 @@ class TestReplayMaskingAndDp3hAlignment:
         assert rain_model.w[dp_idx] != 0.0
         assert rt.store.async_save.await_count == 2
 
+    async def test_reset_during_the_pre_migration_backup_wins(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        coord = MagicMock()
+        coord.hass = MagicMock()
+        coord.sources = {}
+        coord.elevation_m = 0.0
+        coord.entry_options = {}
+
+        rt = PatternRuntime(coord)
+        rt.store = MagicMock()
+        rt.store.async_save = AsyncMock()
+        rt.store.async_remove = AsyncMock()
+        rt.store.async_load = AsyncMock(return_value=None)
+        rt.engine.history_learn = {
+            "status": "ok",
+            "targets": {
+                "rain_3h": {"status": "ok", "attempted_at": 1000.0, "reason": None, "method": PATTERN_HISTORY_METHOD}
+            },
+        }
+
+        async def _slow_backup_save(_payload):
+            await rt.async_reset()  # the user resets learning while the backup is written
+
+        rt.backup_store = MagicMock()
+        rt.backup_store.async_load = AsyncMock(return_value=None)
+        rt.backup_store.async_save = AsyncMock(side_effect=_slow_backup_save)
+
+        result = await rt._async_migrate_feature_replay(datetime(2026, 6, 21, 12, 0, tzinfo=UTC))
+
+        assert result is False
+        rt.backup_store.async_save.assert_awaited_once()
+        assert rt.engine.history_learn == {}  # the pre-reset targets were not written back
+        assert all(m.maturity == "collecting" and m.n_updates == 0 for m in rt.engine.models.values())
+        assert rt.store.async_save.await_count == 0
+
     async def test_dp3h_migration_discards_results_if_reset_occurs_during_replay(self):
         from unittest.mock import AsyncMock, MagicMock, patch
 

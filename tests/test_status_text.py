@@ -119,8 +119,9 @@ def _registry(entity_id="event.ws_lightning_event"):
     return SimpleNamespace(async_get_entity_id=lambda domain, platform, uid: entity_id, entities={})
 
 
-def _run(coord, now, event_state=None):
+def _run(coord, now, event_state=None, source_states=None):
     states = {"event.ws_lightning_event": event_state} if event_state is not None else {}
+    states.update(source_states or {})
     data: dict = {}
     with (
         patch.object(coord, "_num", return_value=None),
@@ -134,8 +135,23 @@ def _run(coord, now, event_state=None):
 def test_proximity_is_clear_when_the_distance_source_reports_no_strike():
     coord = _lightning_coord()
     coord._blitzortung_sources = {c.SRC_LIGHTNING_DISTANCE: "sensor.blitzortung_distance"}
-    data = _run(coord, datetime.now(UTC))
+    data = _run(
+        coord, datetime.now(UTC), source_states={"sensor.blitzortung_distance": SimpleNamespace(state="unknown")}
+    )
     assert data[c.KEY_LIGHTNING_PROXIMITY] == "clear"
+
+
+@pytest.mark.parametrize("source_state", ["unavailable", None])
+def test_proximity_stays_unknown_while_the_distance_source_is_offline(source_state):
+    coord = _lightning_coord()
+    coord.sources[c.SRC_LIGHTNING_DISTANCE] = "sensor.detector_distance"
+    states = {} if source_state is None else {"sensor.detector_distance": SimpleNamespace(state=source_state)}
+    data = _run(coord, datetime.now(UTC), source_states=states)
+    assert c.KEY_LIGHTNING_PROXIMITY not in data
+    with patch.object(coord.hass.states, "get", side_effect=lambda eid: states.get(eid), create=True):
+        info = unknown_status(c.KEY_LIGHTNING_PROXIMITY, coord, data)
+    assert info["reason"] == "lightning_source_unavailable"
+    assert info["status_text"] == "Lightning source unavailable"
 
 
 def test_proximity_stays_unknown_without_a_distance_source():

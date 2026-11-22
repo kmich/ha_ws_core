@@ -10,7 +10,7 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
     - **[Weather Windows](guides/weather_windows.md):** when in the next 24 hours the weather suits drying laundry, garden work or your own activity, with a notification blueprint.
     - **Data Status:** one sensor that tells you whether anything needs attention, and a plain reason on every empty sensor instead of a bare "Unknown".
     - **Local PV forecast** learned from your own PV meters, and feels-like sensors that show the air temperature when their formula does not apply.
-    - Upgrading from 2.x? Read **[Upgrading to 3.0](upgrading.md)** first: it needs Home Assistant 2024.10 and has a few breaking changes.
+    - Upgrading from 2.x? Read **[Upgrading to 3.0](upgrading.md)** first: it needs Home Assistant 2024.12 and has a few breaking changes.
 
 ---
 

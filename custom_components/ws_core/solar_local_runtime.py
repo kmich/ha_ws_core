@@ -75,6 +75,9 @@ class SolarLocalRuntime:
         self.status = STATUS_PRIOR
         self.today_kwh: float | None = None
         self.tomorrow_kwh: float | None = None
+        # Local date today_kwh / tomorrow_kwh were computed for, so they roll at midnight.
+        self.totals_date: date | None = None
+        self._refreshing = False
         self.hourly: list[dict[str, Any]] = []
         self.skill: dict[str, Any] = {}
         self.updated_at: str | None = None
@@ -170,6 +173,16 @@ class SolarLocalRuntime:
         return js if isinstance(js, dict) else None
 
     async def async_update(self) -> None:
+        # The periodic refresh and the midnight refresh never run at the same time.
+        if self._refreshing:
+            return
+        self._refreshing = True
+        try:
+            await self._async_update()
+        finally:
+            self._refreshing = False
+
+    async def _async_update(self) -> None:
         coord = self.coord
         if coord.forecast_lat is None or coord.forecast_lon is None:
             return
@@ -204,6 +217,7 @@ class SolarLocalRuntime:
         self.k, self.n_days, self.status = fit_factor(self.state, prior_factor(coord.solar_peak_kw), today)
         self.today_kwh = predict_kwh(self.k, daily.get(today.isoformat()))
         self.tomorrow_kwh = predict_kwh(self.k, daily.get(tomorrow.isoformat()))
+        self.totals_date = today
         self.hourly = hourly_kwh(self.k, series, tz, today, tomorrow)
 
         # Day-ahead snapshots: overwritten on every refresh until the day starts, so the
@@ -225,9 +239,20 @@ class SolarLocalRuntime:
 
     # -- coordinator data --------------------------------------------------
 
+    def _roll_totals(self, local_day: date) -> None:
+        """At local midnight yesterday's "tomorrow" becomes today, until the next refresh."""
+        if self.totals_date is None or local_day == self.totals_date:
+            return
+        self.today_kwh = self.tomorrow_kwh if local_day == self.totals_date + timedelta(days=1) else None
+        self.tomorrow_kwh = None
+        self.totals_date = local_day
+        if not self._refreshing:
+            self.coord._create_bg_task(self.async_update())
+
     def apply(self, data: dict[str, Any], now: datetime) -> None:
         if self.k is None:
             return
+        self._roll_totals(dt_util.as_local(now).date())
         data[KEY_SOLAR_LOCAL_TODAY_KWH] = self.today_kwh
         data[KEY_SOLAR_LOCAL_TOMORROW_KWH] = self.tomorrow_kwh
         data[KEY_SOLAR_LOCAL_REMAINING_KWH] = remaining_kwh(self.hourly, now)
