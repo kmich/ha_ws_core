@@ -58,7 +58,7 @@ your coordinates are outside the continental United States.
 ## OpenWeatherMap
 
 Uses the One Call 3.0 API endpoint. A free tier is available but requires registration
-at openweathermap.org to obtain an API key. Enter the key in Configure → Forecast.
+at openweathermap.org to obtain an API key. Enter the key in Configure → Weather Forecast & Location.
 
 ---
 
@@ -84,7 +84,7 @@ external network call is made; forecast data comes from the existing HA integrat
 This is useful if you already have Met.no, OpenWeatherMap, or another HA weather
 integration set up and do not want ws_core to make its own API calls.
 
-To configure: in Configure → Forecast, select "Home Assistant weather entity" as
+To configure: in Configure → Weather Forecast & Location, select "Home Assistant weather entity" as
 the provider, then pick the entity from the dropdown.
 
 Uses the `weather.get_forecasts` service (HA 2024.2+) with fallback to the `forecast`

@@ -2,9 +2,19 @@
 
 All notable changes to Weather Station Core are documented here.
 
-## [3.0.0] - 2026-11-20
+## [3.0.0] - 2026-11-22
 
 This major release builds directly on the v2.14.0–2.14.3 correctness fixes (all v2.14.x fixes are included). Minimum supported Home Assistant version is raised from **2024.6.0** to **2024.10.0**.
+
+**Highlights**
+
+- **Weather Windows:** when in the next 24 hours the weather suits drying laundry, garden work or your own activity, with start and end sensors, plain-language reasons, a notification blueprint, dashboard views and the `ws_core.get_weather_windows` action. [Guide](https://kmich.github.io/ha_ws_core/guides/weather_windows/)
+- **Data Status and plain status text:** `sensor.ws_data_status` says whether anything needs attention, and every empty sensor carries a short `status_text` that the bundled dashboards show instead of "Unknown".
+- **Local PV forecast** learned from your own PV meters and Open-Meteo irradiance for your panel angle.
+- **Feels-like sensors show the air temperature** outside their formula's range, lightning proximity reads `clear` without a strike, and the clearance timer survives restarts.
+- **A menu-based Configure flow**, setup help in all eight languages, and Pattern Forecast that no longer pauses after frequent restarts.
+
+**Before you upgrade:** read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) and the Breaking Changes below. Home Assistant 2024.10 is required, and if you use the Lightning Safety blueprint, re-import it.
 
 ### Added
 

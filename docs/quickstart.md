@@ -153,7 +153,7 @@ click the device to see all created entities.
 If it shows `Off`, go to Configure and remap any missing source sensors.
 
 If you want the rain countdown shown in the README, make sure **Precipitation
-Nowcast** is enabled under **Configure → Features**. The
+Nowcast** is enabled under **Configure → Features & Diagnostics**. The
 `sensor.ws_minutes_until_rain` entity is optional and is only created when that
 feature is enabled.
 

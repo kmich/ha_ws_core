@@ -81,9 +81,9 @@ def test_fallback_without_a_lux_sensor_removes_all_six():
 
 
 def test_renamed_entity_is_matched_by_unique_id():
-    renamed = _entry(c.KEY_ET0_PM_DAILY_MM, entity_id="sensor.lagonisi_ws_et0_penman_monteith_daily")
+    renamed = _entry(c.KEY_ET0_PM_DAILY_MM, entity_id="sensor.station_ws_et0_penman_monteith_daily")
     registry = _run([renamed])
-    assert registry.removed == ["sensor.lagonisi_ws_et0_penman_monteith_daily"]
+    assert registry.removed == ["sensor.station_ws_et0_penman_monteith_daily"]
 
 
 def test_other_entries_other_domains_and_other_sensors_are_left_alone():
@@ -108,8 +108,8 @@ async def test_setup_removes_leftover_solar_entities(hass, enable_custom_integra
         data={
             c.CONF_PREFIX: "ws",
             c.CONF_SOURCES: {c.SRC_LUX: "sensor.lux"},
-            c.CONF_FORECAST_LAT: 37.8,
-            c.CONF_FORECAST_LON: 23.9,
+            c.CONF_FORECAST_LAT: 37.9,
+            c.CONF_FORECAST_LON: 23.7,
         },
         options={},
     )

@@ -85,7 +85,7 @@ configuration of ws_core's ET₀ as an input to the Smart Irrigation HA integrat
 
 ## Soil sensor integration (v2.1+)
 
-When soil moisture or temperature sensors are available, enable the **Soil Sensors** feature group in Configure → Features.
+When soil moisture or temperature sensors are available, enable the **Soil Sensors** feature group in Configure → Features & Diagnostics.
 
 ### Enabling soil sensors
 

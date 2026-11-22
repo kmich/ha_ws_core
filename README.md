@@ -14,18 +14,17 @@ Derived values are calculated inside Home Assistant. By default ws_core also fet
 
 ![Station sensors go into ws_core, which runs inside Home Assistant and produces sensors, a weather entity, blueprints and dashboards](screenshots/architecture_flow.svg)
 
-## What's new
+## What's new in 3.0
 
-- **Weather Windows Decision Engine (v3.0).** Enable **Decision Profiles** (`Outdoor Drying`, `Garden & Yard Work`, or `Custom`) to get `suitable_now` / `window_upcoming` / `unsuitable` / `unknown` status and `next_start` / `next_end` timestamp sensors over the next 24 hours, plus a dedicated notification blueprint and **Windows** dashboard view.
-- **Voice & script service actions.** Call `ws_core.get_weather_windows` and `ws_core.get_station_summary` (`SupportsResponse.ONLY`) or `ws_core.export_learning_state` (`SupportsResponse.OPTIONAL`) directly from Home Assistant scripts and Assist automations.
-- **Forecasts that learn from your own station.** Pattern Forecast gives the chance of rain, frost, a hot day, strong gusts and thunderstorms over the next hours. It now learns from the history Home Assistant already has, so it can show numbers minutes after you switch it on instead of weeks later.
-- **A rain chance that keeps score.** Your station's rain estimate and the forecast provider's are checked against your gauge every 6 hours, and whichever has been more accurate at your location gets more say. In 2.13.5 both are scored on the same 6-hour window, so the comparison is fair.
-- **Sensors that explain themselves.** When a value can't be calculated, the sensor tells you why (a missing source, a formula that doesn't apply right now, or a model still collecting data) instead of a bare `unknown`.
-- **Faster storm warnings.** Nearby lightning raises the alert straight away and keeps it for 30 minutes after the last strike, and heavy rain alerts start at 10 mm/h.
-- **A new phone-friendly dashboard.** The Bubble Card dashboard puts the current weather, the outlook and the station on one screen, with pop-ups for the details and an optional photo of the current weather behind it. [Screenshots below](#dashboards).
-- **Clearer station health** and fewer false "sensor spike" warnings.
+- **Weather Windows.** Tell ws_core what a job needs (dry laundry, garden work, or your own limits for rain, temperature, humidity, wind, gusts, cloud and daylight) and it shows when the next suitable window in the next 24 hours starts and ends, with the reason in plain words: *"Next suitable window starts at 10:00 tomorrow for 3 hours."* Your station's live rain and gusts override the forecast, a notification blueprint warns you ahead of time, and the Vanilla and Full dashboards have a **Windows** view. [Guide](https://kmich.github.io/ha_ws_core/guides/weather_windows/).
+- **Actions for scripts and voice.** `ws_core.get_weather_windows` returns every window and each hour's verdict, and can try other limits without saving them. `ws_core.get_station_summary` gives a compact snapshot for Assist. `ws_core.export_learning_state` now returns its summary directly.
+- **Data Status: is anything wrong?** `sensor.ws_data_status` reads **OK** or **Needs attention**, and only turns to Needs attention for a source problem that lasts over 5 minutes. It lists every sensor that is empty for a normal reason, and what your station's hardware cannot provide and what would.
+- **No more bare "Unknown".** Every empty sensor carries a short `status_text` ("No rain expected", "No recent strike", "Learning (2 of 5 events)"), and the bundled dashboards show it. Heat index, wind chill and the other feels-like sensors show the air temperature when their formula does not apply, lightning proximity reads `clear` without a strike, and the clearance timer survives restarts.
+- **A local PV forecast.** Pick your PV energy meters (as in the Energy dashboard) and ws_core learns how much your panels really produce from Open-Meteo's irradiance for your panel angle, with today, tomorrow and remaining-today sensors.
+- **A tidier setup.** **Configure** is now a menu (sources, forecast, Weather Windows, rooms, thresholds, uploads, features), setup help is translated into all eight languages, and sensors your station can never fill are no longer created.
+- **Sturdier Pattern Forecast.** Frequent restarts no longer pause it for up to a day, and a few inputs that earlier versions computed inconsistently are relearned once on upgrade.
 
-The [changelog](CHANGELOG.md) has every change.
+**Upgrading from 2.x:** 3.0 needs Home Assistant 2024.10 or newer and changes a few behaviours (feels-like values, lightning values, action errors, removal of sensors that could never have a value). Read [Upgrading to 3.0](https://kmich.github.io/ha_ws_core/upgrading/) before updating. The [changelog](CHANGELOG.md) has every change.
 
 ## What it does
 
@@ -35,11 +34,11 @@ The [changelog](CHANGELOG.md) has every change.
 
 **Protection.** Gust alerts for awnings and blinds, frost point (Buck 1981) and freeze warnings, UTCI and WBGT heat stress, and fire danger from the Canadian FWI, McArthur FFDI and Fosberg FFWI.
 
-**Data quality.** Checks for stuck, spiking and drifting sensors, cross-sensor consistency, and a station health summary. When a value can't be calculated, the sensor's `reason` and `explanation` attributes say why.
+**Data quality.** Checks for stuck, spiking and drifting sensors, cross-sensor consistency, and a station health summary. `sensor.ws_data_status` says in one place whether anything needs attention. When a value can't be calculated, the sensor's `status_text`, `reason` and `explanation` attributes say why.
 
 **Weather Windows & actions (opt-in).** Evaluates hourly forecasts and live station hazards across the next 24 hours for outdoor drying, garden work, or custom limits, creating `window_*_status`, `window_*_next_start`, and `window_*_next_end` entities alongside `ws_core.get_weather_windows`, `ws_core.get_station_summary`, and `ws_core.export_learning_state`. See the [sensor and action reference](docs/sensors.md).
 
-**Extras you can turn on.** Snow phase and accumulation, heating and cooling degree days, 10-year climate normals (ERA5), air quality, pollen, sea temperature, a solar forecast, lightning, and uploads to Weather Underground, Windy, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP and OpenWeatherMap.
+**Extras you can turn on.** Snow phase and accumulation, heating and cooling degree days, 10-year climate normals (ERA5), air quality, pollen, sea temperature, a solar forecast (Forecast.Solar, plus a local PV forecast learned from your own PV meters), lightning, and uploads to Weather Underground, Windy, Weathercloud, PWSWeather, WOW, AWEKAS, CWOP and OpenWeatherMap.
 
 The integration is translated into English, French, German, Spanish, Italian, Dutch, Polish and Portuguese. The formulas and their sources are in the [science documentation](docs/science.md).
 
@@ -73,7 +72,7 @@ The [hardware mapping guide](docs/hardware_mapping.md) covers each brand in deta
 2. If setup did not open automatically, go to **Settings → Devices & Services → Add Integration** and search for **Weather Station Core**. Updates to an already installed integration still require a restart.
 3. Check the entities it suggests for your station and submit.
 
-More than 50 sensors are created straight away. Optional features are under **Configure → Features**. The [quickstart](docs/quickstart.md) walks through each step.
+Requires Home Assistant 2024.10 or newer. More than 50 sensors are created straight away. Optional features are under **Configure → Features & Diagnostics**, and Weather Windows under **Configure → Decision Engine & Weather Windows**. The [quickstart](docs/quickstart.md) walks through each step.
 
 ## Blueprints
 
@@ -158,7 +157,7 @@ No. The default forecast and the optional nowcast and air quality features use O
 
 <details>
 <summary><b>What happens when a sensor goes offline?</b></summary>
-Values that depend on it report <code>unavailable</code> or <code>unknown</code>, with the reason in the sensor's attributes, and everything that doesn't depend on it keeps working.
+Values that depend on it report <code>unavailable</code> or <code>unknown</code>, with the reason in the sensor's attributes, and everything that doesn't depend on it keeps working. If the source stays offline for more than 5 minutes, <code>sensor.ws_data_status</code> turns to <b>Needs attention</b> and names it. A missing or stale source also raises a Repairs issue.
 </details>
 
 ## Support

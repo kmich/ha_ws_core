@@ -463,7 +463,7 @@ instead. To do the same on your own dashboard, use an entities-card row of
 
 ## Feature: Soil Sensors
 
-Requires: soil moisture or soil temperature source sensors mapped in Configure → Sources, and **Soil Sensors** enabled in Configure → Features.
+Requires: soil moisture or soil temperature source sensors mapped in Configure → Sensor Sources, and **Soil Sensors** enabled in Configure → Features & Diagnostics.
 
 | Entity ID | Unit | State Class | Description |
 |---|---|---|---|

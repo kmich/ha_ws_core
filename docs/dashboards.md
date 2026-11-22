@@ -215,6 +215,36 @@ Markdown card that lists every forecast with its maturity; paste it in.
 
 ---
 
+## Plain status instead of "Unknown"
+
+Home Assistant only allows numbers in a sensor with a unit and shows "Unknown" when there
+is none. Since 3.0.0 every empty ws_core sensor carries a short `status_text` attribute
+("No rain expected", "Learning (2 of 5 events)", "Starting up"), and the Enhanced and
+Bubble dashboards show it in place of "Unknown" for the nowcast and Pattern Forecast
+sensors. To do the same on your own dashboard, pair two conditional rows in an entities
+card:
+
+```yaml
+- type: conditional
+  conditions:
+    - entity: sensor.ws_pattern_frost_12h
+      state_not: unknown
+  row:
+    entity: sensor.ws_pattern_frost_12h
+    name: Frost, 12 h
+- type: conditional
+  conditions:
+    - entity: sensor.ws_pattern_frost_12h
+      state: unknown
+  row:
+    type: attribute
+    entity: sensor.ws_pattern_frost_12h
+    attribute: status_text
+    name: Frost, 12 h
+```
+
+---
+
 ## Keeping dashboards up to date
 
 Dashboards are not auto-updated by HACS. When a new version of ws_core adds entities

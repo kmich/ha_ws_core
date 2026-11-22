@@ -39,8 +39,9 @@ Safeguards outdoor awnings, pergolas, and blinds by monitoring sustained wind gu
 * **Key parameters:** Wind Gust Sensor (`sensor.ws_wind_gust`), Gust Threshold (default: 10 m/s ~ 36 km/h), Sustained Duration, Target Cover Entities to Retract.
 
 ### 4. Lightning Safety (`lightning_safety.yaml`)
-Monitors nearby lightning strikes (e.g. from Ecowitt WH57 or WeatherFlow Tempest) and issues an alert, followed by an official "All Clear" announcement once no strikes occur within 30 minutes.
-* **Key parameters:** Lightning Strike Count & Distance Sensors, Proximity Threshold (default: 16 km / 10 mi), Notification Service.
+Alerts when `sensor.ws_lightning_proximity` turns `near` (from a detector such as the Ecowitt WH57, or from Blitzortung), optionally turns off a pool pump, and sends an "All Clear" once `sensor.ws_lightning_clearance` rises past your clearance time.
+* **Key parameters:** Lightning Proximity Sensor, Lightning Clearance Sensor, Notification Service, optional Pool Switch, Safe Clearance Time (minutes).
+* **Re-import after updating to 3.0.0.** The clearance timer now resumes after a restart instead of starting empty, and the updated blueprint ignores that jump so a restart cannot send a false "All Clear".
 
 ### 5. Freeze & Frost Alerts (`freeze_alert.yaml` & `frost_alert.yaml`)
 Monitors outdoor temperatures and the scientific Buck (1981) frost point. Triggers before ice forms, enabling pre-emptive protection of sensitive plants and shutting off outdoor hose bibbs.

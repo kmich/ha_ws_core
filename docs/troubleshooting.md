@@ -3,22 +3,32 @@
 ## Understanding unknown values
 
 An `unknown` value means that a calculation cannot currently return a meaningful
-number; it does not by itself mean the station is offline. Since 2.12.0, open the
-entity's attributes to read `reason` and `explanation`. Ordinary sensors also
-expose a machine-readable `data_status`. These attributes disappear when a valid
-value returns. Event entities explain when no matching event has been recorded.
+number; it does not by itself mean the station is offline.
+
+**Start with `sensor.ws_data_status`** (3.0.0). It reads **OK** or **Needs attention**,
+and only turns to Needs attention for a source problem that lasts over 5 minutes. Its
+`waiting` attribute lists every sensor that is empty for a normal reason, and
+`not_on_this_station` lists what your station's sensors or settings cannot provide. See
+[Data Status](sensors.md#data-status).
+
+Each empty entity also has its own attributes: a short `status_text` such as "No rain
+expected" or "Learning (2 of 5 events)", the longer `explanation`, and the
+machine-readable `reason` (also `data_status` on ordinary sensors). They disappear when a
+valid value returns. Home Assistant only allows numbers in a sensor with a unit and shows
+"Unknown" otherwise; the bundled dashboards show `status_text` there instead.
 
 | Entity group | Why it can be unknown | Action |
 |---|---|---|
-| Heat Index, THW, THSW | This implementation requires at least 27 °C and 40% humidity; THSW also needs solar radiation | Use Feels Like for general conditions; wait for applicable weather |
-| Wind Chill | Requires at most 10 °C and wind above 4.8 km/h | Expected in mild weather |
+| Heat Index, THW, THSW, Wind Chill, Humidex | Since 3.0.0 these show the air temperature (with `formula_applies: false`) when their formula does not apply, so `unknown` means a missing temperature, humidity or wind input. THSW is only created with a solar radiation sensor | Check the source sensors |
+| Wind Gust Factor | The wind is calm (below 0.5 m/s), so gust divided by mean wind is not defined (`status_text`: "Calm") | Expected in calm weather |
 | Solar Energy, Peak Sun Hours, Net Radiation | No valid solar radiation input | Map a W/m² sensor, or enable the optional illuminance fallback with a mapped lux source for an estimate |
 | Clearness Index, Cloud Cover | Requires measured solar radiation and sun elevation of at least 5° | Map radiation; wait for daylight. These do not use the lux fallback |
-| Lightning distance, bearing, proximity | No mapped/discovered location source, or no valid strike location from it yet | Check the source entity; Blitzortung can report zero strikes with an unknown distance |
-| Lightning clearance | No strike observed since the entry loaded | Expected until a strike is observed; unknown does not establish safety |
-| Rain/frost/lightning events | No corresponding event recorded yet | Expected; the state is the last event time |
-| Minutes Until Rain / Dry | No matching transition within the nowcast window, or nowcast data not ready | Read `reason`; check Rain Expected and Rain Next 60 min |
-| Pattern Forecast | Missing recent inputs, or too few checked days/events | Read `explanation`, `progress_pct`, `events_collected` and `days_checked` |
+| Lightning distance, bearing | No mapped/discovered location source, or no strike since the source last reported one ("No recent strike") | Check the source entity; Blitzortung can report zero strikes with an unknown distance |
+| Lightning proximity | Since 3.0.0 it reads `clear` whenever a distance source exists; `unknown` means there is no distance source | Map a lightning detector or set up Blitzortung |
+| Lightning clearance | No strike has ever been recorded. Since 3.0.0 it resumes from the last recorded strike after a restart | Expected until the first strike; unknown does not establish safety |
+| Rain/frost/lightning events | No corresponding event recorded yet ("No frost yet") | Expected; the state is the last event time |
+| Minutes Until Rain / Dry | No matching transition within the nowcast window ("No rain expected", "Not raining"), or nowcast data not ready | Read `reason`; check Rain Expected and Rain Next 60 min |
+| Pattern Forecast | Missing recent inputs, too few checked days/events ("Learning (2 of 5 events)"), or not run yet since a restart ("Starting up", up to 15 minutes) | Read `explanation`, `progress_pct`, `events_collected` and `days_checked` |
 
 Pattern Forecast status `waiting` means missing inputs prevent any forecast from
 publishing. `collecting` means training is not yet sufficient. Individual targets
@@ -48,11 +58,11 @@ does not replace a stored dashboard.
 | Weather Underground upload never succeeds | Wrong API credential | Use the **station key (password)** from `wunderground.com/member/devices`, not a read API key. |
 | Windy upload returns HTTP 401 (`error_auth`) | Stations API v2 credentials used without Station ID, or general API key used instead of Station password | On `stations.windy.com` → My Stations → Connection, copy the **Station password** into API key and the alphanumeric **Station ID** into Station ID. |
 | Blitzortung data not appearing | Auto-discovery needs restart | Restart HA after installing Blitzortung. ws_core discovers Blitzortung entities at startup. |
-| Comfort indices sensors not created | Feature toggle is off | Toggle `switch.ws_enable_comfort_indices` on the device page, or Configure → Features. |
+| Comfort indices sensors not created | Feature toggle is off | Toggle `switch.ws_enable_comfort_indices` on the device page, or Configure → Features & Diagnostics. |
 | FWI values very high on first run | Standard initial values | FWI moisture codes start at Van Wagner (1987) defaults (FFMC=85, DMC=6, DC=15) and self-correct within a few days. |
 | FWI moisture codes don't change in the morning | By design (2.8.0+) | The codes advance once a day on the first reading at or after 12:00 local time, the observation time the FWI system is defined on. ISI/FWI still follow the current wind. |
 | Repairs shows a "stuck sensors" issue | A reading has not changed for hours | Temperature is flagged after 4 h without any change, humidity and pressure after 6 h (humidity at 0-2 % or 98-100 % is never flagged). Check the sensor and its radiation shield; the issue clears as soon as the value moves. With several stations, each entry raises its own issue. |
-| Nowcast always shows unknown | Coordinates not set, or Open-Meteo timeout | Verify forecast coordinates are set in Configure → Forecast. Check internet connectivity. |
+| Nowcast always shows unknown | Coordinates not set, or Open-Meteo timeout | Verify forecast coordinates are set in Configure → Weather Forecast & Location. Check internet connectivity. |
 | Lightning sensor rejected as "entity not found" during setup | Older versions rejected sensors sitting at `unknown` | Update to 2.4.1+. Lightning distance/azimuth/count sensors are idle (`unknown`) outside a strike and are now accepted as long as the entity exists. |
 | Hemisphere / climate region shows a raw value like `atlantic_europe` | Translation not loaded for your language | These are localized in English and French (2.5.0+); other languages fall back to English. Restart HA after updating so new translations load. |
 
@@ -73,7 +83,7 @@ See the [Pattern Forecast guide](guides/pattern_forecast.md) for how it works.
 | `maturity` is `paused` | An input is unavailable, stale, or flagged by the drift, stuck or spike checks (see `reason`) | Fix the sensor; the forecast resumes by itself. Check Station Diagnostics |
 | `reason` shows `waiting_for:dp_24h` | A 24 h pressure change needs a reading from 24 h ago | Since 2.11.1 the learning-from-history step (about 2 minutes after start) fills the last day of pressure from the recorder, so this clears then. Without recorder statistics for pressure, wait a day |
 | `reason` shows `waiting_for:dpd_1h`, `t_1h`, `t_3h`, `wind_u` or `gust_1h` | These need readings from 1 h or 3 h ago, or several in the last hour | Startup seeds the last 3 hours from recorder statistics after about 2 minutes; forecasts then retry at the next 15-minute issue. Since 2.12.0 unsafe arithmetic wind-direction statistics can fall back to circular components from raw history. If suitable history is excluded, purged or unavailable, wind needs three usable 15-minute bins and other changes may need up to 3 h live. Check `warm_start` and the target's `explanation` |
-| No `sensor.ws_pattern_storm_3h` | No lightning detector is mapped, and the internet lightning option is off | Map a detector's strike count sensor in Configure, or, if the Blitzortung integration is installed, turn on **Use internet lightning data** (Configure → Features). The status sensor's `storm_target` attribute says which case applies |
+| No `sensor.ws_pattern_storm_3h` | No lightning detector is mapped, and the internet lightning option is off | Map a detector's strike count sensor in Configure, or, if the Blitzortung integration is installed, turn on **Use internet lightning data** (Configure → Features & Diagnostics). The status sensor's `storm_target` attribute says which case applies |
 | Storm sensor name ends in "(internet lightning)" and stays `unknown` | The Blitzortung integration is not installed, is disabled, or its entities are unavailable | Install or enable it. The feed is checked in the entity registry and must be available |
 | `maturity` went from `skilled` to `degraded` | Over the last 5 weeks, with at least 3 events, the forecast stopped beating the station's usual rate | It is shown, not hidden. A changed sensor, a new location or a different season can cause it. Reset it if the cause was a one-off |
 | A forecast restarted at `collecting` after I changed a setting | The freeze, heat, gust or lightning proximity threshold, or the storm source, defines what the forecast predicts | Expected: only that forecast relearns, from history. Mapping a different station, or editing the elevation, restarts all of them |
@@ -145,7 +155,7 @@ data:
 ### Adaptive (auto-apply) calibration
 
 If you'd rather not track down a reference station yourself, enable **Feature:
-Adaptive Sensor Calibration** under **Configure → Features**. It's off by
+Adaptive Sensor Calibration** under **Configure → Features & Diagnostics**. It's off by
 default. When on, it reuses the regional Open-Meteo reference point already
 fetched hourly for neighbor QC (requesting the station's configured `elevation_m`,
 and skipping temperature/pressure samples whose returned model elevation differs
