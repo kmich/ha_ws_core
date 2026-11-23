@@ -189,7 +189,7 @@
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "On by default. Once an hour, compares your temperature, humidity and pressure with Open-Meteo's reading for your configured coordinates and lists large differences in sensor.ws_neighbor_qc_flags. Turn off to stop the request. Adaptive calibration, if enabled, keeps using it.",
           "enable_pattern_forecast": "Learns from your station's own history to estimate the chance of rain, frost, a hot day, strong gusts and (with a local lightning detector) thunderstorms over the next hours. Each forecast shows numbers once it has seen enough examples at your station, often right away if Home Assistant already has long-term history of your sensors. Runs entirely on this machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temp_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "weathercloud": {
@@ -582,7 +582,7 @@
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "On by default. Once an hour, compares your temperature, humidity and pressure with Open-Meteo's reading for your configured coordinates and lists large differences in sensor.ws_neighbor_qc_flags. Turn off to stop the request. Adaptive calibration, if enabled, keeps using it.",
           "enable_pattern_forecast": "Learns from your station's own history to estimate the chance of rain, frost, a hot day, strong gusts and (with a local lightning detector) thunderstorms over the next hours. Each forecast shows numbers once it has seen enough examples at your station, often right away if Home Assistant already has long-term history of your sensors. Runs entirely on this machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temp_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "indoor_rooms_opt": {
@@ -2116,7 +2116,7 @@
         }
       },
       "temp_anomaly_90d": {
-        "name": "Temperature Anomaly (90-day)"
+        "name": "Temperature Trend (30 vs 90 days)"
       },
       "rain_anomaly_90d": {
         "name": "Rain Anomaly (90-day)"

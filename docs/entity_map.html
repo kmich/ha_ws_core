@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WS Core 3.0.0 - Entity Map</title>
+<title>WS Core 3.0.1 - Entity Map</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:#0f1117;color:#e2e8f0;font-family:system-ui,sans-serif;padding:24px 20px;max-width:1050px;margin:0 auto}
@@ -33,9 +33,9 @@ small{font-size:10px}
 <header>
   <h1>⛅ Weather Station Core - Entity Map</h1>
   <div class="meta">
-    <span>🔖 v3.0.0</span>
+    <span>🔖 v3.0.1</span>
     <span>📦 188 sensor definitions + 34 switches</span>
-    <span>🕐 Generated 2026-11-22T23:08:17Z</span>
+    <span>🕐 Generated 2026-11-23T04:44:20Z</span>
   </div>
 </header>
 <div class="legend">
@@ -571,7 +571,7 @@ small{font-size:10px}
         <tr><td><code>sensor.ws_climatology_30d</code></td><td>WS Climatology (30-day)</td><td><span class="badge cond" title="Requires CONF_ENABLE_DIAGNOSTICS = on">gated:diagnostics</span> <span class="badge attrs">attrs</span></td></tr>
         <tr><td><code>sensor.ws_temperature_anomaly_30d</code></td><td>WS Temperature Anomaly (30-day)</td><td><span class="badge ok">base</span> <span class="badge attrs">attrs</span></td></tr>
         <tr><td><code>sensor.ws_rain_anomaly_30d</code></td><td>WS Rain Anomaly (30-day)</td><td><span class="badge ok">base</span> <span class="badge attrs">attrs</span></td></tr>
-        <tr><td><code>sensor.ws_temp_anomaly_90d</code></td><td>WS Temperature Anomaly (90d)</td><td><span class="badge cond" title="Requires CONF_ENABLE_DIAGNOSTICS = on">gated:diagnostics</span></td></tr>
+        <tr><td><code>sensor.ws_temp_anomaly_90d</code></td><td>WS Temperature Trend (30 vs 90 days)</td><td><span class="badge cond" title="Requires CONF_ENABLE_DIAGNOSTICS = on">gated:diagnostics</span></td></tr>
         <tr><td><code>sensor.ws_rain_anomaly_90d</code></td><td>WS Rain Anomaly (90d)</td><td><span class="badge cond" title="Requires CONF_ENABLE_DIAGNOSTICS = on">gated:diagnostics</span></td></tr>
         <tr><td><code>sensor.ws_temp_high_normal</code></td><td>WS Temperature High (Normal)</td><td><span class="badge cond" title="Requires CONF_ENABLE_CLIMATE_NORMALS = on">gated:climate-normals</span> <span class="badge attrs">attrs</span></td></tr>
         <tr><td><code>sensor.ws_temp_low_normal</code></td><td>WS Temperature Low (Normal)</td><td><span class="badge cond" title="Requires CONF_ENABLE_CLIMATE_NORMALS = on">gated:climate-normals</span></td></tr>

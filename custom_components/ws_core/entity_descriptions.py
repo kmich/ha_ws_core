@@ -2534,11 +2534,11 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         attrs_fn=lambda d: {"normal_30d_avg_mm": d.get("_rain_normal_30d_avg")},
     ),
-    # 90-day seasonal anomaly sensors
+    # 30-vs-90-day trends. Keep the existing keys and entity IDs for upgrades.
     WSSensorDescription(
         key=KEY_TEMP_ANOMALY_90D,
         translation_key="temp_anomaly_90d",
-        name="WS Temperature Anomaly (90d)",
+        name="WS Temperature Trend (30 vs 90 days)",
         icon="mdi:thermometer-alert",
         native_unit=UNIT_TEMP_C,
         unit_group="temp_delta",
@@ -2554,8 +2554,7 @@ SENSORS: list[WSSensorDescription] = [
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    # v2.7 — Historical climate normals (day-of-year, vs. long-term history —
-    # distinct from the self-referential 30d/90d anomalies above)
+    # Historical normals for the same calendar date, based on long-term history.
     WSSensorDescription(
         key=KEY_TEMP_HIGH_NORMAL,
         translation_key="temp_high_normal",

@@ -193,6 +193,16 @@ def test_temperature_difference_has_no_fahrenheit_offset():
     assert s.native_value == 3.6
 
 
+def test_temperature_trend_keeps_its_entity_id():
+    from custom_components.ws_core.const import KEY_TEMP_ANOMALY_90D
+
+    sensor = _make_sensor(KEY_TEMP_ANOMALY_90D)
+
+    assert sensor.entity_id == "sensor.ws_temp_anomaly_90d"
+    assert sensor.unique_id.endswith("_temp_anomaly_90d")
+    assert sensor.translation_key == "temp_anomaly_90d"
+
+
 def _sync_registry_unit(sensor, options, shown_unit):
     from types import SimpleNamespace
     from unittest.mock import MagicMock, PropertyMock, patch
