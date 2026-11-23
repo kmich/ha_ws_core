@@ -2,6 +2,12 @@
 
 All notable changes to Weather Station Core are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- **Temperature anomaly comparisons ([#216](https://github.com/kmich/ha_ws_core/issues/216)).** The 30-day and historical-normal sensors compare the midpoint of today's observed high and low with their respective baselines. **Temperature Trend (30 vs 90 days)** describes the existing difference between overlapping rolling means. Its entity ID stays `sensor.ws_temp_anomaly_90d` with the default prefix.
+
 ## [3.0.0] - 2026-11-22
 
 This major release builds directly on the v2.14.0–2.14.3 correctness fixes (all v2.14.x fixes are included). Minimum supported Home Assistant version is raised from **2024.6.0** to **2024.12.0**.

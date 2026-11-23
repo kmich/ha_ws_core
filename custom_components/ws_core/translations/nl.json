@@ -189,7 +189,7 @@
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temp_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "weathercloud": {
@@ -582,7 +582,7 @@
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standaard aan. Vergelijkt elk uur je temperatuur, luchtvochtigheid en luchtdruk met de waarde van Open-Meteo voor je ingestelde coördinaten en toont grote verschillen in sensor.ws_neighbor_qc_flags. Zet uit om het verzoek te stoppen. Adaptieve kalibratie blijft het gebruiken als die aan staat.",
           "enable_pattern_forecast": "Leert van de eigen geschiedenis van je station om de kans op regen, vorst, een hete dag, zware windstoten en (met een lokale bliksemdetector) onweer in de komende uren te schatten. Elke voorspelling toont waarden zodra er genoeg voorbeelden van je station zijn gezien, vaak meteen als Home Assistant al langetermijngeschiedenis van je sensoren heeft. Draait volledig op deze machine.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temp_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "indoor_rooms_opt": {
@@ -1808,7 +1808,7 @@
         }
       },
       "temp_anomaly_90d": {
-        "name": "Temperatuuranomalie (90 dagen)"
+        "name": "Temperatuurtrend (30 tegenover 90 dagen)"
       },
       "rain_anomaly_90d": {
         "name": "Neerslaganomalie (90 dagen)"

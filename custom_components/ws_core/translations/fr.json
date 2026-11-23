@@ -189,7 +189,7 @@
           "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer.",
           "enable_neighbor_qc": "Activé par défaut. Une fois par heure, compare votre température, humidité et pression à la valeur Open-Meteo pour vos coordonnées configurées et liste les écarts importants dans sensor.ws_neighbor_qc_flags. Désactivez-le pour arrêter la requête. L'étalonnage adaptatif, s'il est activé, continue de l'utiliser.",
           "enable_pattern_forecast": "Apprend de l'historique propre à votre station pour estimer la probabilité de pluie, de gel, d'une journée chaude, de fortes rafales et (avec un détecteur de foudre local) d'orages dans les prochaines heures. Chaque prévision affiche des valeurs dès qu'elle a vu assez d'exemples sur votre station, souvent immédiatement si Home Assistant conserve déjà l'historique à long terme de vos capteurs. Fonctionne entièrement sur cette machine.",
-          "enable_climate_normals": "Désactivé par défaut. Une requête à l'API d'archives (actualisée mensuellement) génère un tableau des moyennes historiques de températures minimales/maximales et de précipitations pour chaque jour de l'année, de sorte que sensor.ws_temperature_anomaly_normal reflète la journée d'aujourd'hui par rapport à l'historique plutôt que par rapport à la moyenne récente de votre propre station."
+          "enable_climate_normals": "Désactivé par défaut. Une requête à l'API d'archives (actualisée mensuellement) génère un tableau des moyennes historiques de températures minimales/maximales et de précipitations pour chaque jour de l'année, de sorte que sensor.ws_temp_anomaly_normal reflète la journée d'aujourd'hui par rapport à l'historique plutôt que par rapport à la moyenne récente de votre propre station."
         }
       },
       "weathercloud": {
@@ -581,7 +581,7 @@
           "enable_auto_calibration": "Désactivé par défaut. Ajuste cal_temp_c/cal_humidity/cal_pressure_hpa d'une valeur faible et limitée au maximum une fois par jour, uniquement lorsqu'environ 10 jours de relevés horaires montrent un biais persistant. Vérifiez sensor.ws_auto_calibration avant d'activer.",
           "enable_neighbor_qc": "Activé par défaut. Une fois par heure, compare votre température, humidité et pression à la valeur Open-Meteo pour vos coordonnées configurées et liste les écarts importants dans sensor.ws_neighbor_qc_flags. Désactivez-le pour arrêter la requête. L'étalonnage adaptatif, s'il est activé, continue de l'utiliser.",
           "enable_pattern_forecast": "Apprend de l'historique propre à votre station pour estimer la probabilité de pluie, de gel, d'une journée chaude, de fortes rafales et (avec un détecteur de foudre local) d'orages dans les prochaines heures. Chaque prévision affiche des valeurs dès qu'elle a vu assez d'exemples sur votre station, souvent immédiatement si Home Assistant conserve déjà l'historique à long terme de vos capteurs. Fonctionne entièrement sur cette machine.",
-          "enable_climate_normals": "Désactivé par défaut. Une requête à l'API d'archives (actualisée mensuellement) génère un tableau des moyennes historiques de températures minimales/maximales et de précipitations pour chaque jour de l'année, de sorte que sensor.ws_temperature_anomaly_normal reflète la journée d'aujourd'hui par rapport à l'historique plutôt que par rapport à la moyenne récente de votre propre station.",
+          "enable_climate_normals": "Désactivé par défaut. Une requête à l'API d'archives (actualisée mensuellement) génère un tableau des moyennes historiques de températures minimales/maximales et de précipitations pour chaque jour de l'année, de sorte que sensor.ws_temp_anomaly_normal reflète la journée d'aujourd'hui par rapport à l'historique plutôt que par rapport à la moyenne récente de votre propre station.",
           "enable_snow": "Heuristique, pas une mesure : il n'existe aucun nivomètre indépendant de la station. Estime la phase de précipitation à partir de la température du thermomètre mouillé et l'accumulation de neige à partir de votre intensité de pluie actuelle via un rapport neige/eau liquide dépendant de la température."
         }
       },
@@ -2116,7 +2116,7 @@
         }
       },
       "temp_anomaly_90d": {
-        "name": "Écart aux normales (Temp.; 90 j)"
+        "name": "Tendance de température (30 j / 90 j)"
       },
       "rain_anomaly_90d": {
         "name": "Écart aux normales (pluie ; 90 j)"

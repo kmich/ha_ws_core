@@ -2051,6 +2051,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_TEMP_HIGH_24H] = round(max(temps), 1)
             data[KEY_TEMP_LOW_24H] = round(min(temps), 1)
             data[KEY_TEMP_AVG_24H] = round(sum(temps) / len(temps), 1)
+            # Match the high/low midpoint used by both anomaly baselines.
+            midnight = dt_util.as_local(now).replace(hour=0, minute=0, second=0, microsecond=0, fold=0).astimezone(UTC)
+            today_temps = [value for stamp, value in temp_hist if midnight <= stamp <= now]
+            if today_temps:
+                data["_temp_midpoint_today_c"] = (max(today_temps) + min(today_temps)) / 2.0
 
         # Display strings
         if tc is not None:
@@ -3666,18 +3671,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("ws_core: climate normals fetch failed (will retry tomorrow): %s", err)
 
-    def _compute_climate_normal_anomaly(self, data: dict, tc: float | None, rain_today_mm: float | None) -> None:
-        """Compare today against the historical day-of-year normal.  (v2.7)
-
-        Distinct from KEY_TEMP_ANOMALY_30D/90D (self-referential, vs. this
-        station's own recent rolling average): this is vs. the long-term
-        historical average for today's specific calendar date.
-        """
+    def _compute_climate_normal_anomaly(self, data: dict, now: datetime) -> None:
+        """Compare today's observed high/low midpoint and rain with the calendar-date normals."""
         if not self.climate_normals_enabled or not self._climate_normals:
             return
         from .climate_normals import climate_normal_for_date
 
-        normal = climate_normal_for_date(self._climate_normals, dt_util.now().date())
+        normal = climate_normal_for_date(self._climate_normals, dt_util.as_local(now).date())
         data[KEY_CLIMATE_NORMALS_YEARS] = self._climate_normals_years
         data[KEY_CLIMATE_NORMALS_FETCHED] = self._climate_normals_fetched_at or None
         if not normal:
@@ -3690,9 +3690,11 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_TEMP_LOW_NORMAL] = t_low
         data[KEY_RAIN_NORMAL_MM] = rain_normal
 
-        if tc is not None and t_high is not None and t_low is not None:
-            normal_mean = round((float(t_high) + float(t_low)) / 2.0, 1)
-            data[KEY_TEMP_ANOMALY_NORMAL] = round(float(tc) - normal_mean, 1)
+        today_midpoint = data.get("_temp_midpoint_today_c")
+        if today_midpoint is not None and t_high is not None and t_low is not None:
+            normal_mean = (float(t_high) + float(t_low)) / 2.0
+            data[KEY_TEMP_ANOMALY_NORMAL] = round(today_midpoint - normal_mean, 1)
+        rain_today_mm = data.get("_rain_today_mm")
         if rain_today_mm is not None and rain_normal is not None:
             data[KEY_RAIN_ANOMALY_NORMAL] = round(float(rain_today_mm) - float(rain_normal), 1)
 
@@ -4662,14 +4664,13 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data[KEY_CLIMATOLOGY_30D] = stats.get("n_days", 0)
         data["_climatology_stats"] = stats
 
-        # Anomaly sensors (D2)
-        tc = data.get(KEY_NORM_TEMP_C)
+        today_midpoint = data.get("_temp_midpoint_today_c")
         avg_high = stats.get("temp_high_avg")
         avg_low = stats.get("temp_low_avg")
-        if tc is not None and avg_high is not None and avg_low is not None:
-            normal_mean = round((float(avg_high) + float(avg_low)) / 2.0, 1)
-            data[KEY_TEMP_ANOMALY_30D] = round(float(tc) - normal_mean, 1)
-            data["_temp_normal_30d"] = normal_mean
+        if today_midpoint is not None and avg_high is not None and avg_low is not None:
+            normal_mean = (float(avg_high) + float(avg_low)) / 2.0
+            data[KEY_TEMP_ANOMALY_30D] = round(today_midpoint - normal_mean, 1)
+            data["_temp_normal_30d"] = round(normal_mean, 1)
 
         rain_avg = stats.get("rain_total_avg_day")
         rain_today = data.get("_rain_today_mm")
@@ -4677,34 +4678,25 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data[KEY_RAIN_ANOMALY_30D] = round(float(rain_today) - float(rain_avg), 1)
             data["_rain_normal_30d_avg"] = rain_avg
 
-        # 90-day anomaly (requires ≥60 days of data for meaningful stats)
+        # Short-window change relative to the longer, overlapping history.
         if len(self._learning_state.climatology_days) >= 60:
             stats_90d = climatology_stats_by_window(self._learning_state, 90)
             if stats_90d:
                 data[KEY_CLIMATOLOGY_90D] = stats_90d
-                # Anomaly = current 30d mean vs 90d "normal" baseline
-                stats_baseline = stats_90d  # full 90d as normal
-                stats_recent = climatology_stats_by_window(self._learning_state, 30)  # last 30d
-                if stats_recent and stats_baseline:
-                    baseline_high = stats_baseline.get("temp_high_avg")
-                    baseline_low = stats_baseline.get("temp_low_avg")
-                    recent_high = stats_recent.get("temp_high_avg")
-                    recent_low = stats_recent.get("temp_low_avg")
-                    if (
-                        baseline_high is not None
-                        and baseline_low is not None
-                        and recent_high is not None
-                        and recent_low is not None
-                    ):
-                        data[KEY_TEMP_ANOMALY_90D] = round(
-                            (float(recent_high) + float(recent_low)) / 2
-                            - (float(baseline_high) + float(baseline_low)) / 2,
-                            1,
-                        )
-                    baseline_rain = stats_baseline.get("rain_total_avg_day")
-                    recent_rain = stats_recent.get("rain_total_avg_day")
-                    if baseline_rain is not None and recent_rain is not None:
-                        data[KEY_RAIN_ANOMALY_90D] = round(float(recent_rain) - float(baseline_rain), 1)
+                baseline_high = stats_90d.get("temp_high_avg")
+                baseline_low = stats_90d.get("temp_low_avg")
+                if (
+                    avg_high is not None
+                    and avg_low is not None
+                    and baseline_high is not None
+                    and baseline_low is not None
+                ):
+                    data[KEY_TEMP_ANOMALY_90D] = round(
+                        (float(avg_high) + float(avg_low)) / 2 - (float(baseline_high) + float(baseline_low)) / 2, 1
+                    )
+                baseline_rain = stats_90d.get("rain_total_avg_day")
+                if rain_avg is not None and baseline_rain is not None:
+                    data[KEY_RAIN_ANOMALY_90D] = round(float(rain_avg) - float(baseline_rain), 1)
 
     # ------------------------------------------------------------------
     # v1.2.0 - Sensor drift detection (C1)
@@ -5392,7 +5384,7 @@ class WSStationCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # are independent of GDD).
         self._compute_streaks(data, now)
         self._compute_climatology(data)
-        self._compute_climate_normal_anomaly(data, tc, data.get("_rain_today_mm"))
+        self._compute_climate_normal_anomaly(data, now)
         self._compute_learning_sensors(data)
         self._compute_conditions_summary(data)
 

@@ -8,7 +8,7 @@ state machine and test each _compute_* sub-method in isolation.
 import os
 import sys
 from collections import deque
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -360,6 +360,51 @@ class TestComputeRawReadings:
 
 
 class TestComputeDerivedTemperature:
+    @pytest.mark.parametrize("current_temp", [8.0, 16.0])
+    def test_temperature_anomalies_use_the_local_day_midpoint(self, current_temp):
+        from custom_components.ws_core.climate_normals import CLIMATE_NORMAL_REF_YEAR
+        from custom_components.ws_core.const import KEY_TEMP_ANOMALY_30D, KEY_TEMP_ANOMALY_NORMAL
+        from custom_components.ws_core.learning_state import LearningState, update_climatology
+
+        coord = _make_coordinator()
+        coord._learning_state = LearningState()
+        for day in ("2026-11-21", "2026-11-22"):
+            update_climatology(coord._learning_state, day, 12.0, 4.0, 0.0)
+        coord.climate_normals_enabled = True
+        coord._climate_normals_years = 10
+        coord._climate_normals_fetched_at = ""
+        coord._climate_normals = {
+            str(date(CLIMATE_NORMAL_REF_YEAR, 11, 22).timetuple().tm_yday): {"t_high": 34.0, "t_low": 26.0},
+            str(date(CLIMATE_NORMAL_REF_YEAR, 11, 23).timetuple().tm_yday): {"t_high": 18.0, "t_low": 2.0},
+        }
+        # The preceding local day ends at 22:00 UTC, not at UTC midnight.
+        coord.runtime.temp_history_24h.extend(
+            [
+                (datetime(2026, 11, 22, 21, 55, tzinfo=UTC), 40.0),
+                (datetime(2026, 11, 22, 22, 5, tzinfo=UTC), 6.0),
+                (datetime(2026, 11, 22, 23, 10, tzinfo=UTC), 18.0),
+            ]
+        )
+        now = datetime(2026, 11, 22, 23, 30, tzinfo=UTC)
+        data = {KEY_NORM_TEMP_C: current_temp}
+        with patch.object(dt_util, "DEFAULT_TIME_ZONE", timezone(timedelta(hours=2))):
+            coord._compute_derived_temperature(data, now, current_temp, None, None, sample=False)
+            coord._compute_climatology(data)
+            coord._compute_climate_normal_anomaly(data, now)
+
+        assert data[KEY_TEMP_ANOMALY_30D] == 4.0
+        assert data[KEY_TEMP_ANOMALY_NORMAL] == 2.0
+
+    def test_no_today_midpoint_before_first_reading(self):
+        coord = _make_coordinator()
+        now = datetime(2026, 11, 23, 0, 5, tzinfo=UTC)
+        coord.runtime.temp_history_24h.append((now - timedelta(minutes=10), 25.0))
+        data = {}
+        with patch.object(dt_util, "DEFAULT_TIME_ZONE", UTC):
+            coord._compute_derived_temperature(data, now, None, None, None)
+
+        assert "_temp_midpoint_today_c" not in data
+
     def test_computes_dew_point(self):
         coord = _make_coordinator()
         data = {}
@@ -2006,9 +2051,11 @@ class TestPR5CalibrationAndClimatology:
     def test_compute_climatology_uses_strict_30_day_window(self):
         from custom_components.ws_core.const import (
             KEY_CLIMATOLOGY_30D,
+            KEY_CLIMATOLOGY_90D,
             KEY_NORM_TEMP_C,
             KEY_RAIN_ANOMALY_30D,
             KEY_TEMP_ANOMALY_30D,
+            KEY_TEMP_ANOMALY_90D,
         )
         from custom_components.ws_core.learning_state import LearningState
 
@@ -2022,12 +2069,14 @@ class TestPR5CalibrationAndClimatology:
         ]
         coord._learning_state = LearningState(climatology_days=older_days + recent_days)
 
-        data = {KEY_NORM_TEMP_C: 25.0, "_rain_today_mm": 10.0}
+        data = {KEY_NORM_TEMP_C: 20.0, "_temp_midpoint_today_c": 25.0, "_rain_today_mm": 10.0}
         coord._compute_climatology(data)
 
         assert data[KEY_CLIMATOLOGY_30D] == 30
         assert data[KEY_TEMP_ANOMALY_30D] == 0.0
         assert data[KEY_RAIN_ANOMALY_30D] == 0.0
+        assert data[KEY_CLIMATOLOGY_90D]["n_days"] == 90
+        assert data[KEY_TEMP_ANOMALY_90D] == 13.3
 
 
 class TestPR6Fixes:

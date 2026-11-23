@@ -496,20 +496,25 @@ instead. To do the same on your own dashboard, use an entities-card row of
 | `sensor.ws_forecast_skill` | Learned forecast skill score |
 | `sensor.ws_solar_lux_factor` | Learned lux → W/m² conversion factor |
 | `sensor.ws_climatology_30d` | Rolling 30-day climatology summary |
-| `sensor.ws_temperature_anomaly_30d` | Today's mean temperature vs 30-day rolling mean |
+| `sensor.ws_temperature_anomaly_30d` | Midpoint of today's observed high and low minus the corresponding average for the last 30 recorded days |
 | `sensor.ws_rain_anomaly_30d` | Today's rain vs 30-day rolling daily average |
 | `sensor.ws_frost_risk` | Frost risk (`no_risk`, `unlikely`, `probable`, `high`); see [Alerts](#alerts) |
 | `sensor.ws_forecast_brier_local` | Brier score for local sensor model (lower is better; requires ≥10 outcomes) |
 | `sensor.ws_forecast_brier_api` | Brier score for the forecast provider, scored on its highest hourly probability over each 6-hour window ([method](science.md#rain-blend)) |
 | `sensor.ws_forecast_blend_weight_local` | Current learned weight (%) of the local model in the blended probability |
-| `sensor.ws_temp_anomaly_90d` | Temperature anomaly (°C) — recent 30d mean vs 90d seasonal baseline (requires ≥60 days of data) |
-| `sensor.ws_rain_anomaly_90d` | Precipitation anomaly (mm/d) — recent 30d mean vs 90d seasonal baseline |
+| `sensor.ws_temp_anomaly_90d` | **Temperature Trend (30 vs 90 days).** Mean of the last 30 recorded days minus the mean of up to 90 recorded days. The windows overlap and the result can reflect ordinary seasonal warming or cooling. Requires at least 60 recorded days |
+| `sensor.ws_rain_anomaly_90d` | Mean daily rainfall over the last 30 recorded days minus the mean of up to 90 recorded days (mm/day). Requires at least 60 recorded days |
 | `sensor.ws_auto_calibration` | Adaptive calibration status (`learning`/`stable`/`adjusted`) — requires **Feature: Adaptive Sensor Calibration** |
 | `sensor.ws_temp_high_normal` | Historical normal high for today's calendar date (~10y average) — requires **Feature: Historical Climate Normals** |
 | `sensor.ws_temp_low_normal` | Historical normal low for today's calendar date |
 | `sensor.ws_rain_normal` | Historical normal rainfall for today's calendar date |
-| `sensor.ws_temp_anomaly_normal` | Today's temperature vs. the historical normal for this specific date — distinct from `_anomaly_30d`/`_90d` (self-referential vs. this station's own recent average) |
+| `sensor.ws_temp_anomaly_normal` | Midpoint of today's observed high and low minus the midpoint of the historical normal high and low for today's date. Requires Historical Climate Normals |
 | `sensor.ws_rain_anomaly_normal` | Today's rain vs. the historical normal for this specific date |
+
+The temperature anomalies use available readings from the current local day. They
+are provisional until the day ends and are unknown until today's first reading.
+The high/low midpoint is a daily temperature estimate.
+[NOAA daily temperature methods](https://prod-01-asg-www-climate.woc.noaa.gov/maps-data/climate-data-primer/how-do-weather-observations-become-climate-data)
 
 ---
 

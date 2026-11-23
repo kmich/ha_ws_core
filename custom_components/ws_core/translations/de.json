@@ -189,7 +189,7 @@
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standardmäßig aktiv. Vergleicht einmal pro Stunde Temperatur, Luftfeuchtigkeit und Luftdruck mit dem Open-Meteo-Wert für Ihre konfigurierten Koordinaten und listet große Abweichungen in sensor.ws_neighbor_qc_flags auf. Ausschalten beendet die Anfrage. Die adaptive Kalibrierung nutzt sie weiterhin, falls aktiviert.",
           "enable_pattern_forecast": "Lernt aus der eigenen Historie Ihrer Station und schätzt die Wahrscheinlichkeit für Regen, Frost, einen heißen Tag, starke Böen und (mit einem lokalen Blitzsensor) Gewitter in den nächsten Stunden. Jede Prognose zeigt Werte, sobald genug Beispiele von Ihrer Station vorliegen - oft sofort, wenn Home Assistant bereits Langzeitdaten Ihrer Sensoren hat. Läuft vollständig auf diesem Rechner.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temp_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "weathercloud": {
@@ -582,7 +582,7 @@
           "enable_auto_calibration": "Off by default. Nudges cal_temp_c/cal_humidity/cal_pressure_hpa by a small, bounded amount at most once per day, only once ~10 days of hourly samples show a persistent bias vs. the regional forecast reference. Review sensor.ws_auto_calibration before enabling.",
           "enable_neighbor_qc": "Standardmäßig aktiv. Vergleicht einmal pro Stunde Temperatur, Luftfeuchtigkeit und Luftdruck mit dem Open-Meteo-Wert für Ihre konfigurierten Koordinaten und listet große Abweichungen in sensor.ws_neighbor_qc_flags auf. Ausschalten beendet die Anfrage. Die adaptive Kalibrierung nutzt sie weiterhin, falls aktiviert.",
           "enable_pattern_forecast": "Lernt aus der eigenen Historie Ihrer Station und schätzt die Wahrscheinlichkeit für Regen, Frost, einen heißen Tag, starke Böen und (mit einem lokalen Blitzsensor) Gewitter in den nächsten Stunden. Jede Prognose zeigt Werte, sobald genug Beispiele von Ihrer Station vorliegen - oft sofort, wenn Home Assistant bereits Langzeitdaten Ihrer Sensoren hat. Läuft vollständig auf diesem Rechner.",
-          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temperature_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
+          "enable_climate_normals": "Off by default. One archive-api request (refreshed monthly) builds a table of the historical average high/low temperature and rainfall for each day of the year, so sensor.ws_temp_anomaly_normal reflects today vs. history rather than vs. your station's own recent average."
         }
       },
       "indoor_rooms_opt": {
@@ -1841,7 +1841,7 @@
         }
       },
       "temp_anomaly_90d": {
-        "name": "Temperaturanomalie (90 Tage)"
+        "name": "Temperaturtrend (30 vs. 90 Tage)"
       },
       "rain_anomaly_90d": {
         "name": "Niederschlagsanomalie (90 Tage)"
